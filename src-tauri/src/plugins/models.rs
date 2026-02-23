@@ -38,4 +38,5 @@ pub struct PluginInstance {
     pub id: String,
     pub manifest: PluginManifest,
     pub folder_path: String,
+    pub is_builtin: bool,
 }

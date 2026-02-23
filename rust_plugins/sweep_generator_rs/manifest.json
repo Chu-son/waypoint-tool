@@ -1,0 +1,53 @@
+{
+    "name": "Sweep Path Generator (Rust/WASM)",
+    "version": "1.0.0",
+    "type": "wasm",
+    "executable": "sweep_generator_rs.wasm",
+    "description": "Generates a sweep/zigzag pattern of waypoints. Rust/WASM version for faster execution.",
+    "inputs": [
+        {
+            "id": "start_point",
+            "label": "Define Start Point & Yaw",
+            "type": "point"
+        }
+    ],
+    "needs": [],
+    "properties": [
+        {
+            "name": "pitch_x",
+            "label": "Pitch X (Distance Forward, m)",
+            "type": "float",
+            "default": 10.0
+        },
+        {
+            "name": "pitch_y",
+            "label": "Pitch Y (Distance Sideways, m)",
+            "type": "float",
+            "default": 1.0
+        },
+        {
+            "name": "num_lines",
+            "label": "Number of Lines",
+            "type": "integer",
+            "default": 5
+        },
+        {
+            "name": "snake_pattern",
+            "label": "Snake Pattern (Alternate line direction)",
+            "type": "boolean",
+            "default": false
+        },
+        {
+            "name": "flip_endpoint_yaw",
+            "label": "[Normal] Flip endpoint yaw 180° (turn around at line end)",
+            "type": "boolean",
+            "default": false
+        },
+        {
+            "name": "endpoint_faces_next",
+            "label": "[Snake] Endpoint faces next line start",
+            "type": "boolean",
+            "default": false
+        }
+    ]
+}

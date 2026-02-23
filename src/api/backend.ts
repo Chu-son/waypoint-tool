@@ -40,9 +40,20 @@ export const BackendAPI = {
     return invoke('fetch_installed_plugins');
   },
 
-  runPlugin: async (pluginInstance: PluginInstance, contextData: any): Promise<Record<string, any>[]> => {
-    const contextJson = JSON.stringify(contextData);
-    return invoke('run_plugin', { pluginInstance, contextJson });
+  scanCustomPlugin: async (path: string): Promise<PluginInstance> => {
+    return invoke('scan_custom_plugin', { path });
+  },
+
+  runPlugin: async (
+    pluginInstance: PluginInstance,
+    contextData: any,
+    pythonPath?: string,
+  ): Promise<Record<string, any>[]> => {
+    return invoke('run_plugin', { pluginInstance, contextJson: JSON.stringify(contextData), pythonPath });
+  },
+
+  getPythonEnvironments: async (): Promise<string[]> => {
+    return invoke('get_python_environments');
   }
 };
 

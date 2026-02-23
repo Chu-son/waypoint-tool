@@ -28,6 +28,15 @@ export type ExportTemplate = {
   content: string;
 };
 
+export interface PluginSetting {
+  id: string;
+  path?: string;
+  enabled: boolean;
+  order: number;
+  isBuiltin: boolean;
+  pythonOverridePath?: string;
+}
+
 export type WaypointOptions = Record<string, string | number | boolean | Array<string | number | boolean>>;
 
 export type WaypointNode = {
@@ -45,13 +54,18 @@ export type PluginInputType = 'point' | 'rectangle' | 'polygon' | 'path' | 'node
 
 export type PluginInputDef = {
   id: string;
-  label: string;
-  type: PluginInputType;
+  name: string; // The property key name
+  label: string; // The display label
+  description?: string;
+  type: PluginInputType | 'boolean' | 'integer' | 'float' | 'string';
+  default?: any;
+  required?: boolean;
 };
 
 export type PluginManifest = {
   name: string;
   version?: string;
+  description?: string;
   type: 'python' | 'wasm';
   executable: string;
   inputs: PluginInputDef[];
@@ -63,6 +77,7 @@ export type PluginInstance = {
   id: string;
   manifest: PluginManifest;
   folder_path: string;
+  is_builtin: boolean;
 };
 // ---------------------------------
 
@@ -111,6 +126,7 @@ export interface AppState {
 
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
+  globalPythonPath: string;
   
   // Unsaved changes tracker
   isDirty: boolean;
@@ -123,6 +139,7 @@ export interface AppState {
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
   setDefaultMapOpacity: (opacity: number) => void;
   setLastDirectory: (dir: string | null) => void;
+  setGlobalPythonPath: (path: string) => void;
 
   setOptionsSchema: (schema: OptionsSchema) => void;
   addExportTemplate: (template: Omit<ExportTemplate, 'id'>) => void;

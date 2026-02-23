@@ -5,6 +5,7 @@ import { TopMenu } from './components/ui/TopMenu';
 import { WaypointTree } from './components/ui/WaypointTree';
 import { PropertiesPanel } from './components/ui/PropertiesPanel';
 import { LayerPanel } from './components/ui/LayerPanel';
+import { PluginParamsPanel } from './components/ui/PluginParamsPanel';
 import { MapCanvas } from './components/canvas/MapCanvas';
 import { useAppStore } from './stores/appStore';
 import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
@@ -15,6 +16,7 @@ import { BackendAPI } from './api/backend';
 import { PluginInstance } from './types/store';
 
 function App() {
+  const activeTool = useAppStore(state => state.activeTool);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const removeNodes = useAppStore(state => state.removeNodes);
 
@@ -28,11 +30,53 @@ function App() {
   useEffect(() => {
     const initApp = async () => {
       try {
-        const plugins = await BackendAPI.fetchInstalledPlugins();
+        const installedPlugins = await BackendAPI.fetchInstalledPlugins();
         const pluginMap: Record<string, PluginInstance> = {};
-        plugins.forEach(p => { pluginMap[p.id] = p; });
+        
+        const storeSettings = useAppStore.getState().pluginSettings;
+        const newSettings = [...storeSettings];
+        let settingsChanged = false;
+
+        // Register scanned plugins (both bundled and user-directory plugins)
+        installedPlugins.forEach(p => { 
+          pluginMap[p.id] = p; 
+          
+          // Auto-add to settings if not exists
+          if (!newSettings.find(s => s.id === p.id)) {
+            newSettings.push({
+              id: p.id,
+              enabled: true,
+              order: newSettings.length,
+              isBuiltin: p.is_builtin,
+              path: p.is_builtin ? undefined : p.folder_path
+            });
+            settingsChanged = true;
+          }
+        });
+
+        // Load custom plugins from settings
+        for (const setting of storeSettings) {
+          if (!setting.isBuiltin && setting.path && setting.enabled !== false) {
+             try {
+                const customPlugin = await BackendAPI.scanCustomPlugin(setting.path);
+                pluginMap[customPlugin.id] = customPlugin;
+                // If ID changed or wasn't set somehow, fix it up
+                if (setting.id !== customPlugin.id) {
+                    setting.id = customPlugin.id;
+                    settingsChanged = true;
+                }
+             } catch (err) {
+                console.warn(`Failed to load custom plugin from ${setting.path}:`, err);
+             }
+          }
+        }
+
         useAppStore.getState().setPlugins(pluginMap);
-        console.log('Loaded plugins:', plugins.length);
+        if (settingsChanged) {
+           useAppStore.getState().setPluginSettings(newSettings);
+        }
+        
+        console.log('Loaded plugins:', Object.keys(pluginMap).length);
       } catch (e) {
         console.error('Failed to load plugins:', e);
       }
@@ -208,7 +252,7 @@ function App() {
                 </button>
               </div>
             </div>
-            {rightTab === 'inspector' ? <PropertiesPanel /> : <LayerPanel />}
+            {activeTool === 'add_generator' ? <PluginParamsPanel /> : (rightTab === 'inspector' ? <PropertiesPanel /> : <LayerPanel />)}
           </div>
         </>
       )}

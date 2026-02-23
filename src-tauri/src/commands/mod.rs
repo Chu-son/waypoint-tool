@@ -33,3 +33,18 @@ pub use plugins::*;
 pub fn force_exit(app: AppHandle) {
     app.exit(0);
 }
+
+pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
+    tauri::generate_handler![
+        load_ros_map,
+        save_project,
+        load_project,
+        export_waypoints,
+        load_options_schema,
+        force_exit,
+        plugins::fetch_installed_plugins,
+        plugins::run_plugin,
+        plugins::scan_custom_plugin,
+        plugins::get_python_environments
+    ]
+}

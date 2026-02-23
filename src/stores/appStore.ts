@@ -15,6 +15,7 @@ export type AppState = {
   defaultMapOpacity: number; // Changed from 0.8
   
   plugins: Record<string, PluginInstance>;
+  pluginSettings: import('../types/store').PluginSetting[];
   activePluginId: string | null;
   pluginInteractionData: Record<string, any>;
   
@@ -24,6 +25,7 @@ export type AppState = {
 
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
+  globalPythonPath: string;
   
   visibleAttributes: string[];
   indexStartIndex: 0 | 1; // 0 or 1 for indexing
@@ -34,6 +36,7 @@ export type AppState = {
   showPaths: boolean;
   showGrid: boolean;
   shouldFitToMaps: number; // timestamp trigger
+  toolPanelMaxColumns: number;
 
   // Methods
   addNode: (node: WaypointNode, parentId?: string) => void;
@@ -48,6 +51,7 @@ export type AppState = {
   removeMapLayer: (id: string) => void;
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
   setLastDirectory: (dir: string | null) => void;
+  setGlobalPythonPath: (path: string) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
@@ -63,9 +67,12 @@ export type AppState = {
   
   // Plugin Methods
   setPlugins: (plugins: Record<string, PluginInstance>) => void;
+  setPluginSettings: (settings: import('../types/store').PluginSetting[]) => void;
+  updatePluginSetting: (id: string, updates: Partial<import('../types/store').PluginSetting>) => void;
   setActivePlugin: (pluginId: string | null) => void;
   updatePluginInteractionData: (inputId: string, data: any) => void;
   clearPluginInteractionData: () => void;
+  setToolPanelMaxColumns: (max: number) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -81,6 +88,7 @@ export const useAppStore = create<AppState>()(
       defaultMapOpacity: 0.5, // Changed from 0.8
       
       plugins: {},
+      pluginSettings: [],
       activePluginId: null,
       pluginInteractionData: {},
       
@@ -90,6 +98,7 @@ export const useAppStore = create<AppState>()(
 
       optionsSchema: null,
       exportTemplates: [],
+      globalPythonPath: 'python',
       visibleAttributes: [],
       indexStartIndex: 0,
       isDirty: false,
@@ -97,6 +106,7 @@ export const useAppStore = create<AppState>()(
       showPaths: true,
       showGrid: true,
       shouldFitToMaps: 0,
+      toolPanelMaxColumns: 1,
 
       // Actions
       setDirty: (dirty: boolean) => set({ isDirty: dirty }), // --- Actions ---
@@ -147,6 +157,7 @@ export const useAppStore = create<AppState>()(
       }),
 
       setLastDirectory: (dir: string | null) => set({ lastDirectory: dir }),
+      setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
 
       setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
       
@@ -193,6 +204,11 @@ export const useAppStore = create<AppState>()(
         })),
         
       setPlugins: (plugins) => set({ plugins }),
+      setPluginSettings: (settings) => set({ pluginSettings: settings, isDirty: true }),
+      updatePluginSetting: (id, updates) => set((state) => ({
+        pluginSettings: state.pluginSettings.map(p => p.id === id ? { ...p, ...updates } : p),
+        isDirty: true
+      })),
       
       setActivePlugin: (pluginId) => set({ activePluginId: pluginId, pluginInteractionData: {} }),
       
@@ -205,6 +221,7 @@ export const useAppStore = create<AppState>()(
         })),
         
       clearPluginInteractionData: () => set({ pluginInteractionData: {} }),
+      setToolPanelMaxColumns: (max) => set({ toolPanelMaxColumns: max, isDirty: true }),
 
       addNode: (node: WaypointNode, parentId?: string) => set((state) => {
         const newNodes = { ...state.nodes, [node.id]: node };
@@ -286,6 +303,9 @@ export const useAppStore = create<AppState>()(
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,
         showGrid: state.showGrid,
+        pluginSettings: state.pluginSettings,
+        toolPanelMaxColumns: state.toolPanelMaxColumns,
+        globalPythonPath: state.globalPythonPath,
       }),
     }
   )

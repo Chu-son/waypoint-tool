@@ -62,12 +62,13 @@ export function MapCanvas() {
   const showPaths = useAppStore(state => state.showPaths);
   const showGrid = useAppStore(state => state.showGrid);
   const shouldFitToMaps = useAppStore(state => state.shouldFitToMaps);
+  const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
   
   const mapLayers = useAppStore(state => state.mapLayers);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
-  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw'>('none');
+  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin'>('none');
   const activeNodeId = useRef<string | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -217,6 +218,22 @@ export function MapCanvas() {
       activeNodeId.current = id;
       e.currentTarget.setPointerCapture(e.pointerId);
     }
+    // Left click + Add Generator Tool -> Define a temporary point input for the PluginParamsPanel
+    else if (e.button === 0 && activeTool === 'add_generator') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+
+      // Default the first point input if requested by active plugin.
+      // E.g. Sweep Generator needs one "Start Point"
+      useAppStore.getState().updatePluginInteractionData('start_point', {
+         x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1
+      });
+      
+      interactionMode.current = 'set_yaw_plugin';
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -271,6 +288,26 @@ export function MapCanvas() {
               qz: Math.sin(halfYaw), 
               qw: Math.cos(halfYaw) 
             }
+          });
+        }
+      }
+    }
+    else if (interactionMode.current === 'set_yaw_plugin') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      
+      const pData = useAppStore.getState().pluginInteractionData['start_point'];
+      if (pData) {
+        const dx = worldX - pData.x;
+        const dy = worldY - pData.y;
+        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+          const yaw = Math.atan2(dy, dx);
+          const halfYaw = yaw / 2.0;
+          useAppStore.getState().updatePluginInteractionData('start_point', {
+             ...pData,
+             qx: 0, qy: 0, qz: Math.sin(halfYaw), qw: Math.cos(halfYaw)
           });
         }
       }
@@ -374,124 +411,179 @@ export function MapCanvas() {
           )}
           {showGrid && <pixiGraphics draw={drawAxes} />}
 
-          {/* Render Path (Lines connecting root nodes in order) */}
+          {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}
           {showPaths && (
             <pixiGraphics
               draw={(g) => {
                 g.clear();
-                g.strokeStyle = { width: 2 / scale, color: 0x94a3b8, alpha: 0.6 }; // Slate 400
                 
-                let isFirst = true;
+                // Flatten all renderable waypoints in order with their type info
+                type PathPoint = { x: number; y: number; isGenerated: boolean };
+                const allPoints: PathPoint[] = [];
+                
                 rootNodeIds.forEach(id => {
                   const node = nodes[id];
-                  if (node && node.transform) {
-                    if (isFirst) {
-                      g.moveTo(node.transform.x, node.transform.y);
-                      isFirst = false;
-                    } else {
-                      g.lineTo(node.transform.x, node.transform.y);
-                    }
+                  if (!node) return;
+                  if (node.type === 'manual' && node.transform) {
+                    allPoints.push({ x: node.transform.x, y: node.transform.y, isGenerated: false });
+                  } else if (node.type === 'generator' && node.children_ids) {
+                    node.children_ids.forEach(childId => {
+                      const child = nodes[childId];
+                      if (child && child.transform) {
+                        allPoints.push({ x: child.transform.x, y: child.transform.y, isGenerated: true });
+                      }
+                    });
                   }
                 });
-                g.stroke();
+
+                // Draw continuous path with color changes at segment boundaries
+                for (let i = 1; i < allPoints.length; i++) {
+                  const prev = allPoints[i - 1];
+                  const curr = allPoints[i];
+                  const segIsGenerated = prev.isGenerated || curr.isGenerated;
+                  
+                  g.strokeStyle = {
+                    width: 2 / scale,
+                    color: segIsGenerated ? 0x22c55e : 0x94a3b8,
+                    alpha: segIsGenerated ? 0.5 : 0.6
+                  };
+                  g.moveTo(prev.x, prev.y);
+                  g.lineTo(curr.x, curr.y);
+                  g.stroke();
+                }
               }}
             />
           )}
 
-          {/* Render Waypoints */}
-          {rootNodeIds.map(id => {
-            const node = nodes[id];
-            if (!node || node.type !== 'manual' || !node.transform) return null;
-            
-            const isSelected = selectedNodeIds.includes(node.id);
-            const transform = node.transform; // Ensure type safety
-            
-            // Convert quaternion to yaw
-            const qx = transform.qx;
-            const qy = transform.qy;
-            const qz = transform.qz;
-            const qw = transform.qw;
-            const yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-            
-            return (
-              <pixiGraphics 
-                key={node.id}
-                x={transform.x}
-                y={transform.y}
-                rotation={yaw}
-                eventMode="dynamic"
-                cursor={activeTool === 'select' ? 'pointer' : 'default'}
-                onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
-                  if (activeTool === 'select') {
-                    // Start dragging the waypoint
-                    e.stopPropagation(); // Avoid triggering pan_map on canvas background
-                    selectNodes([node.id], e.shiftKey || e.metaKey);
-                    interactionMode.current = 'drag_node';
-                    activeNodeId.current = node.id;
-                    
-                    // Capture pointer on the main wrapper div
-                    if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                       containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                    }
+          {/* Render Waypoints (manual root nodes and children of generator nodes) */}
+          {(() => {
+            // Collect all renderable waypoint nodes: root manuals + generator children
+            const renderableNodes: { node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
+            let globalIdx = 0;
+            rootNodeIds.forEach(id => {
+              const node = nodes[id];
+              if (!node) return;
+              if (node.type === 'manual' && node.transform) {
+                renderableNodes.push({ node, parentIsGenerator: false, globalIndex: globalIdx++ });
+              } else if (node.type === 'generator' && node.children_ids) {
+                node.children_ids.forEach(childId => {
+                  const child = nodes[childId];
+                  if (child && child.transform) {
+                    renderableNodes.push({ node: child, parentIsGenerator: true, globalIndex: globalIdx++ });
                   }
-                }}
+                });
+              }
+            });
+
+            return renderableNodes.map(({ node, parentIsGenerator, globalIndex }) => {
+              const isSelected = selectedNodeIds.includes(node.id);
+              const transform = node.transform!;
+              const qx = transform.qx;
+              const qy = transform.qy;
+              const qz = transform.qz;
+              const qw = transform.qw;
+              const yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+
+              // Color: generated children use green, manual uses orange/blue
+              const normalColor = parentIsGenerator ? 0x22c55e : 0xffa500;
+              const selectedColor = 0x3b82f6;
+              const normalFill = parentIsGenerator ? 0x4ade80 : 0xffd700;
+              const selectedFill = 0x60a5fa;
+
+              return (
+                <pixiGraphics
+                  key={node.id}
+                  x={transform.x}
+                  y={transform.y}
+                  rotation={yaw}
+                  eventMode="dynamic"
+                  cursor={activeTool === 'select' ? 'pointer' : 'default'}
+                  onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
+                    if (activeTool === 'select') {
+                      e.stopPropagation();
+                      selectNodes([node.id], e.shiftKey || e.metaKey);
+                      interactionMode.current = 'drag_node';
+                      activeNodeId.current = node.id;
+                      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+                      }
+                    }
+                  }}
+                  draw={(g) => {
+                    g.clear();
+                    g.strokeStyle = { width: 2 / scale, color: isSelected ? selectedColor : normalColor };
+                    g.fillStyle = { color: isSelected ? selectedFill : normalFill, alpha: 0.8 };
+                    g.moveTo(10 / scale, 0);
+                    g.lineTo(-5 / scale, 5 / scale);
+                    g.lineTo(-5 / scale, -5 / scale);
+                    g.lineTo(10 / scale, 0);
+                    g.fill();
+                    g.stroke();
+                    g.circle(0, 0, 3 / scale);
+                    g.fill();
+                  }}
+                >
+                  {visibleAttributes.length > 0 && (
+                    <pixiContainer rotation={-yaw} scale={{ x: 1 / scale, y: -1 / scale }} x={15 / scale} y={-15 / scale}>
+                      {(() => {
+                        const lines: string[] = [];
+                        if (visibleAttributes.includes('index')) {
+                          lines.push(`Index: [${globalIndex + indexStartIndex}]`);
+                        }
+                        if (visibleAttributes.includes('transform')) {
+                          lines.push(`Transform: (${transform.x.toFixed(2)}, ${transform.y.toFixed(2)}, ${yaw.toFixed(2)})`);
+                        }
+                        const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
+                        optionKeys.forEach(attr => {
+                          const key = attr.split('.')[1];
+                          const optDef = optionsSchema?.options?.find(o => o.name === key);
+                          let val = node.options?.[key];
+                          if (val === undefined && optDef && optDef.default !== undefined) {
+                            val = optDef.default;
+                          }
+                          if (val !== undefined && val !== '') {
+                            const displayLabel = optDef?.label || key;
+                            lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
+                          }
+                        });
+                        if (lines.length === 0) return null;
+                        return <pixiText text={lines.join('\n')} style={textStyle} anchor={{ x: 0, y: 1 }} />;
+                      })()}
+                    </pixiContainer>
+                  )}
+                </pixiGraphics>
+              );
+            });
+          })()}
+
+          {/* Render Active Plugin Point Previews */}
+          {activeTool === 'add_generator' && Object.entries(pluginInteractionData).map(([key, point]) => {
+             if (!point || typeof point.x !== 'number') return null;
+             
+             const yaw = Math.atan2(2.0 * (point.qw * point.qz + point.qx * point.qy), 1.0 - 2.0 * (point.qy * point.qy + point.qz * point.qz));
+             return (
+              <pixiGraphics 
+                key={key}
+                x={point.x}
+                y={point.y}
+                rotation={yaw}
                 draw={(g) => {
                   g.clear();
-                  // Draw direction indicator (arrow)
-                  g.strokeStyle = { width: 2 / scale, color: isSelected ? 0x3b82f6 : 0xffa500 };
-                  g.fillStyle = { color: isSelected ? 0x60a5fa : 0xffd700, alpha: 0.8 };
+                  g.strokeStyle = { width: 2 / scale, color: 0xec4899 }; // Pink color for previews
+                  g.fillStyle = { color: 0xf472b6, alpha: 0.8 };
                   g.moveTo(10 / scale, 0);
                   g.lineTo(-5 / scale, 5 / scale);
                   g.lineTo(-5 / scale, -5 / scale);
                   g.lineTo(10 / scale, 0);
                   g.fill();
                   g.stroke();
-                  
-                  // Central circle
                   g.circle(0, 0, 3 / scale);
                   g.fill();
                 }}
-              >
-                {/* Text Label Container. Un-rotate so text stays readable but un-invert scale so it's not upside down */}
-                {visibleAttributes.length > 0 && (
-                  <pixiContainer rotation={-yaw} scale={{ x: 1 / scale, y: -1 / scale }} x={15 / scale} y={-15 / scale}>
-                    {(() => {
-                      const lines: string[] = [];
-                      const nodeIndex = rootNodeIds.indexOf(node.id);
-                      
-                      if (visibleAttributes.includes('index')) {
-                        lines.push(`Index: [${nodeIndex >= 0 ? nodeIndex + indexStartIndex : '?'}]`);
-                      }
-                      if (visibleAttributes.includes('transform')) {
-                        lines.push(`Transform: (${transform.x.toFixed(2)}, ${transform.y.toFixed(2)}, ${yaw.toFixed(2)})`);
-                      }
-                      
-                      // Handle custom options
-                      const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
-                      optionKeys.forEach(attr => {
-                        const key = attr.split('.')[1];
-                        const optDef = optionsSchema?.options?.find(o => o.name === key);
-                        let val = node.options?.[key];
-                        
-                        // Fallback to default if undefined
-                        if (val === undefined && optDef && optDef.default !== undefined) {
-                          val = optDef.default;
-                        }
-                        
-                        if (val !== undefined && val !== '') {
-                          const displayLabel = optDef?.label || key;
-                          lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
-                        }
-                      });
-                      
-                      if (lines.length === 0) return null;
-                      return <pixiText text={lines.join('\n')} style={textStyle} anchor={{ x: 0, y: 1 }} />;
-                    })()}
-                  </pixiContainer>
-                )}
-              </pixiGraphics>
-            );
+              />
+             );
           })}
+
         </pixiContainer>
       </Application>
     </div>

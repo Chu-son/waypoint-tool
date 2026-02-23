@@ -19,7 +19,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const setGlobalOptionsSchema = useAppStore(state => state.setOptionsSchema);
   const globalExportTemplates = useAppStore(state => state.exportTemplates);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
+  const toolPanelMaxColumns = useAppStore(state => state.toolPanelMaxColumns);
+  const globalPythonPath = useAppStore(state => state.globalPythonPath);
   const setIndexStartIndex = useAppStore(state => state.setIndexStartIndex);
+  const setToolPanelMaxColumns = useAppStore(state => state.setToolPanelMaxColumns);
+  const setGlobalPythonPath = useAppStore(state => state.setGlobalPythonPath);
   
   const addExportTemplate = useAppStore(state => state.addExportTemplate);
   const updateExportTemplate = useAppStore(state => state.updateExportTemplate);
@@ -28,12 +32,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   type TabType = 'general' | 'options' | 'export' | 'plugins';
   const [activeTab, setActiveTab] = useState<TabType>('general');
   const plugins = useAppStore(state => state.plugins);
+  const pluginSettings = useAppStore(state => state.pluginSettings);
+  const setPluginSettings = useAppStore(state => state.setPluginSettings);
+  const setPlugins = useAppStore(state => state.setPlugins);
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
+
+  const [pythonEnvs, setPythonEnvs] = useState<string[]>([]);
 
   // Sync when opened
   useEffect(() => {
     if (isOpen) {
       setLocalOptions(globalOptionsSchema?.options || []);
+      import('../../api/backend').then(({ BackendAPI }) => {
+        BackendAPI.getPythonEnvironments().then(envs => setPythonEnvs(envs)).catch(console.error);
+      });
     }
   }, [isOpen, globalOptionsSchema]);
 
@@ -125,6 +137,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
       <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
+        
+        <datalist id="python-envs">
+          {pythonEnvs.map((env, i) => <option key={i} value={env} />)}
+        </datalist>
+
         <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/80 shrink-0">
           <h2 className="text-lg font-bold text-slate-200">User Settings</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
@@ -152,6 +169,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               className={`w-full text-left px-4 py-2 mt-1 rounded-lg text-sm font-medium transition-colors ${activeTab === 'export' ? 'bg-primary text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
             >
               Export Templates
+            </button>
+            <button
+              onClick={() => setActiveTab('plugins')}
+              className={`w-full text-left px-4 py-2 mt-1 rounded-lg text-sm font-medium transition-colors ${activeTab === 'plugins' ? 'bg-primary text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}
+            >
+              Plugins
             </button>
           </div>
           
@@ -194,6 +217,53 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <option value={1}>1 (1-indexed)</option>
                   </select>
                   <p className="text-xs text-slate-500">Determines the starting index count for Waypoints across the Canvas and Exports.</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="flex justify-between text-sm font-medium text-slate-300">
+                    <span>Toolbar Max Columns</span>
+                    <span>{toolPanelMaxColumns}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={toolPanelMaxColumns}
+                    onChange={(e) => setToolPanelMaxColumns(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <p className="text-xs text-slate-500">Maximum column wrapping allowed on the Main Tool Panel before overflowing.</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Global Python Interpreter Path</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      list="python-envs"
+                      value={globalPythonPath}
+                      onChange={(e) => setGlobalPythonPath(e.target.value)}
+                      className="flex-1 bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:border-primary outline-none"
+                      placeholder="e.g. python, python3, /usr/bin/python3.10"
+                    />
+                    <button
+                      onClick={async () => {
+                        const { open } = await import('@tauri-apps/plugin-dialog');
+                        const selectedPath = await open({
+                           multiple: false,
+                           directory: false
+                        });
+                        if (selectedPath) {
+                           setGlobalPythonPath(typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path);
+                        }
+                      }}
+                       className="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded text-slate-200 text-sm transition-colors border border-slate-600"
+                    >
+                      Browse
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">The default command or path used to execute Python plugins (e.g. `python`, `python3` or absolute path to a virtual environment).</p>
                 </div>
               </div>
             )}
@@ -425,42 +495,170 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
             {activeTab === 'plugins' && (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-md font-bold text-slate-200">Installed Plugins</h3>
-                  <p className="text-xs text-slate-500 mt-1">Generator plugins loaded from the application data directory.</p>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-md font-bold text-slate-200">Installed Plugins</h3>
+                    <p className="text-xs text-slate-500 mt-1">Manage Generator plugins order and visibility on the Tool Panel.</p>
+                  </div>
+                  <button onClick={async () => {
+                      try {
+                        const { open } = await import('@tauri-apps/plugin-dialog');
+                        const { BackendAPI } = await import('../../api/backend');
+                        const selectedPath = await open({
+                          multiple: false,
+                          directory: true,
+                          defaultPath: lastDirectory || undefined
+                        });
+                        if (selectedPath) {
+                          const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
+                          if (!pathStr) return;
+                          
+                          // Load it via backend
+                          const customPlugin = await BackendAPI.scanCustomPlugin(pathStr);
+                          
+                          // Store memory
+                          const newMap = { ...plugins, [customPlugin.id]: customPlugin };
+                          setPlugins(newMap);
+                          
+                          // Store settings
+                          if (!pluginSettings.find(s => s.id === customPlugin.id)) {
+                             setPluginSettings([...pluginSettings, {
+                               id: customPlugin.id,
+                               path: pathStr,
+                               enabled: true,
+                               order: pluginSettings.length,
+                               isBuiltin: false
+                             }]);
+                          }
+                        }
+                      } catch (err) {
+                        console.error('Failed to load custom plugin:', err);
+                        alert(`Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+                      }
+                  }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
+                    <Plus size={14} /> Add Custom Folder
+                  </button>
                 </div>
                 
                 <div className="space-y-3">
-                  {Object.values(plugins).length === 0 ? (
+                  {pluginSettings.length === 0 ? (
                     <div className="text-sm text-slate-500 italic p-4 bg-slate-900 rounded-lg text-center">
-                      No plugins installed.
+                      No plugins mapped via settings.
                     </div>
                   ) : (
-                    Object.values(plugins).map((plugin, i) => (
-                      <div key={i} className="bg-slate-900 border border-slate-700/50 p-4 rounded-lg flex flex-col gap-2">
+                    [...pluginSettings].sort((a,b) => a.order - b.order).map((setting, index) => {
+                      const plugin = plugins[setting.id];
+                      return (
+                      <div key={setting.id} className="bg-slate-900 border border-slate-700/50 p-3 rounded-lg flex flex-col gap-2">
                         <div className="flex justify-between items-start">
-                          <div>
-                            <span className="font-bold text-slate-200">{plugin.manifest.name}</span>
-                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wide">
-                              {plugin.manifest.type}
-                            </span>
+                          <div className="flex items-center gap-3">
+                            {/* Toggle Switch */}
+                            <button
+                              onClick={() => {
+                                const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, enabled: !s.enabled } : s);
+                                setPluginSettings(newSettings);
+                              }}
+                              className={`w-10 h-5 rounded-full relative transition-colors ${setting.enabled ? 'bg-primary' : 'bg-slate-700'}`}
+                            >
+                               <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-transform ${setting.enabled ? 'left-6' : 'translate-x-1'}`} />
+                            </button>
+                            <div>
+                               <span className="font-bold text-slate-200">{plugin ? plugin.manifest.name : 'Unknown Plugin'}</span>
+                               <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wide">
+                                 {plugin ? plugin.manifest.type : 'LOST'} {setting.isBuiltin ? '' : '(Custom)'}
+                               </span>
+                            </div>
                           </div>
-                          <span className="text-xs text-slate-500 font-mono">v{plugin.manifest.version || '0.1.0'}</span>
+                          
+                          <div className="flex gap-1 items-center">
+                            {/* Ordering arrows */}
+                            <button 
+                              disabled={index === 0}
+                              onClick={() => {
+                                 let updated = [...pluginSettings];
+                                 const idx = updated.findIndex(u => u.id === setting.id);
+                                 if (idx > 0) {
+                                     const swapIdx = idx - 1;
+                                     const temp = updated[idx].order;
+                                     updated[idx].order = updated[swapIdx].order;
+                                     updated[swapIdx].order = temp;
+                                     updated.sort((a,b) => a.order - b.order);
+                                     setPluginSettings(updated);
+                                 }
+                              }}
+                              className="text-slate-500 hover:text-white disabled:opacity-30 disabled:hover:text-slate-500 p-1 bg-slate-800 rounded">
+                              ▲
+                            </button>
+                            <button 
+                              disabled={index === pluginSettings.length - 1}
+                              onClick={() => {
+                                 let updated = [...pluginSettings];
+                                 const idx = updated.findIndex(u => u.id === setting.id);
+                                 if (idx < updated.length - 1) {
+                                     const swapIdx = idx + 1;
+                                     const temp = updated[idx].order;
+                                     updated[idx].order = updated[swapIdx].order;
+                                     updated[swapIdx].order = temp;
+                                     updated.sort((a,b) => a.order - b.order);
+                                     setPluginSettings(updated);
+                                 }
+                              }}
+                              className="text-slate-500 hover:text-white disabled:opacity-30 disabled:hover:text-slate-500 p-1 bg-slate-800 rounded">
+                              ▼
+                            </button>
+                            
+                            {/* Remove Custom Button */}
+                            {!setting.isBuiltin && (
+                             <button onClick={() => {
+                                 const newSettings = pluginSettings.filter(s => s.id !== setting.id);
+                                 setPluginSettings(newSettings);
+                             }} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors ml-2">
+                               <Trash2 size={16} />
+                             </button>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-xs text-slate-400 font-mono break-all mt-1">{plugin.folder_path}</p>
-                        
-                        {plugin.manifest.inputs && plugin.manifest.inputs.length > 0 && (
-                          <div className="mt-2 text-xs flex gap-2 flex-wrap">
-                            <span className="text-slate-500 py-0.5">Requirements:</span>
-                            {plugin.manifest.inputs.map(input => (
-                              <span key={input.id} className="text-blue-400 bg-blue-950/30 px-1.5 py-0.5 rounded border border-blue-900/50">
-                                {input.label} ({input.type})
-                              </span>
-                            ))}
+                        {plugin && (
+                         <p className="text-xs text-slate-400 font-mono break-all mt-1">{plugin.folder_path}</p>
+                        )}
+                        {!plugin && (
+                         <p className="text-xs text-red-400 font-mono break-all mt-1">WARNING: Memory target missing! Was path {setting.path} moved?</p>
+                        )}
+                        {plugin && plugin.manifest.type === 'python' && (
+                          <div className="mt-2 pt-2 border-t border-slate-800 flex gap-2 items-center">
+                            <span className="text-xs font-medium text-slate-500 w-32 shrink-0">Python Interpreter:</span>
+                            <input 
+                              type="text" 
+                              list="python-envs"
+                              value={setting.pythonOverridePath || ''} 
+                              onChange={(e) => {
+                                const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, pythonOverridePath: e.target.value } : s);
+                                setPluginSettings(newSettings);
+                              }}
+                              className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300 outline-none focus:border-primary"
+                              placeholder={`Global: ${globalPythonPath}`}
+                            />
+                            <button
+                              onClick={async () => {
+                                const { open } = await import('@tauri-apps/plugin-dialog');
+                                const selectedPath = await open({
+                                   multiple: false,
+                                   directory: false
+                                });
+                                if (selectedPath) {
+                                   const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
+                                   const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, pythonOverridePath: pathStr } : s);
+                                   setPluginSettings(newSettings);
+                                }
+                              }}
+                               className="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded text-slate-400 hover:text-white text-xs transition-colors border border-slate-700"
+                            >
+                              Browse
+                            </button>
                           </div>
                         )}
                       </div>
-                    ))
+                    )})
                   )}
                 </div>
               </div>

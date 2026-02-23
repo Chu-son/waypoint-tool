@@ -16,7 +16,11 @@ export function MapCanvasPlaceholder() {
         transform: {
           x: Math.round(Math.random() * 10 - 5), // Fake world coords
           y: Math.round(Math.random() * 10 - 5),
-          yaw: 0
+          z: 0,
+          qx: 0,
+          qy: 0,
+          qz: 0,
+          qw: 1
         },
         options: {}
       });
