@@ -86,8 +86,14 @@ describe('App Integration', () => {
 
     render(<App />);
 
-    // Click the "Load Map (YAML)" button inside ToolPanel
-    const loadMapBtn = screen.getByTitle('Load Map (YAML)');
+    // Switch to Layers tab and click "Load ROS Map (YAML)"
+    const layersTab = screen.getByText('Layers');
+    act(() => {
+      layersTab.click();
+    });
+    
+    // The button should now be visible
+    const loadMapBtn = screen.getByText('Load ROS Map (YAML)');
     act(() => {
       loadMapBtn.click();
     });

@@ -61,7 +61,7 @@ describe('AppStore Zustand Store', () => {
     const newNode = {
       id: 'node-1',
       type: 'manual' as const,
-      transform: { x: 10, y: 20, yaw: 0 },
+      transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 },
     };
 
     addNode(newNode);

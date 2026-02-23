@@ -1,11 +1,16 @@
 import { useAppStore } from '../../stores/appStore';
 import { OptionDef } from '../../types/store';
+import { Eye, EyeOff } from 'lucide-react';
 
 export function PropertiesPanel() {
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const nodes = useAppStore(state => state.nodes);
   const optionsSchema = useAppStore(state => state.optionsSchema);
+  const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
+  const visibleAttributes = useAppStore(state => state.visibleAttributes);
+  const toggleAttributeVisibility = useAppStore(state => state.toggleAttributeVisibility);
+  const indexStartIndex = useAppStore(state => state.indexStartIndex);
 
 // ... (skip down to the render) ...
 // Actually, `multi_replace_file_content` or `replace_file_content`? 
@@ -15,20 +20,6 @@ export function PropertiesPanel() {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
         <div className="text-sm text-slate-400 italic mb-4">No item selected.</div>
-        
-        <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
-          <h3 className="text-xs font-semibold text-slate-300 mb-2 uppercase tracking-wider">Map Settings</h3>
-          <div className="space-y-3 mt-3">
-            <label className="flex items-center text-sm text-slate-300">
-              <input type="checkbox" className="mr-2 rounded bg-slate-900 border-slate-600" defaultChecked />
-              Show Paths
-            </label>
-            <label className="flex items-center text-sm text-slate-300">
-              <input type="checkbox" className="mr-2 rounded bg-slate-900 border-slate-600" defaultChecked />
-              Show Grid
-            </label>
-          </div>
-        </div>
       </div>
     );
   }
@@ -42,22 +33,50 @@ export function PropertiesPanel() {
   const node = isMultiSelection ? null : nodes[selectedNodeIds[0]];
   if (!isMultiSelection && !node) return null;
 
+  const nodeIndex = node ? rootNodeIds.indexOf(node.id) : -1;
+
   return (
     <div className="flex-1 overflow-y-auto w-full p-4">
       <div className="mb-4">
         <h2 className="text-sm font-bold text-white mb-1">
           {isMultiSelection ? `Multiple Selected (${selectedNodeIds.length})` : 
-            (node?.type === 'manual' ? 'Manual Waypoint' : 'Generator Node')}
+            (node?.type === 'manual' ? `Waypoint [${nodeIndex >= 0 ? nodeIndex + indexStartIndex : '?'}]` : 'Generator Node')}
         </h2>
-        {!isMultiSelection && <p className="text-xs text-slate-500 font-mono">{node?.id}</p>}
+        {!isMultiSelection && <p className="text-xs text-slate-500 font-mono break-all">{node?.id}</p>}
       </div>
 
       <div className="space-y-4">
+        {/* Index Group */}
+        <div className="space-y-2 relative">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Index</h3>
+            <button 
+              onClick={() => toggleAttributeVisibility('index')}
+              className="text-slate-500 hover:text-slate-300 transition-colors"
+              title="Toggle Index on Canvas"
+            >
+              {visibleAttributes.includes('index') ? <Eye size={14} /> : <EyeOff size={14} />}
+            </button>
+          </div>
+          <div className="bg-slate-900 border border-slate-700/50 rounded px-2 py-1 text-sm text-slate-300 font-mono">
+            {isMultiSelection ? "Mixed Selection" : (nodeIndex >= 0 ? String(nodeIndex + indexStartIndex) : '-')}
+          </div>
+        </div>
+
         {/* Transform Group */}
-        <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Transform (World)</h3>
+        <div className="space-y-2 relative pt-2">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Transform (World)</h3>
+            <button 
+              onClick={() => toggleAttributeVisibility('transform')}
+              className="text-slate-500 hover:text-slate-300 transition-colors"
+              title="Toggle Transform on Canvas"
+            >
+              {visibleAttributes.includes('transform') ? <Eye size={14} /> : <EyeOff size={14} />}
+            </button>
+          </div>
           
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block text-xs text-slate-500 mb-1">X (m)</label>
               <input 
@@ -100,12 +119,11 @@ export function PropertiesPanel() {
                 className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-primary placeholder:text-slate-600" 
               />
             </div>
-            <div className="col-span-2">
-              <label className="block text-xs text-slate-500 mb-1">Yaw (rad)</label>
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">Z (m)</label>
               <input 
-                type="number"
-                step="0.01"
-                value={isMultiSelection ? '' : (node?.transform?.yaw || 0)} 
+                type="number" 
+                value={isMultiSelection ? '' : (node?.transform?.z ?? 0)} 
                 placeholder={isMultiSelection ? "Mixed" : ""}
                 onChange={e => {
                   const val = parseFloat(e.target.value);
@@ -113,10 +131,36 @@ export function PropertiesPanel() {
                   if (isMultiSelection) {
                     selectedNodeIds.forEach(id => {
                       const n = nodes[id];
-                      if(n && n.transform) handleUpdate(id, { transform: { ...n.transform, yaw: val }});
+                      if(n && n.transform) handleUpdate(id, { transform: { ...n.transform, z: val }});
                     });
                   } else {
-                    handleUpdate(node!.id, { transform: { ...node!.transform!, yaw: val }})
+                    handleUpdate(node!.id, { transform: { ...node!.transform!, z: val }})
+                  }
+                }}
+                className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-primary placeholder:text-slate-600" 
+              />
+            </div>
+            <div className="col-span-3">
+              <label className="block text-xs text-slate-500 mb-1">Yaw (rad)</label>
+              <input 
+                type="number"
+                step="0.01"
+                value={isMultiSelection ? '' : (node?.transform ? Math.atan2(2.0 * ((node.transform.qw ?? 1) * (node.transform.qz || 0) + (node.transform.qx || 0) * (node.transform.qy || 0)), 1.0 - 2.0 * ((node.transform.qy || 0) * (node.transform.qy || 0) + (node.transform.qz || 0) * (node.transform.qz || 0))) : 0)} 
+                placeholder={isMultiSelection ? "Mixed" : ""}
+                onChange={e => {
+                  const val = parseFloat(e.target.value);
+                  if (isNaN(val)) return;
+                  const halfYaw = val / 2.0;
+                  const qz = Math.sin(halfYaw);
+                  const qw = Math.cos(halfYaw);
+
+                  if (isMultiSelection) {
+                    selectedNodeIds.forEach(id => {
+                      const n = nodes[id];
+                      if(n && n.transform) handleUpdate(id, { transform: { ...n.transform, qx: 0, qy: 0, qz, qw }});
+                    });
+                  } else {
+                    handleUpdate(node!.id, { transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw }})
                   }
                 }}
                 className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-primary placeholder:text-slate-600" 
@@ -141,9 +185,10 @@ export function PropertiesPanel() {
                 const nodeOptVal = isMultiSelection ? '' : (node?.options?.[opt.name] ?? opt.default ?? '');
                 
                 const handleChange = (val: string | number | boolean | Array<string | number | boolean>) => {
+                  const currentState = useAppStore.getState();
                   if (isMultiSelection) {
                     selectedNodeIds.forEach(id => {
-                      const n = nodes[id];
+                      const n = currentState.nodes[id];
                       if (n) {
                         handleUpdate(id, { 
                           options: { ...(n.options || {}), [opt.name]: val }
@@ -151,15 +196,27 @@ export function PropertiesPanel() {
                       }
                     });
                   } else {
+                    const n = currentState.nodes[node!.id];
                     handleUpdate(node!.id, { 
-                      options: { ...(node!.options || {}), [opt.name]: val }
+                      options: { ...(n.options || {}), [opt.name]: val }
                     });
                   }
                 };
 
                 return (
                   <div key={opt.name}>
-                    <label className="block text-xs text-slate-500 mb-1">{opt.label || opt.name}</label>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs text-slate-500">
+                        {opt.label || opt.name} <span className="opacity-50 text-[10px] ml-1 uppercase">({opt.type})</span>
+                      </label>
+                      <button 
+                        onClick={() => toggleAttributeVisibility(`options.${opt.name}`)}
+                        className="text-slate-500 hover:text-slate-300 transition-colors"
+                        title={`Toggle ${opt.name} on Canvas`}
+                      >
+                        {visibleAttributes.includes(`options.${opt.name}`) ? <Eye size={12} /> : <EyeOff size={12} />}
+                      </button>
+                    </div>
                     
                     {opt.type === 'list' ? (
                       <input 
@@ -214,7 +271,9 @@ export function PropertiesPanel() {
                         value={String(nodeOptVal)}
                         placeholder={isMultiSelection ? "Mixed" : String(opt.default || '')}
                         onChange={e => handleChange(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-primary placeholder:text-slate-600" 
+                        className={`w-full bg-slate-900 border rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-primary placeholder:text-slate-600 ${
+                          String(nodeOptVal).trim() === '' && !isMultiSelection ? 'border-amber-500/50' : 'border-slate-700'
+                        }`}
                       />
                     )}
                   </div>

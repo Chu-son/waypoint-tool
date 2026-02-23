@@ -1,6 +1,7 @@
 import './App.css';
 import { useEffect, useState, useCallback } from 'react';
 import { ToolPanel } from './components/ui/ToolPanel';
+import { TopMenu } from './components/ui/TopMenu';
 import { WaypointTree } from './components/ui/WaypointTree';
 import { PropertiesPanel } from './components/ui/PropertiesPanel';
 import { LayerPanel } from './components/ui/LayerPanel';
@@ -8,6 +9,7 @@ import { MapCanvas } from './components/canvas/MapCanvas';
 import { useAppStore } from './stores/appStore';
 import { ChevronLeft, ChevronRight, Layers } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { BackendAPI } from './api/backend';
 import { PluginInstance } from './types/store';
@@ -51,21 +53,33 @@ function App() {
 
   useEffect(() => {
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+      // Completely intercept the closing event to bypass tauri-plugin-window-state race conditions
+      event.preventDefault();
+      
       if (useAppStore.getState().isDirty) {
-        // Prevent immediate close
-        event.preventDefault();
-        
-        // Ask user for confirmation
         const confirmed = await ask('未保存の変更があります。保存せずに終了してもよろしいですか？', {
           title: '終了の確認',
           kind: 'warning',
         });
         
-        if (confirmed) {
-          // User chose to close without saving
-          getCurrentWindow().destroy();
+        if (!confirmed) {
+          return; // Abort close
         }
       }
+      
+      // Approved to close.
+      useAppStore.getState().setIsDirty(false);
+      try {
+        // Explicitly trigger window state saving before we force destroy
+        const { saveWindowState, StateFlags } = await import('@tauri-apps/plugin-window-state');
+        await saveWindowState(StateFlags.ALL);
+      } catch (err) {
+        console.error("Failed to save window state", err);
+      }
+      
+      setTimeout(() => {
+        invoke('force_exit');
+      }, 50);
     });
 
     return () => {
@@ -112,10 +126,13 @@ function App() {
   }, [rightWidth]);
 
   return (
-    <div className="flex h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
-      <ToolPanel />
+    <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
+      <TopMenu />
+      
+      <div className="flex flex-1 overflow-hidden w-full relative">
+        <ToolPanel />
 
-      {/* Left Panel */}
+        {/* Left Panel */}
       {leftOpen && (
         <>
           <div style={{ width: leftWidth }} className="bg-slate-800 border-r border-slate-700 flex flex-col z-0 shadow-lg relative flex-shrink-0">
@@ -195,6 +212,7 @@ function App() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

@@ -18,6 +18,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const globalOptionsSchema = useAppStore(state => state.optionsSchema);
   const setGlobalOptionsSchema = useAppStore(state => state.setOptionsSchema);
   const globalExportTemplates = useAppStore(state => state.exportTemplates);
+  const indexStartIndex = useAppStore(state => state.indexStartIndex);
+  const setIndexStartIndex = useAppStore(state => state.setIndexStartIndex);
   
   const addExportTemplate = useAppStore(state => state.addExportTemplate);
   const updateExportTemplate = useAppStore(state => state.updateExportTemplate);
@@ -37,12 +39,60 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   if (!isOpen) return null;
 
+  const isDefaultValid = (opt: OptionDef) => {
+    if (opt.default === undefined || opt.default === '') return true;
+    if (opt.type === 'integer') return !isNaN(Number(opt.default)) && Number.isInteger(Number(opt.default));
+    if (opt.type === 'float') return !isNaN(Number(opt.default));
+    if (opt.type === 'boolean') {
+      const str = String(opt.default).toLowerCase();
+      return str === 'true' || str === 'false';
+    }
+    return true; // string/list are generally freeform in this basic level
+  };
+
   const handleSaveOptions = () => {
-    setGlobalOptionsSchema({ options: localOptions });
+    // Validation
+    const hasEmptyName = localOptions.some(opt => opt.name.trim() === '');
+    const names = localOptions.map(opt => opt.name);
+    const hasDuplicates = new Set(names).size !== names.length;
+    const hasInvalidDefaults = localOptions.some(opt => !isDefaultValid(opt));
+    
+    if (hasEmptyName) {
+      alert("Key Name cannot be empty.");
+      return;
+    }
+    if (hasDuplicates) {
+      alert("Key Names must be unique. Duplicate keys found.");
+      return;
+    }
+    if (hasInvalidDefaults) {
+      alert("Invalid default values detected. Please match the selected type.");
+      return;
+    }
+
+    // Parse correct types before saving to prevent string storage for numbers
+    const parsedOptions = localOptions.map(opt => {
+      let parsedDefault = opt.default;
+      if (opt.default === '') parsedDefault = undefined;
+      else if (opt.type === 'integer') parsedDefault = parseInt(String(opt.default), 10);
+      else if (opt.type === 'float') parsedDefault = parseFloat(String(opt.default));
+      else if (opt.type === 'boolean') parsedDefault = String(opt.default).toLowerCase() === 'true';
+      return { ...opt, default: parsedDefault };
+    });
+
+    setGlobalOptionsSchema({ options: parsedOptions });
+    alert("Schema applied successfully.");
   };
 
   const handleAddOption = () => {
-    setLocalOptions([...localOptions, { name: 'new_option', label: 'New Option', type: 'string', default: '' }]);
+    const baseName = 'new_option';
+    let newName = baseName;
+    let counter = 1;
+    while (localOptions.some(opt => opt.name === newName)) {
+      newName = `${baseName}_${counter}`;
+      counter++;
+    }
+    setLocalOptions([...localOptions, { name: newName, label: 'New Option', type: 'string', default: '' }]);
   };
 
   const handleUpdateOption = (index: number, updates: Partial<OptionDef>) => {
@@ -53,6 +103,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleRemoveOption = (index: number) => {
     setLocalOptions(localOptions.filter((_, i) => i !== index));
+  };
+
+  const insertTemplateVar = (templateId: string, text: string) => {
+    const el = document.getElementById(`template-${templateId}`) as HTMLTextAreaElement;
+    if (el) {
+       const start = el.selectionStart;
+       const end = el.selectionEnd;
+       const template = globalExportTemplates.find(t => t.id === templateId);
+       if (template) {
+         const newContent = template.content.substring(0, start) + text + template.content.substring(end);
+         updateExportTemplate(templateId, { content: newContent });
+         setTimeout(() => {
+           el.focus();
+           el.setSelectionRange(start + text.length, start + text.length);
+         }, 10);
+       }
+    }
   };
   
   return (
@@ -115,6 +182,19 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                   <p className="text-xs text-slate-500">Remembered location for Save/Open dialogs across sessions.</p>
                 </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-300">Waypoint Index Start</label>
+                  <select 
+                    value={indexStartIndex} 
+                    onChange={(e) => setIndexStartIndex(parseInt(e.target.value) as 0 | 1)} 
+                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200"
+                  >
+                    <option value={0}>0 (0-indexed)</option>
+                    <option value={1}>1 (1-indexed)</option>
+                  </select>
+                  <p className="text-xs text-slate-500">Determines the starting index count for Waypoints across the Canvas and Exports.</p>
+                </div>
               </div>
             )}
 
@@ -126,6 +206,35 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <p className="text-xs text-slate-500 mt-1">Define custom properties that can be attached to waypoints.</p>
                   </div>
                   <div className="space-x-2">
+                    <button onClick={async () => {
+                      try {
+                        const { open } = await import('@tauri-apps/plugin-dialog');
+                        const { BackendAPI } = await import('../../api/backend');
+                        const selectedPath = await open({
+                          multiple: false,
+                          defaultPath: lastDirectory || undefined,
+                          filters: [{ name: 'Options Schema YAML', extensions: ['yaml', 'yml'] }]
+                        });
+                        if (selectedPath) {
+                          const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
+                          if (!pathStr) return;
+                          
+                          // Basic generic extraction of directory path
+                          const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
+                          const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
+                          useAppStore.getState().setLastDirectory(dir);
+                          
+                          const schema = await BackendAPI.loadOptionsSchema(pathStr);
+                          setGlobalOptionsSchema(schema);
+                          setLocalOptions(schema.options || []);
+                        }
+                      } catch (err) {
+                        console.error('Failed to load options schema:', err);
+                        alert(`オプションスキーマの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+                      }
+                    }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
+                      <Plus size={14} /> Load from File
+                    </button>
                     <button onClick={handleAddOption} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
                       <Plus size={14} /> Add Field
                     </button>
@@ -142,7 +251,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         <div className="flex gap-2">
                           <div className="flex-1 space-y-1">
                             <label className="text-xs font-medium text-slate-400">Key Name</label>
-                            <input type="text" value={opt.name} onChange={(e) => handleUpdateOption(i, { name: e.target.value })} className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200" placeholder="e.g. velocity" />
+                            <input 
+                              type="text" 
+                              value={opt.name} 
+                              onChange={(e) => {
+                                const sanitized = e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+                                handleUpdateOption(i, { name: sanitized });
+                              }}
+                              className={`w-full bg-slate-800 border rounded px-2 py-1 text-sm text-slate-200 outline-none ${
+                                localOptions.filter(o => o.name === opt.name).length > 1 || opt.name.trim() === ''
+                                ? 'border-red-500 focus:border-red-500' 
+                                : 'border-slate-600 focus:border-primary'
+                              }`}
+                              placeholder="e.g. velocity" 
+                            />
                           </div>
                           <div className="flex-1 space-y-1">
                             <label className="text-xs font-medium text-slate-400">Display Label</label>
@@ -179,8 +301,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                   handleUpdateOption(i, { default: e.target.value });
                                 }
                               }} 
-                              className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200" 
-                              placeholder={opt.type === 'list' ? "csv" : "0.0"} 
+                              className={`w-full bg-slate-800 border rounded px-2 py-1 text-sm text-slate-200 outline-none ${
+                                isDefaultValid(opt) ? 'border-slate-600 focus:border-primary' : 'border-red-500 focus:border-red-500'
+                              }`} 
+                              placeholder={opt.type === 'list' ? "csv" : (opt.type === 'boolean' ? "true/false" : "0")} 
                             />
                           </div>
                         </div>
@@ -237,9 +361,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <h3 className="text-md font-bold text-slate-200">Custom Export Templates</h3>
                     <p className="text-xs text-slate-500 mt-1">Define Handlebars templates for custom waypoint export formats.</p>
                   </div>
-                  <button onClick={() => addExportTemplate({ id: uuidv4(), name: 'New Template', extension: 'txt', content: '{{#each waypoints}}\nwp_{{index}}:\n  x: {{pose.x}}\n  y: {{pose.y}}\n  yaw: {{pose.yaw}}\n{{/each}}' })} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
+                  <button onClick={() => addExportTemplate({ id: uuidv4(), name: 'New Template', extension: 'txt', content: '{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}' })} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
                     <Plus size={14} /> New Template
                   </button>
+                </div>
+
+                <div className="bg-slate-900 border border-slate-700/50 p-3 rounded-lg text-xs text-slate-300">
+                  <h4 className="font-bold text-slate-200 mb-1">Handlebars Iteration Syntax</h4>
+                  <p>Wrap your logic inside <code className="bg-slate-800 text-primary px-1 rounded">{'{{#each waypoints}}'} ... {'{{/each}}'}</code> to render all elements.</p>
                 </div>
 
                 <div className="space-y-4">
@@ -257,12 +386,31 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       </div>
                       <div className="p-3">
                         <textarea
+                          id={`template-${template.id}`}
                           value={template.content}
                           onChange={(e) => updateExportTemplate(template.id, { content: e.target.value })}
                           className="w-full h-40 bg-slate-950 border border-slate-800 rounded p-3 text-xs font-mono text-slate-300 resize-y focus:outline-none focus:border-primary/50"
                           placeholder="{{#each waypoints}}..."
                           spellCheck="false"
                         />
+                        <div className="mt-2 flex flex-wrap gap-1 items-center">
+                          <span className="text-xs font-bold text-slate-500 mr-2">Core:</span>
+                          {['{{index}}', '{{id}}', '{{type}}', '{{x}}', '{{y}}', '{{z}}', '{{yaw}}', '{{qx}}', '{{qy}}', '{{qz}}', '{{qw}}'].map(v => (
+                             <button key={v} onClick={() => insertTemplateVar(template.id, v)} className="bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono text-blue-300 border border-slate-700 transition-colors">
+                               {v}
+                             </button>
+                          ))}
+                        </div>
+                        {globalOptionsSchema?.options && globalOptionsSchema.options.length > 0 && (
+                          <div className="mt-1 flex flex-wrap gap-1 items-center">
+                            <span className="text-xs font-bold text-slate-500 mr-2">Options ({globalOptionsSchema.options.length}):</span>
+                            {globalOptionsSchema.options.map(o => (
+                               <button key={o.name} onClick={() => insertTemplateVar(template.id, `{{options.${o.name}}}`)} className="bg-slate-800 hover:bg-slate-700 px-1.5 py-0.5 rounded text-[10px] font-mono text-purple-300 border border-slate-700 transition-colors">
+                                 {`{{options.${o.name}}}`}
+                               </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

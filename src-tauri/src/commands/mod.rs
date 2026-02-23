@@ -1,4 +1,4 @@
-use tauri::command;
+use tauri::{command, AppHandle};
 use crate::{map, io, models::ProjectData};
 
 #[command]
@@ -22,9 +22,14 @@ pub fn load_options_schema(yaml_path: String) -> Result<crate::models::options::
 }
 
 #[command]
-pub fn export_waypoints(path: String, waypoints: Vec<serde_json::Value>, template: Option<String>) -> Result<(), String> {
-    io::export_waypoints(&path, waypoints, template)
+pub fn export_waypoints(path: String, waypoints: Vec<serde_json::Value>, template: Option<String>, image_data_b64: Option<String>) -> Result<(), String> {
+    io::export_waypoints(&path, waypoints, template, image_data_b64)
 }
 
 pub mod plugins;
 pub use plugins::*;
+
+#[command]
+pub fn force_exit(app: AppHandle) {
+    app.exit(0);
+}

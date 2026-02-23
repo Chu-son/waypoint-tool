@@ -7,6 +7,7 @@ pub mod plugins;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -18,6 +19,7 @@ pub fn run() {
             commands::export_waypoints,
             commands::fetch_installed_plugins,
             commands::run_plugin,
+            commands::force_exit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

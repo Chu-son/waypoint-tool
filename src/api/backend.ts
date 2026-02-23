@@ -32,8 +32,8 @@ export const BackendAPI = {
     return invoke('load_options_schema', { yamlPath });
   },
 
-  exportWaypoints: async (path: string, waypoints: Record<string, any>[], template?: string): Promise<void> => {
-    return invoke('export_waypoints', { path, waypoints, template: template || null });
+  exportWaypoints: async (path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void> => {
+    return invoke('export_waypoints', { path, waypoints, template: template || null, imageDataB64: imageB64 || null });
   },
 
   fetchInstalledPlugins: async (): Promise<PluginInstance[]> => {

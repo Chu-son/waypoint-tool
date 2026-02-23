@@ -22,7 +22,10 @@ pub fn load_project(path: &str) -> Result<ProjectData, String> {
     Ok(data)
 }
 
-pub fn export_waypoints(path: &str, waypoints: Vec<serde_json::Value>, template: Option<String>) -> Result<(), String> {
+use base64::{engine::general_purpose, Engine as _};
+use std::path::Path;
+
+pub fn export_waypoints(path: &str, waypoints: Vec<serde_json::Value>, template: Option<String>, image_data_b64: Option<String>) -> Result<(), String> {
     let content = if let Some(tmpl) = template {
         let reg = Handlebars::new();
         // Register the template string and render it with wrapped data
@@ -40,6 +43,16 @@ pub fn export_waypoints(path: &str, waypoints: Vec<serde_json::Value>, template:
     fs::write(path, content)
         .map_err(|e| format!("File write error: {}", e))?;
 
+    // Export image if provided
+    if let Some(b64) = image_data_b64 {
+        let decoded = general_purpose::STANDARD.decode(b64)
+            .map_err(|e| format!("Base64 decode error: {}", e))?;
+            
+        let path_obj = Path::new(path);
+        let png_path = path_obj.with_extension("png");
+        fs::write(&png_path, decoded).map_err(|e| format!("Image write error: {}", e))?;
+    }
+
     Ok(())
 }
 
@@ -56,14 +69,14 @@ mod tests {
         let path_str = file_path.to_str().unwrap();
 
         let waypoints = vec![
-            json!({ "id": "wp1", "x": 10.0, "y": 20.0, "yaw": 0.0 }),
-            json!({ "id": "wp2", "x": -5.5, "y": 3.2, "yaw": 1.57 }),
+            json!({ "id": "wp1", "x": 10.0, "y": 20.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 }),
+            json!({ "id": "wp2", "x": -5.5, "y": 3.2, "qx": 0.0, "qy": 0.0, "qz": 0.707, "qw": 0.707 }),
         ];
 
         let template = Some("{{#each waypoints}}Node {{id}} is at {{x}}, {{y}}\n{{/each}}".to_string());
         
         // Use temp file for export
-        let res = export_waypoints(path_str, waypoints, template);
+        let res = export_waypoints(path_str, waypoints, template, None);
         assert!(res.is_ok(), "Export failed: {:?}", res.err());
 
         // Read and verify
@@ -80,7 +93,7 @@ mod tests {
 
         let waypoints = vec![json!({ "id": "wp1" })];
         
-        let res = export_waypoints(path_str, waypoints, None);
+        let res = export_waypoints(path_str, waypoints, None, None);
         assert!(res.is_ok(), "Export failed");
 
         let content = fs::read_to_string(path_str).unwrap();
@@ -102,7 +115,7 @@ mod tests {
             WaypointNode {
                 id: "node1".to_string(),
                 node_type: "manual".to_string(),
-                transform: Some(Transform { x: 1.0, y: 2.0, yaw: 3.0 }),
+                transform: Some(Transform { x: 1.0, y: 2.0, z: None, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0 }),
                 options: None,
                 generator_params: None,
                 children_ids: None,
@@ -131,6 +144,9 @@ mod tests {
         assert_eq!(node.node_type, "manual");
         assert_eq!(node.transform.as_ref().unwrap().x, 1.0);
         assert_eq!(node.transform.as_ref().unwrap().y, 2.0);
-        assert_eq!(node.transform.as_ref().unwrap().yaw, 3.0);
+        assert_eq!(node.transform.as_ref().unwrap().qx, 0.0);
+        assert_eq!(node.transform.as_ref().unwrap().qy, 0.0);
+        assert_eq!(node.transform.as_ref().unwrap().qz, 0.0);
+        assert_eq!(node.transform.as_ref().unwrap().qw, 1.0);
     }
 }

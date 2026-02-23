@@ -25,12 +25,21 @@ export type AppState = {
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
   
+  visibleAttributes: string[];
+  indexStartIndex: 0 | 1; // 0 or 1 for indexing
+  
   isDirty: boolean; // Tracks unsaved changes
+
+  // View Settings
+  showPaths: boolean;
+  showGrid: boolean;
+  shouldFitToMaps: number; // timestamp trigger
 
   // Methods
   addNode: (node: WaypointNode, parentId?: string) => void;
   updateNode: (id: string, updates: Partial<WaypointNode>) => void;
   removeNodes: (ids: string[]) => void;
+  reorderNodes: (fromIndex: number, toIndex: number) => void;
   selectNodes: (ids: string[], multi?: boolean) => void;
   setActiveTool: (tool: AppState['activeTool']) => void;
   setMapLayers: (layers: ProjectMapLayer[]) => void;
@@ -40,8 +49,13 @@ export type AppState = {
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
   setLastDirectory: (dir: string | null) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
+  toggleAttributeVisibility: (attr: string) => void;
+  setIndexStartIndex: (index: 0 | 1) => void;
   setIsDirty: (dirty: boolean) => void;
   setProjectData: (data: { rootNodeIds: string[], nodes: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[] }) => void;
+  
+  setShowPaths: (show: boolean) => void;
+  setShowGrid: (show: boolean) => void;
   
   addExportTemplate: (template: ExportTemplate) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
@@ -76,12 +90,29 @@ export const useAppStore = create<AppState>()(
 
       optionsSchema: null,
       exportTemplates: [],
+      visibleAttributes: [],
+      indexStartIndex: 0,
       isDirty: false,
+      
+      showPaths: true,
+      showGrid: true,
+      shouldFitToMaps: 0,
 
       // Actions
       setDirty: (dirty: boolean) => set({ isDirty: dirty }), // --- Actions ---
 
+      toggleAttributeVisibility: (attr: string) => set((state) => {
+        const next = state.visibleAttributes.includes(attr) 
+          ? state.visibleAttributes.filter(a => a !== attr)
+          : [...state.visibleAttributes, attr];
+        return { visibleAttributes: next, isDirty: true };
+      }),
+
+      setShowPaths: (show: boolean) => set({ showPaths: show }),
+      setShowGrid: (show: boolean) => set({ showGrid: show }),
+
       setMapLayers: (layers: ProjectMapLayer[]) => set({ mapLayers: layers, isDirty: true }),
+      setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
       
       addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => set((state) => {
         const newLayer: ProjectMapLayer = {
@@ -152,10 +183,12 @@ export const useAppStore = create<AppState>()(
 
       setProjectData: (data: any) =>
         set((state) => ({
-          rootNodeIds: data.rootNodeIds || [],
+          rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
           nodes: data.nodes || {},
           selectedNodeIds: [],
-          mapLayers: data.mapLayers || state.mapLayers, // Keep existing if not in project
+          mapLayers: data.map_layers || data.mapLayers || state.mapLayers, // Keep existing if not in project
+          exportTemplates: data.export_templates || state.exportTemplates,
+          indexStartIndex: data.index_start_index ?? state.indexStartIndex,
           isDirty: false, // Reset dirty state on load
         })),
         
@@ -194,6 +227,13 @@ export const useAppStore = create<AppState>()(
         },
         isDirty: true
       })),
+
+      reorderNodes: (fromIndex: number, toIndex: number) => set((state) => {
+        const newRootIds = [...state.rootNodeIds];
+        const [moved] = newRootIds.splice(fromIndex, 1);
+        newRootIds.splice(toIndex, 0, moved);
+        return { rootNodeIds: newRootIds, isDirty: true };
+      }),
 
       removeNodes: (ids: string[]) => set((state) => {
         const newNodes = { ...state.nodes };
@@ -243,6 +283,9 @@ export const useAppStore = create<AppState>()(
         lastDirectory: state.lastDirectory,
         optionsSchema: state.optionsSchema,
         exportTemplates: state.exportTemplates,
+        indexStartIndex: state.indexStartIndex,
+        showPaths: state.showPaths,
+        showGrid: state.showGrid,
       }),
     }
   )

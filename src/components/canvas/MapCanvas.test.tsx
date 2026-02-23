@@ -20,6 +20,8 @@ vi.mock('pixi.js', () => ({
   Container: vi.fn(),
   Sprite: vi.fn(),
   Graphics: vi.fn(),
+  Text: vi.fn(),
+  TextStyle: vi.fn(),
 }));
 
 describe('MapCanvas Component', () => {
@@ -35,4 +37,31 @@ describe('MapCanvas Component', () => {
     // Container should exist
     expect(getByTestId('pixi-app').querySelector('pixicontainer')).toBeInTheDocument();
   });
+
+  it('sets the image source exactly as provided without duplicate base64 prefix', () => {
+    const store = useAppStore.getState();
+    const mockBase64 = 'data:image/png;base64,mockImageData';
+    store.mapLayers = [
+      { id: '2', name: 'Map2', visible: true, opacity: 1, z_index: 0, image_base64: mockBase64, width: 100, height: 100, info: null }
+    ];
+
+    // Mock global Image to intercept the src setter
+    let capturedSrc = '';
+    const OriginalImage = globalThis.Image;
+    globalThis.Image = class {
+      onload: () => void = () => {};
+      set src(value: string) {
+        capturedSrc = value;
+      }
+    } as any;
+
+    render(<MapCanvas />);
+
+    expect(capturedSrc).toBe(mockBase64);
+    expect(capturedSrc).not.toContain('data:image/png;base64,data:image/png;base64,');
+
+    // Restore Image mock
+    globalThis.Image = OriginalImage;
+  });
 });
+

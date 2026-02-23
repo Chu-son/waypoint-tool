@@ -10,17 +10,18 @@ describe('PropertiesPanel UI', () => {
       'test-node': {
         id: 'test-node',
         type: 'manual',
-        transform: { x: 10, y: 20, yaw: 0 },
+        transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 },
       }
     };
     store.selectedNodeIds = ['test-node'];
+    store.rootNodeIds = ['test-node'];
     store.optionsSchema = null;
   });
 
   it('updates the store correctly when X/Y values change', () => {
     render(<PropertiesPanel />);
 
-    const header = screen.getByText('Manual Waypoint');
+    const header = screen.getByText('Waypoint [0]');
     expect(header).toBeInTheDocument();
 
     const spinButtons = screen.getAllByRole('spinbutton') as HTMLInputElement[];
