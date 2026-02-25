@@ -138,10 +138,40 @@ impl PluginManager {
         // Scan built-in plugins in resource_dir/python_sdk
         let mut scanned_builtin = false;
         if let Some(res_dir) = &self.resource_dir {
-            let python_sdk_dir = res_dir.join("python_sdk");
-            if python_sdk_dir.exists() {
-                scan_dir(&python_sdk_dir, &mut plugins, true);
-                scanned_builtin = true;
+            // Try common resource paths. Tauri v2 often nests ../ paths under _up_ prefix.
+            let candidates = vec![
+                res_dir.join("python_sdk"),
+                res_dir.join("_up_").join("python_sdk"),
+                res_dir.join("_up_").join("_up_").join("python_sdk"),
+            ];
+
+            for python_sdk_dir in candidates {
+                if python_sdk_dir.exists() {
+                    println!("[DEBUG/RUST] Found bundled python_sdk at: {:?}", python_sdk_dir);
+                    plugins.extend(Self::scan_plugins_in_dir(&python_sdk_dir, true));
+                    scanned_builtin = true;
+                    break;
+                }
+            }
+        }
+
+        // AppImage fallback for Linux
+        if !scanned_builtin && cfg!(target_os = "linux") {
+            if let Ok(appdir) = std::env::var("APPDIR") {
+                let appdir_path = Path::new(&appdir);
+                // In AppImage, resources are usually in usr/lib/<product>/resources
+                let candidates = vec![
+                    appdir_path.join("usr").join("lib").join("waypoint-tool").join("resources").join("python_sdk"),
+                    appdir_path.join("usr").join("bin").join("resources").join("python_sdk"),
+                ];
+                for python_sdk_dir in candidates {
+                    if python_sdk_dir.exists() {
+                        println!("[DEBUG/RUST] Found AppImage python_sdk at: {:?}", python_sdk_dir);
+                        plugins.extend(Self::scan_plugins_in_dir(&python_sdk_dir, true));
+                        scanned_builtin = true;
+                        break;
+                    }
+                }
             }
         }
 
@@ -156,7 +186,9 @@ impl PluginManager {
                 for dev_dir in paths_to_try {
                     let dev_dir = dev_dir.canonicalize().unwrap_or(dev_dir);
                     if dev_dir.exists() && dev_dir.is_dir() {
-                        scan_dir(&dev_dir, &mut plugins, true);
+                        println!("[DEBUG/RUST] Found development python_sdk at: {:?}", dev_dir);
+                        plugins.extend(Self::scan_plugins_in_dir(&dev_dir, true));
+                        scanned_builtin = true;
                         break;
                     }
                 }
