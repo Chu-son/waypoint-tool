@@ -72,9 +72,9 @@ class RectSweepGenerator(WaypointGenerator):
         sweep_half = half_w if is_horizontal else half_h
         step_half = half_h if is_horizontal else half_w
 
-        # 開始コーナーによる符号の決定
+        # 開始コーナーによる符号の決定 (Y-up座標系: Bottom=-Y, Top=+Y)
         x_sign = -1.0 if "Left" in start_corner else 1.0
-        y_sign = 1.0 if "Bottom" in start_corner else -1.0
+        y_sign = -1.0 if "Bottom" in start_corner else 1.0
 
         if is_horizontal:
             sweep_start_sign = x_sign

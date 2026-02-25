@@ -197,6 +197,69 @@ export function MapCanvas() {
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
     
+    // Left click + Select Tool + Generator node selected -> Check rectangle handle hits FIRST (before pan_map)
+    if (e.button === 0 && activeTool === 'select' && selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator') {
+      const selectedNode = nodes[selectedNodeIds[0]];
+      const genPluginId = selectedNode.plugin_id || '';
+      const genPlugin = plugins[genPluginId];
+      const genInputs = genPlugin?.manifest?.inputs || [];
+      
+      if (genInputs.some((inp: any) => inp.type === 'rectangle')) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+        const hitRadius = 12 / scale;
+        
+        for (const inp of genInputs) {
+          if (inp.type !== 'rectangle') continue;
+          const rKey = inp.name || inp.id;
+          if (!rKey) continue;
+          const existing = useAppStore.getState().pluginInteractionData[rKey];
+          if (!existing?.center) continue;
+          
+          const { center, width, height, yaw = 0 } = existing;
+          const halfW = width / 2;
+          const halfH = height / 2;
+          
+          const dx = worldX - center.x;
+          const dy = worldY - center.y;
+          const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
+          const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
+          
+          // Check rotation handle
+          const rotHandleLocalY = halfH + 20 / scale;
+          const rotDx = localX;
+          const rotDy = localY - rotHandleLocalY;
+          if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
+            rectInputKey.current = rKey;
+            interactionMode.current = 'set_rect_rotation';
+            e.currentTarget.setPointerCapture(e.pointerId);
+            return;
+          }
+          
+          // Check corners
+          const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
+            { cx: -halfW, cy: halfH, corner: 'min' },
+            { cx: halfW, cy: -halfH, corner: 'max' },
+            { cx: halfW, cy: halfH, corner: 'topRight' },
+            { cx: -halfW, cy: -halfH, corner: 'bottomLeft' },
+          ];
+          for (const c of cornersMap) {
+            const cdx = localX - c.cx;
+            const cdy = localY - c.cy;
+            if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
+              rectInputKey.current = rKey;
+              rectDragCorner.current = c.corner;
+              interactionMode.current = 'drag_rect_corner';
+              e.currentTarget.setPointerCapture(e.pointerId);
+              return;
+            }
+          }
+        }
+      }
+    }
+
     // Middle click or (Left click + Select Mode + Not hovering over node) -> Pan Map
     if (e.button === 1 || (e.button === 0 && activeTool === 'select' && interactionMode.current === 'none')) {
       interactionMode.current = 'pan_map';
@@ -255,8 +318,8 @@ export function MapCanvas() {
         const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
         const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
 
-        // Check rotation handle (above top-center in local space. Y is inverted, so top is -halfH)
-        const rotHandleLocalY = -halfH - 20 / scale;
+        // Check rotation handle (above top of rect on screen = +halfH in Y-up world)
+        const rotHandleLocalY = halfH + 20 / scale;
         const rotDx = localX - 0;
         const rotDy = localY - rotHandleLocalY;
         if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
@@ -266,12 +329,12 @@ export function MapCanvas() {
           return;
         }
 
-        // Check corners in local space
+        // Check corners in local space (Y-up: +Y = screen top)
         const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
-          { cx: -halfW, cy: -halfH, corner: 'min' },        // top-left in screen space, local -x, -y
-          { cx: halfW, cy: halfH, corner: 'max' },          // bottom-right
-          { cx: halfW, cy: -halfH, corner: 'topRight' },    // top-right
-          { cx: -halfW, cy: halfH, corner: 'bottomLeft' },  // bottom-left
+          { cx: -halfW, cy: halfH, corner: 'min' },         // top-left on screen
+          { cx: halfW, cy: -halfH, corner: 'max' },         // bottom-right on screen
+          { cx: halfW, cy: halfH, corner: 'topRight' },     // top-right on screen
+          { cx: -halfW, cy: -halfH, corner: 'bottomLeft' }, // bottom-left on screen
         ];
         
         for (const c of cornersMap) {
@@ -313,6 +376,7 @@ export function MapCanvas() {
         e.currentTarget.setPointerCapture(e.pointerId);
       }
     }
+
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -484,11 +548,10 @@ export function MapCanvas() {
         const dy = worldY - cy;
         // Require a tiny bit of drag radius to avoid snapping to 0/0 error
         if (Math.abs(dx) > 0.05 || Math.abs(dy) > 0.05) {
-          // MS Office handle is pointing UP (negative Y in local).
-          // We want dragging straight up (dy = -R, dx = 0) to result in yaw = 0.
-          // Math.atan2(dy, dx) for straight up is -PI/2.
-          // So we offset the angle by PI/2.
-          let yaw = Math.atan2(dy, dx) + Math.PI / 2;
+          // Handle points UP on screen = +Y in world.
+          // Dragging straight up: dy>0, dx=0 → atan2 = PI/2.
+          // We want yaw=0 when handle points up, so offset by -PI/2.
+          let yaw = Math.atan2(dy, dx) - Math.PI / 2;
           
           useAppStore.getState().updatePluginInteractionData(key, {
             ...current,
@@ -761,10 +824,10 @@ export function MapCanvas() {
                const cornerSize = 6 / safeScale;
                
                const corners = [
-                 { cx: -halfW, cy: -halfH, corner: 'min' as const },
-                 { cx: halfW, cy: halfH, corner: 'max' as const },
-                 { cx: halfW, cy: -halfH, corner: 'topRight' as const },
-                 { cx: -halfW, cy: halfH, corner: 'bottomLeft' as const },
+                 { cx: -halfW, cy: halfH, corner: 'min' as const },         // top-left on screen
+                 { cx: halfW, cy: -halfH, corner: 'max' as const },         // bottom-right
+                 { cx: halfW, cy: halfH, corner: 'topRight' as const },     // top-right
+                 { cx: -halfW, cy: -halfH, corner: 'bottomLeft' as const }, // bottom-left
                ];
                
                return (
@@ -830,10 +893,10 @@ export function MapCanvas() {
                        }}
                      />
                    ))}
-                   {/* Rotation handle (MS Office style) - above top-center */}
+                   {/* Rotation handle (MS Office style) - above top-center (screen top = +Y in Y-up world) */}
                    {(() => {
                      const stemLen = 20 / safeScale;
-                     const rotHandleY = -halfH - stemLen;
+                     const rotHandleY = halfH + stemLen;
                      const handleR = 5 / safeScale;
                      return (
                        <pixiGraphics
@@ -851,9 +914,9 @@ export function MapCanvas() {
                          }}
                          draw={(g) => {
                            g.clear();
-                           // Stem line from rect top-center to handle
+                           // Stem line from rect top-center up to handle
                            g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
-                           g.moveTo(0, -stemLen);
+                           g.moveTo(0, stemLen);
                            g.lineTo(0, 0);
                            g.stroke();
                            // Handle circle
@@ -884,6 +947,61 @@ export function MapCanvas() {
                            g.lineTo(tipX - aSize * 0.3, tipY - aSize);
                            g.lineTo(tipX, tipY);
                            g.fill();
+                         }}
+                       />
+                     );
+                   })()}
+                   {/* Start corner triangle indicator */}
+                   {(() => {
+                     // Read sweep display params from store (synced by PluginParamsPanel)
+                     const sweepParams = pluginInteractionData['_sweep_params'];
+                     // Fallback to generator node params if editing
+                     const selectedNode = selectedNodeIds.length === 1 ? nodes[selectedNodeIds[0]] : null;
+                     const genParams = selectedNode?.type === 'generator' ? selectedNode.generator_params?.properties : null;
+                     
+                     const startCorner = String(sweepParams?.start_corner || genParams?.start_corner || 'Bottom-Left');
+                     const sweepDir = String(sweepParams?.sweep_direction || genParams?.sweep_direction || 'Horizontal');
+                     
+                     // Corner positions in local space (Y-up)
+                     let cx = 0, cy = 0;
+                     if (startCorner === 'Bottom-Left') { cx = -halfW; cy = -halfH; }
+                     else if (startCorner === 'Bottom-Right') { cx = halfW; cy = -halfH; }
+                     else if (startCorner === 'Top-Left') { cx = -halfW; cy = halfH; }
+                     else if (startCorner === 'Top-Right') { cx = halfW; cy = halfH; }
+                     
+                     // Direction arrow: Horizontal = along X, Vertical = along Y
+                     // Sign depends on which side of the rect we're on
+                     let dirX = 0, dirY = 0;
+                     const arrowLen = 12 / safeScale;
+                     if (sweepDir === 'Horizontal') {
+                       dirX = cx < 0 ? arrowLen : -arrowLen; // point inward
+                     } else {
+                       dirY = cy < 0 ? arrowLen : -arrowLen; // point inward
+                     }
+                     
+                     const triSize = 5 / safeScale;
+                     const angle = Math.atan2(dirY, dirX);
+                     
+                     return (
+                       <pixiGraphics
+                         x={cx}
+                         y={cy}
+                         draw={(g) => {
+                           g.clear();
+                           // Triangle pointing in sweep direction
+                           g.fillStyle = { color: 0xf97316, alpha: 0.9 };
+                           g.strokeStyle = { width: 1 / safeScale, color: 0xf97316 };
+                           // Arrow triangle
+                           const tipX = dirX;
+                           const tipY = dirY;
+                           const perpX = -Math.sin(angle) * triSize;
+                           const perpY = Math.cos(angle) * triSize;
+                           g.moveTo(tipX, tipY);
+                           g.lineTo(tipX - Math.cos(angle) * triSize * 2 + perpX, tipY - Math.sin(angle) * triSize * 2 + perpY);
+                           g.lineTo(tipX - Math.cos(angle) * triSize * 2 - perpX, tipY - Math.sin(angle) * triSize * 2 - perpY);
+                           g.lineTo(tipX, tipY);
+                           g.fill();
+                           g.stroke();
                          }}
                        />
                      );

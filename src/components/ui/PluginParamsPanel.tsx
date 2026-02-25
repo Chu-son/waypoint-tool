@@ -46,6 +46,18 @@ export function PluginParamsPanel() {
     }
   }, [activePluginId, plugin]);
 
+  // Sync sweep display params to store so MapCanvas triangle indicator reacts
+  useEffect(() => {
+    if (!plugin) return;
+    const sc = params.start_corner || '';
+    const sd = params.sweep_direction || '';
+    if (sc || sd) {
+      useAppStore.getState().updatePluginInteractionData('_sweep_params', {
+        start_corner: sc, sweep_direction: sd
+      });
+    }
+  }, [params.start_corner, params.sweep_direction, plugin]);
+
   // Auto-advance to next unset input when current input is completed
   useEffect(() => {
     if (!plugin || activeTool !== 'add_generator') return;
