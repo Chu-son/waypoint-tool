@@ -19,6 +19,11 @@ pub fn run() {
             commands::export_waypoints,
             commands::fetch_installed_plugins,
             commands::run_plugin,
+            commands::scan_custom_plugin,
+            commands::get_python_environments,
+            commands::scaffold_plugin,
+            commands::check_sdk_version,
+            commands::update_plugin_sdk,
             commands::force_exit,
         ])
         .run(tauri::generate_context!())

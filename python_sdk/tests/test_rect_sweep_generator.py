@@ -15,10 +15,8 @@ RectSweepGenerator = _mod.RectSweepGenerator
 
 
 def _get_xy(wp):
-    """Extract x, y from a waypoint dict (supports both flat and transform formats)."""
-    if "transform" in wp:
-        return wp["transform"]["x"], wp["transform"]["y"]
-    return wp["x"], wp["y"]
+    """Extract x, y from a waypoint dict (transform format)."""
+    return wp["transform"]["x"], wp["transform"]["y"]
 
 
 class TestRectSweepGenerator(unittest.TestCase):
@@ -59,6 +57,19 @@ class TestRectSweepGenerator(unittest.TestCase):
         )
         result = gen.generate(ctx)
         self.assertEqual(len(result), 8)  # 4 lines * 2 endpoints
+
+    def test_output_uses_transform_format(self):
+        """Waypoints must use the standard transform format."""
+        gen = RectSweepGenerator()
+        ctx = self._make_context(
+            rect={"center": {"x": 5, "y": 5}, "width": 10, "height": 10, "yaw": 0},
+            num_lines=2,
+        )
+        result = gen.generate(ctx)
+        self.assertTrue(len(result) > 0)
+        self.assertIn("transform", result[0])
+        self.assertIn("x", result[0]["transform"])
+        self.assertIn("qw", result[0]["transform"])
 
     def test_start_corner_changes_start_position(self):
         """Different start_corner values produce different starting positions."""

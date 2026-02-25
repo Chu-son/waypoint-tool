@@ -1,6 +1,7 @@
 {
     "name": "Line Generator",
-    "version": "1.0.0",
+    "version": "1.1.0",
+    "description": "始点から直線方向に等間隔の Waypoint を配置するシンプルなジェネレーターです。",
     "type": "python",
     "executable": "main.py",
     "inputs": [

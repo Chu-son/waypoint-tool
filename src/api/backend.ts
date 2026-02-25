@@ -54,6 +54,18 @@ export const BackendAPI = {
 
   getPythonEnvironments: async (): Promise<string[]> => {
     return invoke('get_python_environments');
+  },
+
+  scaffoldPlugin: async (pluginName: string, targetDir: string): Promise<PluginInstance> => {
+    return invoke('scaffold_plugin', { pluginName, targetDir });
+  },
+
+  checkSdkVersion: async (): Promise<string> => {
+    return invoke('check_sdk_version');
+  },
+
+  updatePluginSdk: async (pluginFolderPath: string): Promise<string> => {
+    return invoke('update_plugin_sdk', { pluginFolderPath });
   }
 };
 

@@ -16,6 +16,11 @@ _spec.loader.exec_module(_mod)
 SweepPathGenerator = _mod.SweepPathGenerator
 
 
+def _get_xy(wp):
+    """Extract x, y from a waypoint dict (transform format)."""
+    return wp["transform"]["x"], wp["transform"]["y"]
+
+
 class TestSweepPathGenerator(unittest.TestCase):
     """Requirement 4: Auto-generation — Sweep waypoint generation."""
 
@@ -49,6 +54,19 @@ class TestSweepPathGenerator(unittest.TestCase):
         # 3 lines * 2 points = 6 waypoints
         self.assertEqual(len(result), 6)
 
+    def test_output_uses_transform_format(self):
+        """Waypoints must use the standard transform format."""
+        gen = SweepPathGenerator()
+        ctx = self._make_context(
+            start_point={"x": 0, "y": 0, "qx": 0, "qy": 0, "qz": 0, "qw": 1},
+            num_lines=1,
+        )
+        result = gen.generate(ctx)
+        self.assertTrue(len(result) > 0)
+        self.assertIn("transform", result[0])
+        self.assertIn("x", result[0]["transform"])
+        self.assertIn("qw", result[0]["transform"])
+
     def test_snake_pattern_reverses_even_lines(self):
         """Snake pattern alternates direction on each line."""
         gen = SweepPathGenerator()
@@ -61,8 +79,8 @@ class TestSweepPathGenerator(unittest.TestCase):
         )
         result = gen.generate(ctx)
         # Line 1 snake: should be reversed
-        line1_start_x = result[2]["x"]
-        line1_end_x = result[3]["x"]
+        line1_start_x = _get_xy(result[2])[0]
+        line1_end_x = _get_xy(result[3])[0]
         # In snake mode, line1 should go in reverse X direction
         self.assertGreaterEqual(line1_start_x, line1_end_x)
 
@@ -75,7 +93,7 @@ class TestSweepPathGenerator(unittest.TestCase):
             pitch_y=3.0,
         )
         result = gen.generate(ctx)
-        y_values = set(round(r["y"], 3) for r in result)
+        y_values = set(round(_get_xy(r)[1], 3) for r in result)
         # Should have 2 distinct Y values separated by pitch_y=3.0
         self.assertEqual(len(y_values), 2)
 

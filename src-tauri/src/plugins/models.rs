@@ -22,6 +22,8 @@ pub struct PluginInputDef {
 pub struct PluginManifest {
     pub name: String,
     pub version: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
     #[serde(rename = "type")]
     pub plugin_type: String, // "python" or "wasm"
     pub executable: String,
@@ -39,6 +41,9 @@ pub struct PluginInstance {
     pub manifest: PluginManifest,
     pub folder_path: String,
     pub is_builtin: bool,
+    /// SDK version detected from wpt_plugin.py in the plugin directory (None if not found)
+    #[serde(default)]
+    pub sdk_version: Option<String>,
 }
 
 #[cfg(test)]
@@ -49,6 +54,7 @@ mod tests {
     fn test_python_manifest_deserialize() {
         let json = r#"{
             "name": "Sweep Generator",
+            "description": "Generates a sweep path from a start point.",
             "type": "python",
             "executable": "main.py",
             "inputs": [{"id": "start_point", "type": "point", "label": "Start"}],
@@ -57,6 +63,7 @@ mod tests {
         }"#;
         let manifest: PluginManifest = serde_json::from_str(json).unwrap();
         assert_eq!(manifest.name, "Sweep Generator");
+        assert_eq!(manifest.description.as_deref(), Some("Generates a sweep path from a start point."));
         assert_eq!(manifest.plugin_type, "python");
         assert_eq!(manifest.inputs.len(), 1);
         assert_eq!(manifest.properties.len(), 1);
@@ -85,6 +92,7 @@ mod tests {
             "executable": "run.py"
         }"#;
         let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert!(manifest.description.is_none());
         assert!(manifest.inputs.is_empty());
         assert!(manifest.properties.is_empty());
         assert!(manifest.needs.is_empty());

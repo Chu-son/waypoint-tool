@@ -2,6 +2,51 @@ use crate::plugins::models::{PluginManifest, PluginInstance};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Read the `__version__` string from a `wpt_plugin.py` file in the given plugin directory.
+/// Returns `None` if the file doesn't exist or the version line isn't found.
+pub fn detect_sdk_version(plugin_dir: &Path) -> Option<String> {
+    let sdk_path = plugin_dir.join("wpt_plugin.py");
+    let content = fs::read_to_string(&sdk_path).ok()?;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("__version__") {
+            // Parse: __version__ = "1.1.0" or __version__ = '1.1.0'
+            if let Some(eq_pos) = trimmed.find('=') {
+                let value = trimmed[eq_pos + 1..].trim();
+                let version = value.trim_matches(|c| c == '"' || c == '\'');
+                if !version.is_empty() {
+                    return Some(version.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Read the bundled SDK version from the resource directory or development fallback.
+pub fn get_bundled_sdk_version(resource_dir: Option<&Path>) -> Option<String> {
+    // Try resource_dir/python_sdk/wpt_plugin.py first
+    if let Some(res_dir) = resource_dir {
+        let sdk_path = res_dir.join("python_sdk");
+        if let Some(v) = detect_sdk_version(&sdk_path) {
+            return Some(v);
+        }
+    }
+    // Fallback for development environment
+    if let Ok(current_dir) = std::env::current_dir() {
+        for path in &[
+            current_dir.join("../python_sdk"),
+            current_dir.join("python_sdk"),
+        ] {
+            let resolved = path.canonicalize().unwrap_or(path.clone());
+            if let Some(v) = detect_sdk_version(&resolved) {
+                return Some(v);
+            }
+        }
+    }
+    None
+}
+
 pub struct PluginManager {
     plugins_dir: PathBuf,
     resource_dir: Option<PathBuf>,
@@ -26,11 +71,13 @@ impl PluginManager {
                     if let Ok(content) = fs::read_to_string(&manifest_path) {
                         if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
                             let id = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                            let sdk_version = detect_sdk_version(&path);
                             plugins.push(PluginInstance {
                                 id,
                                 manifest,
                                 folder_path: path.to_string_lossy().to_string(),
                                 is_builtin,
+                                sdk_version,
                             });
                         }
                     }
@@ -70,11 +117,13 @@ impl PluginManager {
                         if let Ok(content) = fs::read_to_string(&manifest_path) {
                             if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
                                 let id = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                                let sdk_version = detect_sdk_version(&path);
                                 plugins.push(PluginInstance {
                                     id,
                                     manifest,
                                     folder_path: path.to_string_lossy().to_string(),
                                     is_builtin,
+                                    sdk_version,
                                 });
                             }
                         }
@@ -184,5 +233,35 @@ mod tests {
 
         let plugins = PluginManager::scan_plugins_in_dir(tmp.path(), true);
         assert!(plugins.is_empty());
+    }
+
+    #[test]
+    fn test_detect_sdk_version_reads_version() {
+        let tmp = TempDir::new().unwrap();
+        let sdk_content = "__version__ = \"1.1.0\"\n# rest of SDK\n";
+        fs::write(tmp.path().join("wpt_plugin.py"), sdk_content).unwrap();
+
+        let version = detect_sdk_version(tmp.path());
+        assert_eq!(version, Some("1.1.0".to_string()));
+    }
+
+    #[test]
+    fn test_detect_sdk_version_missing_file() {
+        let tmp = TempDir::new().unwrap();
+        let version = detect_sdk_version(tmp.path());
+        assert!(version.is_none());
+    }
+
+    #[test]
+    fn test_scan_populates_sdk_version() {
+        let tmp = TempDir::new().unwrap();
+        let plugin_dir = tmp.path().join("my_plugin");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        fs::write(plugin_dir.join("manifest.json"), r#"{"name":"P","type":"python","executable":"main.py"}"#).unwrap();
+        fs::write(plugin_dir.join("wpt_plugin.py"), "__version__ = '2.0.0'\n").unwrap();
+
+        let plugins = PluginManager::scan_plugins_in_dir(tmp.path(), false);
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].sdk_version, Some("2.0.0".to_string()));
     }
 }

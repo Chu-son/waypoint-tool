@@ -1,6 +1,7 @@
 {
     "name": "Rect Sweep Generator",
-    "version": "1.1.0",
+    "version": "1.2.0",
+    "description": "回転可能な矩形領域内で蛇行走査（boustrophedon）パスを生成します。開始コーナーと走査方向を選択できます。",
     "type": "python",
     "executable": "main.py",
     "inputs": [

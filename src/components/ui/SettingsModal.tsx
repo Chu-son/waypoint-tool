@@ -1,4 +1,4 @@
-import { X, Plus, Trash2, Save } from 'lucide-react';
+import { X, Plus, Trash2, Save, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { OptionDef } from '../../types/store';
@@ -41,6 +41,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
 
   const [pythonEnvs, setPythonEnvs] = useState<string[]>([]);
+  const [bundledSdkVersion, setBundledSdkVersion] = useState<string | null>(null);
 
   // Sync when opened
   useEffect(() => {
@@ -48,6 +49,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setLocalOptions(globalOptionsSchema?.options || []);
       import('../../api/backend').then(({ BackendAPI }) => {
         BackendAPI.getPythonEnvironments().then(envs => setPythonEnvs(envs)).catch(console.error);
+        BackendAPI.checkSdkVersion().then(v => setBundledSdkVersion(v)).catch(() => setBundledSdkVersion(null));
       });
     }
   }, [isOpen, globalOptionsSchema]);
@@ -583,6 +585,45 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   }} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
                     <Plus size={14} /> Add Custom Folder
                   </button>
+                  <button onClick={async () => {
+                      try {
+                        const { open } = await import('@tauri-apps/plugin-dialog');
+                        const { BackendAPI } = await import('../../api/backend');
+                        // Step 1: Select parent directory via explorer dialog
+                        const selectedPath = await open({
+                          multiple: false,
+                          directory: true,
+                          defaultPath: lastDirectory || undefined,
+                          title: 'プラグインを作成する親ディレクトリを選択'
+                        });
+                        if (!selectedPath) return;
+                        const targetDir = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
+                        if (!targetDir) return;
+
+                        // Step 2: Prompt for plugin name
+                        const pluginName = prompt(`プラグイン名を入力してください:\n(作成先: ${targetDir})`);
+                        if (!pluginName || !pluginName.trim()) return;
+
+                        const newPlugin = await BackendAPI.scaffoldPlugin(pluginName.trim(), targetDir);
+                        const newMap = { ...plugins, [newPlugin.id]: newPlugin };
+                        setPlugins(newMap);
+                        if (!pluginSettings.find(s => s.id === newPlugin.id)) {
+                          setPluginSettings([...pluginSettings, {
+                            id: newPlugin.id,
+                            path: newPlugin.folder_path,
+                            enabled: true,
+                            order: pluginSettings.length,
+                            isBuiltin: false
+                          }]);
+                        }
+                        alert(`Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`);
+                      } catch (err) {
+                        console.error('Failed to scaffold plugin:', err);
+                        alert(`プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`);
+                      }
+                  }} className="px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
+                    <Plus size={14} /> Create New Plugin
+                  </button>
                 </div>
                 
                 <div className="space-y-3">
@@ -652,8 +693,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                               ▼
                             </button>
                             
-                            {/* Remove Custom Button */}
-                            {!setting.isBuiltin && (
+                            {/* Remove Button — show for custom and orphaned entries */}
+                            {(!setting.isBuiltin || !plugin) && (
                              <button onClick={() => {
                                  const newSettings = pluginSettings.filter(s => s.id !== setting.id);
                                  setPluginSettings(newSettings);
@@ -664,7 +705,50 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           </div>
                         </div>
                         {plugin && (
-                         <p className="text-xs text-slate-400 font-mono break-all mt-1">{plugin.folder_path}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-slate-400 font-mono break-all flex-1">{plugin.folder_path}</p>
+                            {/* SDK Version Badge */}
+                            {plugin.manifest.type === 'python' && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {plugin.is_builtin ? (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-900/50 text-blue-400 border border-blue-800">
+                                    SDK {bundledSdkVersion ? `v${bundledSdkVersion}` : 'Bundled'}
+                                  </span>
+                                ) : plugin.sdk_version ? (
+                                  plugin.sdk_version === bundledSdkVersion ? (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-900/50 text-green-400 border border-green-800">SDK ✅ v{plugin.sdk_version}</span>
+                                  ) : (
+                                    <>
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-900/50 text-yellow-400 border border-yellow-800">SDK ⚠️ v{plugin.sdk_version}</span>
+                                      <button
+                                        onClick={async () => {
+                                          try {
+                                            const { BackendAPI } = await import('../../api/backend');
+                                            const newVersion = await BackendAPI.updatePluginSdk(plugin.folder_path);
+                                            const refreshed = await BackendAPI.fetchInstalledPlugins();
+                                            const newMap: Record<string, any> = {};
+                                            refreshed.forEach((p: any) => { newMap[p.id] = p; });
+                                            pluginSettings.filter(s => !s.isBuiltin).forEach(s => {
+                                              if (!newMap[s.id] && plugins[s.id]) newMap[s.id] = plugins[s.id];
+                                            });
+                                            setPlugins(newMap);
+                                            alert(`SDK を v${newVersion} に更新しました。`);
+                                          } catch (err) {
+                                            alert(`SDK 更新に失敗しました: ${String(err)}`);
+                                          }
+                                        }}
+                                        className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-700 hover:bg-yellow-600 text-white transition-colors flex items-center gap-0.5"
+                                      >
+                                        <RefreshCw size={10} /> Update
+                                      </button>
+                                    </>
+                                  )
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-400 border border-red-800">SDK ❌</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         )}
                         {!plugin && (
                          <p className="text-xs text-red-400 font-mono break-all mt-1">WARNING: Memory target missing! Was path {setting.path} moved?</p>

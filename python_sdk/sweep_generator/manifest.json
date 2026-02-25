@@ -1,6 +1,7 @@
 {
     "name": "Sweep Path Generator",
-    "version": "1.0.0",
+    "version": "1.1.0",
+    "description": "始点から指定方向に平行走査線（スイープパス）を生成します。蛇行パターンや終端ヨー反転が可能です。",
     "type": "python",
     "executable": "main.py",
     "inputs": [

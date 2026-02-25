@@ -87,6 +87,7 @@ export type PluginInstance = {
   manifest: PluginManifest;
   folder_path: string;
   is_builtin: boolean;
+  sdk_version?: string;
 };
 // ---------------------------------
 

@@ -72,8 +72,19 @@ function App() {
         }
 
         useAppStore.getState().setPlugins(pluginMap);
+
+        // Clean up stale settings entries that don't match any known plugin
+        const validSettings = newSettings.filter(s => {
+          if (pluginMap[s.id]) return true;
+          // Keep non-builtin custom plugins that have a path (might load next time)
+          if (!s.isBuiltin && s.path) return true;
+          console.warn(`Removing stale plugin setting: ${s.id}`);
+          return false;
+        });
+        if (validSettings.length !== newSettings.length) settingsChanged = true;
+
         if (settingsChanged) {
-           useAppStore.getState().setPluginSettings(newSettings);
+           useAppStore.getState().setPluginSettings(validSettings);
         }
         
         console.log('Loaded plugins:', Object.keys(pluginMap).length);

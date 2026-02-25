@@ -9,6 +9,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'line_generator
 from main import LineGenerator
 
 
+def _get_xy(wp):
+    """Extract x, y from a waypoint dict (transform format)."""
+    return wp["transform"]["x"], wp["transform"]["y"]
+
+
 class TestLineGenerator(unittest.TestCase):
     """Requirement 4: Auto-generation — Line waypoint generation."""
 
@@ -33,6 +38,15 @@ class TestLineGenerator(unittest.TestCase):
         result = gen.generate(ctx)
         self.assertEqual(len(result), 5)
 
+    def test_output_uses_transform_format(self):
+        """Waypoints must use the standard transform format."""
+        gen = LineGenerator()
+        ctx = self._make_context(start_point={"x": 0, "y": 0, "qx": 0, "qy": 0, "qz": 0, "qw": 1}, num_points=1)
+        result = gen.generate(ctx)
+        self.assertIn("transform", result[0])
+        self.assertIn("x", result[0]["transform"])
+        self.assertIn("qw", result[0]["transform"])
+
     def test_spacing_affects_coordinates(self):
         """Waypoints are spaced according to the spacing parameter."""
         gen = LineGenerator()
@@ -43,9 +57,12 @@ class TestLineGenerator(unittest.TestCase):
         )
         result = gen.generate(ctx)
         # All points along x-axis (yaw=0 → direction = +x)
-        self.assertAlmostEqual(result[0]["x"], 0.0, places=5)
-        self.assertAlmostEqual(result[1]["x"], 2.0, places=5)
-        self.assertAlmostEqual(result[2]["x"], 4.0, places=5)
+        x0, _ = _get_xy(result[0])
+        x1, _ = _get_xy(result[1])
+        x2, _ = _get_xy(result[2])
+        self.assertAlmostEqual(x0, 0.0, places=5)
+        self.assertAlmostEqual(x1, 2.0, places=5)
+        self.assertAlmostEqual(x2, 4.0, places=5)
 
     def test_yaw_direction_affects_placement(self):
         """Points are placed along the start point's yaw direction."""
@@ -61,8 +78,9 @@ class TestLineGenerator(unittest.TestCase):
         )
         result = gen.generate(ctx)
         # Second point should be ~(0, 1) since direction is +y
-        self.assertAlmostEqual(result[1]["x"], 0.0, places=2)
-        self.assertAlmostEqual(result[1]["y"], 1.0, places=2)
+        x1, y1 = _get_xy(result[1])
+        self.assertAlmostEqual(x1, 0.0, places=2)
+        self.assertAlmostEqual(y1, 1.0, places=2)
 
 
 if __name__ == '__main__':
