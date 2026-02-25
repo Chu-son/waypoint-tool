@@ -159,4 +159,122 @@ describe('AppStore Zustand Store', () => {
     
     expect(useAppStore.getState().isDirty).toBe(false);
   });
+
+  // --- 要件2: Waypoint編集 ---
+
+  it('should mark isDirty when updating a node transform', () => {
+    const { addNode, updateNode } = useAppStore.getState();
+    addNode({ id: 'n1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } });
+    useAppStore.setState({ isDirty: false });
+
+    updateNode('n1', { transform: { x: 5, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 } });
+
+    const state = useAppStore.getState();
+    expect(state.nodes['n1'].transform?.x).toBe(5);
+    expect(state.isDirty).toBe(true);
+  });
+
+  it('should reorder root nodes via reorderNodes', () => {
+    const { addNode, reorderNodes } = useAppStore.getState();
+    addNode({ id: 'r1', type: 'manual' });
+    addNode({ id: 'r2', type: 'manual' });
+    addNode({ id: 'r3', type: 'manual' });
+
+    expect(useAppStore.getState().rootNodeIds).toEqual(['r1', 'r2', 'r3']);
+
+    reorderNodes(0, 2);
+
+    expect(useAppStore.getState().rootNodeIds).toEqual(['r2', 'r3', 'r1']);
+  });
+
+  it('should add child nodes to a generator parent', () => {
+    const { addNode } = useAppStore.getState();
+    addNode({ id: 'gen-1', type: 'generator' });
+    addNode({ id: 'child-a', type: 'manual' }, 'gen-1');
+    addNode({ id: 'child-b', type: 'manual' }, 'gen-1');
+
+    const state = useAppStore.getState();
+    expect(state.nodes['gen-1'].children_ids).toEqual(['child-a', 'child-b']);
+    expect(state.rootNodeIds).toContain('gen-1');
+    expect(state.rootNodeIds).not.toContain('child-a');
+  });
+
+  // --- 要件3: オプションプロパティ ---
+
+  it('should set and update options on a waypoint node', () => {
+    const { addNode, updateNode } = useAppStore.getState();
+    addNode({ id: 'opt-node', type: 'manual' });
+
+    updateNode('opt-node', { options: { speed: 1.5, mode: 'docking' } });
+
+    const node = useAppStore.getState().nodes['opt-node'];
+    expect(node.options?.speed).toBe(1.5);
+    expect(node.options?.mode).toBe('docking');
+  });
+
+  // --- 要件9: プラグイン ---
+
+  it('should set active plugin id', () => {
+    const { setActivePlugin } = useAppStore.getState();
+    setActivePlugin('plugin-sweep');
+
+    expect(useAppStore.getState().activePluginId).toBe('plugin-sweep');
+    expect(useAppStore.getState().pluginInteractionData).toEqual({});
+  });
+
+  it('should accumulate plugin interaction data', () => {
+    const { updatePluginInteractionData } = useAppStore.getState();
+
+    updatePluginInteractionData('start_point', { x: 1, y: 2 });
+    updatePluginInteractionData('end_point', { x: 3, y: 4 });
+
+    const data = useAppStore.getState().pluginInteractionData;
+    expect(data['start_point']).toEqual({ x: 1, y: 2 });
+    expect(data['end_point']).toEqual({ x: 3, y: 4 });
+  });
+
+  it('should clear plugin interaction data', () => {
+    const { updatePluginInteractionData, clearPluginInteractionData } = useAppStore.getState();
+    updatePluginInteractionData('start_point', { x: 1, y: 2 });
+
+    clearPluginInteractionData();
+
+    expect(useAppStore.getState().pluginInteractionData).toEqual({});
+  });
+
+  // --- 要件10: エクスポートサフィックス ---
+
+  it('should update default export format suffix', () => {
+    const { updateDefaultExportFormat } = useAppStore.getState();
+    updateDefaultExportFormat('__default_yaml__', { suffix: '_waypoints' });
+
+    const fmt = useAppStore.getState().defaultExportFormats.find(f => f.id === '__default_yaml__');
+    expect(fmt?.suffix).toBe('_waypoints');
+    expect(useAppStore.getState().isDirty).toBe(true);
+  });
+
+  // --- 要件5: プロジェクトデータ復元 ---
+
+  it('should fully restore nodes, rootNodeIds, and mapLayers from setProjectData', () => {
+    const { setProjectData } = useAppStore.getState();
+    setProjectData({
+      root_node_ids: ['wp1', 'wp2'],
+      nodes: {
+        'wp1': { id: 'wp1', type: 'manual', transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        'wp2': { id: 'wp2', type: 'generator', children_ids: [] },
+      },
+      map_layers: [
+        { id: 'ml1', name: 'Floor', info: null, image_base64: 'b64', visible: true, opacity: 1, z_index: 0, width: 100, height: 100 },
+      ],
+    } as any);
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp1', 'wp2']);
+    expect(state.nodes['wp1'].transform?.x).toBe(10);
+    expect(state.nodes['wp2'].type).toBe('generator');
+    expect(state.mapLayers.length).toBe(1);
+    expect(state.mapLayers[0].name).toBe('Floor');
+    expect(state.selectedNodeIds).toEqual([]);
+    expect(state.isDirty).toBe(false);
+  });
 });

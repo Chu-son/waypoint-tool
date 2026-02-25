@@ -116,4 +116,65 @@ describe('App Integration', () => {
       expect(state.mapLayers[0].image_base64).toBe('mockbase64');
     });
   });
+
+  // --- 要件2: Waypoint編集 ---
+
+  it('switches to add_point tool mode', async () => {
+    render(<App />);
+
+    // Click the "Add Waypoint (P)" tool button
+    const addPointBtn = screen.getByTitle('Add Waypoint (P)');
+    act(() => {
+      addPointBtn.click();
+    });
+
+    expect(useAppStore.getState().activeTool).toBe('add_point');
+  });
+
+  // --- 要件8: UIレイアウト ---
+
+  it('renders the Project / Hierarchy panel', async () => {
+    render(<App />);
+    expect(screen.getByText('Project / Hierarchy')).toBeInTheDocument();
+  });
+
+  it('switches between Inspector and Layers tabs', async () => {
+    render(<App />);
+
+    // Default tab is Inspector
+    expect(screen.getByText('Inspector')).toBeInTheDocument();
+
+    // Click Layers tab
+    const layersTab = screen.getByText('Layers');
+    act(() => {
+      layersTab.click();
+    });
+
+    // Layers panel content should be visible
+    expect(screen.getByText('Load ROS Map (YAML)')).toBeInTheDocument();
+  });
+
+  // --- 要件2: Waypoint編集 ---
+
+  it('removes selected nodes when Delete key is pressed', async () => {
+    // Pre-add a node to the store
+    useAppStore.setState({
+      nodes: {
+        'del-node': { id: 'del-node', type: 'manual', transform: { x: 1, y: 2, qx: 0, qy: 0, qz: 0, qw: 1 } },
+      },
+      rootNodeIds: ['del-node'],
+      selectedNodeIds: ['del-node'],
+    });
+
+    render(<App />);
+
+    // Simulate Delete key press
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+    });
+
+    const state = useAppStore.getState();
+    expect(state.nodes['del-node']).toBeUndefined();
+    expect(state.rootNodeIds).not.toContain('del-node');
+  });
 });
