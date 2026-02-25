@@ -1,10 +1,15 @@
 import { useAppStore } from '../../stores/appStore';
 import { OptionDef } from '../../types/store';
-import { Eye, EyeOff, Play, Settings2, RefreshCcw } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { 
+  Eye, EyeOff, Play, Settings2, RefreshCcw, Trash2, Copy, 
+  MoveVertical, ChevronDown, ChevronUp, AlertCircle, Info 
+} from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
 import { BackendAPI } from '../../api/backend';
 import { v4 as uuidv4 } from 'uuid';
 import { NumericInput } from './NumericInput';
+import { PluginPropertyEditor } from './PluginPropertyEditor';
+import { PluginInputEditor } from './PluginInputEditor';
 
 export function PropertiesPanel() {
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
@@ -23,10 +28,9 @@ export function PropertiesPanel() {
   const globalPythonPath = useAppStore(state => state.globalPythonPath);
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
-  const [interactionParams, setInteractionParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
-  
   const updatePluginInteractionData = useAppStore(state => state.updatePluginInteractionData);
+  const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
 
   const isMultiSelection = selectedNodeIds.length > 1;
   const node = isMultiSelection ? null : nodes[selectedNodeIds[0]];
@@ -35,10 +39,8 @@ export function PropertiesPanel() {
     if (!isMultiSelection && node?.type === 'generator') {
       if (node.generator_params?.properties) setGenParams({ ...node.generator_params.properties });
       if (node.generator_params?.interaction_data) {
-        const iData = { ...node.generator_params.interaction_data };
-        setInteractionParams(iData);
         // Sync to global store so MapCanvas shows the preview
-        Object.entries(iData).forEach(([key, val]) => {
+        Object.entries(node.generator_params.interaction_data).forEach(([key, val]) => {
           updatePluginInteractionData(key, val);
         });
       }
@@ -75,10 +77,18 @@ export function PropertiesPanel() {
       if (!plugin) return;
       setIsExecuting(true);
       try {
+        const filteredInteractionData: Record<string, any> = {};
+        plugin.manifest.inputs?.forEach(inp => {
+          const key = inp.name || inp.id;
+          if (key && pluginInteractionData[key]) {
+            filteredInteractionData[key] = pluginInteractionData[key];
+          }
+        });
+
         const contextData = {
           ...node.generator_params,
           properties: genParams,
-          interaction_data: interactionParams
+          interaction_data: filteredInteractionData
         };
 
         let pythonPathToUse = globalPythonPath?.trim() || 'python3';
@@ -144,183 +154,38 @@ export function PropertiesPanel() {
                {plugin.manifest.name}
             </h3>
 
+            {/* Properties */}
             {plugin.manifest.properties?.map((prop, idx) => {
               const key = prop.name;
               if (!key) return null;
               return (
-                <div key={idx} className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400">{prop.label || key}</label>
-                  {prop.type === 'boolean' ? (
-                     <label className="flex items-center gap-3 mt-1 bg-slate-900 border border-slate-700 p-2 rounded cursor-pointer">
-                       <input 
-                         type="checkbox" 
-                         checked={!!genParams[key]}
-                         onChange={(e) => setGenParams(prev => ({...prev, [key]: e.target.checked}))}
-                         className="rounded bg-slate-800 border-slate-600 text-primary w-4 h-4 cursor-pointer" 
-                       />
-                       <span className="text-xs text-slate-300">Enabled</span>
-                     </label>
-                  ) : prop.type === 'integer' || prop.type === 'float' ? (
-                     <input 
-                       type="number"
-                       step={prop.type === 'float' ? 'any' : '1'}
-                       value={genParams[key] ?? ''}
-                       onChange={e => {
-                         const val = prop.type === 'float' ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-                         setGenParams(prev => ({...prev, [key]: isNaN(val) ? '' : val}));
-                       }}
-                       className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder:text-slate-600"
-                     />
-                  ) : (
-                     <input 
-                       type="text"
-                       value={genParams[key] || ''}
-                       onChange={e => setGenParams(prev => ({...prev, [key]: e.target.value}))}
-                       className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary"
-                     />
-                  )}
-                </div>
+                <PluginPropertyEditor
+                  key={`prop-${idx}`}
+                  property={prop}
+                  value={genParams[key]}
+                  onChange={(val) => setGenParams(prev => ({ ...prev, [key]: val }))}
+                  className="mb-4"
+                />
               );
             })}
 
+            {/* Interaction Inputs */}
             {plugin.manifest.inputs?.map((inp, idx) => {
               const key = inp.name || inp.id;
               if (!key) return null;
               
-              if (inp.type === 'point') {
-                const point = interactionParams[key];
-                if (!point) return null;
-                
-                const pqw = point.qw ?? 1, pqz = point.qz ?? 0, pqx = point.qx ?? 0, pqy = point.qy ?? 0;
-                const yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
-
-                return (
-                  <div key={`param-int-${idx}`} className="space-y-2 pt-3 border-t border-slate-700/50">
-                    <label className="text-xs font-semibold text-pink-400">{inp.label || key} <span className="text-[10px] text-slate-500 font-normal">(Point Input)</span></label>
-                    <div className="grid grid-cols-3 gap-2">
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">X (m)</label>
-                         <NumericInput 
-                           value={point.x ?? 0}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             setInteractionParams(prev => ({...prev, [key]: {...prev[key], x: val}}));
-                             updatePluginInteractionData(key, { ...point, x: val });
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Y (m)</label>
-                         <NumericInput 
-                           value={point.y ?? 0}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             setInteractionParams(prev => ({...prev, [key]: {...prev[key], y: val}}));
-                             updatePluginInteractionData(key, { ...point, y: val });
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Yaw (rad)</label>
-                         <NumericInput 
-                           step="0.01"
-                           value={yaw}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             const qz = Math.sin(val / 2);
-                             const qw = Math.cos(val / 2);
-                             setInteractionParams(prev => ({...prev, [key]: {...prev[key], qx: 0, qy: 0, qz, qw}}));
-                             updatePluginInteractionData(key, { ...point, qx: 0, qy: 0, qz, qw });
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                    </div>
-                  </div>
-                );
-              }
-              
-              if (inp.type === 'rectangle') {
-                const rectData = interactionParams[key];
-                if (!rectData?.center) return null;
-                
-                return (
-                  <div key={`param-int-${idx}`} className="space-y-2 pt-3 border-t border-slate-700/50">
-                    <label className="text-xs font-semibold text-pink-400">{inp.label || key} <span className="text-[10px] text-slate-500 font-normal">(Rectangle)</span></label>
-                    <div className="grid grid-cols-2 gap-2">
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Center X</label>
-                         <NumericInput 
-                           value={rectData.center.x ?? 0}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             const updated = {...rectData, center: {...rectData.center, x: val}};
-                             setInteractionParams(prev => ({...prev, [key]: updated}));
-                             updatePluginInteractionData(key, updated);
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Center Y</label>
-                         <NumericInput 
-                           value={rectData.center.y ?? 0}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             const updated = {...rectData, center: {...rectData.center, y: val}};
-                             setInteractionParams(prev => ({...prev, [key]: updated}));
-                             updatePluginInteractionData(key, updated);
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Width</label>
-                         <NumericInput 
-                           value={rectData.width ?? 0}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             const updated = {...rectData, width: Math.max(0, val)};
-                             setInteractionParams(prev => ({...prev, [key]: updated}));
-                             updatePluginInteractionData(key, updated);
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Height</label>
-                         <NumericInput 
-                           value={rectData.height ?? 0}
-                           precision={decimalPrecision}
-                           onChange={val => {
-                             const updated = {...rectData, height: Math.max(0, val)};
-                             setInteractionParams(prev => ({...prev, [key]: updated}));
-                             updatePluginInteractionData(key, updated);
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                       <div className="col-span-2">
-                         <label className="block text-[10px] text-slate-500 mb-0.5">Yaw (degrees)</label>
-                         <NumericInput 
-                           value={((rectData.yaw ?? 0) * 180 / Math.PI)}
-                           precision={1}
-                           onChange={val => {
-                             const updated = {...rectData, yaw: val * Math.PI / 180};
-                             setInteractionParams(prev => ({...prev, [key]: updated}));
-                             updatePluginInteractionData(key, updated);
-                           }}
-                           className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-pink-500"
-                         />
-                       </div>
-                    </div>
-                  </div>
-                );
-              }
-              
-              return null;
+              return (
+                <PluginInputEditor
+                  key={`input-${idx}`}
+                  input={inp}
+                  interactionData={pluginInteractionData[key]}
+                  onUpdate={(data) => {
+                    updatePluginInteractionData(key, data);
+                  }}
+                  mode="edit"
+                  decimalPrecision={decimalPrecision}
+                />
+              );
             })}
 
             <div className="pt-4 mt-6 border-t border-slate-800">

@@ -9,6 +9,7 @@ vi.mock('../../api/backend', () => ({
     getPythonEnvironments: vi.fn().mockResolvedValue([]),
     loadOptionsSchema: vi.fn(),
     scanCustomPlugin: vi.fn(),
+    checkSdkVersion: vi.fn().mockResolvedValue("1.0.0"),
   },
 }));
 

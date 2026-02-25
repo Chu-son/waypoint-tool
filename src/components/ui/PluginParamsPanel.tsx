@@ -3,6 +3,8 @@ import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api/backend';
 import { Play, Settings2, X, AlertCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { PluginPropertyEditor } from './PluginPropertyEditor';
+import { PluginInputEditor } from './PluginInputEditor';
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore(state => state.activeTool);
@@ -16,6 +18,8 @@ export function PluginParamsPanel() {
   
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const nodes = useAppStore(state => state.nodes);
+  const decimalPrecision = useAppStore(state => state.decimalPrecision);
+  const updatePluginInteractionData = useAppStore(state => state.updatePluginInteractionData);
   
   const [params, setParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
@@ -233,148 +237,39 @@ export function PluginParamsPanel() {
           </div>
         )}
         
-        {inputs.length === 0 ? (
-           <p className="text-xs text-slate-500 italic">No parameters required for this plugin.</p>
-        ) : (
-          inputs.map((inp, idx) => {
-            const key = inp.name || inp.id;
-            if (!key) return null;
-            const isActiveStep = idx === activeInputIndex;
-            const hasData = !!pluginInteractionData[key];
-            return (
-              <div key={idx} className={`space-y-1 rounded-lg p-2 transition-all ${isActiveStep ? 'ring-1 ring-primary/50 bg-primary/5' : ''}`}>
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-2">
-                  {inputs.length > 1 && (
-                    <span className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0 ${
-                      isActiveStep ? 'bg-primary text-white' : hasData ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'
-                    }`}>{idx + 1}</span>
-                  )}
-                  {inp.label || key} {inp.required && <span className="text-red-400">*</span>}
-                </label>
-                {isActiveStep && !hasData && (
-                  <p className="text-[10px] text-primary/70 font-medium">
-                    {inp.type === 'rectangle' ? '▶ Click and drag on map to draw' : inp.type === 'point' ? '▶ Click on map to place' : ''}
-                  </p>
-                )}
-                {inp.description && <p className="text-[10px] text-slate-500 leading-tight mb-1">{inp.description}</p>}
-                
-                {inp.type === 'boolean' ? (
-                   <label className="flex items-center gap-3 mt-1 bg-slate-800/50 p-2 rounded border border-slate-700/50 cursor-pointer">
-                     <input 
-                       type="checkbox" 
-                       checked={!!params[key]}
-                       onChange={(e) => setParams(prev => ({...prev, [key]: e.target.checked}))}
-                       className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary focus:ring-offset-slate-900 w-4 h-4 cursor-pointer" 
-                     />
-                     <span className="text-xs text-slate-300 font-medium">Enabled</span>
-                   </label>
-                ) : inp.type === 'point' ? (
-                  <div className="bg-slate-950 p-2 rounded border border-slate-700 font-mono text-center">
-                     {pluginInteractionData[key] ? (
-                        <span className="text-pink-400">
-                          ({pluginInteractionData[key].x.toFixed(2)}, {pluginInteractionData[key].y.toFixed(2)}) 
-                          <span className="text-slate-500 ml-1">SET</span>
-                        </span>
-                     ) : (
-                        <span className="text-slate-500 italic">Click on map to define</span>
-                     )}
-                  </div>
-                ) : inp.type === 'rectangle' ? (
-                  <div className="bg-slate-950 p-2 rounded border border-slate-700 font-mono text-xs">
-                      {pluginInteractionData[key]?.center ? (
-                         <div className="space-y-1">
-                           <div className="grid grid-cols-2 gap-x-2">
-                             <div className="flex justify-between"><span className="text-slate-400">W:</span><span className="text-pink-400">{pluginInteractionData[key].width?.toFixed(2)}m</span></div>
-                             <div className="flex justify-between"><span className="text-slate-400">H:</span><span className="text-pink-400">{pluginInteractionData[key].height?.toFixed(2)}m</span></div>
-                             <div className="flex justify-between"><span className="text-slate-400">X:</span><span className="text-pink-400">{pluginInteractionData[key].center?.x?.toFixed(2)}</span></div>
-                             <div className="flex justify-between"><span className="text-slate-400">Y:</span><span className="text-pink-400">{pluginInteractionData[key].center?.y?.toFixed(2)}</span></div>
-                           </div>
-                           <div className="flex justify-between pt-0.5 border-t border-slate-800">
-                             <span className="text-slate-400">Yaw:</span>
-                             <span className="text-orange-400">{((pluginInteractionData[key].yaw ?? 0) * 180 / Math.PI).toFixed(1)}°</span>
-                           </div>
-                           <div className="text-center text-slate-500 text-[10px] mt-1">Drag ◻ corners · Drag ↻ handle to rotate</div>
-                         </div>
-                      ) : (
-                         <span className="text-slate-500 italic text-center block">Click and drag on map to draw rectangle</span>
-                      )}
-                   </div>
-                ) : inp.type === 'integer' || inp.type === 'float' ? (
-                   <input 
-                     type="number"
-                     step={inp.type === 'float' ? 'any' : '1'}
-                     value={params[key] ?? ''}
-                     onChange={e => {
-                       const val = inp.type === 'float' ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-                       setParams(prev => ({...prev, [key]: isNaN(val) ? '' : val}));
-                     }}
-                     className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder:text-slate-600"
-                     placeholder={String(inp.default ?? '')}
-                   />
-                ) : (
-                   <input 
-                     type="text"
-                     value={params[key] || ''}
-                     onChange={e => setParams(prev => ({...prev, [key]: e.target.value}))}
-                     className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder:text-slate-600"
-                     placeholder={String(inp.default ?? '')}
-                   />
-                )}
-              </div>
-            );
-          })
-        )}
+        {/* Interaction Inputs */}
+        {inputs.length > 0 && inputs.map((inp, idx) => {
+          const key = inp.name || inp.id;
+          if (!key) return null;
+          const isActiveStep = idx === activeInputIndex;
+          const hasData = !!pluginInteractionData[key];
+          return (
+            <PluginInputEditor
+              key={`input-${idx}`}
+              input={inp}
+              interactionData={pluginInteractionData[key]}
+              onUpdate={(data) => updatePluginInteractionData(key, data)}
+              mode="creation"
+              index={idx}
+              totalSteps={inputs.length}
+              isActive={isActiveStep}
+              hasData={hasData}
+              decimalPrecision={decimalPrecision}
+            />
+          );
+        })}
 
+        {/* Properties */}
         {properties.length > 0 && properties.map((prop, idx) => {
           const key = prop.name;
           if (!key) return null;
           return (
-            <div key={`prop-${idx}`} className="space-y-1 mt-3 pt-3 border-t border-slate-800">
-              <label className="text-xs font-semibold text-slate-300">
-                {prop.label || key}
-              </label>
-              
-              {prop.type === 'boolean' ? (
-                 <label className="flex items-center gap-3 mt-1 bg-slate-800/50 p-2 rounded border border-slate-700/50 cursor-pointer">
-                   <input 
-                     type="checkbox" 
-                     checked={!!params[key]}
-                     onChange={(e) => setParams(prev => ({...prev, [key]: e.target.checked}))}
-                     className="rounded bg-slate-800 border-slate-600 text-primary focus:ring-primary focus:ring-offset-slate-900 w-4 h-4 cursor-pointer" 
-                   />
-                   <span className="text-xs text-slate-300 font-medium">Enabled</span>
-                 </label>
-              ) : prop.type === 'integer' || prop.type === 'float' ? (
-                 <input 
-                   type="number"
-                   step={prop.type === 'float' ? 'any' : '1'}
-                   value={params[key] ?? ''}
-                   onChange={e => {
-                     const val = prop.type === 'float' ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-                     setParams(prev => ({...prev, [key]: isNaN(val) ? '' : val}));
-                   }}
-                   className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder:text-slate-600"
-                   placeholder={String(prop.default ?? '')}
-                 />
-              ) : Array.isArray((prop as any).options) && (prop as any).options.length > 0 ? (
-                 <select
-                   value={params[key] ?? prop.default ?? ''}
-                   onChange={e => setParams(prev => ({...prev, [key]: e.target.value}))}
-                   className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
-                 >
-                   {(prop as any).options.map((opt: string) => (
-                     <option key={opt} value={opt}>{opt}</option>
-                   ))}
-                 </select>
-              ) : (
-                 <input 
-                   type="text"
-                   value={params[key] || ''}
-                   onChange={e => setParams(prev => ({...prev, [key]: e.target.value}))}
-                   className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder:text-slate-600"
-                   placeholder={String(prop.default ?? '')}
-                 />
-              )}
+            <div key={`prop-container-${idx}`} className="mt-3 pt-3 border-t border-slate-800">
+              <PluginPropertyEditor
+                property={prop}
+                value={params[key]}
+                onChange={(val) => setParams(prev => ({ ...prev, [key]: val }))}
+              />
             </div>
           );
         })}
