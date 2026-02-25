@@ -9,10 +9,134 @@
   --highlight: #60a5fa;
 }
 
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  select option,
+  datalist option {
+    background-color: rgb(15 23 42);
+    color: rgb(226 232 240);
+  }
+}
+
+@layer components {
+  .ui-field {
+    @apply w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500;
+  }
+
+  .ui-field:focus {
+    @apply border-blue-500 ring-2 ring-blue-500/20;
+  }
+
+  .ui-field-sm {
+    @apply w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none transition-colors placeholder:text-slate-500;
+  }
+
+  .ui-field-sm:focus {
+    @apply border-blue-500 ring-2 ring-blue-500/20;
+  }
+
+  .ui-select {
+    @apply w-full cursor-pointer rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors;
+  }
+
+  .ui-select-sm {
+    @apply w-full cursor-pointer rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none transition-colors;
+  }
+
+  .ui-select:focus,
+  .ui-select-sm:focus {
+    @apply border-blue-500 ring-2 ring-blue-500/20;
+  }
+
+  .ui-select:disabled,
+  .ui-select-sm:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  .ui-input {
+    @apply w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500;
+  }
+
+  .ui-input:focus {
+    @apply border-blue-500 ring-2 ring-blue-500/20;
+  }
+
+  .ui-input-sm {
+    @apply w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none transition-colors placeholder:text-slate-500;
+  }
+
+  .ui-input-sm:focus {
+    @apply border-blue-500 ring-2 ring-blue-500/20;
+  }
+
+  .ui-textarea {
+    @apply w-full min-h-24 resize-y rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500;
+  }
+
+  .ui-textarea:focus {
+    @apply border-blue-500 ring-2 ring-blue-500/20;
+  }
+
+  .ui-checkbox {
+    @apply h-4 w-4 cursor-pointer rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-2 focus:ring-blue-500/30;
+  }
+
+  .ui-range {
+    @apply h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-700;
+  }
+
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition-colors;
+  }
+
+  .ui-btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .ui-btn-md {
+    @apply px-4 py-2;
+  }
+
+  .ui-btn-primary {
+    @apply border-blue-500 bg-blue-500 text-white hover:bg-blue-400;
+  }
+
+  .ui-btn-secondary {
+    @apply border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600;
+  }
+
+  .ui-btn-ghost {
+    @apply border-slate-700 bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200;
+  }
+
+  .ui-btn-danger {
+    @apply border-red-700 bg-red-700 text-white hover:bg-red-600;
+  }
+
+  .ui-icon-btn {
+    @apply inline-flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200;
+  }
+
+  .ui-tab {
+    @apply rounded-lg px-4 py-2 text-sm font-medium transition-colors;
+  }
+
+  .ui-tab-active {
+    @apply bg-blue-500 text-white;
+  }
+
+  .ui-tab-inactive {
+    @apply text-slate-400 hover:bg-slate-800 hover:text-slate-200;
+  }
+}
+
 body {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
   overflow: hidden;

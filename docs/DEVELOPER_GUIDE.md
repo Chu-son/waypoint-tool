@@ -36,6 +36,19 @@ ROS Waypoint Tool のアーキテクチャおよび機能拡張手順につい�
 `src/components/canvas/MapCanvas.tsx` 内の `pixiGraphics` 描画ブロックにロジックを追加します。
 PixiJSは高速なWebGL描画を行うため、数千ノードまではReactのRe-renderをフックとして描画（`draw={...}` 属性）してもパフィーマンスに影響を与えにくい設計になっています。さらに最適化が必要な場合は、Spriteのバッチ処理やParticle Containerを導入してください。
 
+### 5. UIスタイルを追加・変更したい場合（Tailwind v4）
+中規模開発での視認性と統一性を維持するため、フォームや操作系UIは `src/App.css` の共通クラスを優先して使用します。
+
+- 主要クラス
+  - 入力系: `ui-input`, `ui-input-sm`, `ui-select`, `ui-select-sm`, `ui-textarea`, `ui-checkbox`, `ui-range`
+  - 操作系: `ui-btn`, `ui-btn-sm`, `ui-btn-md`, `ui-btn-primary`, `ui-btn-secondary`, `ui-btn-ghost`, `ui-btn-danger`, `ui-icon-btn`
+  - タブ: `ui-tab`, `ui-tab-active`, `ui-tab-inactive`
+- 運用ルール
+  - 新規画面で同種のUI（input/select/button/tab）を追加する場合は、まず共通クラスで実装します。
+  - 画面固有の見た目差分が必要な場合は、共通クラスに必要最小限のユーティリティを追加して調整します。
+  - `@apply` では Tailwind 標準ユーティリティのみを使い、独自クラス同士の再適用は行いません（Tailwind v4制約）。
+  - プルダウン可読性は `select option` / `datalist option` のベーススタイルで統一されるため、個別コンポーネントでの上書きを避けます。
+
 ---
 
 ## テストの実装と実行 (Testing)

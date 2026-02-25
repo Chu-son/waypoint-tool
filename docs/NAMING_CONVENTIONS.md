@@ -17,6 +17,11 @@
 ### スタイルシート (`.css`)
 - **kebab-case** または **camelCase** (必要に応じて)。（例: `index.css`, `App.css`）
 
+### 共通UIクラス（Tailwind）
+- 画面横断で使う共通クラスは `ui-` プレフィックスを使用します。（例: `ui-input`, `ui-select`, `ui-btn-primary`）
+- 状態表現は用途ベースで命名します。（例: `-primary`, `-secondary`, `-ghost`, `-danger`, `-active`, `-inactive`）
+- 1画面専用の見た目クラスを追加するより、既存の `ui-*` クラスを優先して再利用してください。
+
 ### データ型定義ファイル (`.d.ts` / `.ts`)
 - `types/` 配下に配置し、ドメインに基づく名前を小文字でつけます。（例: `store.ts`, `rosTypes.d.ts`）
 
