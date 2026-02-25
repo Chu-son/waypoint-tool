@@ -90,10 +90,15 @@ function App() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeIds.length > 0) removeNodes(selectedNodeIds);
       }
+      if (e.key === 'Escape') {
+        if (selectedNodeIds.length > 0) useAppStore.setState({ selectedNodeIds: [] });
+        if (activeTool !== 'select') useAppStore.setState({ activeTool: 'select' });
+        useAppStore.setState({ pluginInteractionData: undefined });
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, removeNodes]);
+  }, [selectedNodeIds, activeTool, removeNodes]);
 
   useEffect(() => {
     const unlisten = getCurrentWindow().onCloseRequested(async (event) => {

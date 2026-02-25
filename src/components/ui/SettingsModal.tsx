@@ -20,6 +20,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const globalExportTemplates = useAppStore(state => state.exportTemplates);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
   const toolPanelMaxColumns = useAppStore(state => state.toolPanelMaxColumns);
+  const decimalPrecision = useAppStore(state => state.decimalPrecision);
   const globalPythonPath = useAppStore(state => state.globalPythonPath);
   const setIndexStartIndex = useAppStore(state => state.setIndexStartIndex);
   const setToolPanelMaxColumns = useAppStore(state => state.setToolPanelMaxColumns);
@@ -28,6 +29,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const addExportTemplate = useAppStore(state => state.addExportTemplate);
   const updateExportTemplate = useAppStore(state => state.updateExportTemplate);
   const removeExportTemplate = useAppStore(state => state.removeExportTemplate);
+  const defaultExportFormats = useAppStore(state => state.defaultExportFormats);
+  const updateDefaultExportFormat = useAppStore(state => state.updateDefaultExportFormat);
 
   type TabType = 'general' | 'options' | 'export' | 'plugins';
   const [activeTab, setActiveTab] = useState<TabType>('general');
@@ -217,6 +220,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <option value={1}>1 (1-indexed)</option>
                   </select>
                   <p className="text-xs text-slate-500">Determines the starting index count for Waypoints across the Canvas and Exports.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex justify-between text-sm font-medium text-slate-300">
+                    <span>Decimal Precision</span>
+                    <span>{decimalPrecision}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="12"
+                    step="1"
+                    value={decimalPrecision}
+                    onChange={(e) => useAppStore.setState({ decimalPrecision: parseInt(e.target.value), isDirty: true })}
+                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <p className="text-xs text-slate-500">Number of decimal places shown in numeric input fields (Inspector, Properties).</p>
                 </div>
                 
                 <div className="space-y-2">
@@ -431,12 +451,33 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <h3 className="text-md font-bold text-slate-200">Custom Export Templates</h3>
                     <p className="text-xs text-slate-500 mt-1">Define Handlebars templates for custom waypoint export formats.</p>
                   </div>
-                  <button onClick={() => addExportTemplate({ id: uuidv4(), name: 'New Template', extension: 'txt', content: '{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}' })} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
+                  <button onClick={() => addExportTemplate({ id: uuidv4(), name: 'New Template', extension: 'txt', suffix: '', content: '{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}' })} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded flex items-center gap-1 transition-colors">
                     <Plus size={14} /> New Template
                   </button>
                 </div>
 
-                <div className="bg-slate-900 border border-slate-700/50 p-3 rounded-lg text-xs text-slate-300">
+                <div className="space-y-4">
+                  <h4 className="font-bold text-slate-200 text-sm border-b border-slate-700 pb-1">Default Formats</h4>
+                  {defaultExportFormats.map((format) => (
+                    <div key={format.id} className="bg-slate-900 rounded-lg border border-slate-700/50 flex items-center justify-between p-3">
+                      <div className="flex items-center gap-3 w-1/2">
+                         <span className="text-sm font-bold text-slate-200">{format.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 w-1/2 justify-end">
+                         <div className="flex items-center gap-2">
+                           <span className="text-xs text-slate-400 font-medium">Auto-Suffix :</span>
+                           <input type="text" value={format.suffix} onChange={(e) => updateDefaultExportFormat(format.id, { suffix: e.target.value } as Partial<import('../../types/store').DefaultExportFormat>)} className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200" placeholder="_yaml" />
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <span className="text-xs text-slate-400 font-medium">Ext :</span>
+                           <span className="w-16 text-slate-300 text-sm">.{format.extension}</span>
+                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="bg-slate-900 border border-slate-700/50 p-3 rounded-lg text-xs text-slate-300 mt-6 mt-4">
                   <h4 className="font-bold text-slate-200 mb-1">Handlebars Iteration Syntax</h4>
                   <p>Wrap your logic inside <code className="bg-slate-800 text-primary px-1 rounded">{'{{#each waypoints}}'} ... {'{{/each}}'}</code> to render all elements.</p>
                 </div>
@@ -445,10 +486,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {globalExportTemplates.map((template) => (
                     <div key={template.id} className="bg-slate-900 rounded-lg border border-slate-700/50 flex flex-col overflow-hidden">
                       <div className="flex items-center gap-3 p-3 border-b border-slate-800 bg-slate-800/30">
-                        <input type="text" value={template.name} onChange={(e) => updateExportTemplate(template.id, { name: e.target.value })} className="flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm font-bold text-slate-200" placeholder="Template Name" />
+                        <input type="text" value={template.name} onChange={(e) => updateExportTemplate(template.id, { name: e.target.value } as Partial<import('../../types/store').ExportTemplate>)} className="flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm font-bold text-slate-200" placeholder="Template Name" />
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400 font-medium">Auto-Suffix:</span>
+                          <input type="text" value={template.suffix || ''} onChange={(e) => updateExportTemplate(template.id, { suffix: e.target.value } as Partial<import('../../types/store').ExportTemplate>)} className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200" placeholder="_custom" />
+                        </div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-slate-400 font-medium">Ext:</span>
-                          <input type="text" value={template.extension} onChange={(e) => updateExportTemplate(template.id, { extension: e.target.value })} className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200" placeholder="yaml" />
+                          <input type="text" value={template.extension} onChange={(e) => updateExportTemplate(template.id, { extension: e.target.value } as Partial<import('../../types/store').ExportTemplate>)} className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200" placeholder="yaml" />
                         </div>
                         <button onClick={() => removeExportTemplate(template.id)} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors ml-2">
                           <Trash2 size={16} />

@@ -1,0 +1,50 @@
+{
+    "name": "Rect Sweep Generator",
+    "version": "1.1.0",
+    "type": "python",
+    "executable": "main.py",
+    "inputs": [
+        {
+            "id": "sweep_rect",
+            "label": "Sweep Rectangle",
+            "type": "rectangle"
+        }
+    ],
+    "needs": [],
+    "properties": [
+        {
+            "name": "num_lines",
+            "label": "Number of Lines",
+            "type": "integer",
+            "default": 5
+        },
+        {
+            "name": "snake_pattern",
+            "label": "Snake Pattern (alternating direction)",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "name": "start_corner",
+            "label": "Start Corner",
+            "type": "string",
+            "default": "Bottom-Left",
+            "options": [
+                "Bottom-Left",
+                "Bottom-Right",
+                "Top-Left",
+                "Top-Right"
+            ]
+        },
+        {
+            "name": "sweep_direction",
+            "label": "Sweep Direction",
+            "type": "string",
+            "default": "Horizontal",
+            "options": [
+                "Horizontal",
+                "Vertical"
+            ]
+        }
+    ]
+}

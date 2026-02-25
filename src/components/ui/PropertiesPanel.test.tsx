@@ -24,9 +24,10 @@ describe('PropertiesPanel UI', () => {
     const header = screen.getByText('Waypoint [0]');
     expect(header).toBeInTheDocument();
 
-    const spinButtons = screen.getAllByRole('spinbutton') as HTMLInputElement[];
-    const xInput = spinButtons[0];
-    const yInput = spinButtons[1];
+    // NumericInput renders type="text", so query by textbox role
+    const textboxes = screen.getAllByRole('textbox') as HTMLInputElement[];
+    const xInput = textboxes[0];
+    const yInput = textboxes[1];
 
     expect(xInput.value).toBe('10');
     expect(yInput.value).toBe('20');

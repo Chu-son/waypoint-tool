@@ -25,6 +25,7 @@ export type ExportTemplate = {
   id: string;
   name: string;
   extension: string;
+  suffix: string;
   content: string;
 };
 
@@ -71,6 +72,14 @@ export type PluginManifest = {
   inputs: PluginInputDef[];
   needs?: ('map_image' | 'waypoints' | 'layers')[];
   properties: OptionDef[];
+};
+
+export type DefaultExportFormat = {
+  id: string; // e.g. '__default_yaml__'
+  name: string;
+  extension: string;
+  suffix: string;
+  enabled: boolean;
 };
 
 export type PluginInstance = {
@@ -126,6 +135,7 @@ export interface AppState {
 
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
+  defaultExportFormats: DefaultExportFormat[];
   globalPythonPath: string;
   
   // Unsaved changes tracker
@@ -145,7 +155,8 @@ export interface AppState {
   addExportTemplate: (template: Omit<ExportTemplate, 'id'>) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
-  
+  updateDefaultExportFormat: (id: string, updates: Partial<DefaultExportFormat>) => void;
+
   setActiveTool: (tool: AppState['activeTool']) => void;
   selectNodes: (ids: string[], multi?: boolean) => void;
   addNode: (node: ObjectNode, parentId?: string) => void;

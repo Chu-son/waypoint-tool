@@ -11,6 +11,8 @@ export function PluginParamsPanel() {
   const pluginSettings = useAppStore(state => state.pluginSettings);
   const globalPythonPath = useAppStore(state => state.globalPythonPath);
   const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
+  const activeInputIndex = useAppStore(state => state.activeInputIndex);
+  const setActiveInputIndex = useAppStore(state => state.setActiveInputIndex);
   
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const nodes = useAppStore(state => state.nodes);
@@ -44,6 +46,27 @@ export function PluginParamsPanel() {
     }
   }, [activePluginId, plugin]);
 
+  // Auto-advance to next unset input when current input is completed
+  useEffect(() => {
+    if (!plugin || activeTool !== 'add_generator') return;
+    const inputs = plugin.manifest.inputs || [];
+    if (inputs.length <= 1) return;
+    
+    const currentInput = inputs[activeInputIndex];
+    const currentKey = currentInput?.name || currentInput?.id;
+    if (!currentKey || !pluginInteractionData[currentKey]) return;
+    
+    // Current input has data - find next unset input
+    for (let i = activeInputIndex + 1; i < inputs.length; i++) {
+      const inp = inputs[i];
+      const k = inp.name || inp.id;
+      if (k && !pluginInteractionData[k]) {
+        setActiveInputIndex(i);
+        return;
+      }
+    }
+  }, [pluginInteractionData, activeInputIndex, plugin, activeTool, setActiveInputIndex]);
+
   if (activeTool !== 'add_generator' || !plugin) {
     return null;
   }
@@ -67,10 +90,10 @@ export function PluginParamsPanel() {
          interaction_data: {}
       };
 
-      // Add point coordinates to the parameter payload for python scripts
+      // Add interaction inputs (points & rectangles) to the parameter payload for python scripts
       inputs.forEach(inp => {
          const key = inp.name || inp.id;
-         if (key && inp.type === 'point' && pluginInteractionData[key]) {
+         if (key && pluginInteractionData[key]) {
             contextData.interaction_data[key] = pluginInteractionData[key];
          }
       });
@@ -160,17 +183,67 @@ export function PluginParamsPanel() {
       </div>
 
       <div className="space-y-4 flex-1">
+        {/* Step indicator for multi-input plugins */}
+        {inputs.length > 1 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Input Steps</span>
+              <span className="text-[10px] text-slate-500">{activeInputIndex + 1} / {inputs.length}</span>
+            </div>
+            <div className="flex gap-1">
+              {inputs.map((inp, idx) => {
+                const key = inp.name || inp.id || '';
+                const hasData = !!pluginInteractionData[key];
+                const isActive = idx === activeInputIndex;
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveInputIndex(idx)}
+                    className={`flex-1 py-1.5 px-1 rounded text-[10px] font-medium transition-all border ${
+                      isActive
+                        ? 'bg-primary/20 border-primary text-primary'
+                        : hasData
+                          ? 'bg-emerald-900/30 border-emerald-700/50 text-emerald-400'
+                          : 'bg-slate-800/50 border-slate-700/50 text-slate-500 hover:border-slate-600'
+                    }`}
+                    title={inp.label || key}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold ${
+                        isActive ? 'bg-primary text-white' : hasData ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'
+                      }`}>{idx + 1}</span>
+                      <span className="truncate">{inp.type === 'rectangle' ? '▭' : inp.type === 'point' ? '◉' : '●'}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
         {inputs.length === 0 ? (
            <p className="text-xs text-slate-500 italic">No parameters required for this plugin.</p>
         ) : (
           inputs.map((inp, idx) => {
             const key = inp.name || inp.id;
             if (!key) return null;
+            const isActiveStep = idx === activeInputIndex;
+            const hasData = !!pluginInteractionData[key];
             return (
-              <div key={idx} className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">
+              <div key={idx} className={`space-y-1 rounded-lg p-2 transition-all ${isActiveStep ? 'ring-1 ring-primary/50 bg-primary/5' : ''}`}>
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                  {inputs.length > 1 && (
+                    <span className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0 ${
+                      isActiveStep ? 'bg-primary text-white' : hasData ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'
+                    }`}>{idx + 1}</span>
+                  )}
                   {inp.label || key} {inp.required && <span className="text-red-400">*</span>}
                 </label>
+                {isActiveStep && !hasData && (
+                  <p className="text-[10px] text-primary/70 font-medium">
+                    {inp.type === 'rectangle' ? '▶ Click and drag on map to draw' : inp.type === 'point' ? '▶ Click on map to place' : ''}
+                  </p>
+                )}
                 {inp.description && <p className="text-[10px] text-slate-500 leading-tight mb-1">{inp.description}</p>}
                 
                 {inp.type === 'boolean' ? (
@@ -194,6 +267,26 @@ export function PluginParamsPanel() {
                         <span className="text-slate-500 italic">Click on map to define</span>
                      )}
                   </div>
+                ) : inp.type === 'rectangle' ? (
+                  <div className="bg-slate-950 p-2 rounded border border-slate-700 font-mono text-xs">
+                      {pluginInteractionData[key]?.center ? (
+                         <div className="space-y-1">
+                           <div className="grid grid-cols-2 gap-x-2">
+                             <div className="flex justify-between"><span className="text-slate-400">W:</span><span className="text-pink-400">{pluginInteractionData[key].width?.toFixed(2)}m</span></div>
+                             <div className="flex justify-between"><span className="text-slate-400">H:</span><span className="text-pink-400">{pluginInteractionData[key].height?.toFixed(2)}m</span></div>
+                             <div className="flex justify-between"><span className="text-slate-400">X:</span><span className="text-pink-400">{pluginInteractionData[key].center?.x?.toFixed(2)}</span></div>
+                             <div className="flex justify-between"><span className="text-slate-400">Y:</span><span className="text-pink-400">{pluginInteractionData[key].center?.y?.toFixed(2)}</span></div>
+                           </div>
+                           <div className="flex justify-between pt-0.5 border-t border-slate-800">
+                             <span className="text-slate-400">Yaw:</span>
+                             <span className="text-orange-400">{((pluginInteractionData[key].yaw ?? 0) * 180 / Math.PI).toFixed(1)}°</span>
+                           </div>
+                           <div className="text-center text-slate-500 text-[10px] mt-1">Drag ◻ corners · Drag ↻ handle to rotate</div>
+                         </div>
+                      ) : (
+                         <span className="text-slate-500 italic text-center block">Click and drag on map to draw rectangle</span>
+                      )}
+                   </div>
                 ) : inp.type === 'integer' || inp.type === 'float' ? (
                    <input 
                      type="number"
@@ -251,6 +344,16 @@ export function PluginParamsPanel() {
                    className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary placeholder:text-slate-600"
                    placeholder={String(prop.default ?? '')}
                  />
+              ) : Array.isArray((prop as any).options) && (prop as any).options.length > 0 ? (
+                 <select
+                   value={params[key] ?? prop.default ?? ''}
+                   onChange={e => setParams(prev => ({...prev, [key]: e.target.value}))}
+                   className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-primary cursor-pointer"
+                 >
+                   {(prop as any).options.map((opt: string) => (
+                     <option key={opt} value={opt}>{opt}</option>
+                   ))}
+                 </select>
               ) : (
                  <input 
                    type="text"

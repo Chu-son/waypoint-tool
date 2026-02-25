@@ -16,52 +16,58 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   const lastDirectory = useAppStore(state => state.lastDirectory);
   const setLastDirectory = useAppStore(state => state.setLastDirectory);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
+  const optionsSchema = useAppStore(state => state.optionsSchema);
 
   const [includeImage, setIncludeImage] = useState(false);
-  const [selectedFormatLabel, setSelectedFormatLabel] = useState<string>('YAML Document');
+  const [selectedFormats, setSelectedFormats] = useState<string[]>(['__default_yaml__']);
 
   if (!isOpen) return null;
 
+  const toggleFormat = (fmtId: string) => {
+    setSelectedFormats(prev => 
+      prev.includes(fmtId) ? prev.filter(f => f !== fmtId) : [...prev, fmtId]
+    );
+  };
+
   const handleExport = async () => {
+    if (selectedFormats.length === 0) {
+      alert("At least one export format must be selected.");
+      return;
+    }
+
     try {
-      const customFilters = exportTemplates.map(t => ({ name: t.name, extensions: [t.extension] }));
-      
       const savePath = await save({
         defaultPath: lastDirectory || undefined,
-        filters: [
-          { name: 'YAML Document', extensions: ['yaml', 'yml'] },
-          { name: 'JSON Document', extensions: ['json'] },
-          ...customFilters
-        ]
+        title: 'Select Destination Base Path',
       });
       
       if (savePath) {
-        let finalPath = savePath;
-        const validExts = ['yaml', 'yml', 'json', ...exportTemplates.map(t => t.extension)];
-        const hasValidExt = validExts.some(ext => finalPath.toLowerCase().endsWith('.' + ext.toLowerCase()));
-        
-        // Find extension matching what they selected if missing
-        if (!hasValidExt) {
-          if (selectedFormatLabel === 'JSON Document') finalPath += '.json';
-          else if (selectedFormatLabel === 'YAML Document') finalPath += '.yaml';
-          else {
-             const t = exportTemplates.find(x => x.name === selectedFormatLabel);
-             if (t) finalPath += `.${t.extension}`;
-             else finalPath += '.yaml';
-          }
+        // Remove trailing extension if user typed one, so we can append cleanly
+        let basePath = savePath;
+        const lastDot = basePath.lastIndexOf('.');
+        const lastSlash = Math.max(basePath.lastIndexOf('/'), basePath.lastIndexOf('\\'));
+        if (lastDot > lastSlash) {
+          basePath = basePath.substring(0, lastDot);
         }
 
-        // Basic directory extraction
-        const lastSlash = Math.max(finalPath.lastIndexOf('/'), finalPath.lastIndexOf('\\'));
-        if (lastSlash > -1) setLastDirectory(finalPath.substring(0, lastSlash));
+        if (lastSlash > -1) setLastDirectory(basePath.substring(0, lastSlash));
 
-        const optionsSchema = useAppStore.getState().optionsSchema;
+        // 1. Flatten all waypoints including generator children
+        const flatIds: string[] = [];
+        rootNodeIds.forEach(id => {
+          const node = nodes[id];
+          if (!node) return;
+          if (node.type === 'manual') flatIds.push(id);
+          else if (node.type === 'generator' && node.children_ids) {
+            flatIds.push(...node.children_ids);
+          }
+        });
 
-        const waypointsToExport = rootNodeIds.map((id, index) => {
+        // 2. Hydrate and map
+        const waypointsToExport = flatIds.map((id, index) => {
           const node = nodes[id];
           if (!node) return null;
           
-          // Hydrate options with schema defaults so templates can always access them
           const fullOptions: Record<string, any> = {};
           if (optionsSchema && optionsSchema.options) {
             optionsSchema.options.forEach((opt: any) => {
@@ -98,22 +104,52 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           };
         }).filter(n => n !== null);
 
-        const ext = finalPath.split('.').pop()?.toLowerCase() || '';
-        const matchedTemplate = exportTemplates.find(t => t.extension.toLowerCase() === ext);
-
         // Extract image if requested
         let imageDataB64 = undefined;
         if (includeImage) {
           useAppStore.setState({ shouldFitToMaps: Date.now() });
-          await new Promise(r => setTimeout(r, 800)); // Give Pixi ample time to re-render
-
+          await new Promise(r => setTimeout(r, 800)); // wait for Pixi
           const canvas = document.querySelector('canvas');
           if (canvas) {
-            imageDataB64 = canvas.toDataURL('image/png').split(',')[1]; // remove data prefix
+            imageDataB64 = canvas.toDataURL('image/png').split(',')[1];
           }
         }
 
-        await BackendAPI.exportWaypoints(finalPath, waypointsToExport as any[], matchedTemplate?.content, imageDataB64);
+        // Export each selected format
+        for (let i = 0; i < selectedFormats.length; i++) {
+          const formatId = selectedFormats[i];
+          
+          let extension = 'yaml';
+          let suffix = '';
+          let templateContent = undefined;
+          
+          // Check Default Formats first
+          const defaultFormat = useAppStore.getState().defaultExportFormats.find(f => f.id === formatId);
+          if (defaultFormat) {
+            extension = defaultFormat.extension;
+            suffix = defaultFormat.suffix;
+          } else {
+            // Check Custom Templates
+            const t = exportTemplates.find(x => x.id === formatId);
+            if (t) {
+               templateContent = t.content;
+               extension = t.extension;
+               suffix = t.suffix || '';
+            } else {
+               continue; // Skip invalid
+            }
+          }
+
+          const finalPath = `${basePath}${suffix}.${extension}`;
+
+          // Only send image on the first format to avoid overwriting identical PNGs wastefully
+          await BackendAPI.exportWaypoints(
+            finalPath, 
+            waypointsToExport as any[], 
+            templateContent, 
+            i === 0 ? imageDataB64 : undefined
+          );
+        }
         
         alert("エクスポートが完了しました。");
         onClose();
@@ -136,20 +172,23 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
         
         <div className="p-6 space-y-6">
           <div className="space-y-4">
-            <div className="space-y-2">
-               <label className="text-sm font-medium text-slate-300 block">Default Output Format</label>
-               <select 
-                 value={selectedFormatLabel} 
-                 onChange={e => setSelectedFormatLabel(e.target.value)}
-                 className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200"
-               >
-                 <option value="YAML Document">YAML (.yaml)</option>
-                 <option value="JSON Document">JSON (.json)</option>
-                 {exportTemplates.map(t => (
-                   <option key={t.id} value={t.name}>{t.name} (.{t.extension})</option>
+            <div className="space-y-3">
+               <label className="text-sm font-medium text-slate-300 block">Output Formats</label>
+                <div className="flex flex-col gap-2 bg-slate-900/50 p-3 rounded border border-slate-700">
+                 {useAppStore.getState().defaultExportFormats.filter(f => f.enabled).map(f => (
+                   <label key={f.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input type="checkbox" checked={selectedFormats.includes(f.id)} onChange={() => toggleFormat(f.id)} className="w-4 h-4 rounded border-slate-600 text-primary focus:ring-primary/20 bg-slate-800" />
+                      <span className="text-sm text-slate-300 group-hover:text-white transition-colors">{f.name} (.{f.extension})</span>
+                   </label>
                  ))}
-               </select>
-               <p className="text-xs text-slate-500">This hints the file browser for default extension. You can still choose later.</p>
+                 {exportTemplates.map(t => (
+                   <label key={t.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input type="checkbox" checked={selectedFormats.includes(t.id)} onChange={() => toggleFormat(t.id)} className="w-4 h-4 rounded border-slate-600 text-primary focus:ring-primary/20 bg-slate-800" />
+                      <span className="text-sm text-slate-300 group-hover:text-white transition-colors">{t.name} (.{t.extension})</span>
+                   </label>
+                 ))}
+               </div>
+               <p className="text-xs text-slate-500">Select multiple formats to generate all simultaneously. Suffixes specified in the Settings panel will be automatically appended.</p>
             </div>
 
             <div className="pt-4 border-t border-slate-700">
@@ -179,7 +218,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
             <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors">
               Cancel
             </button>
-            <button onClick={handleExport} className="px-5 py-2 bg-primary hover:bg-blue-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-blue-500/20">
+            <button onClick={handleExport} disabled={selectedFormats.length === 0} className={`px-5 py-2 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-all shadow-lg ${selectedFormats.length === 0 ? 'bg-slate-700 opacity-50 cursor-not-allowed' : 'bg-primary hover:bg-blue-500 shadow-blue-500/20'}`}>
               <Save size={16} /> Choose Path & Export
             </button>
           </div>

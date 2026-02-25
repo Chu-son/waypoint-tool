@@ -36,7 +36,7 @@ describe('AppStore Zustand Store', () => {
     const { addExportTemplate, updateExportTemplate, removeExportTemplate } = useAppStore.getState();
     
     // Add template
-    addExportTemplate({ id: 'template-id-1', name: 'Template 1', extension: 'txt', content: 'test content' });
+    addExportTemplate({ id: 'template-id-1', name: 'Template 1', extension: 'txt', suffix: '', content: 'test content' });
     let state = useAppStore.getState();
     expect(state.exportTemplates.length).toBe(1);
     expect(state.exportTemplates[0].name).toBe('Template 1');

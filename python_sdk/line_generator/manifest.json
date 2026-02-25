@@ -1,0 +1,28 @@
+{
+    "name": "Line Generator",
+    "version": "1.0.0",
+    "type": "python",
+    "executable": "main.py",
+    "inputs": [
+        {
+            "id": "start_point",
+            "label": "Start Point",
+            "type": "point"
+        }
+    ],
+    "needs": [],
+    "properties": [
+        {
+            "name": "num_points",
+            "label": "Number of Points",
+            "type": "integer",
+            "default": 5
+        },
+        {
+            "name": "spacing",
+            "label": "Point Spacing (m)",
+            "type": "float",
+            "default": 1.0
+        }
+    ]
+}

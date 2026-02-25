@@ -18,6 +18,7 @@ export type AppState = {
   pluginSettings: import('../types/store').PluginSetting[];
   activePluginId: string | null;
   pluginInteractionData: Record<string, any>;
+  activeInputIndex: number;
   
   // Maps & Layers
   mapLayers: ProjectMapLayer[];
@@ -25,6 +26,7 @@ export type AppState = {
 
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
+  defaultExportFormats: import('../types/store').DefaultExportFormat[];
   globalPythonPath: string;
   
   visibleAttributes: string[];
@@ -37,6 +39,7 @@ export type AppState = {
   showGrid: boolean;
   shouldFitToMaps: number; // timestamp trigger
   toolPanelMaxColumns: number;
+  decimalPrecision: number; // Number of decimal places for numeric input display (default 6)
 
   // Methods
   addNode: (node: WaypointNode, parentId?: string) => void;
@@ -64,6 +67,7 @@ export type AppState = {
   addExportTemplate: (template: ExportTemplate) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
+  updateDefaultExportFormat: (id: string, updates: Partial<import('../types/store').DefaultExportFormat>) => void;
   
   // Plugin Methods
   setPlugins: (plugins: Record<string, PluginInstance>) => void;
@@ -73,6 +77,7 @@ export type AppState = {
   updatePluginInteractionData: (inputId: string, data: any) => void;
   clearPluginInteractionData: () => void;
   setToolPanelMaxColumns: (max: number) => void;
+  setActiveInputIndex: (index: number) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -91,6 +96,7 @@ export const useAppStore = create<AppState>()(
       pluginSettings: [],
       activePluginId: null,
       pluginInteractionData: {},
+      activeInputIndex: 0,
       
       // Maps & Layers
       mapLayers: [],
@@ -98,6 +104,10 @@ export const useAppStore = create<AppState>()(
 
       optionsSchema: null,
       exportTemplates: [],
+      defaultExportFormats: [
+        { id: '__default_yaml__', name: 'YAML Document', extension: 'yaml', suffix: '_yaml', enabled: true },
+        { id: '__default_json__', name: 'JSON Document', extension: 'json', suffix: '_json', enabled: true },
+      ],
       globalPythonPath: 'python',
       visibleAttributes: [],
       indexStartIndex: 0,
@@ -107,6 +117,7 @@ export const useAppStore = create<AppState>()(
       showGrid: true,
       shouldFitToMaps: 0,
       toolPanelMaxColumns: 1,
+      decimalPrecision: 6,
 
       // Actions
       setDirty: (dirty: boolean) => set({ isDirty: dirty }), // --- Actions ---
@@ -176,6 +187,11 @@ export const useAppStore = create<AppState>()(
         isDirty: true
       })),
 
+      updateDefaultExportFormat: (id: string, updates: Partial<import('../types/store').DefaultExportFormat>) => set((state) => ({
+        defaultExportFormats: state.defaultExportFormats.map((f: import('../types/store').DefaultExportFormat) => f.id === id ? { ...f, ...updates } : f),
+        isDirty: true
+      })),
+
       setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),
 
       setActiveTool: (tool: AppState['activeTool']) => set({ activeTool: tool }),
@@ -199,7 +215,9 @@ export const useAppStore = create<AppState>()(
           selectedNodeIds: [],
           mapLayers: data.map_layers || data.mapLayers || state.mapLayers, // Keep existing if not in project
           exportTemplates: data.export_templates || state.exportTemplates,
+          defaultExportFormats: data.default_export_formats || state.defaultExportFormats,
           indexStartIndex: data.index_start_index ?? state.indexStartIndex,
+          decimalPrecision: data.decimal_precision ?? state.decimalPrecision,
           isDirty: false, // Reset dirty state on load
         })),
         
@@ -210,7 +228,7 @@ export const useAppStore = create<AppState>()(
         isDirty: true
       })),
       
-      setActivePlugin: (pluginId) => set({ activePluginId: pluginId, pluginInteractionData: {} }),
+      setActivePlugin: (pluginId) => set({ activePluginId: pluginId, pluginInteractionData: {}, activeInputIndex: 0 }),
       
       updatePluginInteractionData: (inputId, data) => 
         set((state) => ({
@@ -222,6 +240,7 @@ export const useAppStore = create<AppState>()(
         
       clearPluginInteractionData: () => set({ pluginInteractionData: {} }),
       setToolPanelMaxColumns: (max) => set({ toolPanelMaxColumns: max, isDirty: true }),
+      setActiveInputIndex: (index) => set({ activeInputIndex: index }),
 
       addNode: (node: WaypointNode, parentId?: string) => set((state) => {
         const newNodes = { ...state.nodes, [node.id]: node };
@@ -300,12 +319,14 @@ export const useAppStore = create<AppState>()(
         lastDirectory: state.lastDirectory,
         optionsSchema: state.optionsSchema,
         exportTemplates: state.exportTemplates,
+        defaultExportFormats: state.defaultExportFormats,
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,
         showGrid: state.showGrid,
         pluginSettings: state.pluginSettings,
         toolPanelMaxColumns: state.toolPanelMaxColumns,
         globalPythonPath: state.globalPythonPath,
+        decimalPrecision: state.decimalPrecision,
       }),
     }
   )
