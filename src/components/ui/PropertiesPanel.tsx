@@ -2,7 +2,7 @@ import { useAppStore } from "../../stores/appStore";
 import { OptionDef } from "../../types/store";
 import { Eye, EyeOff, Play, Settings2, RefreshCcw } from "lucide-react";
 import { useState, useEffect } from "react";
-import { BackendAPI } from "../../api/backend";
+import { BackendAPI } from "../../api";
 import { v4 as uuidv4 } from "uuid";
 import { NumericInput } from "./NumericInput";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";

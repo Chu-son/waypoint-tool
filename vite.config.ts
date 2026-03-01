@@ -22,7 +22,10 @@ export default defineConfig(async () => ({
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
-    strictPort: true,
+    // Tauri sets process.env.TAURI_ENV_PLATFORM when running via `tauri dev`
+    // If we're not running through Tauri, we can let Vite pick a random port
+    // @ts-expect-error process is a nodejs global
+    strictPort: !!process.env.TAURI_ENV_PLATFORM,
     host: host || false,
     hmr: host
       ? {

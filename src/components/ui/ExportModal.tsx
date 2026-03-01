@@ -1,8 +1,8 @@
 import { X, Save, Image as ImageIcon } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { save } from "@tauri-apps/plugin-dialog";
-import { BackendAPI } from "../../api/backend";
+import { DialogAPI } from "../../api";
+import { BackendAPI } from "../../api";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -38,9 +38,8 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     }
 
     try {
-      const savePath = await save({
+      const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
-        title: "Select Destination Base Path",
       });
 
       if (savePath) {

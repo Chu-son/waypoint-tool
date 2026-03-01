@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { BackendAPI } from "../../api/backend";
+import { BackendAPI } from "../../api";
 import { Play, Settings2, X, AlertCircle } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";

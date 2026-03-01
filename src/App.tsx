@@ -11,8 +11,10 @@ import { useAppStore } from "./stores/appStore";
 import { ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { ask } from "@tauri-apps/plugin-dialog";
-import { BackendAPI } from "./api/backend";
+import { DialogAPI, BackendAPI } from "./api";
+
+const isTauri = () => '__TAURI_INTERNALS__' in window;
+
 import { PluginInstance } from "./types/store";
 
 function App() {
@@ -123,12 +125,13 @@ function App() {
   }, [selectedNodeIds, activeTool, removeNodes]);
 
   useEffect(() => {
-    const unlisten = getCurrentWindow().onCloseRequested(async (event) => {
+    if (!isTauri()) return;
+    const unlistenPromise = getCurrentWindow().onCloseRequested(async (event) => {
       // Completely intercept the closing event to bypass tauri-plugin-window-state race conditions
       event.preventDefault();
 
       if (useAppStore.getState().isDirty) {
-        const confirmed = await ask(
+        const confirmed = await DialogAPI.ask(
           "未保存の変更があります。保存せずに終了してもよろしいですか？",
           {
             title: "終了の確認",
@@ -158,7 +161,7 @@ function App() {
     });
 
     return () => {
-      unlisten.then((f) => f());
+      unlistenPromise.then((f) => f());
     };
   }, []);
 

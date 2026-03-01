@@ -60,7 +60,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   useEffect(() => {
     if (isOpen) {
       setLocalOptions(globalOptionsSchema?.options || []);
-      import("../../api/backend").then(({ BackendAPI }) => {
+      import("../../api").then(({ BackendAPI }) => {
         BackendAPI.getPythonEnvironments()
           .then((envs) => setPythonEnvs(envs))
           .catch(console.error);
@@ -336,9 +336,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     />
                     <button
                       onClick={async () => {
-                        const { open } =
-                          await import("@tauri-apps/plugin-dialog");
-                        const selectedPath = await open({
+                        const { DialogAPI } = await import("../../api");
+                        const selectedPath = await DialogAPI.open({
                           multiple: false,
                           directory: false,
                         });
@@ -380,11 +379,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <button
                       onClick={async () => {
                         try {
-                          const { open } =
-                            await import("@tauri-apps/plugin-dialog");
-                          const { BackendAPI } =
-                            await import("../../api/backend");
-                          const selectedPath = await open({
+                          const { DialogAPI, BackendAPI } = await import("../../api");
+                          const selectedPath = await DialogAPI.open({
                             multiple: false,
                             defaultPath: lastDirectory || undefined,
                             filters: [
@@ -868,11 +864,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <button
                     onClick={async () => {
                       try {
-                        const { open } =
-                          await import("@tauri-apps/plugin-dialog");
+                        const { DialogAPI } =
+                          await import("../../api");
                         const { BackendAPI } =
-                          await import("../../api/backend");
-                        const selectedPath = await open({
+                          await import("../../api");
+                        const selectedPath = await DialogAPI.open({
                           multiple: false,
                           directory: true,
                           defaultPath: lastDirectory || undefined,
@@ -927,16 +923,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <button
                     onClick={async () => {
                       try {
-                        const { open } =
-                          await import("@tauri-apps/plugin-dialog");
+                        const { DialogAPI } =
+                          await import("../../api");
                         const { BackendAPI } =
-                          await import("../../api/backend");
+                          await import("../../api");
                         // Step 1: Select parent directory via explorer dialog
-                        const selectedPath = await open({
+                        const selectedPath = await DialogAPI.open({
                           multiple: false,
                           directory: true,
                           defaultPath: lastDirectory || undefined,
-                          title: "プラグインを作成する親ディレクトリを選択",
                         });
                         if (!selectedPath) return;
                         const targetDir =
@@ -1128,7 +1123,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                             onClick={async () => {
                                               try {
                                                 const { BackendAPI } =
-                                                  await import("../../api/backend");
+                                                  await import("../../api");
                                                 const newVersion =
                                                   await BackendAPI.updatePluginSdk(
                                                     plugin.folder_path,
@@ -1210,9 +1205,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 />
                                 <button
                                   onClick={async () => {
-                                    const { open } =
-                                      await import("@tauri-apps/plugin-dialog");
-                                    const selectedPath = await open({
+                                    const { DialogAPI } =
+                                      await import("../../api");
+                                    const selectedPath = await DialogAPI.open({
                                       multiple: false,
                                       directory: false,
                                     });

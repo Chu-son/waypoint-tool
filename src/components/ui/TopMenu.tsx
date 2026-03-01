@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { open, save as tauriSave, ask } from "@tauri-apps/plugin-dialog";
-import { BackendAPI } from "../../api/backend";
+import { DialogAPI, BackendAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
 import { saveWindowState, StateFlags } from "@tauri-apps/plugin-window-state";
 import { MousePointer2 } from "lucide-react";
@@ -115,7 +114,7 @@ export function TopMenu() {
 
   const handleLoadProject = async () => {
     try {
-      const selectedPath = await open({
+      const selectedPath = await DialogAPI.open({
         multiple: false,
         defaultPath: lastDirectory || undefined,
         filters: [{ name: "Waypoint Project", extensions: ["wptroj"] }],
@@ -164,7 +163,7 @@ export function TopMenu() {
 
   const handleSaveProject = async () => {
     try {
-      const savePath = await tauriSave({
+      const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
         filters: [{ name: "Waypoint Project", extensions: ["wptroj"] }],
       });
@@ -207,7 +206,7 @@ export function TopMenu() {
 
   const handleExit = async () => {
     if (useAppStore.getState().isDirty) {
-      const confirmed = await ask(
+      const confirmed = await DialogAPI.ask(
         "未保存の変更があります。保存せずに終了してもよろしいですか？",
         {
           title: "終了の確認",

@@ -4,7 +4,7 @@ import { LayerPanel } from './LayerPanel';
 import { useAppStore } from '../../stores/appStore';
 
 // Mock Tauri modules
-vi.mock('@tauri-apps/plugin-dialog', () => ({
+vi.mock('../../api/dialog', () => ({
   open: vi.fn(),
 }));
 

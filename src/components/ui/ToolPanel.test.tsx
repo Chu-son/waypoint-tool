@@ -4,7 +4,7 @@ import { ToolPanel } from './ToolPanel';
 import { useAppStore } from '../../stores/appStore';
 
 // Mock Tauri modules used by child components (SettingsModal, ExportModal)
-vi.mock('@tauri-apps/plugin-dialog', () => ({
+vi.mock('../../api/dialog', () => ({
   open: vi.fn(),
   save: vi.fn(),
 }));

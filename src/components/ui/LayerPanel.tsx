@@ -1,7 +1,7 @@
 import { Eye, EyeOff, Trash2, FolderOpen } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
-import { open } from "@tauri-apps/plugin-dialog";
-import { BackendAPI } from "../../api/backend";
+import { DialogAPI } from "../../api";
+import { BackendAPI } from "../../api";
 
 export function LayerPanel() {
   const mapLayers = useAppStore((state) => state.mapLayers);
@@ -14,7 +14,7 @@ export function LayerPanel() {
 
   const handleLoadMap = async () => {
     try {
-      const selectedPath = await open({
+      const selectedPath = await DialogAPI.open({
         multiple: false,
         defaultPath: lastDirectory || undefined,
         filters: [{ name: "ROS Map YAML", extensions: ["yaml"] }],

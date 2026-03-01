@@ -1,7 +1,7 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from './App';
-import { BackendAPI } from './api/backend';
+import { BackendAPI, DialogAPI } from './api';
 import { useAppStore } from './stores/appStore';
 
 // Mock Tauri specific modules
@@ -16,13 +16,14 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }));
 
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  open: vi.fn(),
-  ask: vi.fn().mockResolvedValue(true),
-}));
+
 
 // Mock the backend API
-vi.mock('./api/backend', () => ({
+vi.mock('./api', () => ({
+  DialogAPI: {
+    open: vi.fn(),
+    ask: vi.fn().mockResolvedValue(true),
+  },
   BackendAPI: {
     fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
     loadROSMap: vi.fn(),
@@ -72,8 +73,7 @@ describe('App Integration', () => {
 
   it('handles loading a map file', async () => {
     // Mock open dialog specifically for this test
-    const { open } = await import('@tauri-apps/plugin-dialog');
-    (open as any).mockResolvedValue('map.yaml');
+    (DialogAPI.open as any).mockResolvedValueOnce('map.yaml');
 
     // Make the backend mock map load
     const mockedMapData = {
@@ -99,8 +99,7 @@ describe('App Integration', () => {
     });
 
     await waitFor(() => {
-      // It should call the plugin dialog to select a file
-      expect(open).toHaveBeenCalled();
+      expect(DialogAPI.open).toHaveBeenCalled();
     });
 
     await waitFor(() => {
