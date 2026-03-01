@@ -15,6 +15,10 @@ export type OptionDef = {
   item_type?: string;
   default?: any;
   enum_values?: string[];
+  interaction_hint?: {
+    type: 'start_corner' | 'sweep_direction';
+    target_input: string;
+  };
 };
 
 export type OptionsSchema = {

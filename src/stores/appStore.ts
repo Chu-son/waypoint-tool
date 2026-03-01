@@ -17,7 +17,8 @@ export type AppState = {
   plugins: Record<string, PluginInstance>;
   pluginSettings: import('../types/store').PluginSetting[];
   activePluginId: string | null;
-  pluginInteractionData: Record<string, any>;
+  pluginInteractionData: Record<string, any>; // Interaction inputs (e.g. { 'sweep_rect': { center, ... } })
+  pluginActiveProperties: Record<string, any>; // Currently edited properties (e.g. { 'num_lines': 5 })
   activeInputIndex: number;
   
   // Maps & Layers
@@ -76,6 +77,7 @@ export type AppState = {
   setActivePlugin: (pluginId: string | null) => void;
   updatePluginInteractionData: (inputId: string, data: any) => void;
   clearPluginInteractionData: () => void;
+  setPluginActiveProperties: (props: Record<string, any>) => void;
   setToolPanelMaxColumns: (max: number) => void;
   setActiveInputIndex: (index: number) => void;
 }
@@ -96,6 +98,7 @@ export const useAppStore = create<AppState>()(
       pluginSettings: [],
       activePluginId: null,
       pluginInteractionData: {},
+      pluginActiveProperties: {},
       activeInputIndex: 0,
       
       // Maps & Layers
@@ -228,7 +231,12 @@ export const useAppStore = create<AppState>()(
         isDirty: true
       })),
       
-      setActivePlugin: (pluginId) => set({ activePluginId: pluginId, pluginInteractionData: {}, activeInputIndex: 0 }),
+      setActivePlugin: (pluginId) => set({ 
+        activePluginId: pluginId, 
+        pluginInteractionData: {}, 
+        pluginActiveProperties: {},
+        activeInputIndex: 0 
+      }),
       
       updatePluginInteractionData: (inputId, data) => 
         set((state) => ({
@@ -238,7 +246,12 @@ export const useAppStore = create<AppState>()(
           }
         })),
         
-      clearPluginInteractionData: () => set({ pluginInteractionData: {} }),
+      clearPluginInteractionData: () => set({ 
+        pluginInteractionData: {}, 
+        pluginActiveProperties: {},
+        activeInputIndex: 0 
+      }),
+      setPluginActiveProperties: (props) => set({ pluginActiveProperties: props }),
       setToolPanelMaxColumns: (max) => set({ toolPanelMaxColumns: max, isDirty: true }),
       setActiveInputIndex: (index) => set({ activeInputIndex: index }),
 

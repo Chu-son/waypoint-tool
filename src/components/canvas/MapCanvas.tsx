@@ -65,6 +65,7 @@ export function MapCanvas() {
   const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
   const activePluginId = useAppStore(state => state.activePluginId);
   const plugins = useAppStore(state => state.plugins);
+  const pluginActiveProperties = useAppStore(state => state.pluginActiveProperties);
   const activeInputIndex = useAppStore(state => state.activeInputIndex);
   
   const mapLayers = useAppStore(state => state.mapLayers);
@@ -962,36 +963,50 @@ export function MapCanvas() {
                        />
                      );
                    })()}
-                   {/* Start corner triangle indicator */}
-                   {(() => {
-                     // Read sweep display params from store (synced by PluginParamsPanel)
-                     const sweepParams = pluginInteractionData['_sweep_params'];
-                     // Fallback to generator node params if editing
-                     const selectedNode = selectedNodeIds.length === 1 ? nodes[selectedNodeIds[0]] : null;
-                     const genParams = selectedNode?.type === 'generator' ? selectedNode.generator_params?.properties : null;
-                     
-                     const startCorner = String(sweepParams?.start_corner || genParams?.start_corner || 'Bottom-Left');
-                     const sweepDir = String(sweepParams?.sweep_direction || genParams?.sweep_direction || 'Horizontal');
-                     
-                     // Corner positions in local space (Y-up)
-                     let cx = 0, cy = 0;
-                     if (startCorner === 'Bottom-Left') { cx = -halfW; cy = -halfH; }
-                     else if (startCorner === 'Bottom-Right') { cx = halfW; cy = -halfH; }
-                     else if (startCorner === 'Top-Left') { cx = -halfW; cy = halfH; }
-                     else if (startCorner === 'Top-Right') { cx = halfW; cy = halfH; }
-                     
-                     // Direction arrow: Horizontal = along X, Vertical = along Y
-                     // Sign depends on which side of the rect we're on
-                     let dirX = 0, dirY = 0;
-                     const arrowLen = 12 / safeScale;
-                     if (sweepDir === 'Horizontal') {
-                       dirX = cx < 0 ? arrowLen : -arrowLen; // point inward
-                     } else {
-                       dirY = cy < 0 ? arrowLen : -arrowLen; // point inward
-                     }
-                     
-                     const triSize = 5 / safeScale;
-                     const angle = Math.atan2(dirY, dirX);
+                    {/* Dynamic interaction hints (e.g. sweep indicator) */}
+                    {(() => {
+                      // Generic hint resolution: look for properties in the manifest that target this input ID
+                      const selectedNode = selectedNodeIds.length === 1 ? nodes[selectedNodeIds[0]] : null;
+                      const selectedPluginId = selectedNode?.type === 'generator' ? selectedNode.plugin_id : activePluginId;
+                      const activePlugin = selectedPluginId ? plugins[selectedPluginId] : null;
+
+                      let startCorner = '';
+                      let sweepDir = '';
+
+                      // Iterate over properties to find hints targeting this specific input (key)
+                      activePlugin?.manifest?.properties?.forEach(prop => {
+                        if (prop.interaction_hint?.target_input === key) {
+                          const val = pluginActiveProperties[prop.name] ?? prop.default;
+                          if (prop.interaction_hint.type === 'start_corner') startCorner = String(val || '');
+                          if (prop.interaction_hint.type === 'sweep_direction') sweepDir = String(val || '');
+                        }
+                      });
+
+                      if (!startCorner && !sweepDir) return null;
+
+                      // Default to standard sweep behaviors if hints are partially present
+                      if (!startCorner) startCorner = 'Bottom-Left';
+                      if (!sweepDir) sweepDir = 'Horizontal';
+                      
+                      // Corner positions in local space (Y-up)
+                      let cx = 0, cy = 0;
+                      // NOTE: Our Y coordinate is inverted (+Y is up).
+                      if (startCorner === 'Bottom-Left') { cx = -halfW; cy = -halfH; }
+                      else if (startCorner === 'Bottom-Right') { cx = halfW; cy = -halfH; }
+                      else if (startCorner === 'Top-Left') { cx = -halfW; cy = halfH; }
+                      else if (startCorner === 'Top-Right') { cx = halfW; cy = halfH; }
+                      
+                      // Direction arrow: Horizontal = along X, Vertical = along Y
+                      let dirX = 0, dirY = 0;
+                      const arrowLen = 12 / safeScale;
+                      if (sweepDir === 'Horizontal') {
+                        dirX = cx < 0 ? arrowLen : -arrowLen; // point inward
+                      } else {
+                        dirY = cy < 0 ? arrowLen : -arrowLen; // point inward
+                      }
+                      
+                      const triSize = 5 / safeScale;
+                      const angle = Math.atan2(dirY, dirX);
                      
                      return (
                        <pixiGraphics

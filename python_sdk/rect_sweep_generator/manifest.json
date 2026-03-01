@@ -35,7 +35,11 @@
                 "Bottom-Right",
                 "Top-Left",
                 "Top-Right"
-            ]
+            ],
+            "interaction_hint": {
+                "type": "start_corner",
+                "target_input": "sweep_rect"
+            }
         },
         {
             "name": "sweep_direction",
@@ -45,7 +49,11 @@
             "options": [
                 "Horizontal",
                 "Vertical"
-            ]
+            ],
+            "interaction_hint": {
+                "type": "sweep_direction",
+                "target_input": "sweep_rect"
+            }
         }
     ]
 }

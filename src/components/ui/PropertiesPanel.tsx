@@ -56,6 +56,13 @@ export function PropertiesPanel() {
     }
   }, [node?.id, isMultiSelection]);
 
+  // Sync current property values to the global store so MapCanvas can use them for interaction hints
+  useEffect(() => {
+    if (!isMultiSelection && node?.type === "generator") {
+      useAppStore.getState().setPluginActiveProperties(genParams);
+    }
+  }, [genParams, node?.id, isMultiSelection]);
+
   if (selectedNodeIds.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
