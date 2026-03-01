@@ -93,8 +93,6 @@ function App() {
         if (settingsChanged) {
           useAppStore.getState().setPluginSettings(validSettings);
         }
-
-        console.log("Loaded plugins:", Object.keys(pluginMap).length);
       } catch (e) {
         console.error("Failed to load plugins:", e);
       }
@@ -117,7 +115,7 @@ function App() {
           useAppStore.setState({ selectedNodeIds: [] });
         if (activeTool !== "select")
           useAppStore.setState({ activeTool: "select" });
-        useAppStore.setState({ pluginInteractionData: undefined });
+        useAppStore.setState({ pluginInteractionData: {} });
       }
     };
     window.addEventListener("keydown", handleKeyDown);

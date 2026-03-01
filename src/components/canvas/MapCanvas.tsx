@@ -496,10 +496,10 @@ export function MapCanvas() {
 
         // Current corner coordinates in local space BEFORE drag
         let origLocalCx = 0, origLocalCy = 0;
-        if (corner === 'min') { origLocalCx = -halfW; origLocalCy = -halfH; }
-        else if (corner === 'max') { origLocalCx = halfW; origLocalCy = halfH; }
-        else if (corner === 'topRight') { origLocalCx = halfW; origLocalCy = -halfH; }
-        else if (corner === 'bottomLeft') { origLocalCx = -halfW; origLocalCy = halfH; }
+        if (corner === 'min') { origLocalCx = -halfW; origLocalCy = halfH; }
+        else if (corner === 'max') { origLocalCx = halfW; origLocalCy = -halfH; }
+        else if (corner === 'topRight') { origLocalCx = halfW; origLocalCy = halfH; }
+        else if (corner === 'bottomLeft') { origLocalCx = -halfW; origLocalCy = -halfH; }
 
         // The *opposite* corner remains perfectly fixed during this drag.
         const oppLocalX = -origLocalCx;
@@ -885,6 +885,11 @@ export function MapCanvas() {
                        }}
                        draw={(g) => {
                          g.clear();
+                         // Larger invisible hit area
+                         g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                         g.circle(0, 0, 15 / safeScale);
+                         g.fill();
+
                          g.fillStyle = { color: 0xffffff, alpha: 0.9 };
                          g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
                          g.rect(-cornerSize / 2, -cornerSize / 2, cornerSize, cornerSize);
@@ -919,6 +924,12 @@ export function MapCanvas() {
                            g.moveTo(0, stemLen);
                            g.lineTo(0, 0);
                            g.stroke();
+                           
+                           // Larger invisible hit area
+                           g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                           g.circle(0, 0, 15 / safeScale);
+                           g.fill();
+                           
                            // Handle circle
                            g.fillStyle = { color: 0xffffff, alpha: 0.9 };
                            g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };

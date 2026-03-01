@@ -188,7 +188,6 @@ impl PluginManager {
                     if dev_dir.exists() && dev_dir.is_dir() {
                         println!("[DEBUG/RUST] Found development python_sdk at: {:?}", dev_dir);
                         plugins.extend(Self::scan_plugins_in_dir(&dev_dir, true));
-                        scanned_builtin = true;
                         break;
                     }
                 }
