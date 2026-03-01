@@ -36,25 +36,46 @@ my_plugin/
 
 ## 5. Python SDK の利用
 
-組み込みの `wpt_plugin.py` をインポートして利用することを推奨します。
+組み込みの `wpt_plugin` パッケージを利用することを推奨します。SDK には、座標計算を容易にする幾何学クラスが含まれています。
 
+### 基本的な構造
 ```python
-from wpt_plugin import WaypointGenerator
+from wpt_plugin import WaypointGenerator, Point
 
 class MyGenerator(WaypointGenerator):
     def generate(self, context):
-        # パラメータの取得
+        # 1. 入力データの取得 (オブジェクトとして取得可能)
+        start = self.get_interaction_point(context, "start_point")
+        if not start:
+            return []
+
+        # 2. パラメータの取得
+        count = self.get_property(context, "count", 5)
         spacing = self.get_property(context, "spacing", 1.0)
-        # Waypoint の生成
+
+        # 3. 幾何計算 (Point, Line, Rectangle, Ray クラスが利用可能)
         points = []
-        # ... ロジック ...
+        for i in range(count):
+            # ローカル座標で点を定義し、ワールド座標へ変換
+            p = Point(i * spacing, 0).to_world(start.x, start.y, start.yaw)
+            points.append(self.make_waypoint(p.x, p.y, p.yaw))
+            
         return points
 
 if __name__ == "__main__":
     MyGenerator().run_from_stdin()
 ```
 
+### 利用可能な幾何学クラス
+- `Point(x, y, yaw)`: 座標と向き。`to_world()` メソッドで変換可能。
+- `Line(p1, p2)`: 線分。長さの取得や交点判定が可能。
+- `Rectangle(center, width, height, yaw)`: 矩形。頂点の取得や点の内包判定が可能。
+- `Ray(origin, yaw, bidirectional)`: 仮想無限線。線分や矩形との交点取得に便利。
+
+詳細は `wpt_plugin` ディレクトリ内のソースコードおよび既存のプラグイン実装（`sweep_generator` 等）を参照してください。
+
 ## 6. プラグインの登録
 1. アプリの Settings > Plugins タブを開きます。
 2. 「Add Custom Plugin」をクリックし、プラグインディレクトリを選択します。
 3. 自動的にリストに追加され、ジェネレーターとして利用可能になります。
+   - ※ SDK のバージョンが古い場合は「Update SDK」ボタンが表示されます。

@@ -79,7 +79,7 @@ pub fn scaffold_plugin(app: AppHandle, plugin_name: String, target_dir: String) 
         .map_err(|e| format!("Failed to write manifest.json: {}", e))?;
 
     // Generate main.py
-    let main_py = format!(r#""""\n{} Plugin\n"""\nimport sys\nimport os\nimport math\n\nsys.path.append(os.path.dirname(__file__))\nfrom wpt_plugin import WaypointGenerator\n\n\nclass {}Generator(WaypointGenerator):\n    def generate(self, context):\n        start = self.get_interaction_data(context, "start_point")\n        if not start:\n            return []\n\n        base_x = float(start.get("x", 0.0))\n        base_y = float(start.get("y", 0.0))\n        yaw = self.quaternion_to_yaw(start)\n\n        count = int(self.get_property(context, "count", default=5))\n        spacing = float(self.get_property(context, "spacing", default=1.0))\n\n        waypoints = []\n        for i in range(count):\n            wx = base_x + i * spacing * math.cos(yaw)\n            wy = base_y + i * spacing * math.sin(yaw)\n            waypoints.append(self.make_waypoint(wx, wy, yaw))\n\n        self.log(f"Generated {{len(waypoints)}} waypoints.")\n        return waypoints\n\n\nif __name__ == "__main__":\n    {}Generator().run_from_stdin()\n"#,
+    let main_py = format!(r#""""\n{} Plugin\n"""\nimport sys\nimport os\nimport math\n\nsys.path.append(os.path.dirname(__file__))\nfrom wpt_plugin.core import WaypointGenerator\nfrom wpt_plugin.geometry import Point\n\n\nclass {}Generator(WaypointGenerator):\n    def generate(self, context):\n        # Get start point as an object\n        start = self.get_interaction_point(context, "start_point")\n        if not start:\n            return []\n\n        count = int(self.get_property(context, "count", default=5))\n        spacing = float(self.get_property(context, "spacing", default=1.0))\n\n        waypoints = []\n        for i in range(count):\n            # Use geometry helper or to_world if needed\n            wp_pt = Point(i * spacing, 0).to_world(start.x, start.y, start.yaw)\n            waypoints.append(self.make_waypoint(wp_pt.x, wp_pt.y, wp_pt.yaw))\n\n        self.log(f"Generated {{len(waypoints)}} waypoints.")\n        return waypoints\n\n\nif __name__ == "__main__":\n    {}Generator().run_from_stdin()\n"#,
         plugin_name,
         plugin_name.replace(" ", "").replace("-", "").replace("_", ""),
         plugin_name.replace(" ", "").replace("-", "").replace("_", ""),
@@ -88,10 +88,11 @@ pub fn scaffold_plugin(app: AppHandle, plugin_name: String, target_dir: String) 
     std::fs::write(plugin_dir.join("main.py"), &main_py)
         .map_err(|e| format!("Failed to write main.py: {}", e))?;
 
-    // Copy SDK (wpt_plugin.py) from bundled resources
-    let sdk_content = find_bundled_sdk_content(&app)?;
-    std::fs::write(plugin_dir.join("wpt_plugin.py"), &sdk_content)
-        .map_err(|e| format!("Failed to write wpt_plugin.py SDK: {}", e))?;
+    // Copy SDK directory from bundled resources
+    let sdk_source = find_bundled_sdk_path(&app)?;
+    let sdk_dest = plugin_dir.join("wpt_plugin");
+    copy_dir_recursive(&sdk_source, &sdk_dest)
+        .map_err(|e| format!("Failed to copy wpt_plugin SDK: {}", e))?;
 
     // Return the new plugin instance
     scan_custom_plugin(plugin_dir.to_string_lossy().to_string())
@@ -105,43 +106,73 @@ pub fn check_sdk_version(app: AppHandle) -> Result<String, String> {
         .ok_or_else(|| "Could not determine bundled SDK version.".to_string())
 }
 
-/// Update the wpt_plugin.py in a plugin directory with the bundled version.
+/// Update the SDK in a plugin directory with the bundled version.
 #[tauri::command]
 pub fn update_plugin_sdk(app: AppHandle, plugin_folder_path: String) -> Result<String, String> {
-    let sdk_content = find_bundled_sdk_content(&app)?;
-    let target = std::path::Path::new(&plugin_folder_path).join("wpt_plugin.py");
-    std::fs::write(&target, &sdk_content)
-        .map_err(|e| format!("Failed to write SDK: {}", e))?;
+    let sdk_source = find_bundled_sdk_path(&app)?;
+    let plugin_dir = std::path::Path::new(&plugin_folder_path);
+    
+    // Remove old wpt_plugin.py if it exists (legacy)
+    let old_sdk_file = plugin_dir.join("wpt_plugin.py");
+    if old_sdk_file.exists() {
+        let _ = std::fs::remove_file(old_sdk_file);
+    }
+    
+    // Copy new directory
+    let sdk_dest = plugin_dir.join("wpt_plugin");
+    if sdk_dest.exists() {
+        std::fs::remove_dir_all(&sdk_dest).map_err(|e| format!("Failed to clear old SDK dir: {}", e))?;
+    }
+    
+    copy_dir_recursive(&sdk_source, &sdk_dest)
+        .map_err(|e| format!("Failed to copy SDK: {}", e))?;
 
     // Return the new version
-    detect_sdk_version(std::path::Path::new(&plugin_folder_path))
+    detect_sdk_version(plugin_dir)
         .ok_or_else(|| "SDK was written but version could not be read back.".to_string())
 }
 
-/// Find and read the content of the bundled wpt_plugin.py SDK file.
-fn find_bundled_sdk_content(app: &AppHandle) -> Result<String, String> {
+/// Find the path to the bundled wpt_plugin package directory.
+fn find_bundled_sdk_path(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     // Try resource_dir (bundled app)
     if let Ok(res_dir) = app.path().resource_dir() {
-        let sdk_path = res_dir.join("python_sdk").join("wpt_plugin.py");
+        let sdk_path = res_dir.join("python_sdk").join("wpt_plugin");
         if sdk_path.exists() {
-            return std::fs::read_to_string(&sdk_path)
-                .map_err(|e| format!("Failed to read bundled SDK: {}", e));
+            return Ok(sdk_path);
+        }
+        // Tauri v2 structure
+        let sdk_path_up = res_dir.join("_up_").join("python_sdk").join("wpt_plugin");
+        if sdk_path_up.exists() {
+            return Ok(sdk_path_up);
         }
     }
     // Fallback for development environment
     if let Ok(current_dir) = std::env::current_dir() {
         for path in &[
-            current_dir.join("../python_sdk/wpt_plugin.py"),
-            current_dir.join("python_sdk/wpt_plugin.py"),
+            current_dir.join("../python_sdk/wpt_plugin"),
+            current_dir.join("python_sdk/wpt_plugin"),
         ] {
             let resolved = path.canonicalize().unwrap_or(path.clone());
             if resolved.exists() {
-                return std::fs::read_to_string(&resolved)
-                    .map_err(|e| format!("Failed to read SDK: {}", e));
+                return Ok(resolved);
             }
         }
     }
-    Err("Could not find bundled wpt_plugin.py SDK.".to_string())
+    Err("Could not find bundled wpt_plugin SDK directory.".to_string())
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
