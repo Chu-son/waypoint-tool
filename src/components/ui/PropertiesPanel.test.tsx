@@ -1,121 +1,210 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PropertiesPanel } from './PropertiesPanel';
 import { useAppStore } from '../../stores/appStore';
+import { BackendAPI } from '../../api';
 
-describe('PropertiesPanel UI', () => {
+// Mock Lucide icons
+vi.mock('lucide-react', () => ({
+  Eye: () => <div data-testid="eye-icon" />,
+  EyeOff: () => <div data-testid="eye-off-icon" />,
+  Play: () => <div data-testid="play-icon" />,
+  Settings2: () => <div data-testid="settings-icon" />,
+  RefreshCcw: () => <div data-testid="refresh-icon" />,
+}));
+
+// Mock Store
+vi.mock('../../stores/appStore', () => ({
+  useAppStore: vi.fn(),
+}));
+
+// Mock API
+vi.mock('../../api', () => ({
+  BackendAPI: {
+    runPlugin: vi.fn(),
+  },
+}));
+
+// Mock uuid
+vi.mock('uuid', () => ({
+  v4: () => 'new-uuid',
+}));
+
+describe('PropertiesPanel', () => {
+  const mockUpdateNode = vi.fn();
+  const mockRemoveNodes = vi.fn();
+  const mockToggleAttributeVisibility = vi.fn();
+  const mockAddNode = vi.fn();
+
+  const mockManualNode = {
+    id: 'node-1',
+    type: 'manual',
+    transform: { x: 1.0, y: 2.0, z: 0.0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    options: { 'custom-attr': 'val' }
+  };
+
+  const mockGeneratorNode = {
+    id: 'gen-1',
+    type: 'generator',
+    plugin_id: 'plugin-1',
+    generator_params: {
+      properties: { count: 5 },
+      interaction_data: { start: { x: 0, y: 0 } }
+    },
+    children_ids: ['child-1']
+  };
+
+  const mockPlugin = {
+    id: 'plugin-1',
+    manifest: {
+      name: 'Test Generator',
+      properties: [{ name: 'count', type: 'float', label: 'Count' }],
+      inputs: [{ name: 'start', type: 'point', label: 'Start Point' }]
+    }
+  };
+
   beforeEach(() => {
-    const store = useAppStore.getState();
-    store.nodes = {
-      'test-node': {
-        id: 'test-node',
-        type: 'manual',
-        transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 },
-      }
-    };
-    store.selectedNodeIds = ['test-node'];
-    store.rootNodeIds = ['test-node'];
-    store.optionsSchema = null;
+    vi.clearAllMocks();
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      selectedNodeIds: [],
+      nodes: {},
+      rootNodeIds: [],
+      optionsSchema: null,
+      visibleAttributes: ['index', 'transform'],
+      indexStartIndex: 0,
+      decimalPrecision: 2,
+      plugins: {},
+      pluginSettings: [],
+      updateNode: mockUpdateNode,
+      removeNodes: mockRemoveNodes,
+      toggleAttributeVisibility: mockToggleAttributeVisibility,
+      updatePluginInteractionData: vi.fn(),
+      pluginInteractionData: {},
+    }));
+    
+    // Mock getState for non-hook access (used inside handleRegenerate and status sync)
+    (useAppStore.getState as any) = vi.fn().mockReturnValue({
+        clearPluginInteractionData: vi.fn(),
+        setPluginActiveProperties: vi.fn(),
+        addNode: mockAddNode,
+        nodes: { 'gen-1': mockGeneratorNode }, // needed for handleUpdate inside handleRegenerate
+    });
   });
 
-  it('updates the store correctly when X/Y values change', () => {
+  it('renders "No item selected" when selection is empty', () => {
     render(<PropertiesPanel />);
+    expect(screen.getByText(/no item selected/i)).toBeInTheDocument();
+  });
 
-    const header = screen.getByText('Waypoint [0]');
-    expect(header).toBeInTheDocument();
+  it('renders properties for a single manual node and updates X', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      selectedNodeIds: ['node-1'],
+      nodes: { 'node-1': mockManualNode },
+      rootNodeIds: ['node-1'],
+      visibleAttributes: ['index', 'transform'],
+      indexStartIndex: 0,
+      decimalPrecision: 2,
+      updateNode: mockUpdateNode,
+      toggleAttributeVisibility: mockToggleAttributeVisibility,
+    }));
 
-    // NumericInput renders type="text", so query by textbox role
-    const textboxes = screen.getAllByRole('textbox') as HTMLInputElement[];
-    const xInput = textboxes[0];
-    const yInput = textboxes[1];
-
-    expect(xInput.value).toBe('10');
-    expect(yInput.value).toBe('20');
-
-    // Simulate user changing X to 15
+    render(<PropertiesPanel />);
+    expect(screen.getByText(/Waypoint \[0\]/i)).toBeInTheDocument();
+    
+    const xInput = screen.getByDisplayValue('1');
     fireEvent.change(xInput, { target: { value: '15' } });
     fireEvent.blur(xInput);
 
-    const state = useAppStore.getState();
-    expect(state.nodes['test-node'].transform?.x).toBe(15);
+    expect(mockUpdateNode).toHaveBeenCalledWith('node-1', expect.objectContaining({
+      transform: expect.objectContaining({ x: 15 })
+    }));
   });
 
-  // --- 要件2: Waypoint編集 ---
+  it('renders generator node and handles re-generation flow', async () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      selectedNodeIds: ['gen-1'],
+      nodes: { 'gen-1': mockGeneratorNode },
+      rootNodeIds: ['gen-1'],
+      plugins: { 'plugin-1': mockPlugin },
+      pluginSettings: [],
+      visibleAttributes: [],
+      decimalPrecision: 2,
+      updateNode: mockUpdateNode,
+      removeNodes: mockRemoveNodes,
+      updatePluginInteractionData: vi.fn(),
+      pluginInteractionData: { start: { x: 0, y: 0 } },
+    }));
 
-  it('updates Yaw value through the numeric input', () => {
+    (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 10, y: 10, yaw: 0 }]);
+
     render(<PropertiesPanel />);
+    expect(screen.getByText('Generator Node')).toBeInTheDocument();
+    expect(screen.getByText('Test Generator')).toBeInTheDocument();
 
-    const textboxes = screen.getAllByRole('textbox') as HTMLInputElement[];
-    // X, Y, Z, Yaw — Yaw is the 4th textbox
-    const yawInput = textboxes[3];
-    expect(yawInput.value).toBe('0');
+    const regenBtn = screen.getByText(/re-generate path/i);
+    fireEvent.click(regenBtn);
 
-    fireEvent.change(yawInput, { target: { value: '1.57' } });
-    fireEvent.blur(yawInput);
-
-    const node = useAppStore.getState().nodes['test-node'];
-    // After yaw=1.57, qz = sin(1.57/2) ≈ 0.707
-    expect(node.transform?.qz).toBeCloseTo(Math.sin(1.57 / 2), 2);
-  });
-
-  it('shows "No item selected." when no node is selected', () => {
-    useAppStore.setState({ selectedNodeIds: [] });
-    render(<PropertiesPanel />);
-
-    expect(screen.getByText(/No item selected/)).toBeInTheDocument();
-  });
-
-  it('shows multiple selection header when multiple nodes are selected', () => {
-    useAppStore.setState({
-      nodes: {
-        'n1': { id: 'n1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } },
-        'n2': { id: 'n2', type: 'manual', transform: { x: 5, y: 5, qx: 0, qy: 0, qz: 0, qw: 1 } },
-      },
-      rootNodeIds: ['n1', 'n2'],
-      selectedNodeIds: ['n1', 'n2'],
+    await waitFor(() => {
+      expect(BackendAPI.runPlugin).toHaveBeenCalled();
     });
 
-    render(<PropertiesPanel />);
-
-    expect(screen.getByText('Multiple Selected (2)')).toBeInTheDocument();
+    expect(mockRemoveNodes).toHaveBeenCalledWith(['child-1']);
+    expect(mockAddNode).toHaveBeenCalled();
+    expect(mockUpdateNode).toHaveBeenCalledWith('gen-1', expect.objectContaining({
+        generator_params: expect.objectContaining({
+            properties: { count: 5 }
+        })
+    }));
   });
 
-  // --- 要件3: オプションプロパティ ---
+  it('renders options from schema for manual node', () => {
+      const schema = {
+          options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }]
+      };
+      (useAppStore as any).mockImplementation((selector: any) => selector({
+        selectedNodeIds: ['node-1'],
+        nodes: { 'node-1': mockManualNode },
+        rootNodeIds: ['node-1'],
+        optionsSchema: schema,
+        visibleAttributes: [],
+        indexStartIndex: 0,
+        decimalPrecision: 2,
+        updateNode: mockUpdateNode,
+        toggleAttributeVisibility: vi.fn(),
+      }));
 
-  it('renders option input forms when optionsSchema is defined', () => {
-    useAppStore.setState({
-      optionsSchema: {
-        options: [
-          { name: 'speed', label: 'Target Speed', type: 'float' },
-          { name: 'mode', label: 'Action Mode', type: 'string' },
-        ],
-      },
-    });
+      (useAppStore.getState as any).mockReturnValue({
+        nodes: { 'node-1': mockManualNode },
+        toggleAttributeVisibility: vi.fn(),
+        clearPluginInteractionData: vi.fn(),
+        setPluginActiveProperties: vi.fn(),
+      });
 
-    render(<PropertiesPanel />);
-
-    expect(screen.getByText('Target Speed')).toBeInTheDocument();
-    expect(screen.getByText('Action Mode')).toBeInTheDocument();
+      render(<PropertiesPanel />);
+      expect(screen.getByText('Target Speed')).toBeInTheDocument();
+      
+      const speedInput = screen.getByDisplayValue('0.5');
+      fireEvent.change(speedInput, { target: { value: '1.2' } });
+      // updateNode is called on change for custom options
+      expect(mockUpdateNode).toHaveBeenCalledWith('node-1', expect.objectContaining({
+          options: expect.objectContaining({ speed: 1.2 })
+      }));
   });
 
-  it('updates option values in the store when changed', () => {
-    useAppStore.setState({
-      optionsSchema: {
-        options: [
-          { name: 'label_text', label: 'Label', type: 'string' },
-        ],
+  it('renders multiple selection view', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      selectedNodeIds: ['node-1', 'node-2'],
+      nodes: { 
+        'node-1': mockManualNode,
+        'node-2': { ...mockManualNode, id: 'node-2' }
       },
-    });
+      rootNodeIds: ['node-1', 'node-2'],
+      visibleAttributes: [],
+      indexStartIndex: 0,
+      decimalPrecision: 2,
+    }));
 
     render(<PropertiesPanel />);
-
-    // Find the text input for the option (it should be the last textbox)
-    const textboxes = screen.getAllByRole('textbox') as HTMLInputElement[];
-    const optionInput = textboxes[textboxes.length - 1];
-
-    fireEvent.change(optionInput, { target: { value: 'Dock A' } });
-
-    const node = useAppStore.getState().nodes['test-node'];
-    expect(node.options?.label_text).toBe('Dock A');
+    expect(screen.getByText(/multiple selected \(2\)/i)).toBeInTheDocument();
   });
 });

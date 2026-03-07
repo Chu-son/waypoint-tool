@@ -77,3 +77,46 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         read_image_base64
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_read_image_base64_png() {
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("test.png");
+        fs::write(&file_path, b"fake png data").unwrap();
+
+        let res = read_image_base64(file_path.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let s = res.unwrap();
+        assert!(s.starts_with("data:image/png;base64,"));
+    }
+
+    #[test]
+    fn test_read_image_base64_jpg() {
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("test.jpg");
+        fs::write(&file_path, b"fake jpg data").unwrap();
+
+        let res = read_image_base64(file_path.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let s = res.unwrap();
+        assert!(s.starts_with("data:image/jpeg;base64,"));
+    }
+
+    #[test]
+    fn test_read_image_base64_unknown() {
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("test.unknown");
+        fs::write(&file_path, b"data").unwrap();
+
+        let res = read_image_base64(file_path.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let s = res.unwrap();
+        assert!(s.starts_with("data:application/octet-stream;base64,"));
+    }
+}

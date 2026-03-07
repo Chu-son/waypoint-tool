@@ -40,3 +40,19 @@ pub fn run_wasm_plugin(
 
     Ok(waypoints)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_run_wasm_plugin_non_existent_file() {
+        // This will likely fail either at spawn (if wasmtime missing) 
+        // or during wasmtime execution (if wasmtime exists but file doesn't).
+        let res = run_wasm_plugin("non_existent.wasm", "{}");
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        // Check if it's one of the expected error messages
+        assert!(err.contains("Failed to spawn wasmtime") || err.contains("Wasmtime execution failed"));
+    }
+}

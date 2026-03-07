@@ -1,82 +1,129 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { LayerPanel } from './LayerPanel';
 import { useAppStore } from '../../stores/appStore';
+import { DialogAPI, BackendAPI } from '../../api';
 
-// Mock Tauri modules
-vi.mock('../../api/dialog', () => ({
-  open: vi.fn(),
+// Mock Lucide icons
+vi.mock('lucide-react', () => ({
+  Eye: () => <div data-testid="eye-icon" />,
+  EyeOff: () => <div data-testid="eye-off-icon" />,
+  Trash2: () => <div data-testid="trash-icon" />,
+  FolderOpen: () => <div data-testid="folder-icon" />,
 }));
 
-vi.mock('../../api/backend', () => ({
+// Mock API
+vi.mock('../../api', () => ({
+  DialogAPI: {
+    open: vi.fn(),
+  },
   BackendAPI: {
     loadROSMap: vi.fn(),
   },
 }));
 
-describe('LayerPanel UI', () => {
+// Mock Store
+vi.mock('../../stores/appStore', () => ({
+  useAppStore: vi.fn(),
+}));
+
+describe('LayerPanel', () => {
+  const mockUpdateMapLayer = vi.fn();
+  const mockRemoveMapLayer = vi.fn();
+  const mockReorderMapLayers = vi.fn();
+  const mockAddMapLayer = vi.fn();
+  const mockSetLastDirectory = vi.fn();
+
+  const mockLayers = [
+    { id: 'l1', name: 'Map 1', visible: true, opacity: 1, info: {}, width: 10, height: 10 },
+    { id: 'l2', name: 'Map 2', visible: false, opacity: 0.5, info: {}, width: 20, height: 20 },
+  ];
+
   beforeEach(() => {
-    useAppStore.setState({
+    vi.clearAllMocks();
+    (useAppStore as any).mockImplementation((selector: any) => selector({
       mapLayers: [],
-      lastDirectory: null,
+      lastDirectory: '/test/dir',
+      updateMapLayer: mockUpdateMapLayer,
+      removeMapLayer: mockRemoveMapLayer,
+      reorderMapLayers: mockReorderMapLayers,
+      addMapLayer: mockAddMapLayer,
+      setLastDirectory: mockSetLastDirectory,
+    }));
+  });
+
+  it('renders empty state', () => {
+    render(<LayerPanel />);
+    expect(screen.getByText(/no maps loaded/i)).toBeInTheDocument();
+  });
+
+  it('shows layers and handles visibility toggle', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      mapLayers: mockLayers,
+      updateMapLayer: mockUpdateMapLayer,
+    }));
+
+    render(<LayerPanel />);
+    expect(screen.getByText('Map 1')).toBeInTheDocument();
+    
+    const toggleBtns = screen.getAllByTitle('Toggle Visibility');
+    fireEvent.click(toggleBtns[0]);
+    expect(mockUpdateMapLayer).toHaveBeenCalledWith('l1', { visible: false });
+  });
+
+  it('handles reordering with up/down buttons', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      mapLayers: mockLayers,
+      reorderMapLayers: mockReorderMapLayers,
+    }));
+
+    render(<LayerPanel />);
+    const downBtn = screen.getAllByText('▼')[0]; // For first layer
+    fireEvent.click(downBtn);
+    expect(mockReorderMapLayers).toHaveBeenCalledWith(0, 1);
+  });
+
+  it('handles map loading flow', async () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      mapLayers: [],
+      lastDirectory: '/test/dir',
+      addMapLayer: mockAddMapLayer,
+      setLastDirectory: mockSetLastDirectory,
+    }));
+
+    (DialogAPI.open as any).mockResolvedValue('/new/map.yaml');
+    (BackendAPI.loadROSMap as any).mockResolvedValue({
+        info: { res: 0.1 },
+        image_data_b64: 'b64',
+        width: 100,
+        height: 100
+    });
+
+    render(<LayerPanel />);
+    const loadBtn = screen.getByText(/load ros map/i);
+    fireEvent.click(loadBtn);
+
+    await waitFor(() => {
+      expect(DialogAPI.open).toHaveBeenCalled();
+      expect(BackendAPI.loadROSMap).toHaveBeenCalledWith('/new/map.yaml');
+      expect(mockAddMapLayer).toHaveBeenCalledWith('map.yaml', { res: 0.1 }, 'b64', 100, 100);
+      expect(mockSetLastDirectory).toHaveBeenCalledWith('/new');
     });
   });
 
-  // --- 要件1: マップ表示 ---
+  it('removes layer after confirmation', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      mapLayers: [mockLayers[0]],
+      removeMapLayer: mockRemoveMapLayer,
+    }));
 
-  it('renders the Load ROS Map button', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    
     render(<LayerPanel />);
-    expect(screen.getByText('Load ROS Map (YAML)')).toBeInTheDocument();
-  });
+    const deleteBtn = screen.getByTitle('Remove Map');
+    fireEvent.click(deleteBtn);
 
-  it('displays map layers in the list', () => {
-    useAppStore.setState({
-      mapLayers: [
-        { id: 'l1', name: 'floor_map.yaml', info: null, image_base64: 'b64', visible: true, opacity: 1, z_index: 0, width: 100, height: 100 },
-        { id: 'l2', name: 'office_map.yaml', info: null, image_base64: 'b64', visible: true, opacity: 0.5, z_index: 1, width: 200, height: 200 },
-      ],
-    });
-
-    render(<LayerPanel />);
-
-    expect(screen.getByText('floor_map.yaml')).toBeInTheDocument();
-    expect(screen.getByText('office_map.yaml')).toBeInTheDocument();
-  });
-
-  it('toggles layer visibility and updates the store', () => {
-    useAppStore.setState({
-      mapLayers: [
-        { id: 'l1', name: 'Map1', info: null, image_base64: 'b64', visible: true, opacity: 1, z_index: 0, width: 100, height: 100 },
-      ],
-    });
-
-    render(<LayerPanel />);
-
-    const toggleBtn = screen.getByTitle('Toggle Visibility');
-    act(() => {
-      toggleBtn.click();
-    });
-
-    expect(useAppStore.getState().mapLayers[0].visible).toBe(false);
-  });
-
-  it('updates layer opacity via the slider', () => {
-    useAppStore.setState({
-      mapLayers: [
-        { id: 'l1', name: 'Map1', info: null, image_base64: 'b64', visible: true, opacity: 1, z_index: 0, width: 100, height: 100 },
-      ],
-    });
-
-    render(<LayerPanel />);
-
-    const slider = screen.getByRole('slider');
-    fireEvent.change(slider, { target: { value: '0.5' } });
-
-    expect(useAppStore.getState().mapLayers[0].opacity).toBe(0.5);
-  });
-
-  it('shows empty state when no layers exist', () => {
-    render(<LayerPanel />);
-    expect(screen.getByText('No maps loaded.')).toBeInTheDocument();
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mockRemoveMapLayer).toHaveBeenCalledWith('l1');
   });
 });

@@ -1,78 +1,145 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WaypointTree } from './WaypointTree';
 import { useAppStore } from '../../stores/appStore';
 
-describe('WaypointTree UI', () => {
+// Mock Lucide icons
+vi.mock('lucide-react', () => ({
+  ChevronUp: () => <div data-testid="up-icon" />,
+  ChevronDown: () => <div data-testid="down-icon" />,
+  ChevronRight: () => <div data-testid="right-icon" />,
+  Layers: () => <div data-testid="layers-icon" />,
+}));
+
+// Mock Store
+vi.mock('../../stores/appStore', () => ({
+  useAppStore: vi.fn(),
+}));
+
+describe('WaypointTree', () => {
+  const mockSelectNodes = vi.fn();
+  const mockReorderNodes = vi.fn();
+
+  const mockNodes = {
+    'wp-1': { id: 'wp-1', type: 'manual' },
+    'gen-1': { id: 'gen-1', type: 'generator', children_ids: ['c1', 'c2'], plugin_id: 'p1' },
+    'c1': { id: 'c1', type: 'manual' },
+    'c2': { id: 'c2', type: 'manual' },
+    'wp-2': { id: 'wp-2', type: 'manual' },
+  };
+
+  const mockPlugins = {
+    'p1': { manifest: { name: 'Test Plugin' } }
+  };
+
   beforeEach(() => {
-    useAppStore.setState({
-      nodes: {},
+    vi.clearAllMocks();
+    (useAppStore as any).mockImplementation((selector: any) => selector({
       rootNodeIds: [],
-      selectedNodeIds: [],
+      nodes: {},
       plugins: {},
+      selectedNodeIds: [],
       indexStartIndex: 0,
-    });
+      selectNodes: mockSelectNodes,
+      reorderNodes: mockReorderNodes,
+    }));
   });
 
-  // --- 要件2: Waypoint編集 ---
+  it('renders empty state', () => {
+    render(<WaypointTree />);
+    expect(screen.getByText(/no items yet/i)).toBeInTheDocument();
+  });
 
-  it('displays waypoint nodes in the tree', () => {
-    useAppStore.setState({
-      rootNodeIds: ['wp1', 'wp2'],
-      nodes: {
-        'wp1': { id: 'wp1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } },
-        'wp2': { id: 'wp2', type: 'manual', transform: { x: 5, y: 5, qx: 0, qy: 0, qz: 0, qw: 1 } },
-      },
-    });
+  it('displays mixed node types and correct indexing', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: ['wp-1', 'gen-1', 'wp-2'],
+      nodes: mockNodes,
+      plugins: mockPlugins,
+      selectedNodeIds: [],
+      indexStartIndex: 10, // Offset
+      selectNodes: mockSelectNodes,
+    }));
 
     render(<WaypointTree />);
 
-    // Should show index labels [0] and [1]
+    // wp-1: [10]
+    expect(screen.getByText('[10]')).toBeInTheDocument();
+    
+    // gen-1 item
+    expect(screen.getByText('Test Plugin')).toBeInTheDocument();
+    expect(screen.getByText('(2 pts)')).toBeInTheDocument();
+
+    // wp-2: should skip 2 children of gen-1 -> 10 + 1 (wp-1) + 2 (gen children) = 13
+    expect(screen.getByText('[13]')).toBeInTheDocument();
+  });
+
+  it('handles expansion and showing children with correct indices', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: ['gen-1'],
+      nodes: mockNodes,
+      plugins: mockPlugins,
+      selectedNodeIds: [],
+      indexStartIndex: 0,
+      selectNodes: mockSelectNodes,
+    }));
+
+    render(<WaypointTree />);
+    
+    // Initially children are hidden
+    expect(screen.queryByText(/\[0\]/)).not.toBeInTheDocument();
+
+    // Click chevron to expand
+    const chevron = screen.getByTestId('right-icon');
+    fireEvent.click(chevron);
+
+    // c1: [0], c2: [1]
     expect(screen.getByText('[0]')).toBeInTheDocument();
     expect(screen.getByText('[1]')).toBeInTheDocument();
   });
 
-  it('selects a node when clicked', () => {
-    useAppStore.setState({
-      rootNodeIds: ['wp1'],
-      nodes: {
-        'wp1': { id: 'wp1', type: 'manual' },
-      },
-    });
+  it('handles selection on click (single and multi)', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: ['wp-1', 'wp-2'],
+      nodes: mockNodes,
+      plugins: mockPlugins,
+      selectedNodeIds: [],
+      indexStartIndex: 0,
+      selectNodes: mockSelectNodes,
+    }));
 
     render(<WaypointTree />);
 
-    const item = screen.getByText('[0]').closest('li')!;
-    fireEvent.click(item);
+    const item1 = screen.getByText('[0]').closest('li')!;
+    fireEvent.click(item1);
+    expect(mockSelectNodes).toHaveBeenCalledWith(['wp-1'], false);
 
-    expect(useAppStore.getState().selectedNodeIds).toEqual(['wp1']);
+    const item2 = screen.getByText('[1]').closest('li')!;
+    fireEvent.click(item2, { shiftKey: true });
+    expect(mockSelectNodes).toHaveBeenCalledWith(['wp-2'], true);
   });
 
-  // --- 要件4: 自動生成 ---
+  it('handles reordering buttons', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+        rootNodeIds: ['wp-1', 'wp-2'],
+        nodes: mockNodes,
+        plugins: mockPlugins,
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        reorderNodes: mockReorderNodes,
+      }));
+  
+      render(<WaypointTree />);
+      
+      // Need to hover or look for buttons
+      const upBtns = screen.getAllByTitle('Move Up');
+      const downBtns = screen.getAllByTitle('Move Down');
 
-  it('displays generator nodes with nested children', () => {
-    useAppStore.setState({
-      rootNodeIds: ['gen1'],
-      nodes: {
-        'gen1': { id: 'gen1', type: 'generator', children_ids: ['c1', 'c2'], plugin_id: 'sweep' },
-        'c1': { id: 'c1', type: 'manual' },
-        'c2': { id: 'c2', type: 'manual' },
-      },
-      plugins: {
-        'sweep': { id: 'sweep', manifest: { name: 'Sweep Generator', type: 'python', executable: 'main.py', inputs: [], properties: [] }, folder_path: '/p', is_builtin: true },
-      },
-    });
+      // Click Down on wp-1
+      fireEvent.click(downBtns[0]);
+      expect(mockReorderNodes).toHaveBeenCalledWith(0, 1);
 
-    render(<WaypointTree />);
-
-    // Generator node label should show the plugin name
-    expect(screen.getByText('Sweep Generator')).toBeInTheDocument();
-    // Should show child count
-    expect(screen.getByText('(2 pts)')).toBeInTheDocument();
-  });
-
-  it('shows empty state message when no nodes exist', () => {
-    render(<WaypointTree />);
-    expect(screen.getByText(/No items yet/)).toBeInTheDocument();
+      // Click Up on wp-2
+      fireEvent.click(upBtns[1]);
+      expect(mockReorderNodes).toHaveBeenCalledWith(1, 0);
   });
 });

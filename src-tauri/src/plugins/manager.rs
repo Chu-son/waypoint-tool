@@ -320,4 +320,24 @@ mod tests {
         assert_eq!(plugins.len(), 1);
         assert_eq!(plugins[0].sdk_version, Some("2.0.0".to_string()));
     }
+
+    #[test]
+    fn test_plugin_manager_scan_plugins_combined() {
+        let user_tmp = TempDir::new().unwrap();
+        let builtin_tmp = TempDir::new().unwrap();
+        
+        // Create a user plugin
+        create_test_plugin(user_tmp.path().join("plugins").as_path(), "user_p", r#"{"name":"User","type":"python","executable":"m.py"}"#);
+        
+        // Create a builtin plugin (nested in python_sdk as per manager logic)
+        let sdk_dir = builtin_tmp.path().join("python_sdk");
+        create_test_plugin(&sdk_dir, "builtin_p", r#"{"name":"Builtin","type":"python","executable":"m.py"}"#);
+        
+        let manager = PluginManager::new(user_tmp.path(), Some(builtin_tmp.path().to_path_buf()));
+        let plugins = manager.scan_plugins().unwrap();
+        
+        assert_eq!(plugins.len(), 2);
+        assert!(plugins.iter().any(|p| p.manifest.name == "User" && !p.is_builtin));
+        assert!(plugins.iter().any(|p| p.manifest.name == "Builtin" && p.is_builtin));
+    }
 }

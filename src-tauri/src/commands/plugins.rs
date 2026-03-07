@@ -315,3 +315,51 @@ pub fn get_python_environments() -> Vec<String> {
 
     envs
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_scan_custom_plugin_valid() {
+        let tmp = TempDir::new().unwrap();
+        let plugin_dir = tmp.path().join("my_custom_p");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        
+        let manifest = r#"{
+            "name": "Custom",
+            "type": "python",
+            "executable": "run.py",
+            "inputs": [],
+            "properties": []
+        }"#;
+        fs::write(plugin_dir.join("manifest.json"), manifest).unwrap();
+
+        let res = scan_custom_plugin(plugin_dir.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let p = res.unwrap();
+        assert_eq!(p.manifest.name, "Custom");
+        assert_eq!(p.id, "my_custom_p");
+        assert!(!p.is_builtin);
+    }
+
+    #[test]
+    fn test_scan_custom_plugin_missing_manifest() {
+        let tmp = TempDir::new().unwrap();
+        let plugin_dir = tmp.path().join("no_manifest");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        
+        let res = scan_custom_plugin(plugin_dir.to_string_lossy().to_string());
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("manifest.json not found"));
+    }
+
+    #[test]
+    fn test_get_python_environments_not_empty() {
+        let envs = get_python_environments();
+        // Should at least return the fallback "python" or "python3"
+        assert!(!envs.is_empty());
+    }
+}
