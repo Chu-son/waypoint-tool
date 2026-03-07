@@ -6,13 +6,17 @@ import {
   Plus,
   MoreHorizontal,
   Puzzle,
+  Sparkles,
+  Map,
+  PenTool,
+  Wand2,
+  Image as ImageIcon
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
-import { SettingsModal } from "./SettingsModal";
 import { ExportModal } from "./ExportModal";
 
 export function ToolPanel() {
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
   const activeTool = useAppStore((state) => state.activeTool);
@@ -60,6 +64,29 @@ export function ToolPanel() {
 
   const visiblePlugins = enabledPluginsList.slice(0, maxIcons);
   const overflowPlugins = enabledPluginsList.slice(maxIcons);
+
+  const getPluginIcon = (pluginId: string) => {
+    const setting = pluginSettings.find(s => s.id === pluginId);
+    const manifestIcon = plugins[pluginId]?.manifest?.icon;
+    return setting?.icon || manifestIcon || "Puzzle";
+  };
+
+  const renderPluginIcon = (pluginId: string, size: number, className: string = "") => {
+    const iconStr = getPluginIcon(pluginId);
+    
+    if (iconStr.startsWith("data:image/")) {
+      return <img src={iconStr} alt="plugin-icon" style={{ width: size, height: size, objectFit: 'contain' }} className={className} />;
+    }
+
+    switch (iconStr) {
+      case "Sparkles": return <Sparkles size={size} className={className} />;
+      case "Map": return <Map size={size} className={className} />;
+      case "PenTool": return <PenTool size={size} className={className} />;
+      case "Wand2": return <Wand2 size={size} className={className} />;
+      case "ImageIcon": return <ImageIcon size={size} className={className} />;
+      default: return <Puzzle size={size} className={className} />;
+    }
+  };
 
   return (
     <div
@@ -127,7 +154,7 @@ export function ToolPanel() {
                 ${isActive ? "bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-primary-300" : "bg-slate-900/50 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/50"}
               `}
             >
-              <Puzzle size={18} />
+              {renderPluginIcon(plugin.id, 18)}
             </button>
           );
         })}
@@ -166,12 +193,7 @@ export function ToolPanel() {
                         ${isActive ? "bg-primary/20 text-primary-100 font-bold" : "text-slate-300 hover:bg-slate-700 hover:text-white"}
                       `}
                     >
-                      <Puzzle
-                        size={14}
-                        className={
-                          isActive ? "text-primary-300" : "text-slate-500"
-                        }
-                      />
+                      {renderPluginIcon(plugin.id, 14, isActive ? "text-primary-300" : "text-slate-500")}
                       <span className="truncate">{plugin.manifest.name}</span>
                     </button>
                   );
@@ -195,7 +217,7 @@ export function ToolPanel() {
         </button>
 
         <button
-          onClick={() => setIsSettingsOpen(true)}
+          onClick={() => setSettingsModalOpen(true, 'general')}
           title="Settings & Plugins"
           className="ui-icon-btn h-10 w-10 rounded-xl mt-2"
         >
@@ -206,10 +228,7 @@ export function ToolPanel() {
         </button>
       </div>
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+
       <ExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}

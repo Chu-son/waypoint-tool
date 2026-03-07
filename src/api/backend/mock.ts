@@ -90,4 +90,9 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] updatePluginSdk called for:', pluginFolderPath);
     return "Mock SDK Updated successfully";
   }
+
+  async readImageBase64(path: string): Promise<string> {
+    console.log('[Mock Backend] readImageBase64 called for:', path);
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  }
 }

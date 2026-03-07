@@ -31,6 +31,7 @@ export interface IBackendAPI {
   scaffoldPlugin(pluginName: string, targetDir: string): Promise<PluginInstance>;
   checkSdkVersion(): Promise<string>;
   updatePluginSdk(pluginFolderPath: string): Promise<string>;
+  readImageBase64(path: string): Promise<string>;
 }
 
 export interface OpenDialogOptions {

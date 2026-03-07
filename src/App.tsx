@@ -1,14 +1,24 @@
 import "./App.css";
-import { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { ToolPanel } from "./components/ui/ToolPanel";
 import { TopMenu } from "./components/ui/TopMenu";
 import { WaypointTree } from "./components/ui/WaypointTree";
 import { PropertiesPanel } from "./components/ui/PropertiesPanel";
 import { LayerPanel } from "./components/ui/LayerPanel";
 import { PluginParamsPanel } from "./components/ui/PluginParamsPanel";
+import { PluginListPanel } from "./components/ui/PluginListPanel";
+import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
+import { SettingsModal } from "./components/ui/SettingsModal";
 import { useAppStore } from "./stores/appStore";
-import { ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Layers, 
+  Box, 
+  Puzzle, 
+  Settings2 
+} from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { DialogAPI, BackendAPI } from "./api";
@@ -22,12 +32,23 @@ function App() {
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const removeNodes = useAppStore((state) => state.removeNodes);
 
-  // Sidebar States
+  // Sidebar States from Store
+  const leftPanelActiveTab = useAppStore((state) => state.leftPanelActiveTab);
+  const rightPanelActiveTab = useAppStore((state) => state.rightPanelActiveTab);
+  const leftPanelViewMode = useAppStore((state) => state.leftPanelViewMode);
+  const rightPanelViewMode = useAppStore((state) => state.rightPanelViewMode);
+  const setLeftPanelActiveTab = useAppStore((state) => state.setLeftPanelActiveTab);
+  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
+  const setLeftPanelViewMode = useAppStore((state) => state.setLeftPanelViewMode);
+  const setRightPanelViewMode = useAppStore((state) => state.setRightPanelViewMode);
+
+  const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
+  const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
+
   const [leftWidth, setLeftWidth] = useState(256);
   const [rightWidth, setRightWidth] = useState(320);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [rightTab, setRightTab] = useState<"inspector" | "layers">("inspector");
 
   useEffect(() => {
     const initApp = async () => {
@@ -116,11 +137,14 @@ function App() {
         if (activeTool !== "select")
           useAppStore.setState({ activeTool: "select" });
         useAppStore.setState({ pluginInteractionData: {} });
+        
+        // Return to Layers panel on Escape
+        setRightPanelActiveTab("layers");
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedNodeIds, activeTool, removeNodes]);
+  }, [selectedNodeIds, activeTool, removeNodes, setRightPanelActiveTab]);
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -207,6 +231,36 @@ function App() {
     [rightWidth],
   );
 
+  const leftPanels: PanelTab[] = useMemo(() => [
+    {
+      id: "project",
+      title: "Project",
+      icon: <Box size={14} />,
+      component: <WaypointTree />
+    },
+    {
+      id: "plugins",
+      title: "Plugins",
+      icon: <Puzzle size={14} />,
+      component: <PluginListPanel />
+    }
+  ], []);
+
+  const rightPanels: PanelTab[] = useMemo(() => [
+    {
+      id: "layers",
+      title: "Layers",
+      icon: <Layers size={14} />,
+      component: <LayerPanel />
+    },
+    {
+      id: "inspector",
+      title: "Inspector",
+      icon: <Settings2 size={14} />,
+      component: activeTool === "add_generator" ? <PluginParamsPanel /> : <PropertiesPanel />
+    }
+  ], [activeTool]);
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
       <TopMenu />
@@ -221,18 +275,15 @@ function App() {
               style={{ width: leftWidth }}
               className="bg-slate-800 border-r border-slate-700 flex flex-col z-0 shadow-lg relative flex-shrink-0"
             >
-              <div className="p-3 border-b border-slate-700 bg-slate-800/80 backdrop-blur flex justify-between items-center">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                  Project / Hierarchy
-                </h2>
-                <button
-                  onClick={() => setLeftOpen(false)}
-                  className="ui-icon-btn h-7 w-7 border-transparent bg-transparent"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-              </div>
-              <WaypointTree />
+              <PanelContainer
+                panels={leftPanels}
+                activeTabId={leftPanelActiveTab}
+                onTabChange={setLeftPanelActiveTab}
+                viewMode={leftPanelViewMode}
+                onViewModeChange={setLeftPanelViewMode}
+                onClose={() => setLeftOpen(false)}
+                closeIcon={<ChevronLeft size={16} />}
+              />
             </div>
             {/* Dragger */}
             <div
@@ -286,39 +337,23 @@ function App() {
               style={{ width: rightWidth }}
               className="bg-slate-800 border-l border-slate-700 flex flex-col z-0 shadow-lg relative flex-shrink-0"
             >
-              <div className="p-3 border-b border-slate-700 bg-slate-800/80 backdrop-blur flex justify-between items-center">
-                <button
-                  onClick={() => setRightOpen(false)}
-                  className="ui-icon-btn h-7 w-7 border-transparent bg-transparent"
-                >
-                  <ChevronRight size={16} />
-                </button>
-                <div className="flex space-x-4">
-                  <button
-                    onClick={() => setRightTab("inspector")}
-                    className={`text-xs font-bold uppercase tracking-wider pb-1 ${rightTab === "inspector" ? "text-primary border-b-2 border-primary" : "text-slate-500 hover:text-slate-300"}`}
-                  >
-                    Inspector
-                  </button>
-                  <button
-                    onClick={() => setRightTab("layers")}
-                    className={`text-xs font-bold uppercase tracking-wider pb-1 flex items-center gap-1 ${rightTab === "layers" ? "text-primary border-b-2 border-primary" : "text-slate-500 hover:text-slate-300"}`}
-                  >
-                    <Layers size={14} /> Layers
-                  </button>
-                </div>
-              </div>
-              {activeTool === "add_generator" ? (
-                <PluginParamsPanel />
-              ) : rightTab === "inspector" ? (
-                <PropertiesPanel />
-              ) : (
-                <LayerPanel />
-              )}
+              <PanelContainer
+                panels={rightPanels}
+                activeTabId={rightPanelActiveTab}
+                onTabChange={setRightPanelActiveTab}
+                viewMode={rightPanelViewMode}
+                onViewModeChange={setRightPanelViewMode}
+                onClose={() => setRightOpen(false)}
+                closeIcon={<ChevronRight size={16} />}
+              />
             </div>
           </>
         )}
       </div>
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setSettingsModalOpen(false)}
+      />
     </div>
   );
 }

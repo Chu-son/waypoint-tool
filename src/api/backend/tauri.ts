@@ -54,4 +54,8 @@ export class TauriBackendAPI implements IBackendAPI {
   async updatePluginSdk(pluginFolderPath: string): Promise<string> {
     return invoke('update_plugin_sdk', { pluginFolderPath });
   }
+
+  async readImageBase64(path: string): Promise<string> {
+    return invoke('read_image_base64', { path });
+  }
 }

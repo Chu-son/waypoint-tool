@@ -1,4 +1,4 @@
-import { X, Plus, Trash2, Save, RefreshCw } from "lucide-react";
+import { X, Plus, Trash2, Save, RefreshCw, Sparkles, Map, PenTool, Wand2, Puzzle, Image as ImageIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { OptionDef } from "../../types/store";
@@ -45,6 +45,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   type TabType = "general" | "options" | "export" | "plugins";
   const [activeTab, setActiveTab] = useState<TabType>("general");
+  const modalTabFromStore = useAppStore((state) => state.settingsModalTab);
+
   const plugins = useAppStore((state) => state.plugins);
   const pluginSettings = useAppStore((state) => state.pluginSettings);
   const setPluginSettings = useAppStore((state) => state.setPluginSettings);
@@ -59,6 +61,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   // Sync when opened
   useEffect(() => {
     if (isOpen) {
+      setActiveTab(modalTabFromStore);
       setLocalOptions(globalOptionsSchema?.options || []);
       import("../../api").then(({ BackendAPI }) => {
         BackendAPI.getPythonEnvironments()
@@ -1178,6 +1181,85 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                                 {setting.path} moved?
                               </p>
                             )}
+                            {/* Icon Settings */}
+                            <div className="mt-2 pt-2 border-t border-slate-800 flex flex-col gap-2">
+                              <span className="text-xs font-medium text-slate-500">Plugin Icon:</span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
+                                   {setting.icon?.startsWith("data:image/") ? (
+                                      <img src={setting.icon} alt="icon" className="w-full h-full object-contain" />
+                                   ) : (
+                                     (() => {
+                                        const iconName = setting.icon || plugin?.manifest?.icon || "Puzzle";
+                                        switch(iconName) {
+                                          case "Sparkles": return <Sparkles size={16} className="text-slate-300" />;
+                                          case "Map": return <Map size={16} className="text-slate-300" />;
+                                          case "PenTool": return <PenTool size={16} className="text-slate-300" />;
+                                          case "Wand2": return <Wand2 size={16} className="text-slate-300" />;
+                                          case "ImageIcon": return <ImageIcon size={16} className="text-slate-300" />;
+                                          default: return <Puzzle size={16} className="text-slate-300" />;
+                                        }
+                                     })()
+                                   )}
+                                </div>
+                                
+                                <select 
+                                  className="ui-select flex-1 text-xs h-7 py-1 pl-2 pr-8"
+                                  value={setting.icon?.startsWith("data:image/") ? "custom" : (setting.icon || "default")}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    if (val === "custom") return; // Handled by button
+                                    const newFallback = val === "default" ? undefined : val;
+                                    const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, icon: newFallback } : s);
+                                    setPluginSettings(newSettings);
+                                  }}
+                                >
+                                  <option value="default">Default</option>
+                                  <option value="Puzzle">Puzzle</option>
+                                  <option value="Sparkles">Sparkles</option>
+                                  <option value="Map">Map</option>
+                                  <option value="PenTool">PenTool</option>
+                                  <option value="Wand2">Wand</option>
+                                  <option value="ImageIcon">Image</option>
+                                  {setting.icon?.startsWith("data:image/") && <option value="custom">Custom Image</option>}
+                                </select>
+
+                                <button
+                                  className="ui-btn ui-btn-secondary ui-btn-sm h-7 shrink-0"
+                                  onClick={async () => {
+                                     const { DialogAPI, BackendAPI } = await import("../../api");
+                                     const selectedPath = await DialogAPI.open({
+                                       multiple: false,
+                                       filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "svg", "webp"] }]
+                                     });
+                                     if (selectedPath) {
+                                        const pathStr = typeof selectedPath === "string" ? selectedPath : (selectedPath as any).path;
+                                        try {
+                                          const base64Data = await BackendAPI.readImageBase64(pathStr);
+                                          const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, icon: base64Data } : s);
+                                          setPluginSettings(newSettings);
+                                        } catch (err) {
+                                          console.error("Failed to read image", err);
+                                          alert("画像の読み込みに失敗しました。");
+                                        }
+                                     }
+                                  }}
+                                >
+                                  Browse Custom
+                                </button>
+                                {setting.icon && (
+                                   <button 
+                                      onClick={() => {
+                                        const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, icon: undefined } : s);
+                                        setPluginSettings(newSettings);
+                                      }}
+                                      className="text-[10px] text-red-400 hover:text-red-300 ml-auto shrink-0"
+                                   >
+                                     Clear
+                                   </button>
+                                )}
+                              </div>
+                            </div>
                             {plugin && plugin.manifest.type === "python" && (
                               <div className="mt-2 pt-2 border-t border-slate-800 flex gap-2 items-center">
                                 <span className="text-xs font-medium text-slate-500 w-32 shrink-0">

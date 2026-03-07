@@ -32,6 +32,8 @@ pub struct PluginManifest {
     #[serde(default)]
     pub needs: Vec<String>,
     #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(default)]
     pub properties: Vec<serde_json::Value>,
 }
 

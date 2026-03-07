@@ -40,6 +40,7 @@ export interface PluginSetting {
   order: number;
   isBuiltin: boolean;
   pythonOverridePath?: string;
+  icon?: string;
 }
 
 export type WaypointOptions = Record<string, string | number | boolean | Array<string | number | boolean>>;
@@ -76,6 +77,7 @@ export type PluginManifest = {
   inputs: PluginInputDef[];
   needs?: ('map_image' | 'waypoints' | 'layers')[];
   properties: OptionDef[];
+  icon?: string;
 };
 
 export type DefaultExportFormat = {

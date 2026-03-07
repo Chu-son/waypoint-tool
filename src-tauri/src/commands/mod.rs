@@ -1,4 +1,6 @@
 use tauri::{command, AppHandle};
+use std::fs;
+use base64::{engine::general_purpose, Engine as _};
 use crate::{map, io, models::ProjectData};
 
 #[command]
@@ -26,6 +28,29 @@ pub fn export_waypoints(path: String, waypoints: Vec<serde_json::Value>, templat
     io::export_waypoints(&path, waypoints, template, image_data_b64)
 }
 
+#[command]
+pub fn read_image_base64(path: String) -> Result<String, String> {
+    let bytes = fs::read(&path).map_err(|e| format!("Failed to read image file: {}", e))?;
+    
+    // Determine mime type from extension
+    let mime_type = match std::path::Path::new(&path)
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|s| s.to_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("svg") => "image/svg+xml",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream",
+    };
+    
+    let base64_str = general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{};base64,{}", mime_type, base64_str))
+}
+
 pub mod plugins;
 pub use plugins::*;
 
@@ -48,6 +73,7 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         plugins::get_python_environments,
         plugins::scaffold_plugin,
         plugins::check_sdk_version,
-        plugins::update_plugin_sdk
+        plugins::update_plugin_sdk,
+        read_image_base64
     ]
 }

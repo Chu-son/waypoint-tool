@@ -41,6 +41,16 @@ export type AppState = {
   shouldFitToMaps: number; // timestamp trigger
   toolPanelMaxColumns: number;
   decimalPrecision: number; // Number of decimal places for numeric input display (default 6)
+  
+  // Settings Modal State
+  isSettingsModalOpen: boolean;
+  settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
+
+  // Panel States
+  leftPanelActiveTab: string;
+  rightPanelActiveTab: string;
+  leftPanelViewMode: 'tabs' | 'split';
+  rightPanelViewMode: 'tabs' | 'split';
 
   // Methods
   addNode: (node: WaypointNode, parentId?: string) => void;
@@ -80,6 +90,13 @@ export type AppState = {
   setPluginActiveProperties: (props: Record<string, any>) => void;
   setToolPanelMaxColumns: (max: number) => void;
   setActiveInputIndex: (index: number) => void;
+
+  setLeftPanelActiveTab: (tab: string) => void;
+  setRightPanelActiveTab: (tab: string) => void;
+  setLeftPanelViewMode: (mode: 'tabs' | 'split') => void;
+  setRightPanelViewMode: (mode: 'tabs' | 'split') => void;
+
+  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'export' | 'plugins') => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -121,6 +138,14 @@ export const useAppStore = create<AppState>()(
       shouldFitToMaps: 0,
       toolPanelMaxColumns: 1,
       decimalPrecision: 6,
+
+      isSettingsModalOpen: false,
+      settingsModalTab: 'general',
+
+      leftPanelActiveTab: 'project',
+      rightPanelActiveTab: 'layers',
+      leftPanelViewMode: 'tabs',
+      rightPanelViewMode: 'tabs',
 
       // Actions
       setDirty: (dirty: boolean) => set({ isDirty: dirty }), // --- Actions ---
@@ -197,19 +222,39 @@ export const useAppStore = create<AppState>()(
 
       setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),
 
-      setActiveTool: (tool: AppState['activeTool']) => set({ activeTool: tool }),
+      setActiveTool: (tool: AppState['activeTool']) => set(() => {
+        const updates: Partial<AppState> = { activeTool: tool };
+        if (tool === 'add_generator') {
+          updates.rightPanelActiveTab = 'inspector';
+        }
+        return updates;
+      }),
       selectNodes: (ids: string[], multi = false) => set((state) => {
-        if (multi) {
-          // Toggle logic: if already selected, remove it; otherwise add it.
+        const nextIds = multi ? (() => {
           const current = new Set(state.selectedNodeIds);
           ids.forEach(id => {
             if (current.has(id)) current.delete(id);
             else current.add(id);
           });
-          return { selectedNodeIds: Array.from(current) };
+          return Array.from(current);
+        })() : ids;
+
+        const updates: Partial<AppState> = { selectedNodeIds: nextIds };
+        if (nextIds.length > 0) {
+          updates.rightPanelActiveTab = 'inspector';
         }
-        return { selectedNodeIds: ids };
+        return updates;
       }),
+
+      setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
+      setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
+      setLeftPanelViewMode: (mode) => set({ leftPanelViewMode: mode, isDirty: true }),
+      setRightPanelViewMode: (mode) => set({ rightPanelViewMode: mode, isDirty: true }),
+
+      setSettingsModalOpen: (open, tab) => set((state) => ({
+        isSettingsModalOpen: open,
+        settingsModalTab: tab || state.settingsModalTab
+      })),
 
       setProjectData: (data: any) =>
         set((state) => ({
@@ -340,6 +385,8 @@ export const useAppStore = create<AppState>()(
         toolPanelMaxColumns: state.toolPanelMaxColumns,
         globalPythonPath: state.globalPythonPath,
         decimalPrecision: state.decimalPrecision,
+        leftPanelViewMode: state.leftPanelViewMode,
+        rightPanelViewMode: state.rightPanelViewMode,
       }),
     }
   )
