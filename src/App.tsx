@@ -24,6 +24,7 @@ import {
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { DialogAPI, BackendAPI } from "./api";
+import { Button } from "./components/ui/common/Button";
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -119,8 +120,20 @@ function App() {
         });
         if (validSettings.length !== newSettings.length) settingsChanged = true;
 
+        // Final deduplication by ID and cleanup
+        const uniqueSettings: typeof validSettings = [];
+        const seenIds = new Set<string>();
+        for (const s of validSettings) {
+          if (!seenIds.has(s.id)) {
+            uniqueSettings.push(s);
+            seenIds.add(s.id);
+          } else {
+            settingsChanged = true;
+          }
+        }
+
         if (settingsChanged) {
-          useAppStore.getState().setPluginSettings(validSettings);
+          useAppStore.getState().setPluginSettings(uniqueSettings);
         }
       } catch (e) {
         console.error("Failed to load plugins:", e);
@@ -248,7 +261,7 @@ function App() {
   ], [activeTool]);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-screen bg-surface-base text-text-base overflow-hidden font-sans">
       <ShortcutManager />
       <TopMenu />
 
@@ -260,7 +273,7 @@ function App() {
           <>
             <div
               style={{ width: leftWidth }}
-              className="bg-slate-800 border-r border-slate-700 flex flex-col z-0 shadow-lg relative flex-shrink-0"
+              className="bg-surface-panel border-r border-border-base flex flex-col z-0 shadow-lg relative flex-shrink-0"
             >
               <PanelContainer
                 panels={leftPanels}
@@ -274,34 +287,38 @@ function App() {
             </div>
             {/* Dragger */}
             <div
-              className="w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary z-10 transition-colors"
+              className="w-1 cursor-col-resize hover:bg-primary-base/50 active:bg-primary-base z-10 transition-colors"
               onMouseDown={handleLeftDrag}
             />
           </>
         )}
 
         {/* Main Center Area */}
-        <div className="flex-1 bg-slate-950 relative overflow-hidden flex flex-col">
+        <div className="flex-1 bg-surface-base relative overflow-hidden flex flex-col">
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
             {!isLeftPanelOpen ? (
-              <button
+              <Button
+                variant="secondary"
+                size="icon"
                 onClick={() => setLeftPanelOpen(true)}
-                className="pointer-events-auto ui-icon-btn h-10 w-10 bg-slate-800/80 backdrop-blur shadow"
+                className="pointer-events-auto h-10 w-10 bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
               >
                 <ChevronRight size={20} />
-              </button>
+              </Button>
             ) : (
               <div />
             )}
 
             {!isRightPanelOpen ? (
-              <button
+              <Button
+                variant="secondary"
+                size="icon"
                 onClick={() => setRightPanelOpen(true)}
-                className="pointer-events-auto ui-icon-btn h-10 w-10 bg-slate-800/80 backdrop-blur shadow"
+                className="pointer-events-auto h-10 w-10 bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
               >
                 <ChevronLeft size={20} />
-              </button>
+              </Button>
             ) : (
               <div />
             )}
@@ -317,12 +334,12 @@ function App() {
           <>
             {/* Dragger */}
             <div
-              className="w-1 cursor-col-resize hover:bg-primary/50 active:bg-primary z-10 transition-colors"
+              className="w-1 cursor-col-resize hover:bg-primary-base/50 active:bg-primary-base z-10 transition-colors"
               onMouseDown={handleRightDrag}
             />
             <div
               style={{ width: rightWidth }}
-              className="bg-slate-800 border-l border-slate-700 flex flex-col z-0 shadow-lg relative flex-shrink-0"
+              className="bg-surface-panel border-l border-border-base flex flex-col z-0 shadow-lg relative flex-shrink-0"
             >
               <PanelContainer
                 panels={rightPanels}

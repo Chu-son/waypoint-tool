@@ -1,5 +1,7 @@
 import React, { useEffect } from "react";
-import { X, Keyboard } from "lucide-react";
+import { Keyboard } from "lucide-react";
+import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
+import { Button } from "./common/Button";
 
 type KeyboardShortcutsModalProps = {
   isOpen: boolean;
@@ -33,38 +35,27 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div 
-        className="bg-slate-900 border border-slate-700 w-[500px] max-w-[90vw] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-950">
-          <div className="flex items-center gap-3 text-slate-100 font-semibold text-lg">
-            <Keyboard size={20} className="text-primary" />
-            <h2>Keyboard Shortcuts</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white hover:bg-slate-800 p-1.5 rounded-md transition-colors"
-          >
-            <X size={20} />
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <ModalHeader onClose={onClose}>
+        <div className="flex items-center gap-3">
+          <Keyboard size={20} className="text-primary-base" />
+          <span>Keyboard Shortcuts</span>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-900">
+      </ModalHeader>
+      
+      <ModalContent className="p-0">
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 gap-3">
             {shortcuts.map((shortcut, idx) => (
-              <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-800 last:border-0 hover:bg-slate-800/50 px-3 rounded transition-colors">
-                <span className="text-slate-300 font-medium text-[14px]">{shortcut.action}</span>
+              <div key={idx} className="flex justify-between items-center py-2.5 border-b border-border-base/30 last:border-0 hover:bg-surface-hover/50 px-3 rounded-lg transition-colors">
+                <span className="text-text-base font-medium text-[14px]">{shortcut.action}</span>
                 <div className="flex items-center gap-1.5">
                   {shortcut.keys.map((key, keyIdx) => (
                     <React.Fragment key={keyIdx}>
                       {key === "or" || key === "+" ? (
-                        <span className="text-slate-500 text-[12px]">{key}</span>
+                        <span className="text-text-muted text-[12px] font-medium">{key}</span>
                       ) : (
-                        <kbd className="bg-slate-800 border-b-2 border-slate-950 px-2.5 py-1 rounded text-slate-200 text-[12px] font-mono shadow-sm">
+                        <kbd className="bg-surface-base border-b-2 border-slate-950 px-2.5 py-1 rounded-md text-text-base text-[12px] font-mono shadow-sm">
                           {key}
                         </kbd>
                       )}
@@ -75,17 +66,13 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
             ))}
           </div>
         </div>
+      </ModalContent>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-950 flex justify-end">
-          <button
-            onClick={onClose}
-            className="ui-btn-primary px-6 py-2"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+      <ModalFooter>
+        <Button onClick={onClose} className="px-8">
+          Close
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }

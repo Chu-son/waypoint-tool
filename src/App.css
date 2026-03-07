@@ -1,11 +1,34 @@
 @import "tailwindcss";
 
+@theme {
+  /* 背景/サーフェス */
+  --color-surface-base: #0f172a;    /* 全体の背景 (bg-slate-900相当) */
+  --color-surface-panel: #1e293b;   /* パネルやモーダルの背景 (bg-slate-800相当) */
+  --color-surface-hover: #334155;   /* ホバー時の背景 (bg-slate-700相当) */
+  
+  /* ボーダー */
+  --color-border-base: #334155;     /* 標準の枠線 (border-slate-700相当) */
+  --color-border-focus: #3b82f6;    /* フォーカス時の枠線 (border-blue-500相当) */
+  --color-border-error: #ef4444;    /* エラー状態の枠線 */
+  
+  /* テキスト */
+  --color-text-base: #f8fafc;       /* 標準のテキスト (text-slate-100) */
+  --color-text-muted: #94a3b8;      /* 控えめなテキスト (text-slate-400) */
+  --color-text-inverse: #ffffff;    /* ボタン内などの反転テキスト */
+  
+  /* ブランド・アクセント */
+  --color-primary-base: #3b82f6;    /* メインカラー */
+  --color-primary-hover: #2563eb;   /* メインカラーのホバー状態 */
+  --color-danger-base: #b91c1c;     /* 危険アクション (bg-red-700相当) */
+  --color-danger-hover: #dc2626;    /* 危険アクションのホバー */
+}
+
 :root {
-  --primary: #3b82f6;
-  --bg-color: #0f172a;
-  --text-color: #f8fafc;
-  --panel-bg: #1e293b;
-  --border-color: #334155;
+  --primary: var(--color-primary-base);
+  --bg-color: var(--color-surface-base);
+  --text-color: var(--color-text-base);
+  --panel-bg: var(--color-surface-panel);
+  --border-color: var(--color-border-base);
   --highlight: #60a5fa;
 }
 
@@ -22,115 +45,6 @@
 }
 
 @layer components {
-  .ui-field {
-    @apply w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500;
-  }
-
-  .ui-field:focus {
-    @apply border-blue-500 ring-2 ring-blue-500/20;
-  }
-
-  .ui-field-sm {
-    @apply w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none transition-colors placeholder:text-slate-500;
-  }
-
-  .ui-field-sm:focus {
-    @apply border-blue-500 ring-2 ring-blue-500/20;
-  }
-
-  .ui-select {
-    @apply w-full cursor-pointer rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors;
-  }
-
-  .ui-select-sm {
-    @apply w-full cursor-pointer rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none transition-colors;
-  }
-
-  .ui-select:focus,
-  .ui-select-sm:focus {
-    @apply border-blue-500 ring-2 ring-blue-500/20;
-  }
-
-  .ui-select:disabled,
-  .ui-select-sm:disabled {
-    @apply cursor-not-allowed opacity-60;
-  }
-
-  .ui-input {
-    @apply w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500;
-  }
-
-  .ui-input:focus {
-    @apply border-blue-500 ring-2 ring-blue-500/20;
-  }
-
-  .ui-input-sm {
-    @apply w-full rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none transition-colors placeholder:text-slate-500;
-  }
-
-  .ui-input-sm:focus {
-    @apply border-blue-500 ring-2 ring-blue-500/20;
-  }
-
-  .ui-textarea {
-    @apply w-full min-h-24 resize-y rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500;
-  }
-
-  .ui-textarea:focus {
-    @apply border-blue-500 ring-2 ring-blue-500/20;
-  }
-
-  .ui-checkbox {
-    @apply h-4 w-4 cursor-pointer rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-2 focus:ring-blue-500/30;
-  }
-
-  .ui-range {
-    @apply h-2 w-full cursor-pointer appearance-none rounded-lg bg-slate-700;
-  }
-
-  .ui-btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition-colors;
-  }
-
-  .ui-btn-sm {
-    @apply px-3 py-1.5 text-xs;
-  }
-
-  .ui-btn-md {
-    @apply px-4 py-2;
-  }
-
-  .ui-btn-primary {
-    @apply border-blue-500 bg-blue-500 text-white hover:bg-blue-400;
-  }
-
-  .ui-btn-secondary {
-    @apply border-slate-600 bg-slate-700 text-slate-200 hover:bg-slate-600;
-  }
-
-  .ui-btn-ghost {
-    @apply border-slate-700 bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200;
-  }
-
-  .ui-btn-danger {
-    @apply border-red-700 bg-red-700 text-white hover:bg-red-600;
-  }
-
-  .ui-icon-btn {
-    @apply inline-flex items-center justify-center rounded-lg border border-slate-700 bg-slate-800/50 text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200;
-  }
-
-  .ui-tab {
-    @apply rounded-lg px-4 py-2 text-sm font-medium transition-colors;
-  }
-
-  .ui-tab-active {
-    @apply bg-blue-500 text-white;
-  }
-
-  .ui-tab-inactive {
-    @apply text-slate-400 hover:bg-slate-800 hover:text-slate-200;
-  }
 }
 
 body {

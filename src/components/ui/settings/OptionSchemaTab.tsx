@@ -2,6 +2,11 @@ import { Plus, Save, Trash2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { OptionDef } from "../../../types/store";
+import { Button } from "../common/Button";
+import { Input } from "../common/Input";
+import { Select } from "../common/Select";
+import { Label } from "../common/Label";
+import { cn } from "../../../utils/cn";
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -88,18 +93,20 @@ export function OptionSchemaTab() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex justify-between items-center bg-surface-panel p-4 rounded-xl border border-border-base/50 shadow-sm">
         <div>
-          <h3 className="text-md font-bold text-slate-200">
+          <h3 className="text-lg font-bold text-text-base tracking-tight">
             Waypoint Options Schema
           </h3>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-text-muted mt-0.5 font-medium">
             Define custom properties that can be attached to waypoints.
           </p>
         </div>
-        <div className="space-x-2">
-          <button
+        <div className="flex gap-2.5">
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={async () => {
               try {
                 const { DialogAPI, BackendAPI } = await import("../../../api");
@@ -139,38 +146,39 @@ export function OptionSchemaTab() {
                 );
               }
             }}
-            className="ui-btn ui-btn-secondary ui-btn-sm"
           >
-            <Plus size={14} /> Load from File
-          </button>
-          <button
+            <Plus size={14} className="mr-1" /> Load File
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={handleAddOption}
-            className="ui-btn ui-btn-secondary ui-btn-sm"
           >
-            <Plus size={14} /> Add Field
-          </button>
-          <button
+            <Plus size={14} className="mr-1" /> Add Field
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleSaveOptions}
-            className="ui-btn ui-btn-primary ui-btn-sm"
           >
-            <Save size={14} /> Apply Schema
-          </button>
+            <Save size={14} className="mr-1" /> Apply
+          </Button>
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 px-1">
         {localOptions.map((opt, i) => (
           <div
             key={i}
-            className="flex gap-2 items-start bg-slate-900 p-3 rounded-lg border border-slate-700/50"
+            className="flex gap-3 items-start bg-surface-panel/40 p-4 rounded-xl border border-border-base/30 shadow-subtle hover:border-border-base/60 transition-all"
           >
-            <div className="flex-1 space-y-3">
-              <div className="flex gap-2">
-                <div className="flex-1 space-y-1">
-                  <label className="text-xs font-medium text-slate-400">
+            <div className="flex-1 space-y-4">
+              <div className="grid grid-cols-12 gap-3">
+                <div className="col-span-3 space-y-1.5">
+                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
                     Key Name
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     type="text"
                     value={opt.name}
                     onChange={(e) => {
@@ -179,52 +187,52 @@ export function OptionSchemaTab() {
                         .toLowerCase();
                       handleUpdateOption(i, { name: sanitized });
                     }}
-                    className={`w-full bg-slate-800 border rounded px-2 py-1 text-sm text-slate-200 outline-none ${
-                      localOptions.filter((o) => o.name === opt.name).length >
-                        1 || opt.name.trim() === ""
-                        ? "border-red-500 focus:border-red-500"
-                        : "border-slate-600 focus:border-primary"
-                    }`}
+                    className={cn(
+                      "h-9 text-xs font-mono",
+                      (localOptions.filter((o) => o.name === opt.name).length > 1 || opt.name.trim() === "")
+                        ? "border-danger-base focus:border-danger-base ring-danger-base/20"
+                        : ""
+                    )}
                     placeholder="e.g. velocity"
                   />
                 </div>
-                <div className="flex-1 space-y-1">
-                  <label className="text-xs font-medium text-slate-400">
-                    Display Label
-                  </label>
-                  <input
+                <div className="col-span-3 space-y-1.5">
+                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
+                    Label
+                  </Label>
+                  <Input
                     type="text"
                     value={opt.label}
                     onChange={(e) =>
                       handleUpdateOption(i, { label: e.target.value })
                     }
-                    className="ui-input"
+                    className="h-9 text-xs"
                     placeholder="e.g. Target Speed"
                   />
                 </div>
-                <div className="w-32 space-y-1">
-                  <label className="text-xs font-medium text-slate-400">
+                <div className="col-span-3 space-y-1.5">
+                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
                     Type
-                  </label>
-                  <select
+                  </Label>
+                  <Select
                     value={opt.type}
                     onChange={(e) =>
                       handleUpdateOption(i, { type: e.target.value })
                     }
-                    className="ui-select"
+                    className="h-9 text-xs"
                   >
                     <option value="string">String</option>
                     <option value="float">Float</option>
                     <option value="integer">Integer</option>
                     <option value="boolean">Boolean</option>
                     <option value="list">List (Array)</option>
-                  </select>
+                  </Select>
                 </div>
-                <div className="w-32 space-y-1">
-                  <label className="text-xs font-medium text-slate-400">
-                    Default Value
-                  </label>
-                  <input
+                <div className="col-span-3 space-y-1.5">
+                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
+                    Default
+                  </Label>
+                  <Input
                     type="text"
                     value={
                       opt.default !== undefined
@@ -260,11 +268,10 @@ export function OptionSchemaTab() {
                         });
                       }
                     }}
-                    className={`w-full rounded px-2 py-1 text-sm text-slate-200 outline-none ${
-                      isDefaultValid(opt)
-                        ? "border-slate-600 focus:border-primary"
-                        : "border-red-500 focus:border-red-500"
-                    } bg-slate-800 border`}
+                    className={cn(
+                      "h-9 text-xs font-mono",
+                      !isDefaultValid(opt) ? "border-danger-base focus:border-danger-base ring-danger-base/20" : ""
+                    )}
                     placeholder={
                       opt.type === "list"
                         ? "csv"
@@ -276,35 +283,35 @@ export function OptionSchemaTab() {
                 </div>
               </div>
               {opt.type === "list" && (
-                <div className="flex gap-2 mt-2">
-                  <div className="w-48 space-y-1">
-                    <label className="text-xs font-medium text-slate-400">
+                <div className="flex gap-2 mt-1">
+                  <div className="w-48 space-y-1.5">
+                    <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
                       List Item Type
-                    </label>
-                    <select
+                    </Label>
+                    <Select
                       value={opt.item_type || "string"}
                       onChange={(e) =>
                         handleUpdateOption(i, {
                           item_type: e.target.value,
                         })
                       }
-                      className="ui-select"
+                      className="h-9 text-xs"
                     >
                       <option value="string">String</option>
                       <option value="float">Float</option>
                       <option value="integer">Integer</option>
                       <option value="boolean">Boolean</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
               )}
               {opt.type === "string" && (
-                <div className="flex gap-2 mt-2">
-                  <div className="flex-1 space-y-1">
-                    <label className="text-xs font-medium text-slate-400">
+                <div className="flex gap-2 mt-1">
+                  <div className="flex-1 space-y-1.5">
+                    <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
                       Dropdown Enums (csv, optional)
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="text"
                       value={
                         opt.enum_values ? opt.enum_values.join(", ") : ""
@@ -317,23 +324,25 @@ export function OptionSchemaTab() {
                             .filter((s) => s.length > 0),
                         })
                       }
-                      className="ui-input"
+                      className="h-9 text-xs"
                       placeholder="e.g. none, docking"
                     />
                   </div>
                 </div>
               )}
             </div>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => handleRemoveOption(i)}
-              className="p-1.5 mt-5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+              className="mt-6 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
             >
               <Trash2 size={16} />
-            </button>
+            </Button>
           </div>
         ))}
         {localOptions.length === 0 && (
-          <div className="text-center py-8 text-slate-500 text-sm bg-slate-900 rounded-lg border border-dashed border-slate-700">
+          <div className="text-center py-12 text-text-muted/60 text-sm bg-surface-panel/30 rounded-2xl border-2 border-dashed border-border-base/40 animate-pulse">
             No custom options defined. Click "Add Field" to create one.
           </div>
         )}

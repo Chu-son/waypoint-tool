@@ -93,7 +93,7 @@ describe('App Integration', () => {
     });
     
     // The button should now be visible
-    const loadMapBtn = screen.getByText('Load ROS Map (YAML)');
+    const loadMapBtn = screen.getByText('Load ROS Map');
     act(() => {
       loadMapBtn.click();
     });
@@ -150,7 +150,7 @@ describe('App Integration', () => {
     });
 
     // Layers panel content should be visible
-    expect(screen.getByText('Load ROS Map (YAML)')).toBeInTheDocument();
+    expect(screen.getByText('Load ROS Map')).toBeInTheDocument();
   });
 
   // --- 要件2: Waypoint編集 ---

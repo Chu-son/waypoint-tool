@@ -1,8 +1,13 @@
-import { X, Save, Image as ImageIcon } from "lucide-react";
+import { Save } from "lucide-react";
 import { useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { BackendAPI } from "../../api";
+import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
+import { Button } from "./common/Button";
+import { Checkbox } from "./common/Checkbox";
+import { Label } from "./common/Label";
+import { cn } from "../../utils/cn";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -174,112 +179,113 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl w-full max-w-md flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/80 shrink-0">
-          <h2 className="text-lg font-bold text-slate-200">Export Options</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors"
-          >
-            <X size={20} />
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} size="md">
+      <ModalHeader onClose={onClose}>
+        <div className="flex items-center gap-3">
+          <Save size={20} className="text-primary-base" />
+          <span>Export Waypoints</span>
         </div>
+      </ModalHeader>
 
-        <div className="p-6 space-y-6">
+      <ModalContent className="p-0">
+        <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="space-y-4">
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-slate-300 block">
-                Output Formats
-              </label>
-              <div className="flex flex-col gap-2 bg-slate-900/50 p-3 rounded border border-slate-700">
-                {useAppStore
-                  .getState()
-                  .defaultExportFormats.filter((f) => f.enabled)
-                  .map((f) => (
-                    <label
-                      key={f.id}
-                      className="flex items-center gap-2 cursor-pointer group"
-                    >
-                      <input
-                        type="checkbox"
+            <Label className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1 block">
+              Desired Output Formats
+            </Label>
+            <div className="grid grid-cols-1 gap-2 bg-surface-base/30 p-4 rounded-xl border border-border-base/40 shadow-inner">
+              {useAppStore
+                .getState()
+                .defaultExportFormats.filter((f) => f.enabled)
+                .map((f) => (
+                  <label
+                    key={f.id}
+                    className="flex items-center justify-between p-3 px-4 rounded-lg bg-surface-panel/40 border border-border-base/20 hover:border-primary-base/30 hover:bg-surface-panel/60 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <Checkbox
                         checked={selectedFormats.includes(f.id)}
                         onChange={() => toggleFormat(f.id)}
-                        className="ui-checkbox"
                       />
-                      <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
-                        {f.name} (.{f.extension})
-                      </span>
-                    </label>
-                  ))}
-                {exportTemplates.map((t) => (
-                  <label
-                    key={t.id}
-                    className="flex items-center gap-2 cursor-pointer group"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedFormats.includes(t.id)}
-                      onChange={() => toggleFormat(t.id)}
-                      className="ui-checkbox"
-                    />
-                    <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
-                      {t.name} (.{t.extension})
-                    </span>
+                      <div className="flex flex-col">
+                        <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
+                          {f.name}
+                        </span>
+                        <span className="text-[10px] text-text-muted font-mono uppercase">
+                          Standard Format (.{f.extension})
+                        </span>
+                      </div>
+                    </div>
                   </label>
                 ))}
-              </div>
-              <p className="text-xs text-slate-500">
-                Select multiple formats to generate all simultaneously. Suffixes
-                specified in the Settings panel will be automatically appended.
-              </p>
+              {exportTemplates.map((t) => (
+                <label
+                  key={t.id}
+                  className="flex items-center justify-between p-3 px-4 rounded-lg bg-surface-panel/40 border border-border-base/20 hover:border-primary-base/30 hover:bg-surface-panel/60 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-4">
+                    <Checkbox
+                      checked={selectedFormats.includes(t.id)}
+                      onChange={() => toggleFormat(t.id)}
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
+                        {t.name}
+                      </span>
+                      <span className="text-[10px] text-text-muted font-mono uppercase">
+                        Custom Template (.{t.extension})
+                      </span>
+                    </div>
+                  </div>
+                </label>
+              ))}
             </div>
-
-            <div className="pt-4 border-t border-slate-700">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <div className="relative flex items-center justify-center pt-0.5">
-                  <input
-                    type="checkbox"
-                    checked={includeImage}
-                    onChange={(e) => setIncludeImage(e.target.checked)}
-                    className="peer w-5 h-5 appearance-none border-2 border-slate-600 rounded-md bg-slate-900 checked:bg-primary checked:border-primary transition-colors cursor-pointer"
-                  />
-                  <ImageIcon
-                    size={14}
-                    className="absolute text-white pointer-events-none opacity-0 peer-checked:opacity-100 transition-opacity"
-                  />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">
-                    Include Canvas Image
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Saves a .png image of the current visible canvas (Map +
-                    Waypoints with visible attributes) alongside the exported
-                    file.
-                  </p>
-                </div>
-              </label>
-            </div>
+            <p className="text-[11px] text-text-muted/80 leading-relaxed px-2">
+              Select multiple formats to generate all simultaneously. Suffixes specified in settings will be automatically appended to filenames.
+            </p>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-bold text-slate-400 hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleExport}
-              disabled={selectedFormats.length === 0}
-              className={`ui-btn ui-btn-md ${selectedFormats.length === 0 ? "border-slate-700 bg-slate-700 text-slate-400 opacity-50 cursor-not-allowed" : "ui-btn-primary shadow-blue-500/20 shadow-lg"}`}
-            >
-              <Save size={16} /> Choose Path & Export
-            </button>
+          <div className="pt-6 border-t border-border-base/30">
+            <label className="flex items-start gap-4 p-4 rounded-xl bg-primary-base/5 border border-primary-base/10 hover:border-primary-base/30 hover:bg-primary-base/[0.08] transition-all cursor-pointer group">
+              <div className="pt-1">
+                <Checkbox
+                  checked={includeImage}
+                  onChange={(e) => setIncludeImage(e.target.checked)}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-text-base group-hover:text-primary-base transition-colors">
+                  Include High-Res Map Shot
+                </p>
+                <p className="text-[11px] text-text-muted/80 leading-relaxed">
+                  Generates a dedicated `.png` capture highlighting all exported waypoints on top of the map layer.
+                </p>
+              </div>
+            </label>
           </div>
         </div>
-      </div>
-    </div>
+      </ModalContent>
+
+      <ModalFooter>
+        <Button
+          variant="ghost"
+          onClick={onClose}
+          className="px-6 text-text-muted font-bold"
+        >
+          Cancel
+        </Button>
+        <Button
+          onClick={handleExport}
+          disabled={selectedFormats.length === 0}
+          className={cn(
+            "min-w-40 shadow-lg transition-all",
+            selectedFormats.length > 0 ? "bg-primary-base hover:bg-primary-hover hover:scale-105 active:scale-95 shadow-primary-base/20" : "opacity-50"
+          )}
+        >
+          <Save size={16} className="mr-2" />
+          Choose Path & Export
+        </Button>
+      </ModalFooter>
+    </Modal>
   );
 }

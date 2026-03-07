@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Input } from './common/Input';
 
 interface NumericInputProps {
   value: number;
@@ -38,7 +39,7 @@ export function NumericInput({ value, onChange, step, precision = 6, placeholder
   }, [text, value, precision, onChange]);
 
   return (
-    <input
+    <Input
       type="text"
       inputMode="decimal"
       value={text}

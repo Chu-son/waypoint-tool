@@ -21,7 +21,7 @@ describe('KeyboardShortcutsModal', () => {
     const mockOnClose = vi.fn();
     render(<KeyboardShortcutsModal isOpen={true} onClose={mockOnClose} />);
     
-    fireEvent.click(screen.getByText('Close'));
+    fireEvent.click(screen.getByLabelText('Close'));
     expect(mockOnClose).toHaveBeenCalled();
   });
 

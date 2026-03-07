@@ -3,6 +3,7 @@ import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
 import { MousePointer2 } from "lucide-react";
+import { cn } from "../../utils/cn";
 
 type MenuOption = {
   label: string;
@@ -46,16 +47,19 @@ function DropdownMenu({
       <button
         onClick={onClick}
         onMouseEnter={onMouseEnter}
-        className={`ui-btn border-transparent px-3 py-1.5 text-[13px] font-medium ${isOpen ? "bg-slate-700/80 text-white shadow-inner" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}
+        className={cn(
+          "px-3 py-1.5 text-[13px] font-medium transition-colors rounded-md",
+          isOpen ? "bg-surface-hover text-text-base shadow-inner" : "text-text-muted hover:bg-surface-hover hover:text-text-base"
+        )}
       >
         {label}
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-56 bg-slate-800 border border-slate-700 shadow-2xl rounded py-1 z-50">
+        <div className="absolute left-0 top-full mt-1 w-56 bg-surface-panel/95 backdrop-blur-md border border-border-base shadow-2xl rounded-lg py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
           {options.map((opt, i) =>
             opt.divider ? (
-              <div key={i} className="h-px bg-slate-700/80 my-1 mx-2" />
+              <div key={i} className="h-px bg-border-base/50 my-1 mx-2" />
             ) : (
               <button
                 key={i}
@@ -63,11 +67,17 @@ function DropdownMenu({
                   opt.action?.();
                   onClose();
                 }}
-                className={`w-full text-left px-4 py-1.5 text-[13px] flex justify-between items-center transition-colors ${opt.danger ? "text-red-400 hover:bg-red-900/40" : "text-slate-300 hover:bg-primary hover:text-white"}`}
+                className={cn(
+                  "w-full text-left px-4 py-1.5 text-[13px] flex justify-between items-center transition-colors group",
+                  opt.danger ? "text-danger-base hover:bg-danger-base/10" : "text-text-muted hover:bg-primary-base hover:text-white"
+                )}
               >
                 <span>{opt.label}</span>
                 {opt.shortcut && (
-                  <span className="text-[11px] text-slate-500 font-mono tracking-tighter truncate ml-2 group-hover:text-primary-200">
+                  <span className={cn(
+                    "text-[10px] text-text-muted font-mono tracking-tighter truncate ml-2",
+                    !opt.danger && "group-hover:text-white/80"
+                  )}>
                     {opt.shortcut}
                   </span>
                 )}
@@ -215,13 +225,13 @@ export function TopMenu() {
   ];
 
   return (
-    <div className="h-9 bg-slate-950 border-b border-slate-800 flex items-center px-4 shrink-0 text-slate-300 z-50 relative select-none shadow-sm">
+    <div className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm">
       <div className="flex items-center gap-6">
         {/* App Logo/Name */}
-        <div className="flex items-center gap-2 text-slate-100 font-bold tracking-wide pointer-events-none">
+        <div className="flex items-center gap-2 text-text-base font-bold tracking-wide pointer-events-none">
           <MousePointer2
             size={16}
-            className="text-primary rotate-45 transform fill-primary"
+            className="text-primary-base rotate-45 transform fill-primary-base"
           />
           <span className="text-[14px]">Waypoint Tool</span>
         </div>

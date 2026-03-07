@@ -1,5 +1,7 @@
 import React from "react";
 import { NumericInput } from "./NumericInput";
+import { Label } from "./common/Label";
+import { cn } from "../../utils/cn";
 
 export interface PluginInput {
   id: string;
@@ -39,27 +41,27 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
   if (mode === "creation") {
     return (
       <div
-        className={`space-y-1 rounded-lg p-2 transition-all ${isActive ? "ring-1 ring-primary/50 bg-primary/5" : ""}`}
+        className={cn(
+          "space-y-2 rounded-lg p-2 transition-all border border-transparent",
+          isActive ? "bg-primary-base/5 border-primary-base/20 ring-1 ring-primary-base/20" : ""
+        )}
       >
-        <label className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+        <Label className="text-[13px] font-semibold text-text-base flex items-center gap-2">
           {totalSteps > 1 && (
             <span
-              className={`w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0 ${
-                isActive
-                  ? "bg-primary text-white"
-                  : hasData
-                    ? "bg-emerald-600 text-white"
-                    : "bg-slate-700 text-slate-400"
-              }`}
+              className={cn(
+                "w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0",
+                isActive ? "bg-primary-base text-white" : hasData ? "bg-emerald-600 text-white" : "bg-surface-hover text-text-muted"
+              )}
             >
               {index + 1}
             </span>
           )}
-          {label} {input.required && <span className="text-red-400">*</span>}
-        </label>
+          {label} {input.required && <span className="text-danger-base">*</span>}
+        </Label>
 
         {isActive && !hasData && (
-          <p className="text-[10px] text-primary/70 font-medium">
+          <p className="text-[10px] text-primary-base font-medium opacity-80">
             {input.type === "rectangle"
               ? "▶ Click and drag on map to draw"
               : input.type === "point"
@@ -69,40 +71,40 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         )}
 
         {input.description && (
-          <p className="text-[10px] text-slate-500 leading-tight mb-1">
+          <p className="text-[10px] text-text-muted/70 leading-tight mb-1">
             {input.description}
           </p>
         )}
 
         {input.type === "point" && (
-          <div className="bg-slate-950 p-2 rounded border border-slate-700">
+          <div className="bg-surface-base p-2 rounded-md border border-border-base/50">
             {interactionData ? (
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                  <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                     X (m)
                   </label>
                   <NumericInput
                     value={interactionData.x ?? 0}
                     precision={decimalPrecision}
                     onChange={(val) => onUpdate({ ...interactionData, x: val })}
-                    className="ui-input-sm"
+                    className="h-7 text-[11px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                  <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                     Y (m)
                   </label>
                   <NumericInput
                     value={interactionData.y ?? 0}
                     precision={decimalPrecision}
                     onChange={(val) => onUpdate({ ...interactionData, y: val })}
-                    className="ui-input-sm"
+                    className="h-7 text-[11px]"
                   />
                 </div>
               </div>
             ) : (
-              <div className="py-1 text-center text-slate-500 italic text-[11px]">
+              <div className="py-1 text-center text-text-muted/50 italic text-[11px]">
                 Click on map to define
               </div>
             )}
@@ -110,12 +112,12 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         )}
 
         {input.type === "rectangle" && (
-          <div className="bg-slate-950 p-2 rounded border border-slate-700">
+          <div className="bg-surface-base p-2 rounded-md border border-border-base/50">
             {interactionData?.center ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="col-span-1">
-                    <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                       Width (m)
                     </label>
                     <NumericInput
@@ -127,11 +129,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                           width: Math.max(0, val),
                         })
                       }
-                      className="ui-input-sm"
+                      className="h-7 text-[11px]"
                     />
                   </div>
                   <div className="col-span-1">
-                    <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                       Height (m)
                     </label>
                     <NumericInput
@@ -143,11 +145,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                           height: Math.max(0, val),
                         })
                       }
-                      className="ui-input-sm"
+                      className="h-7 text-[11px]"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                       Center X
                     </label>
                     <NumericInput
@@ -159,11 +161,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                           center: { ...interactionData.center, x: val },
                         })
                       }
-                      className="ui-input-sm"
+                      className="h-7 text-[11px]"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                       Center Y
                     </label>
                     <NumericInput
@@ -175,11 +177,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                           center: { ...interactionData.center, y: val },
                         })
                       }
-                      className="ui-input-sm"
+                      className="h-7 text-[11px]"
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-[9px] text-slate-500 uppercase mb-0.5">
+                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
                       Yaw (degrees)
                     </label>
                     <NumericInput
@@ -191,16 +193,16 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                           yaw: (val * Math.PI) / 180,
                         })
                       }
-                      className="ui-input-sm"
+                      className="h-7 text-[11px]"
                     />
                   </div>
                 </div>
-                <div className="text-center text-slate-500 text-[9px] mt-1 font-sans border-t border-slate-800 pt-1">
+                <div className="text-center text-text-muted text-[9px] mt-1 font-sans border-t border-border-base/30 pt-1">
                   Drag ◻ corners · Drag ↻ handle to rotate
                 </div>
               </div>
             ) : (
-              <div className="py-1 text-center text-slate-500 italic text-[11px]">
+              <div className="py-1 text-center text-text-muted/50 italic text-[11px]">
                 Click and drag on map to draw
               </div>
             )}
@@ -212,40 +214,40 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
 
   // Edit Mode (PropertiesPanel)
   return (
-    <div className="space-y-2 pt-3 border-t border-slate-700/50">
-      <label className="text-xs font-semibold text-pink-400 flex items-center justify-between">
+    <div className="space-y-2 pt-3 border-t border-border-base/50">
+      <Label className="text-[13px] font-bold text-primary-base flex items-center justify-between uppercase tracking-tight">
         <span>{label}</span>
-        <span className="text-[10px] text-slate-500 font-normal opacity-70">
+        <span className="text-[10px] text-text-muted font-normal opacity-70 normal-case">
           ({input.type === "point" ? "Point" : "Rectangle Area"})
         </span>
-      </label>
+      </Label>
 
       {input.type === "point" && interactionData && (
         <div className="grid grid-cols-3 gap-2">
           <div>
-            <label className="block text-[10px] text-slate-500 mb-0.5">
+            <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
               X (m)
             </label>
             <NumericInput
               value={interactionData.x ?? 0}
               precision={decimalPrecision}
               onChange={(val) => onUpdate({ ...interactionData, x: val })}
-              className="ui-input-sm"
+              className="h-8 text-xs"
             />
           </div>
           <div>
-            <label className="block text-[10px] text-slate-500 mb-0.5">
+            <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
               Y (m)
             </label>
             <NumericInput
               value={interactionData.y ?? 0}
               precision={decimalPrecision}
               onChange={(val) => onUpdate({ ...interactionData, y: val })}
-              className="ui-input-sm"
+              className="h-8 text-xs"
             />
           </div>
           <div>
-            <label className="block text-[10px] text-slate-500 mb-0.5">
+            <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
               Yaw (rad)
             </label>
             <NumericInput
@@ -265,7 +267,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                 const qw = Math.cos(val / 2);
                 onUpdate({ ...interactionData, qx: 0, qy: 0, qz, qw });
               }}
-              className="ui-input-sm"
+              className="h-8 text-xs"
             />
           </div>
         </div>
@@ -275,7 +277,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         (interactionData?.center || interactionData?.origin) && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] text-slate-500 mb-0.5">
+              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
                 Center X
               </label>
               <NumericInput
@@ -287,11 +289,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                     center: { ...interactionData.center, x: val },
                   })
                 }
-                className="ui-input-sm"
+                className="h-8 text-xs"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-500 mb-0.5">
+              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
                 Center Y
               </label>
               <NumericInput
@@ -303,11 +305,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                     center: { ...interactionData.center, y: val },
                   })
                 }
-                className="ui-input-sm"
+                className="h-8 text-xs"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-500 mb-0.5">
+              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
                 Width
               </label>
               <NumericInput
@@ -316,11 +318,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                 onChange={(val) =>
                   onUpdate({ ...interactionData, width: Math.max(0, val) })
                 }
-                className="ui-input-sm"
+                className="h-8 text-xs"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-500 mb-0.5">
+              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
                 Height
               </label>
               <NumericInput
@@ -329,11 +331,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                 onChange={(val) =>
                   onUpdate({ ...interactionData, height: Math.max(0, val) })
                 }
-                className="ui-input-sm"
+                className="h-8 text-xs"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-[10px] text-slate-500 mb-0.5">
+              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
                 Yaw (degrees)
               </label>
               <NumericInput
@@ -342,7 +344,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                 onChange={(val) =>
                   onUpdate({ ...interactionData, yaw: (val * Math.PI) / 180 })
                 }
-                className="ui-input-sm"
+                className="h-8 text-xs"
               />
             </div>
           </div>

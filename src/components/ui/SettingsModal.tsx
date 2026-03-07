@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 
@@ -6,6 +6,9 @@ import { GeneralTab } from "./settings/GeneralTab";
 import { OptionSchemaTab } from "./settings/OptionSchemaTab";
 import { ExportTemplatesTab } from "./settings/ExportTemplatesTab";
 import { PluginsTab } from "./settings/PluginsTab";
+import { Modal, ModalHeader, ModalContent } from "./common/Modal";
+import { Button } from "./common/Button";
+import { cn } from "../../utils/cn";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -38,58 +41,68 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }, [isOpen, modalTabFromStore]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden">
-        <datalist id="python-envs">
-          {pythonEnvs.map((env, i) => (
-            <option key={i} value={env} />
-          ))}
-        </datalist>
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl" className="h-[80vh]">
+      <datalist id="python-envs">
+        {pythonEnvs.map((env, i) => (
+          <option key={i} value={env} />
+        ))}
+      </datalist>
 
-        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/80 shrink-0">
-          <h2 className="text-lg font-bold text-slate-200">User Settings</h2>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors"
+      <ModalHeader onClose={onClose}>
+        <div className="flex items-center gap-3">
+          <span>User Settings</span>
+        </div>
+      </ModalHeader>
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Tabs Sidebar */}
+        <div className="w-56 bg-surface-panel/40 border-r border-border-base/40 p-3 shrink-0 space-y-1">
+          <Button
+            variant={activeTab === "general" ? "secondary" : "ghost"}
+            onClick={() => setActiveTab("general")}
+            className={cn(
+              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
+              activeTab === "general" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
+            )}
           >
-            <X size={20} />
-          </button>
+            General
+          </Button>
+          <Button
+            variant={activeTab === "options" ? "secondary" : "ghost"}
+            onClick={() => setActiveTab("options")}
+            className={cn(
+              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
+              activeTab === "options" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
+            )}
+          >
+            Option Schema
+          </Button>
+          <Button
+            variant={activeTab === "export" ? "secondary" : "ghost"}
+            onClick={() => setActiveTab("export")}
+            className={cn(
+              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
+              activeTab === "export" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
+            )}
+          >
+            Export Templates
+          </Button>
+          <Button
+            variant={activeTab === "plugins" ? "secondary" : "ghost"}
+            onClick={() => setActiveTab("plugins")}
+            className={cn(
+              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
+              activeTab === "plugins" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
+            )}
+          >
+            Plugins
+          </Button>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Tabs Sidebar */}
-          <div className="w-48 bg-slate-900 border-r border-slate-700 p-2 shrink-0">
-            <button
-              onClick={() => setActiveTab("general")}
-              className={`w-full text-left ui-tab ${activeTab === "general" ? "ui-tab-active" : "ui-tab-inactive"}`}
-            >
-              General
-            </button>
-            <button
-              onClick={() => setActiveTab("options")}
-              className={`mt-1 w-full text-left ui-tab ${activeTab === "options" ? "ui-tab-active" : "ui-tab-inactive"}`}
-            >
-              Option Schema
-            </button>
-            <button
-              onClick={() => setActiveTab("export")}
-              className={`mt-1 w-full text-left ui-tab ${activeTab === "export" ? "ui-tab-active" : "ui-tab-inactive"}`}
-            >
-              Export Templates
-            </button>
-            <button
-              onClick={() => setActiveTab("plugins")}
-              className={`mt-1 w-full text-left ui-tab ${activeTab === "plugins" ? "ui-tab-active" : "ui-tab-inactive"}`}
-            >
-              Plugins
-            </button>
-          </div>
-
-          {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-6">
+        {/* Content Area */}
+        <ModalContent className="p-0">
+          <div className="flex-1 overflow-y-auto p-8">
             {activeTab === "general" && <GeneralTab />}
             {activeTab === "options" && <OptionSchemaTab />}
             {activeTab === "export" && <ExportTemplatesTab />}
@@ -100,8 +113,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
             )}
           </div>
-        </div>
+        </ModalContent>
       </div>
-    </div>
+    </Modal>
   );
 }

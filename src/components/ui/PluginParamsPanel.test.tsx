@@ -31,6 +31,7 @@ vi.mock('lucide-react', () => ({
   Settings2: () => <div data-testid="settings-icon" />,
   X: () => <div data-testid="close-icon" />,
   AlertCircle: () => <div data-testid="alert-icon" />,
+  RefreshCcw: () => <div data-testid="refresh-icon" />,
 }));
 
 describe('PluginParamsPanel', () => {

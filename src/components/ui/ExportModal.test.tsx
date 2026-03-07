@@ -35,9 +35,11 @@ describe('ExportModal UI', () => {
   it('displays default export formats (YAML and JSON)', () => {
     render(<ExportModal isOpen={true} onClose={vi.fn()} />);
 
-    // ExportModal renders format names as "Name (.ext)"
-    expect(screen.getByText('YAML Document (.yaml)')).toBeInTheDocument();
-    expect(screen.getByText('JSON Document (.json)')).toBeInTheDocument();
+    // ExportModal renders format names as "Name" and metadata as "Standard Format (.ext)"
+    expect(screen.getByText('YAML Document')).toBeInTheDocument();
+    expect(screen.getByText(/Standard Format \(.yaml\)/)).toBeInTheDocument();
+    expect(screen.getByText('JSON Document')).toBeInTheDocument();
+    expect(screen.getByText(/Standard Format \(.json\)/)).toBeInTheDocument();
   });
 
   it('displays custom templates in the list', () => {
@@ -49,7 +51,8 @@ describe('ExportModal UI', () => {
 
     render(<ExportModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(screen.getByText('Custom ROS (.txt)')).toBeInTheDocument();
+    expect(screen.getByText('Custom ROS')).toBeInTheDocument();
+    expect(screen.getByText(/Custom Template \(.txt\)/)).toBeInTheDocument();
   });
 
   // --- 要件10: エクスポートサフィックス ---
@@ -57,8 +60,8 @@ describe('ExportModal UI', () => {
   it('renders the Export Options heading when open', () => {
     render(<ExportModal isOpen={true} onClose={vi.fn()} />);
 
-    expect(screen.getByText('Export Options')).toBeInTheDocument();
-    expect(screen.getByText('Output Formats')).toBeInTheDocument();
+    expect(screen.getByText('Export Waypoints')).toBeInTheDocument();
+    expect(screen.getByText('Desired Output Formats')).toBeInTheDocument();
   });
 
   it('does not render when isOpen is false', () => {

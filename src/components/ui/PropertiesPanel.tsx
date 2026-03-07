@@ -7,6 +7,12 @@ import { v4 as uuidv4 } from "uuid";
 import { NumericInput } from "./NumericInput";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";
 import { PluginInputEditor } from "./PluginInputEditor";
+import { Button } from "./common/Button";
+import { Input } from "./common/Input";
+import { Select } from "./common/Select";
+import { Checkbox } from "./common/Checkbox";
+import { Label } from "./common/Label";
+import { cn } from "../../utils/cn";
 
 export function PropertiesPanel() {
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
@@ -66,7 +72,7 @@ export function PropertiesPanel() {
   if (selectedNodeIds.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
-        <div className="text-sm text-slate-400 italic mb-4">
+        <div className="text-sm text-text-muted italic mb-4">
           No item selected.
         </div>
       </div>
@@ -180,18 +186,18 @@ export function PropertiesPanel() {
 
     return (
       <div className="flex-1 overflow-y-auto w-full p-4 flex flex-col h-full">
-        <div className="mb-4 pb-3 border-b border-slate-700/50">
+        <div className="mb-4 pb-3 border-b border-border-base/50">
           <h2 className="text-sm font-bold text-emerald-400 mb-1 flex items-center gap-2">
             <Settings2 size={16} /> Generator Node
           </h2>
-          <p className="text-[11px] text-slate-500 font-mono break-all">
+          <p className="text-[11px] text-text-muted font-mono break-all">
             {node.id}
           </p>
         </div>
 
         {plugin ? (
           <div className="space-y-4 flex-1">
-            <h3 className="text-xs font-semibold text-slate-300 bg-slate-800/50 p-2 rounded">
+            <h3 className="text-xs font-semibold text-text-base bg-surface-panel p-2 rounded">
               {plugin.manifest.name}
             </h3>
 
@@ -231,11 +237,11 @@ export function PropertiesPanel() {
               );
             })}
 
-            <div className="pt-4 mt-6 border-t border-slate-800">
-              <button
+            <div className="pt-4 mt-6 border-t border-border-base">
+              <Button
                 disabled={isExecuting}
                 onClick={handleRegenerate}
-                className="w-full h-9 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-lg shadow transition-colors"
+                className="w-full h-9 gap-2 shadow transition-colors bg-emerald-600 hover:bg-emerald-500"
               >
                 {isExecuting ? (
                   <RefreshCcw size={14} className="animate-spin" />
@@ -243,7 +249,7 @@ export function PropertiesPanel() {
                   <Play size={14} className="fill-current" />
                 )}
                 {isExecuting ? "Re-Generating..." : "Re-Generate Path"}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -262,13 +268,13 @@ export function PropertiesPanel() {
   return (
     <div className="flex-1 overflow-y-auto w-full p-4">
       <div className="mb-4">
-        <h2 className="text-sm font-bold text-white mb-1">
+        <h2 className="text-sm font-bold text-text-base mb-1">
           {isMultiSelection
             ? `Multiple Selected (${selectedNodeIds.length})`
             : `Waypoint [${nodeIndex >= 0 ? nodeIndex + indexStartIndex : "?"}]`}
         </h2>
         {!isMultiSelection && (
-          <p className="text-xs text-slate-500 font-mono break-all">
+          <p className="text-xs text-text-muted font-mono break-all">
             {node?.id}
           </p>
         )}
@@ -278,12 +284,14 @@ export function PropertiesPanel() {
         {/* Index Group */}
         <div className="space-y-2 relative">
           <div className="flex justify-between items-center">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
               Index
             </h3>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-text-muted hover:text-text-base"
               onClick={() => toggleAttributeVisibility("index")}
-              className="text-slate-500 hover:text-slate-300 transition-colors"
               title="Toggle Index on Canvas"
             >
               {visibleAttributes.includes("index") ? (
@@ -291,9 +299,9 @@ export function PropertiesPanel() {
               ) : (
                 <EyeOff size={14} />
               )}
-            </button>
+            </Button>
           </div>
-          <div className="bg-slate-900 border border-slate-700/50 rounded px-2 py-1 text-sm text-slate-300 font-mono">
+          <div className="bg-surface-panel border border-border-base rounded px-2 py-1 text-sm text-text-base font-mono">
             {isMultiSelection
               ? "Mixed Selection"
               : nodeIndex >= 0
@@ -305,12 +313,14 @@ export function PropertiesPanel() {
         {/* Transform Group */}
         <div className="space-y-2 relative pt-2">
           <div className="flex justify-between items-center">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
               Transform (World)
             </h3>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0 text-text-muted hover:text-text-base"
               onClick={() => toggleAttributeVisibility("transform")}
-              className="text-slate-500 hover:text-slate-300 transition-colors"
               title="Toggle Transform on Canvas"
             >
               {visibleAttributes.includes("transform") ? (
@@ -318,12 +328,12 @@ export function PropertiesPanel() {
               ) : (
                 <EyeOff size={14} />
               )}
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="block text-xs text-slate-500 mb-1">X (m)</label>
+              <Label className="block text-xs text-text-muted mb-1">X (m)</Label>
               <NumericInput
                 value={isMultiSelection ? 0 : (node?.transform?.x ?? 0)}
                 precision={decimalPrecision}
@@ -343,11 +353,10 @@ export function PropertiesPanel() {
                     });
                   }
                 }}
-                className="ui-input"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Y (m)</label>
+              <Label className="block text-xs text-text-muted mb-1">Y (m)</Label>
               <NumericInput
                 value={isMultiSelection ? 0 : (node?.transform?.y ?? 0)}
                 precision={decimalPrecision}
@@ -367,11 +376,10 @@ export function PropertiesPanel() {
                     });
                   }
                 }}
-                className="ui-input"
               />
             </div>
             <div>
-              <label className="block text-xs text-slate-500 mb-1">Z (m)</label>
+              <Label className="block text-xs text-text-muted mb-1">Z (m)</Label>
               <NumericInput
                 value={isMultiSelection ? 0 : (node?.transform?.z ?? 0)}
                 precision={decimalPrecision}
@@ -391,13 +399,12 @@ export function PropertiesPanel() {
                     });
                   }
                 }}
-                className="ui-input"
               />
             </div>
             <div className="col-span-3">
-              <label className="block text-xs text-slate-500 mb-1">
+              <Label className="block text-xs text-text-muted mb-1">
                 Yaw (rad)
-              </label>
+              </Label>
               <NumericInput
                 step="0.01"
                 precision={decimalPrecision}
@@ -425,7 +432,7 @@ export function PropertiesPanel() {
                   const halfYaw = val / 2.0;
                   const qz = Math.sin(halfYaw);
                   const qw = Math.cos(halfYaw);
-
+ 
                   if (isMultiSelection) {
                     selectedNodeIds.forEach((id) => {
                       const n = nodes[id];
@@ -440,20 +447,19 @@ export function PropertiesPanel() {
                     });
                   }
                 }}
-                className="ui-input"
               />
             </div>
           </div>
         </div>
 
         {/* Custom Options Group */}
-        <div className="space-y-2 pt-4 border-t border-slate-700">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex justify-between items-center">
+        <div className="space-y-2 pt-4 border-t border-border-base">
+          <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider flex justify-between items-center">
             Custom Options
           </h3>
 
           {!optionsSchema ? (
-            <div className="text-xs text-slate-500 italic p-2 bg-slate-900 rounded border border-slate-800">
+            <div className="text-xs text-text-muted italic p-2 bg-surface-panel rounded border border-border-base">
               No schema loaded. Load a schema (YAML) from the Toolbar.
             </div>
           ) : (
@@ -491,17 +497,19 @@ export function PropertiesPanel() {
                 return (
                   <div key={opt.name}>
                     <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs text-slate-500">
+                      <Label className="text-xs text-text-muted">
                         {opt.label || opt.name}{" "}
                         <span className="opacity-50 text-[10px] ml-1 uppercase">
                           ({opt.type})
                         </span>
-                      </label>
-                      <button
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-text-muted hover:text-text-base"
                         onClick={() =>
                           toggleAttributeVisibility(`options.${opt.name}`)
                         }
-                        className="text-slate-500 hover:text-slate-300 transition-colors"
                         title={`Toggle ${opt.name} on Canvas`}
                       >
                         {visibleAttributes.includes(`options.${opt.name}`) ? (
@@ -509,11 +517,11 @@ export function PropertiesPanel() {
                         ) : (
                           <EyeOff size={12} />
                         )}
-                      </button>
+                      </Button>
                     </div>
 
                     {opt.type === "list" ? (
-                      <input
+                      <Input
                         type="text"
                         value={
                           Array.isArray(nodeOptVal)
@@ -550,15 +558,13 @@ export function PropertiesPanel() {
                           }
                           handleChange(parsedArr);
                         }}
-                        className="ui-input"
                       />
                     ) : opt.type === "string" &&
                       opt.enum_values &&
                       opt.enum_values.length > 0 ? (
-                      <select
+                      <Select
                         value={String(nodeOptVal)}
                         onChange={(e) => handleChange(e.target.value)}
-                        className="ui-select"
                       >
                         {isMultiSelection && (
                           <option value="" disabled hidden>
@@ -570,9 +576,9 @@ export function PropertiesPanel() {
                             {v}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     ) : opt.type === "integer" || opt.type === "float" ? (
-                      <input
+                      <Input
                         type="number"
                         step={opt.type === "float" ? "0.1" : "1"}
                         value={String(nodeOptVal)}
@@ -586,28 +592,23 @@ export function PropertiesPanel() {
                               : parseInt(e.target.value, 10);
                           if (!isNaN(val)) handleChange(val);
                         }}
-                        className="ui-input"
                       />
                     ) : opt.type === "boolean" ? (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={Boolean(nodeOptVal)}
                         onChange={(e) => handleChange(e.target.checked)}
-                        className="ui-checkbox"
                       />
                     ) : (
-                      <input
+                      <Input
                         type="text"
                         value={String(nodeOptVal)}
                         placeholder={
                           isMultiSelection ? "Mixed" : String(opt.default || "")
                         }
                         onChange={(e) => handleChange(e.target.value)}
-                        className={`w-full bg-slate-900 border rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-primary placeholder:text-slate-600 ${
-                          String(nodeOptVal).trim() === "" && !isMultiSelection
-                            ? "border-amber-500/50"
-                            : "border-slate-700"
-                        }`}
+                        className={cn(
+                          String(nodeOptVal).trim() === "" && !isMultiSelection && "border-amber-500/50"
+                        )}
                       />
                     )}
                   </div>

@@ -61,7 +61,7 @@ describe('SettingsModal UI', () => {
     });
 
     // Save changes
-    const applyButton = screen.getByText(/Apply Schema/i);
+    const applyButton = screen.getByText('Apply');
     act(() => {
       applyButton.click();
     });
@@ -207,7 +207,7 @@ describe('SettingsModal UI', () => {
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
     fireEvent.click(screen.getByText('Plugins'));
 
-    const browseBtn = await screen.findByText('Browse Custom');
+    const browseBtn = (await screen.findAllByText('Browse'))[0];
     fireEvent.click(browseBtn);
 
     await waitFor(() => {
@@ -232,7 +232,7 @@ describe('SettingsModal UI', () => {
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
     fireEvent.click(screen.getByText('Plugins'));
 
-    const createBtn = await screen.findByText('Create New Plugin');
+    const createBtn = await screen.findByText('Create New');
     fireEvent.click(createBtn);
 
     await waitFor(() => {

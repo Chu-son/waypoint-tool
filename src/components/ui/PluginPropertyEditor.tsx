@@ -1,4 +1,8 @@
 import React from "react";
+import { Label } from "./common/Label";
+import { Checkbox } from "./common/Checkbox";
+import { Input } from "./common/Input";
+import { Select } from "./common/Select";
 
 export interface PluginProperty {
   name: string;
@@ -26,21 +30,19 @@ export const PluginPropertyEditor: React.FC<PluginPropertyEditorProps> = ({
   const label = property.label || key;
 
   return (
-    <div className={`space-y-1 ${className}`}>
-      <label className="text-xs font-semibold text-slate-300">{label}</label>
+    <div className={`space-y-1.5 ${className}`}>
+      <Label className="text-xs font-semibold text-text-muted">{label}</Label>
 
       {property.type === "boolean" ? (
-        <label className="flex items-center gap-3 mt-1 bg-slate-800/50 p-2 rounded border border-slate-700/50 cursor-pointer hover:bg-slate-800/80 transition-colors">
-          <input
-            type="checkbox"
+        <Label className="flex items-center gap-3 mt-1 bg-surface-panel/50 p-2 rounded-md border border-border-base/50 cursor-pointer hover:bg-surface-hover transition-colors">
+          <Checkbox
             checked={!!value}
             onChange={(e) => onChange(e.target.checked)}
-            className="ui-checkbox"
           />
-          <span className="text-xs text-slate-300 font-medium">Enabled</span>
-        </label>
+          <span className="text-xs text-text-muted font-medium">Enabled</span>
+        </Label>
       ) : property.type === "integer" || property.type === "float" ? (
-        <input
+        <Input
           type="number"
           step={property.type === "float" ? "any" : "1"}
           value={value ?? ""}
@@ -51,32 +53,32 @@ export const PluginPropertyEditor: React.FC<PluginPropertyEditorProps> = ({
                 : parseInt(e.target.value, 10);
             onChange(isNaN(val) ? "" : val);
           }}
-          className="ui-input-sm"
+          className="h-8 text-xs"
           placeholder={String(property.default ?? "")}
         />
       ) : Array.isArray(property.options) && property.options.length > 0 ? (
-        <select
+        <Select
           value={value ?? property.default ?? ""}
           onChange={(e) => onChange(e.target.value)}
-          className="ui-select-sm"
+          className="h-8 text-xs"
         >
           {property.options.map((opt: string) => (
             <option key={opt} value={opt}>
               {opt}
             </option>
           ))}
-        </select>
+        </Select>
       ) : (
-        <input
+        <Input
           type="text"
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
-          className="ui-input-sm"
+          className="h-8 text-xs"
           placeholder={String(property.default ?? "")}
         />
       )}
       {property.description && (
-        <p className="text-[10px] text-slate-500 leading-tight mt-1">
+        <p className="text-[10px] text-text-muted/60 leading-tight mt-1 px-1">
           {property.description}
         </p>
       )}

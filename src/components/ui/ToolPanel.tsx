@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { ExportModal } from "./ExportModal";
+import { Panel } from "./common/Panel";
+import { Button } from "./common/Button";
+import { cn } from "../../utils/cn";
 
 export function ToolPanel() {
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
@@ -90,12 +93,12 @@ export function ToolPanel() {
   };
 
   return (
-    <div
+    <Panel
       ref={panelRef}
-      className="bg-slate-800 border-r border-slate-700 flex flex-col items-center py-4 px-2 gap-4 z-10 shadow-md transition-all duration-300 relative"
+      className="flex flex-col items-center py-4 px-2 gap-4 z-10 transition-all duration-300 relative border-r"
       style={{ minWidth: "4rem", width: "auto" }}
     >
-      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-2">
+      <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-2">
         Tools
       </div>
 
@@ -104,17 +107,19 @@ export function ToolPanel() {
         const isActive = activeTool === tool.id;
 
         return (
-          <button
+          <Button
             key={tool.id}
             onClick={() => {
               setActiveTool(tool.id);
               setActivePlugin(null);
             }}
             title={tool.label}
-            className={`
-              ui-icon-btn h-10 w-10 rounded-xl transition-all group flex-shrink-0
-              ${isActive && !activePluginId ? "bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"}
-            `}
+            variant={isActive && !activePluginId ? "primary" : "icon"}
+            size="icon"
+            className={cn(
+              "rounded-xl transition-all group flex-shrink-0",
+              isActive && !activePluginId && "shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+            )}
           >
             <Icon
               size={20}
@@ -124,25 +129,24 @@ export function ToolPanel() {
                   : "group-hover:scale-110 transition-transform"
               }
             />
-          </button>
+          </Button>
         );
       })}
 
-      <div className="w-full border-t border-slate-700/50 my-1" />
+      <div className="w-full border-t border-border-base/50 my-1" />
 
       {/* Dynamic Plugins Grid */}
       <div
-        className="grid gap-2 items-start justify-items-center"
+        className="grid gap-2 justify-items-center"
         style={{
-          gridTemplateColumns: `repeat(${Math.ceil(visiblePlugins.length / maxRows) || 1}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${Math.min(maxRows, visiblePlugins.length || 1)}, minmax(0, auto))`,
+          gridTemplateColumns: `repeat(${toolPanelMaxColumns}, minmax(0, 1fr))`,
         }}
       >
         {visiblePlugins.map((plugin) => {
           const isActive =
             activePluginId === plugin.id && activeTool === "add_generator";
           return (
-            <button
+            <Button
               key={plugin.id}
               onClick={() => {
                 setActiveTool("add_generator");
@@ -150,33 +154,37 @@ export function ToolPanel() {
                 setIsMoreMenuOpen(false);
               }}
               title={plugin.manifest.name}
-              className={`
-                ui-icon-btn h-10 w-10 rounded-xl transition-all flex-shrink-0
-                ${isActive ? "bg-primary text-white shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-primary-300" : "bg-slate-900/50 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700/50"}
-              `}
+              variant={isActive ? "primary" : "icon"}
+              size="icon"
+              className={cn(
+                "rounded-xl transition-all flex-shrink-0",
+                isActive && "shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-primary-base/50"
+              )}
             >
               {renderPluginIcon(plugin.id, 18)}
-            </button>
+            </Button>
           );
         })}
 
         {/* More Menu Toggle */}
         {overflowPlugins.length > 0 && (
           <div className="relative">
-            <button
+            <Button
               onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
               title="More Plugins..."
-              className={`
-                ui-icon-btn h-10 w-10 rounded-xl transition-all
-                ${isMoreMenuOpen ? "bg-slate-600 text-white" : "bg-slate-900/50 text-slate-400 hover:bg-slate-700 hover:text-white"}
-              `}
+              variant={isMoreMenuOpen ? "secondary" : "icon"}
+              size="icon"
+              className="rounded-xl transition-all"
             >
               <MoreHorizontal size={20} />
-            </button>
+            </Button>
 
             {/* Overflow Dropdown */}
             {isMoreMenuOpen && (
-              <div className="absolute left-12 top-0 ml-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-50">
+              <Panel
+                variant="overlay"
+                className="absolute left-12 top-0 ml-2 w-48 rounded-lg py-2 z-50"
+              >
                 {overflowPlugins.map((plugin) => {
                   const isActive =
                     activePluginId === plugin.id &&
@@ -189,51 +197,54 @@ export function ToolPanel() {
                         setActivePlugin(plugin.id);
                         setIsMoreMenuOpen(false);
                       }}
-                      className={`
-                        w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors
-                        ${isActive ? "bg-primary/20 text-primary-100 font-bold" : "text-slate-300 hover:bg-slate-700 hover:text-white"}
-                      `}
+                      className={cn(
+                        "w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors",
+                        isActive ? "bg-primary-base/20 text-primary-base font-bold" : "text-text-muted hover:bg-surface-hover hover:text-text-base"
+                      )}
                     >
-                      {renderPluginIcon(plugin.id, 14, isActive ? "text-primary-300" : "text-slate-500")}
+                      {renderPluginIcon(plugin.id, 14, isActive ? "text-primary-base" : "text-text-muted")}
                       <span className="truncate">{plugin.manifest.name}</span>
                     </button>
                   );
                 })}
-              </div>
+              </Panel>
             )}
           </div>
         )}
       </div>
 
-      <div className="mt-auto mb-4 border-t border-slate-700 pt-4 flex flex-col items-center w-full gap-3">
-        <button
+      <div className="mt-auto mb-4 border-t border-border-base pt-4 flex flex-col items-center w-full gap-3">
+        <Button
           onClick={handleExportWaypointsClick}
           title="Export Waypoints"
-          className="ui-icon-btn h-10 w-10 rounded-xl group"
+          variant="icon"
+          size="icon"
+          className="rounded-xl group"
         >
           <Download
             size={20}
             className="group-hover:scale-110 transition-transform text-purple-400"
           />
-        </button>
+        </Button>
 
-        <button
+        <Button
           onClick={() => setSettingsModalOpen(true, 'general')}
           title="Settings & Plugins"
-          className="ui-icon-btn h-10 w-10 rounded-xl mt-2"
+          variant="icon"
+          size="icon"
+          className="rounded-xl mt-2"
         >
           <Settings
             size={20}
-            className="text-slate-500 hover:text-white transition-colors"
+            className="text-text-muted hover:text-text-base transition-colors"
           />
-        </button>
+        </Button>
       </div>
-
 
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setExportModalOpen(false)}
       />
-    </div>
+    </Panel>
   );
 }

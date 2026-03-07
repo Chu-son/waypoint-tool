@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { BackendAPI } from "../../api";
-import { Play, Settings2, X, AlertCircle } from "lucide-react";
+import { Play, Settings2, X, AlertCircle, RefreshCcw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";
 import { PluginInputEditor } from "./PluginInputEditor";
+import { Button } from "./common/Button";
+import { cn } from "../../utils/cn";
+import { Label } from "./common/Label";
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
@@ -210,25 +213,27 @@ export function PluginParamsPanel() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto w-full p-4 flex flex-col h-full bg-slate-900 border-l border-slate-700">
-      <div className="flex justify-between items-start mb-4 border-b border-slate-800 pb-3">
+    <div className="flex-1 overflow-y-auto w-full p-4 flex flex-col h-full bg-surface-base border-l border-border-base">
+      <div className="flex justify-between items-start mb-4 border-b border-border-base/50 pb-3">
         <div>
           <div className="flex items-center gap-2">
-            <Settings2 size={16} className="text-primary" />
-            <h2 className="text-sm font-bold text-white leading-none">
+            <Settings2 size={16} className="text-primary-base" />
+            <h2 className="text-sm font-bold text-text-base leading-none">
               {plugin.manifest.name}
             </h2>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 leading-tight">
+          <p className="text-[11px] text-text-muted mt-1 leading-tight">
             {plugin.manifest.description || "No description provided"}
           </p>
         </div>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => useAppStore.getState().setActiveTool("select")}
-          className="ui-icon-btn h-7 w-7 rounded-md shrink-0 ml-2"
+          className="h-7 w-7"
         >
           <X size={14} />
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-4 flex-1">
@@ -236,10 +241,10 @@ export function PluginParamsPanel() {
         {inputs.length > 1 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <Label className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
                 Input Steps
-              </span>
-              <span className="text-[10px] text-slate-500">
+              </Label>
+              <span className="text-[10px] text-text-muted">
                 {activeInputIndex + 1} / {inputs.length}
               </span>
             </div>
@@ -249,27 +254,24 @@ export function PluginParamsPanel() {
                 const hasData = !!pluginInteractionData[key];
                 const isActive = idx === activeInputIndex;
                 return (
-                  <button
+                  <Button
                     key={idx}
+                    variant={isActive ? "primary" : hasData ? "secondary" : "ghost"}
                     onClick={() => setActiveInputIndex(idx)}
-                    className={`ui-btn flex-1 py-1.5 px-1 rounded text-[10px] font-medium transition-all ${
-                      isActive
-                        ? "bg-primary/20 border-primary text-primary"
-                        : hasData
-                          ? "bg-emerald-900/30 border-emerald-700/50 text-emerald-400"
-                          : "bg-slate-800/50 border-slate-700/50 text-slate-500 hover:border-slate-600"
-                    }`}
+                    className={cn(
+                      "flex-1 py-1 px-1 h-auto text-[10px]",
+                      isActive && "bg-primary-base/20 border-primary-base text-primary-base",
+                      hasData && !isActive && "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+                      !isActive && !hasData && "bg-surface-panel/50 border-border-base/50 text-text-muted hover:border-border-base"
+                    )}
                     title={inp.label || key}
                   >
                     <div className="flex items-center justify-center gap-1">
                       <span
-                        className={`w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold ${
-                          isActive
-                            ? "bg-primary text-white"
-                            : hasData
-                              ? "bg-emerald-600 text-white"
-                              : "bg-slate-700 text-slate-400"
-                        }`}
+                        className={cn(
+                          "w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold",
+                          isActive ? "bg-primary-base text-white" : hasData ? "bg-emerald-600 text-white" : "bg-surface-hover text-text-muted"
+                        )}
                       >
                         {idx + 1}
                       </span>
@@ -281,7 +283,7 @@ export function PluginParamsPanel() {
                             : "●"}
                       </span>
                     </div>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -319,7 +321,7 @@ export function PluginParamsPanel() {
             return (
               <div
                 key={`prop-container-${idx}`}
-                className="mt-3 pt-3 border-t border-slate-800"
+                className="mt-3 pt-3 border-t border-border-base/50"
               >
                 <PluginPropertyEditor
                   property={prop}
@@ -333,19 +335,19 @@ export function PluginParamsPanel() {
           })}
 
         {needsSelection && (
-          <div className="mt-4 p-3 bg-indigo-950/20 border border-indigo-900/50 rounded-lg">
+          <div className="mt-4 p-3 bg-primary-base/10 border border-primary-base/30 rounded-lg">
             <div className="flex items-start gap-2">
               <AlertCircle
                 size={14}
-                className="text-indigo-400 mt-0.5 shrink-0"
+                className="text-primary-base mt-0.5 shrink-0"
               />
               <div>
-                <h4 className="text-xs font-bold text-indigo-300">
+                <h4 className="text-xs font-bold text-primary-base">
                   Requires Waypoint Selection
                 </h4>
-                <p className="text-[10px] text-indigo-400/70 mt-0.5">
+                <p className="text-[10px] text-primary-base/70 mt-0.5">
                   You currently have{" "}
-                  <strong className="text-indigo-300">
+                  <strong className="text-primary-base">
                     {selectedNodeIds.length}
                   </strong>{" "}
                   points selected.
@@ -367,30 +369,27 @@ export function PluginParamsPanel() {
         )}
       </div>
 
-      <div className="mt-auto pt-4 border-t border-slate-800">
-        <button
+      <div className="mt-auto pt-4 border-t border-border-base/50">
+        <Button
           disabled={
             isExecuting || (needsSelection && selectedNodeIds.length === 0)
           }
           onClick={handleExecute}
-          className="ui-btn ui-btn-primary ui-btn-md h-9 w-full disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed"
+          className="h-9 w-full bg-primary-base hover:bg-primary-hover text-white"
         >
           {isExecuting ? (
-            <span className="animate-pulse">Running Generator...</span>
+            <RefreshCcw size={14} className="animate-spin mr-2" />
           ) : (
-            <>
-              <Play
-                size={14}
-                className={
-                  needsSelection && selectedNodeIds.length === 0
-                    ? ""
-                    : "fill-current"
-                }
-              />
-              Generate Path
-            </>
+            <Play
+              size={14}
+              className={cn(
+                "mr-2",
+                !(needsSelection && selectedNodeIds.length === 0) && "fill-current"
+              )}
+            />
           )}
-        </button>
+          {isExecuting ? "Executing..." : "Generate Path"}
+        </Button>
       </div>
     </div>
   );

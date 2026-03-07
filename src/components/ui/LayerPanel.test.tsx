@@ -10,6 +10,9 @@ vi.mock('lucide-react', () => ({
   EyeOff: () => <div data-testid="eye-off-icon" />,
   Trash2: () => <div data-testid="trash-icon" />,
   FolderOpen: () => <div data-testid="folder-icon" />,
+  ChevronUp: () => <div data-testid="up-icon" />,
+  ChevronDown: () => <div data-testid="down-icon" />,
+  Layers: () => <div data-testid="layers-icon" />,
 }));
 
 // Mock API
@@ -78,8 +81,8 @@ describe('LayerPanel', () => {
     }));
 
     render(<LayerPanel />);
-    const downBtn = screen.getAllByText('▼')[0]; // For first layer
-    fireEvent.click(downBtn);
+    const downBtns = screen.getAllByTitle('Move Down');
+    fireEvent.click(downBtns[0]);
     expect(mockReorderMapLayers).toHaveBeenCalledWith(0, 1);
   });
 
@@ -100,7 +103,7 @@ describe('LayerPanel', () => {
     });
 
     render(<LayerPanel />);
-    const loadBtn = screen.getByText(/load ros map/i);
+    const loadBtn = screen.getByRole('button', { name: /load ros map/i });
     fireEvent.click(loadBtn);
 
     await waitFor(() => {
