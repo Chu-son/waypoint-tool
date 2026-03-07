@@ -142,10 +142,6 @@ export function PluginParamsPanel() {
         }
       }
 
-      console.log("[DEBUG] Executing Plugin ID:", plugin.id);
-      console.log("[DEBUG] Python Path Context:", pythonPathToUse);
-      console.log("[DEBUG] Full Context Data sent to Execution:", contextData);
-
       // Execute plugin through backend API (passing contextual Python path)
       const resultingWaypoints = await BackendAPI.runPlugin(
         plugin,
@@ -198,6 +194,8 @@ export function PluginParamsPanel() {
 
         // Auto select the newly generated parent node
         useAppStore.getState().selectNodes([parentId]);
+        // Switch tool back to select, which triggers inspector to switch to Regenerate
+        useAppStore.getState().setActiveTool("select");
       } else {
         setErrorInfo(
           "Plugin executed successfully but returned 0 waypoints. Check your settings.",

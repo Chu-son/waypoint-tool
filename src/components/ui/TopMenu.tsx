@@ -97,6 +97,10 @@ export function TopMenu() {
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
   const setLeftPanelOpen = useAppStore((state) => state.setLeftPanelOpen);
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const showProperties = useAppStore((state) => state.showProperties);
+  const setShowProperties = useAppStore((state) => state.setShowProperties);
+  const resetWindowLayout = useAppStore((state) => state.resetWindowLayout);
+  const triggerFitToMaps = useAppStore((state) => state.triggerFitToMaps);
   const loadProject = useAppStore((state) => state.loadProject);
   const saveProject = useAppStore((state) => state.saveProject);
 
@@ -163,12 +167,22 @@ export function TopMenu() {
 
   const viewOptions: MenuOption[] = [
     {
+      label: `${showProperties ? "✓ " : "  "}Show Properties`,
+      action: () => setShowProperties(!showProperties),
+    },
+    { divider: true, label: "" },
+    {
       label: `${showPaths ? "✓ " : "  "}Show Paths`,
       action: () => setShowPaths(!showPaths),
     },
     {
       label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`,
       action: () => setShowGrid(!showGrid),
+    },
+    {
+      label: "Fit to Map",
+      action: triggerFitToMaps,
+      shortcut: "Mid D-Click",
     },
     { divider: true, label: "" },
     {
@@ -178,6 +192,11 @@ export function TopMenu() {
     {
       label: `${isRightPanelOpen ? "✓ " : "  "}Show Right Panel`,
       action: () => setRightPanelOpen(!isRightPanelOpen),
+    },
+    { divider: true, label: "" },
+    {
+      label: "Reset Window Layout",
+      action: resetWindowLayout,
     },
   ];
 

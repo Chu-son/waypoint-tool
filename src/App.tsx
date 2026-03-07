@@ -1,5 +1,5 @@
 import "./App.css";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useCallback, useMemo } from "react";
 import { ToolPanel } from "./components/ui/ToolPanel";
 import { TopMenu } from "./components/ui/TopMenu";
 import { WaypointTree } from "./components/ui/WaypointTree";
@@ -53,8 +53,10 @@ function App() {
   const isShortcutsModalOpen = useAppStore((state) => state.isShortcutsModalOpen);
   const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
 
-  const [leftWidth, setLeftWidth] = useState(256);
-  const [rightWidth, setRightWidth] = useState(320);
+  const leftWidth = useAppStore((state) => state.leftPanelWidth);
+  const rightWidth = useAppStore((state) => state.rightPanelWidth);
+  const setLeftWidth = useAppStore((state) => state.setLeftPanelWidth);
+  const setRightWidth = useAppStore((state) => state.setRightPanelWidth);
 
   useEffect(() => {
     const initApp = async () => {

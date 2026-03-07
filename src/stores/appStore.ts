@@ -44,6 +44,9 @@ export type AppState = {
   decimalPrecision: number; // Number of decimal places for numeric input display (default 6)
   
   // Panel States
+  leftPanelWidth: number;
+  rightPanelWidth: number;
+  showProperties: boolean;
   leftPanelActiveTab: string;
   rightPanelActiveTab: string;
   leftPanelViewMode: 'tabs' | 'split';
@@ -79,6 +82,7 @@ export type AppState = {
   
   setShowPaths: (show: boolean) => void;
   setShowGrid: (show: boolean) => void;
+  triggerFitToMaps: () => void;
   
   addExportTemplate: (template: ExportTemplate) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
@@ -102,6 +106,10 @@ export type AppState = {
   setRightPanelViewMode: (mode: 'tabs' | 'split') => void;
   setLeftPanelOpen: (open: boolean) => void;
   setRightPanelOpen: (open: boolean) => void;
+  setLeftPanelWidth: (width: number) => void;
+  setRightPanelWidth: (width: number) => void;
+  setShowProperties: (show: boolean) => void;
+  resetWindowLayout: () => void;
 
   setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'export' | 'plugins') => void;
   setExportModalOpen: (open: boolean) => void;
@@ -166,6 +174,9 @@ export const useAppStore = create<AppState>()(
       rightPanelViewMode: 'tabs',
       isLeftPanelOpen: true,
       isRightPanelOpen: true,
+      leftPanelWidth: 256,
+      rightPanelWidth: 320,
+      showProperties: true,
 
       // Actions
       setDirty: (dirty: boolean) => set({ isDirty: dirty }), // --- Actions ---
@@ -179,6 +190,7 @@ export const useAppStore = create<AppState>()(
 
       setShowPaths: (show: boolean) => set({ showPaths: show }),
       setShowGrid: (show: boolean) => set({ showGrid: show }),
+      triggerFitToMaps: () => set({ shouldFitToMaps: Date.now() }),
 
       setMapLayers: (layers: ProjectMapLayer[]) => set({ mapLayers: layers, isDirty: true }),
       setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
@@ -272,6 +284,21 @@ export const useAppStore = create<AppState>()(
       setRightPanelViewMode: (mode) => set({ rightPanelViewMode: mode, isDirty: true }),
       setLeftPanelOpen: (open) => set({ isLeftPanelOpen: open }),
       setRightPanelOpen: (open) => set({ isRightPanelOpen: open }),
+      setLeftPanelWidth: (width) => set({ leftPanelWidth: width, isDirty: true }),
+      setRightPanelWidth: (width) => set({ rightPanelWidth: width, isDirty: true }),
+      setShowProperties: (show) => set({ showProperties: show, isDirty: true }),
+      
+      resetWindowLayout: () => set({
+        isLeftPanelOpen: true,
+        isRightPanelOpen: true,
+        leftPanelViewMode: 'tabs',
+        rightPanelViewMode: 'tabs',
+        leftPanelActiveTab: 'project',
+        rightPanelActiveTab: 'layers',
+        leftPanelWidth: 256,
+        rightPanelWidth: 320,
+        isDirty: true
+      }),
 
       setSettingsModalOpen: (open, tab) => set((state) => ({
         isSettingsModalOpen: open,
@@ -508,6 +535,9 @@ export const useAppStore = create<AppState>()(
         decimalPrecision: state.decimalPrecision,
         leftPanelViewMode: state.leftPanelViewMode,
         rightPanelViewMode: state.rightPanelViewMode,
+        leftPanelWidth: state.leftPanelWidth,
+        rightPanelWidth: state.rightPanelWidth,
+        showProperties: state.showProperties,
       }),
     }
   )

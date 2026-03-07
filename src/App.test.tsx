@@ -57,7 +57,7 @@ describe('App Integration', () => {
     render(<App />);
 
     // Validate main structural elements are mounted
-    expect(screen.getByText('Project / Hierarchy')).toBeInTheDocument();
+    expect(screen.getByText('Project')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByTestId('mock-map-canvas')).toBeInTheDocument();
     
@@ -132,9 +132,9 @@ describe('App Integration', () => {
 
   // --- 要件8: UIレイアウト ---
 
-  it('renders the Project / Hierarchy panel', async () => {
+  it('renders the Project panel', async () => {
     render(<App />);
-    expect(screen.getByText('Project / Hierarchy')).toBeInTheDocument();
+    expect(screen.getByText('Project')).toBeInTheDocument();
   });
 
   it('switches between Inspector and Layers tabs', async () => {

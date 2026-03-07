@@ -57,13 +57,15 @@ export function MapCanvas() {
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
   const visibleAttributes = useAppStore(state => state.visibleAttributes);
-  const indexStartIndex = useAppStore(state => state.indexStartIndex);
+  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const optionsSchema = useAppStore(state => state.optionsSchema);
-  const showPaths = useAppStore(state => state.showPaths);
-  const showGrid = useAppStore(state => state.showGrid);
+  const showPaths = useAppStore((state) => state.showPaths);
+  const showGrid = useAppStore((state) => state.showGrid);
+  const showProperties = useAppStore((state) => state.showProperties);
   const shouldFitToMaps = useAppStore(state => state.shouldFitToMaps);
   const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
   const activePluginId = useAppStore(state => state.activePluginId);
+  const triggerFitToMaps = useAppStore(state => state.triggerFitToMaps);
   const plugins = useAppStore(state => state.plugins);
   const pluginActiveProperties = useAppStore(state => state.pluginActiveProperties);
   const activeInputIndex = useAppStore(state => state.activeInputIndex);
@@ -73,6 +75,7 @@ export function MapCanvas() {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
   const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation'>('none');
+  const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -259,6 +262,17 @@ export function MapCanvas() {
           }
         }
       }
+    }
+
+    // Double click on middle button (wheel) -> Fit to Maps
+    if (e.button === 1) {
+      const now = Date.now();
+      if (now - lastMiddleClickTime.current < 300) {
+        triggerFitToMaps();
+        lastMiddleClickTime.current = 0;
+        return;
+      }
+      lastMiddleClickTime.current = now;
     }
 
     // Middle click or (Left click + Select Mode + Not hovering over node) -> Pan Map
@@ -745,39 +759,78 @@ export function MapCanvas() {
               const selectedFill = 0x60a5fa;
 
               return (
-                <pixiGraphics
+                <pixiContainer
                   key={node.id}
                   x={px}
                   y={py}
                   rotation={yaw}
-                  eventMode="dynamic"
-                  cursor={activeTool === 'select' ? 'pointer' : 'default'}
-                  onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
-                    if (activeTool === 'select') {
-                      e.stopPropagation();
-                      selectNodes([node.id], e.shiftKey || e.metaKey);
-                      interactionMode.current = 'drag_node';
-                      activeNodeId.current = node.id;
-                      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                      }
-                    }
-                  }}
-                  draw={(g) => {
-                    g.clear();
-                    g.strokeStyle = { width: 2 / safeScale, color: isSelected ? selectedColor : normalColor };
-                    g.fillStyle = { color: isSelected ? selectedFill : normalFill, alpha: 0.8 };
-                    g.moveTo(10 / safeScale, 0);
-                    g.lineTo(-5 / safeScale, 5 / safeScale);
-                    g.lineTo(-5 / safeScale, -5 / safeScale);
-                    g.lineTo(10 / safeScale, 0);
-                    g.fill();
-                    g.stroke();
-                    g.circle(0, 0, 3 / safeScale);
-                    g.fill();
-                  }}
                 >
-                  {visibleAttributes.length > 0 && (
+                  <pixiGraphics
+                    eventMode="dynamic"
+                    cursor={activeTool === 'select' ? 'pointer' : 'default'}
+                    onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
+                      if (activeTool === 'select') {
+                        e.stopPropagation();
+                        selectNodes([node.id], e.shiftKey || e.metaKey);
+                        interactionMode.current = 'drag_node';
+                        activeNodeId.current = node.id;
+                        if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                          containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+                        }
+                      }
+                    }}
+                    draw={(g) => {
+                      g.clear();
+                      g.strokeStyle = { width: 2 / safeScale, color: isSelected ? selectedColor : normalColor };
+                      g.fillStyle = { color: isSelected ? selectedFill : normalFill, alpha: 0.8 };
+                      g.moveTo(10 / safeScale, 0);
+                      g.lineTo(-5 / safeScale, 5 / safeScale);
+                      g.lineTo(-5 / safeScale, -5 / safeScale);
+                      g.lineTo(10 / safeScale, 0);
+                      g.fill();
+                      g.stroke();
+                      g.circle(0, 0, 3 / safeScale);
+                      g.fill();
+                    }}
+                  />
+
+                  {isSelected && activeTool === 'select' && (
+                    <pixiGraphics
+                      x={25 / safeScale}
+                      y={0}
+                      eventMode="dynamic"
+                      cursor="grab"
+                      onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
+                        e.stopPropagation();
+                        interactionMode.current = 'set_yaw';
+                        activeNodeId.current = node.id;
+                        if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                          containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+                        }
+                      }}
+                      draw={(g) => {
+                        g.clear();
+                        
+                        // Error tolerance hit area
+                        g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                        g.circle(0, 0, 15 / safeScale);
+                        g.fill();
+
+                        g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 }; // Selected handle blue
+                        g.fillStyle = { color: 0xffffff, alpha: 0.9 };
+                        g.circle(0, 0, 4 / safeScale);
+                        g.fill();
+                        g.stroke();
+                        
+                        // Connector line pointing to body
+                        g.moveTo(-15 / safeScale, 0);
+                        g.lineTo(-4 / safeScale, 0);
+                        g.stroke();
+                      }}
+                    />
+                  )}
+
+                  {showProperties && visibleAttributes.length > 0 && (
                     <pixiContainer rotation={-yaw} scale={{ x: 1 / safeScale, y: -1 / safeScale }} x={15 / safeScale} y={-15 / safeScale}>
                       {(() => {
                         const lines: string[] = [];
@@ -785,7 +838,7 @@ export function MapCanvas() {
                           lines.push(`Index: [${globalIndex + indexStartIndex}]`);
                         }
                         if (visibleAttributes.includes('transform')) {
-                          lines.push(`Transform: (${transform.x.toFixed(2)}, ${transform.y.toFixed(2)}, ${yaw.toFixed(2)})`);
+                          lines.push(`Transform:\n  x: ${transform.x.toFixed(3)}, y: ${transform.y.toFixed(3)}, z: ${(transform.z ?? 0).toFixed(3)}\n  yaw: ${yaw.toFixed(3)}\n  qx: ${qx.toFixed(3)}, qy: ${qy.toFixed(3)}, qz: ${qz.toFixed(3)}, qw: ${qw.toFixed(3)}`);
                         }
                         const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
                         optionKeys.forEach(attr => {
@@ -805,7 +858,7 @@ export function MapCanvas() {
                       })()}
                     </pixiContainer>
                   )}
-                </pixiGraphics>
+                </pixiContainer>
               );
             });
           })()}
