@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { WaypointNode, ProjectMapLayer, OptionsSchema, PluginInstance, ExportTemplate } from '../types/store';
 import { v4 as uuidv4 } from 'uuid';
+import { BackendAPI, DialogAPI } from '../api';
 
 export type AppState = {
   // App State
@@ -42,15 +43,19 @@ export type AppState = {
   toolPanelMaxColumns: number;
   decimalPrecision: number; // Number of decimal places for numeric input display (default 6)
   
-  // Settings Modal State
-  isSettingsModalOpen: boolean;
-  settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
-
   // Panel States
   leftPanelActiveTab: string;
   rightPanelActiveTab: string;
   leftPanelViewMode: 'tabs' | 'split';
   rightPanelViewMode: 'tabs' | 'split';
+  isLeftPanelOpen: boolean;
+  isRightPanelOpen: boolean;
+
+  // Modals
+  isSettingsModalOpen: boolean;
+  isExportModalOpen: boolean;
+  isShortcutsModalOpen: boolean;
+  settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
 
   // Methods
   addNode: (node: WaypointNode, parentId?: string) => void;
@@ -95,8 +100,18 @@ export type AppState = {
   setRightPanelActiveTab: (tab: string) => void;
   setLeftPanelViewMode: (mode: 'tabs' | 'split') => void;
   setRightPanelViewMode: (mode: 'tabs' | 'split') => void;
+  setLeftPanelOpen: (open: boolean) => void;
+  setRightPanelOpen: (open: boolean) => void;
 
   setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'export' | 'plugins') => void;
+  setExportModalOpen: (open: boolean) => void;
+  setShortcutsModalOpen: (open: boolean) => void;
+  
+  selectAllNodes: () => void;
+  deselectAllNodes: () => void;
+
+  loadProject: () => Promise<void>;
+  saveProject: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -139,13 +154,18 @@ export const useAppStore = create<AppState>()(
       toolPanelMaxColumns: 1,
       decimalPrecision: 6,
 
+      // Modals
       isSettingsModalOpen: false,
       settingsModalTab: 'general',
+      isExportModalOpen: false,
+      isShortcutsModalOpen: false,
 
       leftPanelActiveTab: 'project',
       rightPanelActiveTab: 'layers',
       leftPanelViewMode: 'tabs',
       rightPanelViewMode: 'tabs',
+      isLeftPanelOpen: true,
+      isRightPanelOpen: true,
 
       // Actions
       setDirty: (dirty: boolean) => set({ isDirty: dirty }), // --- Actions ---
@@ -250,11 +270,112 @@ export const useAppStore = create<AppState>()(
       setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
       setLeftPanelViewMode: (mode) => set({ leftPanelViewMode: mode, isDirty: true }),
       setRightPanelViewMode: (mode) => set({ rightPanelViewMode: mode, isDirty: true }),
+      setLeftPanelOpen: (open) => set({ isLeftPanelOpen: open }),
+      setRightPanelOpen: (open) => set({ isRightPanelOpen: open }),
 
       setSettingsModalOpen: (open, tab) => set((state) => ({
         isSettingsModalOpen: open,
         settingsModalTab: tab || state.settingsModalTab
       })),
+      setExportModalOpen: (open) => set({ isExportModalOpen: open }),
+      setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
+
+      selectAllNodes: () => set((state) => ({
+        selectedNodeIds: Object.keys(state.nodes)
+      })),
+      deselectAllNodes: () => set({ selectedNodeIds: [] }),
+
+      loadProject: async () => {
+        const { lastDirectory, setLastDirectory, setProjectData, setIsDirty } = useAppStore.getState();
+        try {
+          const selectedPath = await DialogAPI.open({
+            multiple: false,
+            defaultPath: lastDirectory || undefined,
+            filters: [{ name: "Waypoint Project", extensions: ["wptroj"] }],
+          });
+
+          if (selectedPath) {
+            const pathStr = typeof selectedPath === "string" ? selectedPath : (selectedPath as any).path;
+            if (!pathStr) return;
+
+            const getDirName = (path: string) => {
+              const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+              return lastSlash > -1 ? path.substring(0, lastSlash) : path;
+            };
+
+            setLastDirectory(getDirName(pathStr));
+            const projectData = await BackendAPI.loadProject(pathStr);
+
+            setProjectData({
+              nodes: projectData.nodes,
+              rootNodeIds: projectData.root_node_ids,
+              mapLayers: projectData.map_layers?.map((layer: any) => ({
+                id: uuidv4(),
+                name: layer.name || "Restored Map",
+                info: layer.info || {},
+                image_base64: layer.image_base64 || "",
+                width: layer.width || 1000,
+                height: layer.height || 1000,
+                visible: true,
+                opacity: useAppStore.getState().defaultMapOpacity,
+                z_index: 0
+              }))
+            });
+            setIsDirty(false);
+          }
+        } catch (err) {
+          console.error("Failed to load project:", err);
+          alert(`プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+        }
+      },
+
+      saveProject: async () => {
+        const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, setIsDirty } = useAppStore.getState();
+        try {
+          const savePath = await DialogAPI.save({
+            defaultPath: lastDirectory || undefined,
+            filters: [{ name: "Waypoint Project", extensions: ["wptroj"] }],
+          });
+
+          if (savePath) {
+            let finalPath = savePath;
+            if (!finalPath.toLowerCase().endsWith(".wptroj")) {
+              finalPath += ".wptroj";
+            }
+
+            const getDirName = (path: string) => {
+              const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+              return lastSlash > -1 ? path.substring(0, lastSlash) : path;
+            };
+
+            setLastDirectory(getDirName(finalPath));
+
+            const mapLayersToSave = mapLayers.map((layer) => ({
+              id: layer.id,
+              name: layer.name,
+              info: layer.info,
+              image_base64: layer.image_base64,
+              width: layer.width,
+              height: layer.height,
+              visible: layer.visible,
+              opacity: layer.opacity,
+              z_index: layer.z_index,
+            }));
+
+            const projectData = {
+              root_node_ids: rootNodeIds,
+              nodes,
+              map_layers: mapLayersToSave,
+            };
+            await BackendAPI.saveProject(finalPath, projectData);
+            setIsDirty(false);
+            alert("プロジェクトを保存しました。");
+          }
+        } catch (err) {
+          console.error("Failed to save project:", err);
+          alert(`プロジェクトの保存に失敗しました。\nエラー詳細: ${String(err)}`);
+        }
+      },
 
       setProjectData: (data: any) =>
         set((state) => ({

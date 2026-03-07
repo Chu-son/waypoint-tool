@@ -10,6 +10,8 @@ import { PluginListPanel } from "./components/ui/PluginListPanel";
 import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
 import { SettingsModal } from "./components/ui/SettingsModal";
+import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
+import { ShortcutManager } from "./components/common/ShortcutManager";
 import { useAppStore } from "./stores/appStore";
 import { 
   ChevronLeft, 
@@ -29,26 +31,30 @@ import { PluginInstance } from "./types/store";
 
 function App() {
   const activeTool = useAppStore((state) => state.activeTool);
-  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
-  const removeNodes = useAppStore((state) => state.removeNodes);
 
   // Sidebar States from Store
   const leftPanelActiveTab = useAppStore((state) => state.leftPanelActiveTab);
   const rightPanelActiveTab = useAppStore((state) => state.rightPanelActiveTab);
   const leftPanelViewMode = useAppStore((state) => state.leftPanelViewMode);
   const rightPanelViewMode = useAppStore((state) => state.rightPanelViewMode);
+  const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
+  const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
+
   const setLeftPanelActiveTab = useAppStore((state) => state.setLeftPanelActiveTab);
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setLeftPanelViewMode = useAppStore((state) => state.setLeftPanelViewMode);
   const setRightPanelViewMode = useAppStore((state) => state.setRightPanelViewMode);
+  const setLeftPanelOpen = useAppStore((state) => state.setLeftPanelOpen);
+  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
 
   const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
+  
+  const isShortcutsModalOpen = useAppStore((state) => state.isShortcutsModalOpen);
+  const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
 
   const [leftWidth, setLeftWidth] = useState(256);
   const [rightWidth, setRightWidth] = useState(320);
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
 
   useEffect(() => {
     const initApp = async () => {
@@ -121,30 +127,8 @@ function App() {
     initApp();
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA"
-      )
-        return;
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedNodeIds.length > 0) removeNodes(selectedNodeIds);
-      }
-      if (e.key === "Escape") {
-        if (selectedNodeIds.length > 0)
-          useAppStore.setState({ selectedNodeIds: [] });
-        if (activeTool !== "select")
-          useAppStore.setState({ activeTool: "select" });
-        useAppStore.setState({ pluginInteractionData: {} });
-        
-        // Return to Layers panel on Escape
-        setRightPanelActiveTab("layers");
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedNodeIds, activeTool, removeNodes, setRightPanelActiveTab]);
+  // Initialization moved to ShortcutManager for shortcuts, 
+  // though basic initialization remains in App for now.
 
   useEffect(() => {
     if (!isTauri()) return;
@@ -263,13 +247,14 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
+      <ShortcutManager />
       <TopMenu />
 
       <div className="flex flex-1 overflow-hidden w-full relative">
         <ToolPanel />
 
         {/* Left Panel */}
-        {leftOpen && (
+        {isLeftPanelOpen && (
           <>
             <div
               style={{ width: leftWidth }}
@@ -281,7 +266,7 @@ function App() {
                 onTabChange={setLeftPanelActiveTab}
                 viewMode={leftPanelViewMode}
                 onViewModeChange={setLeftPanelViewMode}
-                onClose={() => setLeftOpen(false)}
+                onClose={() => setLeftPanelOpen(false)}
                 closeIcon={<ChevronLeft size={16} />}
               />
             </div>
@@ -297,9 +282,9 @@ function App() {
         <div className="flex-1 bg-slate-950 relative overflow-hidden flex flex-col">
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
-            {!leftOpen ? (
+            {!isLeftPanelOpen ? (
               <button
-                onClick={() => setLeftOpen(true)}
+                onClick={() => setLeftPanelOpen(true)}
                 className="pointer-events-auto ui-icon-btn h-10 w-10 bg-slate-800/80 backdrop-blur shadow"
               >
                 <ChevronRight size={20} />
@@ -308,9 +293,9 @@ function App() {
               <div />
             )}
 
-            {!rightOpen ? (
+            {!isRightPanelOpen ? (
               <button
-                onClick={() => setRightOpen(true)}
+                onClick={() => setRightPanelOpen(true)}
                 className="pointer-events-auto ui-icon-btn h-10 w-10 bg-slate-800/80 backdrop-blur shadow"
               >
                 <ChevronLeft size={20} />
@@ -326,7 +311,7 @@ function App() {
         </div>
 
         {/* Right Panel */}
-        {rightOpen && (
+        {isRightPanelOpen && (
           <>
             {/* Dragger */}
             <div
@@ -343,7 +328,7 @@ function App() {
                 onTabChange={setRightPanelActiveTab}
                 viewMode={rightPanelViewMode}
                 onViewModeChange={setRightPanelViewMode}
-                onClose={() => setRightOpen(false)}
+                onClose={() => setRightPanelOpen(false)}
                 closeIcon={<ChevronRight size={16} />}
               />
             </div>
@@ -353,6 +338,10 @@ function App() {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+      />
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
       />
     </div>
   );

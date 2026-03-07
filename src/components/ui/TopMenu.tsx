@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { DialogAPI, BackendAPI } from "../../api";
+import { DialogAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
-import { saveWindowState, StateFlags } from "@tauri-apps/plugin-window-state";
 import { MousePointer2 } from "lucide-react";
 
 type MenuOption = {
@@ -82,10 +81,6 @@ function DropdownMenu({
 }
 
 export function TopMenu() {
-  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
-  const nodes = useAppStore((state) => state.nodes);
-  const lastDirectory = useAppStore((state) => state.lastDirectory);
-  const setLastDirectory = useAppStore((state) => state.setLastDirectory);
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const removeNodes = useAppStore((state) => state.removeNodes);
 
@@ -93,6 +88,17 @@ export function TopMenu() {
   const showGrid = useAppStore((state) => state.showGrid);
   const setShowPaths = useAppStore((state) => state.setShowPaths);
   const setShowGrid = useAppStore((state) => state.setShowGrid);
+
+  const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
+  const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
+  const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
+  const selectAllNodes = useAppStore((state) => state.selectAllNodes);
+  const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
+  const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
+  const setLeftPanelOpen = useAppStore((state) => state.setLeftPanelOpen);
+  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const loadProject = useAppStore((state) => state.loadProject);
+  const saveProject = useAppStore((state) => state.saveProject);
 
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -104,103 +110,6 @@ export function TopMenu() {
   const handleMouseEnter = (menuName: string) => {
     if (activeMenu && activeMenu !== menuName) {
       setActiveMenu(menuName);
-    }
-  };
-
-  const getDirName = (path: string) => {
-    const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-    return lastSlash > -1 ? path.substring(0, lastSlash) : path;
-  };
-
-  const handleLoadProject = async () => {
-    try {
-      const selectedPath = await DialogAPI.open({
-        multiple: false,
-        defaultPath: lastDirectory || undefined,
-        filters: [{ name: "Waypoint Project", extensions: ["wptroj"] }],
-      });
-
-      if (selectedPath) {
-        const pathStr =
-          typeof selectedPath === "string"
-            ? selectedPath
-            : (selectedPath as any).path;
-        if (!pathStr) return;
-
-        setLastDirectory(getDirName(pathStr));
-        const projectData = await BackendAPI.loadProject(pathStr);
-
-        useAppStore.setState({
-          nodes: projectData.nodes,
-          rootNodeIds: projectData.root_node_ids,
-          selectedNodeIds: [],
-        });
-
-        if (projectData.map_layers && Array.isArray(projectData.map_layers)) {
-          useAppStore.setState({ mapLayers: [] });
-          projectData.map_layers.forEach((layer: any) => {
-            useAppStore
-              .getState()
-              .addMapLayer(
-                layer.name || "Restored Map",
-                layer.info || {},
-                layer.image_base64 || "",
-                layer.width || 1000,
-                layer.height || 1000,
-              );
-          });
-        }
-
-        useAppStore.getState().setIsDirty(false);
-      }
-    } catch (err) {
-      console.error("Failed to load project:", err);
-      alert(
-        `プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`,
-      );
-    }
-  };
-
-  const handleSaveProject = async () => {
-    try {
-      const savePath = await DialogAPI.save({
-        defaultPath: lastDirectory || undefined,
-        filters: [{ name: "Waypoint Project", extensions: ["wptroj"] }],
-      });
-
-      if (savePath) {
-        let finalPath = savePath;
-        if (!finalPath.toLowerCase().endsWith(".wptroj")) {
-          finalPath += ".wptroj";
-        }
-
-        setLastDirectory(getDirName(finalPath));
-
-        const currentMapLayers = useAppStore.getState().mapLayers;
-        const mapLayersToSave = currentMapLayers.map((layer) => ({
-          id: layer.id,
-          name: layer.name,
-          info: layer.info,
-          image_base64: layer.image_base64,
-          width: layer.width,
-          height: layer.height,
-          visible: layer.visible,
-          opacity: layer.opacity,
-          z_index: layer.z_index,
-        }));
-
-        const projectData = {
-          root_node_ids: rootNodeIds,
-          nodes,
-          map_layers: mapLayersToSave,
-        };
-        await BackendAPI.saveProject(finalPath, projectData);
-        useAppStore.getState().setIsDirty(false);
-        alert("プロジェクトを保存しました。");
-      }
-    } catch (err) {
-      console.error("Failed to save project:", err);
-      alert(`プロジェクトの保存に失敗しました。\nエラー詳細: ${String(err)}`);
     }
   };
 
@@ -217,19 +126,32 @@ export function TopMenu() {
     }
     useAppStore.getState().setIsDirty(false);
     try {
-      await saveWindowState(StateFlags.ALL);
+      // saveWindowState is removed as it's handled by the store's exitApp action or not needed here
     } catch (e) {}
     invoke("force_exit");
   };
 
   const fileOptions: MenuOption[] = [
-    { label: "Open Project...", action: handleLoadProject },
-    { label: "Save Project", action: handleSaveProject },
+    { label: "Open Project...", action: loadProject, shortcut: "Ctrl+O" },
+    { label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
+    { divider: true, label: "" },
+    { label: "Export Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
+    { label: "Settings...", action: () => setSettingsModalOpen(true, "general") },
     { divider: true, label: "" },
     { label: "Exit", action: handleExit, danger: true, shortcut: "Alt+F4" },
   ];
 
   const editOptions: MenuOption[] = [
+    {
+      label: "Select All",
+      action: selectAllNodes,
+      shortcut: "Ctrl+A",
+    },
+    {
+      label: "Deselect All",
+      action: () => useAppStore.setState({ selectedNodeIds: [] }),
+    },
+    { divider: true, label: "" },
     {
       label: "Delete Selected",
       action: () => {
@@ -247,6 +169,29 @@ export function TopMenu() {
     {
       label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`,
       action: () => setShowGrid(!showGrid),
+    },
+    { divider: true, label: "" },
+    {
+      label: `${isLeftPanelOpen ? "✓ " : "  "}Show Left Panel`,
+      action: () => setLeftPanelOpen(!isLeftPanelOpen),
+    },
+    {
+      label: `${isRightPanelOpen ? "✓ " : "  "}Show Right Panel`,
+      action: () => setRightPanelOpen(!isRightPanelOpen),
+    },
+  ];
+
+  const helpOptions: MenuOption[] = [
+    {
+      label: "Keyboard Shortcuts",
+      action: () => setShortcutsModalOpen(true),
+    },
+    { divider: true, label: "" },
+    {
+      label: "About Waypoint Tool",
+      action: () => {
+        alert("Waypoint Tool v1.0.0\n\nA powerful tool for waypoint generation and editing.");
+      },
     },
   ];
 
@@ -287,6 +232,14 @@ export function TopMenu() {
             onClick={() => toggleMenu("View")}
             onClose={closeMenu}
             onMouseEnter={() => handleMouseEnter("View")}
+          />
+          <DropdownMenu
+            label="Help"
+            options={helpOptions}
+            isOpen={activeMenu === "Help"}
+            onClick={() => toggleMenu("Help")}
+            onClose={closeMenu}
+            onMouseEnter={() => handleMouseEnter("Help")}
           />
         </div>
       </div>

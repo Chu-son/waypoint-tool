@@ -17,7 +17,8 @@ import { ExportModal } from "./ExportModal";
 
 export function ToolPanel() {
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
-  const [isExportOpen, setIsExportOpen] = useState(false);
+  const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
+  const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
 
   const activeTool = useAppStore((state) => state.activeTool);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
@@ -47,7 +48,7 @@ export function ToolPanel() {
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
   const handleExportWaypointsClick = () => {
-    setIsExportOpen(true);
+    setExportModalOpen(true);
   };
 
   const tools = [
@@ -230,8 +231,8 @@ export function ToolPanel() {
 
 
       <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
+        isOpen={isExportModalOpen}
+        onClose={() => setExportModalOpen(false)}
       />
     </div>
   );
