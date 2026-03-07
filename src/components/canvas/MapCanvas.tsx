@@ -608,7 +608,7 @@ export function MapCanvas() {
   const drawAxes = useCallback((g: import('pixi.js').Graphics) => {
     g.clear();
     const axisLength = 50 / scale; // Keep length consistent on screen
-    const lineWidth = Math.max(0.5, 2 / scale); // Keep line width consistent on screen
+    const lineWidth = 2 / scale; // Keep line width consistent on screen
 
     // X axis (Red)
     g.strokeStyle = { width: lineWidth, color: 0xef4444 };

@@ -208,7 +208,7 @@ export function TopMenu() {
         </div>
 
         {/* Windows-style Application Menu */}
-        <div className="flex gap-1 items-center" onMouseLeave={closeMenu}>
+        <div className="flex gap-1 items-center">
           <DropdownMenu
             label="File"
             options={fileOptions}
