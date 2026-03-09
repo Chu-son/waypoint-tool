@@ -1,7 +1,7 @@
 {
-    "name": "Rect Sweep Generator",
+    "name": "Rect Search Generator",
     "version": "1.2.0",
-    "description": "回転可能な矩形領域内で蛇行走査（boustrophedon）パスを生成します。開始コーナーと走査方向を選択できます。",
+    "description": "回転可能な矩形領域内でジグザグ走査パスを生成します。開始コーナーと走査方向を選択できます。",
     "type": "python",
     "executable": "main.py",
     "inputs": [
@@ -18,12 +18,6 @@
             "label": "Number of Lines",
             "type": "integer",
             "default": 5
-        },
-        {
-            "name": "snake_pattern",
-            "label": "Snake Pattern (alternating direction)",
-            "type": "boolean",
-            "default": true
         },
         {
             "name": "start_corner",

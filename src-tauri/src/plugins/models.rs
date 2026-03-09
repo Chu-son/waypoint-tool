@@ -8,6 +8,7 @@ pub enum PluginInputType {
     Polygon,
     Path,
     NodeSelect,
+    Waypoint,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

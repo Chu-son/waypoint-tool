@@ -741,6 +741,20 @@ export function MapCanvas() {
 
             return renderableNodes.map(({ node, parentIsGenerator, globalIndex }) => {
               const isSelected = selectedNodeIds.includes(node.id);
+              
+              // Check if this node is referenced by a 'waypoint' plugin input
+              let isReferenced = false;
+              const rootIdx = rootNodeIds.indexOf(node.id);
+              if (rootIdx !== -1) {
+                // Look through manifest inputs to find which ones are type 'waypoint'
+                const activePlugin = activePluginId ? plugins[activePluginId] : null;
+                const waypointInputKeys = activePlugin?.manifest?.inputs
+                  ?.filter(inp => inp.type === 'waypoint')
+                  ?.map(inp => inp.name || inp.id) || [];
+                
+                isReferenced = waypointInputKeys.some(key => pluginInteractionData[key] === rootIdx);
+              }
+
               const transform = node.transform!;
               const qx = transform.qx ?? 0;
               const qy = transform.qy ?? 0;
@@ -753,9 +767,10 @@ export function MapCanvas() {
               const safeScale = Math.max(scale, 0.001);
 
               // Color: generated children use green, manual uses orange/blue
-              const normalColor = parentIsGenerator ? 0x22c55e : 0xffa500;
+              // Referenced waypoint gets a special highlight (e.g. bright orange/yellow)
+              const normalColor = isReferenced ? 0xfacc15 : (parentIsGenerator ? 0x22c55e : 0xffa500);
               const selectedColor = 0x3b82f6;
-              const normalFill = parentIsGenerator ? 0x4ade80 : 0xffd700;
+              const normalFill = isReferenced ? 0xfef08a : (parentIsGenerator ? 0x4ade80 : 0xffd700);
               const selectedFill = 0x60a5fa;
 
               return (

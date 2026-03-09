@@ -1,6 +1,6 @@
 import { useAppStore } from "../../stores/appStore";
 import { OptionDef } from "../../types/store";
-import { Eye, EyeOff, Play, Settings2, RefreshCcw } from "lucide-react";
+import { Eye, EyeOff, Play, Settings2, RefreshCcw, BoxSelect } from "lucide-react";
 import { useState, useEffect } from "react";
 import { BackendAPI } from "../../api";
 import { v4 as uuidv4 } from "uuid";
@@ -31,6 +31,7 @@ export function PropertiesPanel() {
   const plugins = useAppStore((state) => state.plugins);
   const pluginSettings = useAppStore((state) => state.pluginSettings);
   const globalPythonPath = useAppStore((state) => state.globalPythonPath);
+  const explodeGenerator = useAppStore((state) => state.explodeGenerator);
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
@@ -249,6 +250,23 @@ export function PropertiesPanel() {
                   <Play size={14} className="fill-current" />
                 )}
                 {isExecuting ? "Re-Generating..." : "Re-Generate Path"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Are you sure you want to explode this generator? This will convert it into independent manual waypoints and cannot be undone."
+                    )
+                  ) {
+                    explodeGenerator(node.id);
+                  }
+                }}
+                className="w-full h-9 gap-2 mt-2 border-red-900/50 hover:bg-red-950/30 text-red-400 hover:text-red-300 transition-colors"
+                title="Explode into individual manual waypoints"
+              >
+                <BoxSelect size={14} />
+                Explode to Waypoints (バラす)
               </Button>
             </div>
           </div>

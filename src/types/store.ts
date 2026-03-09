@@ -56,7 +56,7 @@ export type WaypointNode = {
 };
 
 // --- Plugin Architecture Types ---
-export type PluginInputType = 'point' | 'rectangle' | 'polygon' | 'path' | 'node_select';
+export type PluginInputType = 'point' | 'rectangle' | 'polygon' | 'path' | 'node_select' | 'waypoint';
 
 export type PluginInputDef = {
   id: string;

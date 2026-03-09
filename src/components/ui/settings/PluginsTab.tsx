@@ -131,6 +131,42 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
         </div>
       </div>
 
+      {/* Missing Plugins Cleanup Banner */}
+      {(() => {
+        const missingCount = pluginSettings.filter(s => !plugins[s.id]).length;
+        if (missingCount > 0) {
+          return (
+            <div className="bg-danger-base/10 border border-danger-base/20 rounded-xl p-4 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-danger-base/20 flex items-center justify-center text-danger-base shrink-0">
+                  <AlertCircle size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-danger-base leading-tight">Missing Plugin Sources</h4>
+                  <p className="text-[11px] text-danger-base/80 mt-0.5">
+                    {missingCount} {missingCount === 1 ? 'plugin setting doesn\'t' : 'plugin settings don\'t'} match any installed folder.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (confirm(`${missingCount}個の欠落したプラグイン設定を削除します。よろしいですか？`)) {
+                    const nextSettings = pluginSettings.filter(s => !!plugins[s.id]);
+                    setPluginSettings(nextSettings);
+                  }
+                }}
+                className="bg-danger-base/10 hover:bg-danger-base/20 border-danger-base/20 text-danger-base hover:text-danger-base"
+              >
+                Cleanup All
+              </Button>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       <div className="space-y-4">
         {pluginSettings.length === 0 ? (
           <div className="text-center py-12 text-text-muted/60 text-sm bg-surface-panel/30 rounded-2xl border-2 border-dashed border-border-base/50 animate-pulse">

@@ -165,6 +165,47 @@ describe('SettingsModal UI', () => {
       expect(settings.find(s => s.id === 'p1')?.pythonOverridePath).toBe('/venv/bin/python');
     });
   });
+  
+  it('shows cleanup banner when settings have missing plugins and removes them on click', async () => {
+    // Setup state with a missing plugin (p2 is not in plugins map)
+    useAppStore.setState({
+      plugins: {
+        'p1': { 
+          id: 'p1', 
+          manifest: { name: 'Exists' } 
+        } as any
+      },
+      pluginSettings: [
+        { id: 'p1', enabled: true, order: 0, isBuiltin: false },
+        { id: 'p2', enabled: true, order: 1, isBuiltin: false } // p2's source is missing
+      ],
+    });
+
+    // Mock window.confirm
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByText('Plugins'));
+
+    // Check if banner appears
+    expect(await screen.findByText('Missing Plugin Sources')).toBeInTheDocument();
+    expect(screen.getByText(/1 plugin setting doesn't match/)).toBeInTheDocument();
+
+    // Click Cleanup
+    const cleanupBtn = screen.getByText('Cleanup All');
+    fireEvent.click(cleanupBtn);
+
+    expect(confirmSpy).toHaveBeenCalled();
+
+    // Verify p2 is removed from store
+    await waitFor(() => {
+      const settings = useAppStore.getState().pluginSettings;
+      expect(settings.length).toBe(1);
+      expect(settings.find(s => s.id === 'p2')).toBeUndefined();
+    });
+
+    confirmSpy.mockRestore();
+  });
 
   it('allows changing plugin icons', async () => {
     useAppStore.setState({

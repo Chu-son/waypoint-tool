@@ -2,6 +2,9 @@ import React from "react";
 import { NumericInput } from "./NumericInput";
 import { Label } from "./common/Label";
 import { cn } from "../../utils/cn";
+import { useAppStore } from "../../stores/appStore";
+import { Select } from "./common/Select";
+import { Input } from "./common/Input";
 
 export interface PluginInput {
   id: string;
@@ -35,6 +38,10 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
   hasData = false,
   decimalPrecision = 2,
 }) => {
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
+  const nodes = useAppStore((state) => state.nodes);
+  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
+
   const key = input.name || input.id;
   const label = input.label || key;
 
@@ -66,7 +73,9 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
               ? "▶ Click and drag on map to draw"
               : input.type === "point"
                 ? "▶ Click on map to place"
-                : ""}
+                : input.type === "waypoint"
+                  ? "▶ Select a waypoint from list or map"
+                  : ""}
           </p>
         )}
 
@@ -208,6 +217,54 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
             )}
           </div>
         )}
+
+        {input.type === "waypoint" && (
+          <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
+            <Select
+              value={interactionData ?? ""}
+              onChange={(e) => {
+                const val = e.target.value === "" ? null : parseInt(e.target.value);
+                onUpdate(val);
+              }}
+              className="h-8 text-[11px] mb-2"
+            >
+              <option value="">-- Select Waypoint --</option>
+              {rootNodeIds.map((id, idx) => {
+                const n = nodes[id];
+                if (n && n.type === "manual") {
+                  return (
+                    <option key={id} value={idx}>
+                      Waypoint {idx + indexStartIndex}
+                    </option>
+                  );
+                }
+                return null;
+              })}
+            </Select>
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-text-muted shrink-0">Index:</label>
+              <Input
+                type="number"
+                min={indexStartIndex}
+                max={rootNodeIds.length - 1 + indexStartIndex}
+                value={interactionData !== null ? interactionData + indexStartIndex : ""}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val)) {
+                    const idx = val - indexStartIndex;
+                    if (idx >= 0 && idx < rootNodeIds.length) {
+                      onUpdate(idx);
+                    }
+                  } else {
+                    onUpdate(null);
+                  }
+                }}
+                className="h-7 text-[11px]"
+                placeholder="Direct Input"
+              />
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -218,9 +275,35 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
       <Label className="text-[13px] font-bold text-primary-base flex items-center justify-between uppercase tracking-tight">
         <span>{label}</span>
         <span className="text-[10px] text-text-muted font-normal opacity-70 normal-case">
-          ({input.type === "point" ? "Point" : "Rectangle Area"})
+          ({input.type === "point" ? "Point" : input.type === "waypoint" ? "Waypoint Reference" : "Rectangle Area"})
         </span>
       </Label>
+
+      {input.type === "waypoint" && (
+        <div className="space-y-2">
+          <Select
+            value={interactionData ?? ""}
+            onChange={(e) => {
+              const val = e.target.value === "" ? null : parseInt(e.target.value);
+              onUpdate(val);
+            }}
+            className="h-8 text-xs"
+          >
+            <option value="">-- Select Waypoint --</option>
+            {rootNodeIds.map((id, idx) => {
+              const n = nodes[id];
+              if (n && n.type === "manual") {
+                return (
+                  <option key={id} value={idx}>
+                    Waypoint {idx + indexStartIndex}
+                  </option>
+                );
+              }
+              return null;
+            })}
+          </Select>
+        </div>
+      )}
 
       {input.type === "point" && interactionData && (
         <div className="grid grid-cols-3 gap-2">

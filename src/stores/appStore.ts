@@ -120,6 +120,7 @@ export type AppState = {
 
   loadProject: () => Promise<void>;
   saveProject: () => Promise<void>;
+  explodeGenerator: (id: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -514,6 +515,42 @@ export const useAppStore = create<AppState>()(
           nodes: newNodes, 
           rootNodeIds: newRootIds,
           selectedNodeIds: state.selectedNodeIds.filter(id => !idsToRemove.has(id)),
+          isDirty: true
+        };
+      }),
+
+      explodeGenerator: (id: string) => set((state) => {
+        const node = state.nodes[id];
+        if (!node || node.type !== 'generator') return {};
+
+        const childIds = node.children_ids || [];
+        const newNodes = { ...state.nodes };
+        delete newNodes[id];
+
+        let newRootNodeIds = [...state.rootNodeIds];
+        const rootIdx = newRootNodeIds.indexOf(id);
+
+        if (rootIdx !== -1) {
+          // It's a root node, replace it with its children
+          newRootNodeIds.splice(rootIdx, 1, ...childIds);
+        } else {
+          // It might be a child of another node (though usually generators are root nodes in this app)
+          Object.values(newNodes).forEach(parent => {
+            if (parent.children_ids && parent.children_ids.includes(id)) {
+              const idx = parent.children_ids.indexOf(id);
+              parent.children_ids = [
+                ...parent.children_ids.slice(0, idx),
+                ...childIds,
+                ...parent.children_ids.slice(idx + 1)
+              ];
+            }
+          });
+        }
+
+        return {
+          nodes: newNodes,
+          rootNodeIds: newRootNodeIds,
+          selectedNodeIds: state.selectedNodeIds.filter(sid => sid !== id),
           isDirty: true
         };
       }),

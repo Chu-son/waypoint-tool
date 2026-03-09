@@ -157,6 +157,30 @@ impl PluginManager {
 
         // Scan built-in plugins in resource_dir/python_sdk
         let mut scanned_builtin = false;
+
+        // 【開発環境キャッシュ問題の対策】
+        // 開発環境 (debug_assertions 有効時) では、ビルドキャッシュ (resource_dir/target) 配下の
+        // 古いプラグインが読み込まれるのを防ぐため、ワークスペースのソース (../python_sdk) を
+        // 最優先でスキャンします。
+        #[cfg(all(debug_assertions, not(test)))]
+        {
+            if let Ok(current_dir) = std::env::current_dir() {
+                let dev_paths = vec![
+                    current_dir.join("../python_sdk"),
+                    current_dir.join("python_sdk"),
+                ];
+                for dev_dir in dev_paths {
+                    let dev_dir = dev_dir.canonicalize().unwrap_or(dev_dir);
+                    if dev_dir.exists() && dev_dir.is_dir() {
+                        println!("[DEBUG/RUST] (DEBUG-MODE) Prioritizing development python_sdk at: {:?}", dev_dir);
+                        plugins.extend(Self::scan_plugins_in_dir(&dev_dir, true));
+                        scanned_builtin = true;
+                        break;
+                    }
+                }
+            }
+        }
+
         if let Some(res_dir) = &self.resource_dir {
             // Try common resource paths. Tauri v2 often nests ../ paths under _up_ prefix.
             let candidates = vec![
@@ -167,6 +191,12 @@ impl PluginManager {
 
             for python_sdk_dir in candidates {
                 if python_sdk_dir.exists() {
+                    // すでにワークスペースのパスをスキャン済みの場合は、重複を避けるため
+                    // resource_dir 側のパスはスキップする
+                    if scanned_builtin {
+                        println!("[DEBUG/RUST] Skipping resource_dir python_sdk because dev path was already scanned.");
+                        break;
+                    }
                     println!("[DEBUG/RUST] Found bundled python_sdk at: {:?}", python_sdk_dir);
                     plugins.extend(Self::scan_plugins_in_dir(&python_sdk_dir, true));
                     scanned_builtin = true;

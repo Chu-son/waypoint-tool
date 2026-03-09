@@ -130,6 +130,27 @@ export function PluginParamsPanel() {
           .filter(Boolean);
       }
 
+      // Collect waypoint range if waypoint inputs are used
+      let idsToConsume: string[] = [];
+      let insertIndex = -1;
+      const waypointInputs = inputs.filter(inp => inp.type === 'waypoint');
+      if (waypointInputs.length > 0) {
+        const waypointIndices = waypointInputs
+          .map(inp => pluginInteractionData[inp.name || inp.id])
+          .filter(idx => idx !== undefined && idx !== null);
+        
+        if (waypointIndices.length > 0) {
+          const rootNodeIds = useAppStore.getState().rootNodeIds;
+          const minIdx = Math.min(...waypointIndices);
+          const maxIdx = Math.max(...waypointIndices);
+          insertIndex = minIdx;
+          idsToConsume = rootNodeIds.slice(minIdx, maxIdx + 1);
+          
+          // Pass the full data of waypoints in range to the plugin
+          contextData.waypoint_range = idsToConsume.map(id => nodes[id]).filter(Boolean);
+        }
+      }
+
       // ----------------------------------------------------------------------
       // Python Configuration Injection
       // ----------------------------------------------------------------------
@@ -155,13 +176,29 @@ export function PluginParamsPanel() {
       if (Array.isArray(resultingWaypoints) && resultingWaypoints.length > 0) {
         // Create Parent Generator Node
         const parentId = uuidv4();
-        useAppStore.getState().addNode({
+        const store = useAppStore.getState();
+        
+        // Remove consumed nodes first
+        if (idsToConsume.length > 0) {
+          store.removeNodes(idsToConsume);
+        }
+
+        store.addNode({
           id: parentId,
           type: "generator",
           plugin_id: plugin.id,
           generator_params: contextData,
           children_ids: [],
         });
+        
+        // If we have an insert index, we need to move the newly added node to that index
+        if (insertIndex !== -1) {
+          const currentRootIds = useAppStore.getState().rootNodeIds;
+          const newIdx = currentRootIds.indexOf(parentId);
+          if (newIdx !== -1 && newIdx !== insertIndex) {
+            store.reorderNodes(newIdx, insertIndex);
+          }
+        }
 
         // Build new child nodes
         resultingWaypoints.forEach((wp) => {

@@ -277,4 +277,21 @@ describe('AppStore Zustand Store', () => {
     expect(state.selectedNodeIds).toEqual([]);
     expect(state.isDirty).toBe(false);
   });
+
+  it('should explode a generator node into root nodes', () => {
+    const { addNode, explodeGenerator } = useAppStore.getState();
+    // Setup: Root -> Generator -> Children
+    addNode({ id: 'gen-1', type: 'generator' });
+    addNode({ id: 'child-1', type: 'manual' }, 'gen-1');
+    addNode({ id: 'child-2', type: 'manual' }, 'gen-1');
+
+    explodeGenerator('gen-1');
+
+    const state = useAppStore.getState();
+    expect(state.nodes['gen-1']).toBeUndefined();
+    expect(state.rootNodeIds).toEqual(['child-1', 'child-2']);
+    expect(state.nodes['child-1']).toBeDefined();
+    expect(state.nodes['child-2']).toBeDefined();
+    expect(state.isDirty).toBe(true);
+  });
 });

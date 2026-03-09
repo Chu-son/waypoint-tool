@@ -1,26 +1,23 @@
 """
-Line Generator プラグイン
-=========================
+Line Path Generator
+====================
 
 始点の位置・方向に沿って、等間隔に Waypoint を直線配置するプラグイン。
-最もシンプルな構造のプラグインであり、SDK の基本的な使い方を示します。
 """
 
 import sys
 import os
-import math
 
 # SDK のインポート
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from wpt_plugin import WaypointGenerator, Point
 
 
-class LineGenerator(WaypointGenerator):
+class LinePathGenerator(WaypointGenerator):
     """始点から直線方向に等間隔の Waypoint を生成するプラグイン。
     """
 
     def generate(self, context):
-        # Use new object-based helper
         start = self.get_interaction_point(context, "start_point")
         if not start:
             return []
@@ -35,15 +32,12 @@ class LineGenerator(WaypointGenerator):
         waypoints = []
         for i in range(num_points):
             distance = i * spacing
-            # Use Point objects and coordinate transformation helper
-            # Local point (distance along X, 0 offset on Y)
             local_pt = Point(distance, 0)
-            # Transform to world relative to start
             world_pt = local_pt.to_world(start.x, start.y, start.yaw)
 
             waypoints.append(self.make_waypoint(
                 world_pt.x, world_pt.y, start.yaw,
-                options={"generated_by": "LineGenerator", "line_index": i},
+                options={"generated_by": "LinePathGenerator", "line_index": i},
             ))
 
         self.log(f"Generated {len(waypoints)} waypoints along line.")
@@ -51,4 +45,4 @@ class LineGenerator(WaypointGenerator):
 
 
 if __name__ == "__main__":
-    LineGenerator().run_from_stdin()
+    LinePathGenerator().run_from_stdin()

@@ -1,7 +1,7 @@
 {
-    "name": "Sweep Path Generator",
+    "name": "Zigzag Path Generator",
     "version": "1.1.0",
-    "description": "始点から指定方向に平行走査線（スイープパス）を生成します。蛇行パターンや終端ヨー反転が可能です。",
+    "description": "始点から指定方向に平行走査線（Zigzag）を生成します。終端ヨー反転が可能です。",
     "type": "python",
     "executable": "main.py",
     "inputs": [
@@ -32,20 +32,8 @@
             "default": 5
         },
         {
-            "name": "snake_pattern",
-            "label": "Snake Pattern (Alternate line direction)",
-            "type": "boolean",
-            "default": false
-        },
-        {
             "name": "flip_endpoint_yaw",
-            "label": "[Normal] Flip endpoint yaw 180° (turn around at line end)",
-            "type": "boolean",
-            "default": false
-        },
-        {
-            "name": "endpoint_faces_next",
-            "label": "[Snake] Endpoint faces next line start",
+            "label": "Flip endpoint yaw 180° (turn around at line end)",
             "type": "boolean",
             "default": false
         }

@@ -1,0 +1,28 @@
+{
+    "name": "Interpolation Generator",
+    "version": "1.0.0",
+    "description": "既存のWaypointの間をピッチ指定で補完します。StartとEndの間に点があればそこをたどります。",
+    "type": "python",
+    "executable": "main.py",
+    "inputs": [
+        {
+            "id": "start_node",
+            "label": "Start Waypoint",
+            "type": "waypoint"
+        },
+        {
+            "id": "end_node",
+            "label": "End Waypoint",
+            "type": "waypoint"
+        }
+    ],
+    "needs": [],
+    "properties": [
+        {
+            "name": "pitch",
+            "label": "Pitch (m)",
+            "type": "float",
+            "default": 1.0
+        }
+    ]
+}

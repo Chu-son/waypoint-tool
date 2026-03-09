@@ -1,10 +1,8 @@
 """
-Rect Sweep Generator プラグイン
-================================
+Rect Search Generator
+======================
 
-回転可能な矩形領域内で蛇行走査（boustrophedon）パスを生成するプラグイン。
-矩形はユーザーが MapCanvas 上でドラッグして描画し、コーナー/回転ハンドルで
-サイズと向きを調整できます。
+回転可能な矩形領域内でジグザグ走査パスを生成するプラグイン。
 """
 
 import sys
@@ -16,12 +14,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from wpt_plugin import WaypointGenerator, Point, normalize_yaw, Line, Ray
 
 
-class RectSweepGenerator(WaypointGenerator):
+class RectSearchGenerator(WaypointGenerator):
     """矩形領域内でジグザグ走査パスを生成するプラグイン。
     """
 
     def generate(self, context):
-        # Use new object-based helper for Rectangle
         rect = self.get_interaction_rect(context, "sweep_rect")
         if not rect:
             return []
@@ -31,7 +28,6 @@ class RectSweepGenerator(WaypointGenerator):
 
         # プロパティの取得
         num_lines = max(2, int(self.get_property(context, "num_lines", default=5)))
-        snake = bool(self.get_property(context, "snake_pattern", default=True))
         start_corner = str(self.get_property(context, "start_corner", default="Bottom-Left"))
         sweep_direction = str(self.get_property(context, "sweep_direction", default="Horizontal"))
 
@@ -39,30 +35,22 @@ class RectSweepGenerator(WaypointGenerator):
         corners = rect.get_corners()
         
         # 2. 基準となる辺 (Reference Line) を決定
-        # Horizontal Sweep: 左右どちらかの縦辺を基準にする
-        # Vertical Sweep: 上下どちらかの横辺を基準にする
         is_horizontal = (sweep_direction == "Horizontal")
         is_left = "Left" in start_corner
         is_bottom = "Bottom" in start_corner
         
         if is_horizontal:
-            # 基準は縦辺 (左または右)
             if is_left:
-                # 左辺: BL(0) -> TL(3) または TL(3) -> BL(0)
                 ref_line = Line(corners[0], corners[3]) if is_bottom else Line(corners[3], corners[0])
                 perp_clockwise = is_bottom
             else:
-                # 右辺: BR(1) -> TR(2) または TR(2) -> BR(1)
                 ref_line = Line(corners[1], corners[2]) if is_bottom else Line(corners[2], corners[1])
                 perp_clockwise = not is_bottom
         else:
-            # 基準は横辺 (下または上)
             if is_bottom:
-                # 下辺: BL(0) -> BR(1) または BR(1) -> BL(0)
                 ref_line = Line(corners[0], corners[1]) if is_left else Line(corners[1], corners[0])
                 perp_clockwise = not is_left
             else:
-                # 上辺: TL(3) -> TR(2) または TR(2) -> TL(3)
                 ref_line = Line(corners[3], corners[2]) if is_left else Line(corners[2], corners[3])
                 perp_clockwise = is_left
 
@@ -70,18 +58,15 @@ class RectSweepGenerator(WaypointGenerator):
 
         waypoints = []
         for i in range(num_lines):
-            # 基準辺上の分割点 (始点候補)
             t = i / (num_lines - 1)
             start_pt = Point(
                 ref_line.p1.x + t * (ref_line.p2.x - ref_line.p1.x),
                 ref_line.p1.y + t * (ref_line.p2.y - ref_line.p1.y)
             )
             
-            # 垂直方向にレイを飛ばして対向境界との交点を得る
             ray = Ray(start_pt, perp_yaw)
             hits = rect.intersect_ray(ray)
             
-            # 自分自身(start_pt)以外の最も遠い交点を探す
             end_pt = None
             max_dist = -1.0
             for h in hits:
@@ -95,7 +80,8 @@ class RectSweepGenerator(WaypointGenerator):
 
             # 進行方向
             line_yaw = perp_yaw
-            is_reverse = snake and (i % 2 == 1)
+            # 常にジグザグ走査（偶数行ごとに反転）
+            is_reverse = (i % 2 == 1)
             
             w_start, w_end = start_pt, end_pt
             if is_reverse:
@@ -105,8 +91,8 @@ class RectSweepGenerator(WaypointGenerator):
             waypoints.append(self.make_waypoint(
                 w_start.x, w_start.y, line_yaw,
                 options={
-                    "generated_by": "RectSweepGenerator",
-                    "sweep_line_id": i,
+                    "generated_by": "RectSearchGenerator",
+                    "line_id": i,
                     "position": "start",
                 },
             ))
@@ -114,15 +100,15 @@ class RectSweepGenerator(WaypointGenerator):
             waypoints.append(self.make_waypoint(
                 w_end.x, w_end.y, line_yaw,
                 options={
-                    "generated_by": "RectSweepGenerator",
-                    "sweep_line_id": i,
+                    "generated_by": "RectSearchGenerator",
+                    "line_id": i,
                     "position": "end",
                 },
             ))
 
-        self.log(f"Generated {len(waypoints)} waypoints in perpendicular rect sweep.")
+        self.log(f"Generated {len(waypoints)} waypoints in zigzag search.")
         return waypoints
 
 
 if __name__ == "__main__":
-    RectSweepGenerator().run_from_stdin()
+    RectSearchGenerator().run_from_stdin()
