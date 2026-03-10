@@ -235,6 +235,9 @@ describe('SettingsModal UI', () => {
   });
 
   it('handles custom icon browsing via base64', async () => {
+    // Mock confirm for security warning
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    
     const { BackendAPI, DialogAPI } = await import('../../api');
     
     vi.mocked(DialogAPI.open).mockResolvedValue('/path/to/icon.png');
@@ -255,12 +258,15 @@ describe('SettingsModal UI', () => {
       const settings = useAppStore.getState().pluginSettings;
       expect(settings.find(s => s.id === 'p1')?.icon).toBe('data:image/png;base64,fake');
     }, { timeout: 3000 });
+    
+    confirmSpy.mockRestore();
   });
 
   it('triggers create new plugin flow', async () => {
     const { BackendAPI, DialogAPI } = await import('../../api');
     
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('New Cool Plugin');
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.stubGlobal('alert', vi.fn());
     
     vi.mocked(DialogAPI.open).mockResolvedValue('/dev/plugins');
@@ -283,5 +289,6 @@ describe('SettingsModal UI', () => {
     expect(DialogAPI.open).toHaveBeenCalled();
     expect(promptSpy).toHaveBeenCalled();
     promptSpy.mockRestore();
+    confirmSpy.mockRestore();
   });
 });

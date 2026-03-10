@@ -32,6 +32,9 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
             variant="secondary"
             size="sm"
             onClick={async () => {
+              if (!confirm("プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？")) {
+                return;
+              }
               try {
                 const { DialogAPI, BackendAPI } = await import("../../../api");
                 const selectedPath = await DialogAPI.open({
@@ -77,6 +80,9 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
             variant="primary"
             size="sm"
             onClick={async () => {
+              if (!confirm("プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？")) {
+                return;
+              }
               try {
                 const { DialogAPI, BackendAPI } = await import("../../../api");
                 const selectedPath = await DialogAPI.open({

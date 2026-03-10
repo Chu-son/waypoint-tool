@@ -3,6 +3,7 @@ import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import { MousePointer2, Minus, Square, X } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -220,8 +221,9 @@ export function TopMenu() {
     { divider: true, label: "" },
     {
       label: "About Waypoint Tool",
-      action: () => {
-        alert("Waypoint Tool v1.0.0\n\nA powerful tool for waypoint generation and editing.");
+      action: async () => {
+        const version = await getVersion();
+        alert(`Waypoint Tool v${version}`);
       },
     },
   ];

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import {
   MousePointer2,
+  Hand,
   Download,
   Settings,
-  Plus,
   MoreHorizontal,
   Puzzle,
   Sparkles,
@@ -55,8 +55,8 @@ export function ToolPanel() {
   };
 
   const tools = [
-    { id: "select", icon: MousePointer2, label: "Select (V)" },
-    { id: "add_point", icon: Plus, label: "Add Waypoint (P)" },
+    { id: "select", icon: Hand, label: "Select (V)" },
+    { id: "add_point", icon: MousePointer2, label: "Add Waypoint (P)" },
   ] as const;
 
   const enabledPluginsList = pluginSettings

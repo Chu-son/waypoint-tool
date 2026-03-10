@@ -58,7 +58,7 @@ describe('App Integration', () => {
     render(<App />);
 
     // Validate main structural elements are mounted
-    expect(screen.getByText('Project')).toBeInTheDocument();
+    expect(screen.getByText('Waypoints')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByTestId('mock-map-canvas')).toBeInTheDocument();
     
@@ -94,7 +94,7 @@ describe('App Integration', () => {
     });
     
     // The button should now be visible
-    const loadMapBtn = screen.getByText('Load ROS Map');
+    const loadMapBtn = screen.getByText('Load Map');
     act(() => {
       loadMapBtn.click();
     });
@@ -135,7 +135,7 @@ describe('App Integration', () => {
 
   it('renders the Project panel', async () => {
     render(<App />);
-    expect(screen.getByText('Project')).toBeInTheDocument();
+    expect(screen.getByText('Waypoints')).toBeInTheDocument();
   });
 
   it('switches between Inspector and Layers tabs', async () => {
@@ -151,7 +151,7 @@ describe('App Integration', () => {
     });
 
     // Layers panel content should be visible
-    expect(screen.getByText('Load ROS Map')).toBeInTheDocument();
+    expect(screen.getByText('Load Map')).toBeInTheDocument();
   });
 
   // --- 要件2: Waypoint編集 ---

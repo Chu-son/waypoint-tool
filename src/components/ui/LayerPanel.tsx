@@ -66,7 +66,7 @@ export function LayerPanel() {
           className="w-full h-10 shadow-sm border-border-base/50 group hover:border-emerald-500/30 transition-all font-bold"
         >
           <FolderOpen size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-          Load ROS Map
+          Load Map
         </Button>
       </div>
 

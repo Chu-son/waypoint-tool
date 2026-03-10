@@ -266,7 +266,7 @@ export function PropertiesPanel() {
                 title="Explode into individual manual waypoints"
               >
                 <BoxSelect size={14} />
-                Explode to Waypoints (バラす)
+                Explode to Waypoints
               </Button>
             </div>
           </div>

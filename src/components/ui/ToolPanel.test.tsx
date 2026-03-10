@@ -6,6 +6,7 @@ import { useAppStore } from '../../stores/appStore';
 // Mock Lucide icons
 vi.mock('lucide-react', () => ({
   MousePointer2: () => <div data-testid="select-icon" />,
+  Hand: () => <div data-testid="hand-icon" />,
   Plus: () => <div data-testid="add-icon" />,
   Download: () => <div data-testid="download-icon" />,
   Settings: () => <div data-testid="settings-icon" />,

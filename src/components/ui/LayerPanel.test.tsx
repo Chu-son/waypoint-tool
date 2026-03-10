@@ -103,7 +103,7 @@ describe('LayerPanel', () => {
     });
 
     render(<LayerPanel />);
-    const loadBtn = screen.getByRole('button', { name: /load ros map/i });
+    const loadBtn = screen.getByRole('button', { name: /load map/i });
     fireEvent.click(loadBtn);
 
     await waitFor(() => {

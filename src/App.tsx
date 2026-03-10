@@ -233,7 +233,7 @@ function App() {
   const leftPanels: PanelTab[] = useMemo(() => [
     {
       id: "project",
-      title: "Project",
+      title: "Waypoints",
       icon: <Box size={14} />,
       component: <WaypointTree />
     },
