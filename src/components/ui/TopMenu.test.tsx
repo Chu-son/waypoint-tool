@@ -7,6 +7,9 @@ import { DialogAPI } from '../../api';
 // Mock Lucide icons
 vi.mock('lucide-react', () => ({
   MousePointer2: () => <div data-testid="mouse-icon" />,
+  Minus: () => <div data-testid="minus-icon" />,
+  Square: () => <div data-testid="square-icon" />,
+  X: () => <div data-testid="x-icon" />,
 }));
 
 // Mock Store
@@ -24,6 +27,13 @@ vi.mock('../../api', () => ({
 // Mock @tauri-apps/api/core
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+}));
+
+// Mock @tauri-apps/api/window
+vi.mock('@tauri-apps/api/window', () => ({
+  getCurrentWindow: () => ({
+    setDecorations: vi.fn(),
+  }),
 }));
 
 describe('TopMenu', () => {

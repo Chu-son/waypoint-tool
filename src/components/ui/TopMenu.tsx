@@ -2,7 +2,8 @@ import { useRef, useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
-import { MousePointer2 } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { MousePointer2, Minus, Square, X } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 type MenuOption = {
@@ -146,6 +147,7 @@ export function TopMenu() {
   };
 
   const fileOptions: MenuOption[] = [
+    { label: "New Project...", action: () => useAppStore.getState().resetProject(), shortcut: "Ctrl+N" },
     { label: "Open Project...", action: loadProject, shortcut: "Ctrl+O" },
     { label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
     { divider: true, label: "" },
@@ -225,8 +227,8 @@ export function TopMenu() {
   ];
 
   return (
-    <div className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm">
-      <div className="flex items-center gap-6">
+    <div data-tauri-drag-region className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm">
+      <div className="flex items-center gap-6" data-tauri-drag-region>
         {/* App Logo/Name */}
         <div className="flex items-center gap-2 text-text-base font-bold tracking-wide pointer-events-none">
           <MousePointer2
@@ -271,6 +273,28 @@ export function TopMenu() {
             onMouseEnter={() => handleMouseEnter("Help")}
           />
         </div>
+      </div>
+
+      {/* Window Controls (Tauri) */}
+      <div className="flex items-center ml-auto">
+        <button
+          onClick={() => getCurrentWindow().minimize()}
+          className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md"
+        >
+          <Minus size={16} />
+        </button>
+        <button
+          onClick={() => getCurrentWindow().toggleMaximize()}
+          className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md mx-1"
+        >
+          <Square size={14} />
+        </button>
+        <button
+          onClick={handleExit}
+          className="p-1 hover:bg-danger-base hover:text-white text-text-muted transition-colors rounded-md"
+        >
+          <X size={16} />
+        </button>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
     onCloseRequested: vi.fn().mockResolvedValue(vi.fn()),
     destroy: vi.fn(),
+    setDecorations: vi.fn(),
   }),
 }));
 

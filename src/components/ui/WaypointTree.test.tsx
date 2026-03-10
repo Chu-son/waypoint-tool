@@ -5,10 +5,9 @@ import { useAppStore } from '../../stores/appStore';
 
 // Mock Lucide icons
 vi.mock('lucide-react', () => ({
-  ChevronUp: () => <div data-testid="up-icon" />,
-  ChevronDown: () => <div data-testid="down-icon" />,
   ChevronRight: () => <div data-testid="right-icon" />,
   Layers: () => <div data-testid="layers-icon" />,
+  GripVertical: () => <div data-testid="grip-vertical-icon" />,
 }));
 
 // Mock Store
@@ -40,6 +39,8 @@ describe('WaypointTree', () => {
       plugins: {},
       selectedNodeIds: [],
       indexStartIndex: 0,
+      insertionIndex: -1,
+      setInsertionIndex: vi.fn(),
       selectNodes: mockSelectNodes,
       reorderNodes: mockReorderNodes,
     }));
@@ -57,6 +58,8 @@ describe('WaypointTree', () => {
       plugins: mockPlugins,
       selectedNodeIds: [],
       indexStartIndex: 10, // Offset
+      insertionIndex: -1,
+      setInsertionIndex: vi.fn(),
       selectNodes: mockSelectNodes,
     }));
 
@@ -80,6 +83,8 @@ describe('WaypointTree', () => {
       plugins: mockPlugins,
       selectedNodeIds: [],
       indexStartIndex: 0,
+      insertionIndex: -1,
+      setInsertionIndex: vi.fn(),
       selectNodes: mockSelectNodes,
     }));
 
@@ -104,42 +109,21 @@ describe('WaypointTree', () => {
       plugins: mockPlugins,
       selectedNodeIds: [],
       indexStartIndex: 0,
+      insertionIndex: -1,
+      setInsertionIndex: vi.fn(),
       selectNodes: mockSelectNodes,
     }));
 
     render(<WaypointTree />);
 
-    const item1 = screen.getByText('[0]').closest('li')!;
-    fireEvent.click(item1);
+    const item1Text = screen.getByText('[0]');
+    fireEvent.click(item1Text);
     expect(mockSelectNodes).toHaveBeenCalledWith(['wp-1'], false);
 
-    const item2 = screen.getByText('[1]').closest('li')!;
-    fireEvent.click(item2, { shiftKey: true });
+    const item2Text = screen.getByText('[1]');
+    fireEvent.click(item2Text, { shiftKey: true });
     expect(mockSelectNodes).toHaveBeenCalledWith(['wp-2'], true);
   });
 
-  it('handles reordering buttons', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-        rootNodeIds: ['wp-1', 'wp-2'],
-        nodes: mockNodes,
-        plugins: mockPlugins,
-        selectedNodeIds: [],
-        indexStartIndex: 0,
-        reorderNodes: mockReorderNodes,
-      }));
-  
-      render(<WaypointTree />);
-      
-      // Need to hover or look for buttons
-      const upBtns = screen.getAllByTitle('Move Up');
-      const downBtns = screen.getAllByTitle('Move Down');
-
-      // Click Down on wp-1
-      fireEvent.click(downBtns[0]);
-      expect(mockReorderNodes).toHaveBeenCalledWith(0, 1);
-
-      // Click Up on wp-2
-      fireEvent.click(upBtns[1]);
-      expect(mockReorderNodes).toHaveBeenCalledWith(1, 0);
-  });
+  // (Removed handle reordering buttons test because buttons were replaced by DnD GripVertical)
 });

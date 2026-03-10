@@ -10,6 +10,7 @@ export type AppState = {
   nodes: Record<string, WaypointNode>;
   selectedNodeIds: string[];
   activeTool: 'select' | 'add_point' | 'add_generator';
+  insertionIndex: number;
   
   isSidebarOpen: boolean;
   mouseCenteredZoom: boolean;
@@ -77,6 +78,7 @@ export type AppState = {
   setOptionsSchema: (schema: OptionsSchema) => void;
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
+  setInsertionIndex: (index: number) => void;
   setIsDirty: (dirty: boolean) => void;
   setProjectData: (data: { rootNodeIds: string[], nodes: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[] }) => void;
   
@@ -120,6 +122,7 @@ export type AppState = {
 
   loadProject: () => Promise<void>;
   saveProject: () => Promise<void>;
+  resetProject: () => void;
   explodeGenerator: (id: string) => void;
 }
 
@@ -155,6 +158,7 @@ export const useAppStore = create<AppState>()(
       globalPythonPath: 'python',
       visibleAttributes: [],
       indexStartIndex: 0,
+      insertionIndex: -1,
       isDirty: false,
       
       showPaths: true,
@@ -195,6 +199,7 @@ export const useAppStore = create<AppState>()(
 
       setMapLayers: (layers: ProjectMapLayer[]) => set({ mapLayers: layers, isDirty: true }),
       setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
+      setInsertionIndex: (index: number) => set({ insertionIndex: index }),
       
       addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => set((state) => {
         const newLayer: ProjectMapLayer = {
@@ -417,6 +422,14 @@ export const useAppStore = create<AppState>()(
           decimalPrecision: data.decimal_precision ?? state.decimalPrecision,
           isDirty: false, // Reset dirty state on load
         })),
+
+      resetProject: () => set({
+        rootNodeIds: [],
+        nodes: {},
+        selectedNodeIds: [],
+        mapLayers: [],
+        isDirty: false
+      }),
         
       setPlugins: (plugins) => set({ plugins }),
       setPluginSettings: (settings) => set({ pluginSettings: settings, isDirty: true }),
@@ -457,10 +470,22 @@ export const useAppStore = create<AppState>()(
           const parent = newNodes[parentId];
           parent.children_ids = [...(parent.children_ids || []), node.id];
         } else {
-          newRootIds.push(node.id);
+          if (state.insertionIndex !== -1 && state.insertionIndex <= newRootIds.length) {
+            newRootIds.splice(state.insertionIndex, 0, node.id);
+            // Optionally, we could advance the insertion bar automatically
+            // state.insertionIndex += 1; // Handled by a separate action or we can just leave it to stay below the inserted node
+          } else {
+            newRootIds.push(node.id);
+          }
         }
         
-        return { nodes: newNodes, rootNodeIds: newRootIds, isDirty: true };
+        return { 
+          nodes: newNodes, 
+          rootNodeIds: newRootIds, 
+          // Auto-advance the insertion bar if it's not at the very end (-1)
+          insertionIndex: state.insertionIndex !== -1 ? state.insertionIndex + 1 : -1,
+          isDirty: true 
+        };
       }),
 
       updateNode: (id: string, updates: Partial<WaypointNode>) => set((state) => ({

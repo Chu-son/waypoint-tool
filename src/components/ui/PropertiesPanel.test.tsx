@@ -11,6 +11,7 @@ vi.mock('lucide-react', () => ({
   Play: () => <div data-testid="play-icon" />,
   Settings2: () => <div data-testid="settings-icon" />,
   RefreshCcw: () => <div data-testid="refresh-icon" />,
+  BoxSelect: () => <div data-testid="box-select-icon" />,
 }));
 
 // Mock Store

@@ -10,6 +10,7 @@ export function ShortcutManager() {
     setExportModalOpen,
     loadProject,
     saveProject,
+    resetProject,
     setRightPanelActiveTab,
   } = useAppStore();
 
@@ -62,6 +63,10 @@ export function ShortcutManager() {
             e.preventDefault();
             loadProject();
             break;
+          case "n":
+            e.preventDefault();
+            resetProject();
+            break;
         }
       }
     };
@@ -76,6 +81,7 @@ export function ShortcutManager() {
     setExportModalOpen,
     loadProject,
     saveProject,
+    resetProject,
     setRightPanelActiveTab,
   ]);
 
