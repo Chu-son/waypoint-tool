@@ -16,6 +16,7 @@ vi.mock('../../api', () => ({
   },
   DialogAPI: {
     open: vi.fn(),
+    ask: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -181,8 +182,7 @@ describe('SettingsModal UI', () => {
       ],
     });
 
-    // Mock window.confirm
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { DialogAPI } = await import('../../api');
 
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
     fireEvent.click(screen.getByText('Plugins'));
@@ -195,7 +195,9 @@ describe('SettingsModal UI', () => {
     const cleanupBtn = screen.getByText('Cleanup All');
     fireEvent.click(cleanupBtn);
 
-    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(DialogAPI.ask).toHaveBeenCalled();
+    });
 
     // Verify p2 is removed from store
     await waitFor(() => {
@@ -203,8 +205,6 @@ describe('SettingsModal UI', () => {
       expect(settings.length).toBe(1);
       expect(settings.find(s => s.id === 'p2')).toBeUndefined();
     });
-
-    confirmSpy.mockRestore();
   });
 
   it('allows changing plugin icons', async () => {

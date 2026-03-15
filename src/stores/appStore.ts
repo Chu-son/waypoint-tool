@@ -124,6 +124,7 @@ export type AppState = {
   saveProject: () => Promise<void>;
   resetProject: () => void;
   explodeGenerator: (id: string) => void;
+  reloadPlugins: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -579,6 +580,40 @@ export const useAppStore = create<AppState>()(
           isDirty: true
         };
       }),
+
+      reloadPlugins: async () => {
+        try {
+          const installedPlugins = await BackendAPI.fetchInstalledPlugins();
+          const newMap: Record<string, PluginInstance> = {};
+          
+          // 1. 標準ディレクトリのプラグインを登録
+          installedPlugins.forEach((p: PluginInstance) => {
+            newMap[p.id] = p;
+          });
+
+          // 2. 設定に保存されているカスタムプラグインを再読み込みしてマージ
+          const { pluginSettings } = useAppStore.getState();
+          for (const setting of pluginSettings) {
+            // builtinでない、かつパスがあるものを再スキャン
+            if (!setting.isBuiltin && setting.path) {
+              try {
+                const customPlugin = await BackendAPI.scanCustomPlugin(setting.path);
+                newMap[customPlugin.id] = customPlugin;
+              } catch (err) {
+                console.warn(`[AppStore] Failed to re-scan custom plugin at ${setting.path}:`, err);
+                // スキャンに失敗しても、既存の情報を保持するか、リンク切れとして扱うかは
+                // UI側で !plugin の判定をしているため、ここでは無理に保持せずスキップする
+              }
+            }
+          }
+          
+          set({ plugins: newMap });
+          console.log("[AppStore] Plugins reloaded successfully (with custom merging).");
+        } catch (err) {
+          console.error("Failed to reload plugins:", err);
+          throw err;
+        }
+      },
     }),
     {
       name: 'waypoint-tool-storage',

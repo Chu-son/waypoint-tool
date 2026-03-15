@@ -19,6 +19,7 @@ vi.mock('lucide-react', () => ({
 vi.mock('../../api', () => ({
   DialogAPI: {
     open: vi.fn(),
+    ask: vi.fn().mockResolvedValue(true),
   },
   BackendAPI: {
     loadROSMap: vi.fn(),
@@ -114,19 +115,21 @@ describe('LayerPanel', () => {
     });
   });
 
-  it('removes layer after confirmation', () => {
+  it('removes layer after confirmation', async () => {
     (useAppStore as any).mockImplementation((selector: any) => selector({
       mapLayers: [mockLayers[0]],
       removeMapLayer: mockRemoveMapLayer,
     }));
 
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    (DialogAPI.ask as any).mockResolvedValue(true);
     
     render(<LayerPanel />);
     const deleteBtn = screen.getByTitle('Remove Map');
     fireEvent.click(deleteBtn);
 
-    expect(confirmSpy).toHaveBeenCalled();
-    expect(mockRemoveMapLayer).toHaveBeenCalledWith('l1');
+    await waitFor(() => {
+      expect(DialogAPI.ask).toHaveBeenCalled();
+      expect(mockRemoveMapLayer).toHaveBeenCalledWith('l1');
+    });
   });
 });

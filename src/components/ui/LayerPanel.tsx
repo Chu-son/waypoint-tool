@@ -145,8 +145,12 @@ export function LayerPanel() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
-                      onClick={() => {
-                        if (confirm(`Remove map layer '${layer.name}'?`)) {
+                      onClick={async () => {
+                        const confirmed = await DialogAPI.ask(
+                          `Remove map layer '${layer.name}'?`,
+                          { title: "Remove Map", kind: "warning" }
+                        );
+                        if (confirmed) {
                           removeMapLayer(layer.id);
                         }
                       }}

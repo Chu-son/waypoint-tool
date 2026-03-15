@@ -263,14 +263,32 @@ export function PluginParamsPanel() {
             {plugin.manifest.description || "No description provided"}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => useAppStore.getState().setActiveTool("select")}
-          className="h-7 w-7"
-        >
-          <X size={14} />
-        </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Reload Plugin"
+              onClick={async () => {
+                try {
+                  const reloadPlugins = useAppStore.getState().reloadPlugins;
+                  await reloadPlugins();
+                } catch (err) {
+                  alert(`プラグインのリロードに失敗しました: ${String(err)}`);
+                }
+              }}
+              className="h-7 w-7 text-text-muted hover:text-primary-base"
+            >
+              <RefreshCcw size={14} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => useAppStore.getState().setActiveTool("select")}
+              className="h-7 w-7"
+            >
+              <X size={14} />
+            </Button>
+          </div>
       </div>
 
       <div className="space-y-4 flex-1">

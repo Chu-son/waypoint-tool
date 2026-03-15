@@ -29,14 +29,33 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
         </div>
         <div className="flex gap-2.5">
           <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () => {
+              try {
+                const reloadPlugins = useAppStore.getState().reloadPlugins;
+                await reloadPlugins();
+              } catch (err) {
+                alert(`リロードに失敗しました: ${String(err)}`);
+              }
+            }}
+            className="text-text-muted hover:text-text-base border-border-base/30"
+          >
+            <RefreshCw size={14} className="mr-1" /> Reload All
+          </Button>
+          <Button
             variant="secondary"
             size="sm"
             onClick={async () => {
-              if (!confirm("プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？")) {
+              const { DialogAPI, BackendAPI } = await import("../../../api");
+              const confirmed = await DialogAPI.ask(
+                "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
+                { title: "セキュリティ警告", kind: "warning" }
+              );
+              if (!confirmed) {
                 return;
               }
               try {
-                const { DialogAPI, BackendAPI } = await import("../../../api");
                 const selectedPath = await DialogAPI.open({
                   multiple: false,
                   directory: true,
@@ -80,11 +99,15 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
             variant="primary"
             size="sm"
             onClick={async () => {
-              if (!confirm("プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？")) {
+              const { DialogAPI, BackendAPI } = await import("../../../api");
+              const confirmed = await DialogAPI.ask(
+                "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
+                { title: "セキュリティ警告", kind: "warning" }
+              );
+              if (!confirmed) {
                 return;
               }
               try {
-                const { DialogAPI, BackendAPI } = await import("../../../api");
                 const selectedPath = await DialogAPI.open({
                   multiple: false,
                   directory: true,
@@ -154,11 +177,16 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   </p>
                 </div>
               </div>
-              <Button
+               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {
-                  if (confirm(`${missingCount}個の欠落したプラグイン設定を削除します。よろしいですか？`)) {
+                onClick={async () => {
+                  const { DialogAPI } = await import("../../../api");
+                  const confirmed = await DialogAPI.ask(
+                    `${missingCount}個の欠落したプラグイン設定を削除します。よろしいですか？`,
+                    { title: "一括削除の確認", kind: "warning" }
+                  );
+                  if (confirmed) {
                     const nextSettings = pluginSettings.filter(s => !!plugins[s.id]);
                     setPluginSettings(nextSettings);
                   }

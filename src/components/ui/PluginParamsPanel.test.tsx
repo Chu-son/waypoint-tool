@@ -18,6 +18,10 @@ vi.mock('../../api', () => ({
   BackendAPI: {
     runPlugin: vi.fn(),
   },
+  DialogAPI: {
+    ask: vi.fn(),
+    open: vi.fn(),
+  },
 }));
 
 // Mock uuid
@@ -69,6 +73,7 @@ describe('PluginParamsPanel', () => {
       selectNodes: vi.fn(),
       setActiveTool: vi.fn(),
       setPluginActiveProperties: vi.fn(),
+      reloadPlugins: vi.fn(),
     });
   });
 
@@ -136,5 +141,19 @@ describe('PluginParamsPanel', () => {
     expect(mockAddNode).toHaveBeenCalled(); // Should be called for parent and children
     expect(mockSelectNodes).toHaveBeenCalledWith(['new-uuid']);
     expect(mockSetActiveTool).toHaveBeenCalledWith('select');
+  });
+
+  it('calls reloadPlugins when reload button is clicked', async () => {
+    const mockReloadPlugins = vi.fn();
+    (useAppStore.getState as any).mockReturnValue({
+      reloadPlugins: mockReloadPlugins,
+      setPluginActiveProperties: vi.fn(),
+    });
+
+    render(<PluginParamsPanel />);
+    const reloadBtn = screen.getByTitle('Reload Plugin');
+    fireEvent.click(reloadBtn);
+
+    expect(mockReloadPlugins).toHaveBeenCalled();
   });
 });

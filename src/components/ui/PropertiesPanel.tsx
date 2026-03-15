@@ -253,12 +253,13 @@ export function PropertiesPanel() {
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Are you sure you want to explode this generator? This will convert it into independent manual waypoints and cannot be undone."
-                    )
-                  ) {
+                onClick={async () => {
+                  const { DialogAPI } = await import("../../api");
+                  const confirmed = await DialogAPI.ask(
+                    "Are you sure you want to explode this generator? This will convert it into independent manual waypoints and cannot be undone.",
+                    { title: "Explode Generator", kind: "warning" }
+                  );
+                  if (confirmed) {
                     explodeGenerator(node.id);
                   }
                 }}
