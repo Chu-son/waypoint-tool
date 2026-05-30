@@ -9,14 +9,21 @@ type KeyboardShortcutsModalProps = {
 };
 
 const shortcuts = [
+  { action: "New Project", keys: ["Ctrl", "N"] },
   { action: "Open Project", keys: ["Ctrl", "O"] },
   { action: "Save Project", keys: ["Ctrl", "S"] },
   { action: "Export Waypoints", keys: ["Ctrl", "E"] },
   { action: "Select All Nodes", keys: ["Ctrl", "A"] },
   { action: "Delete Selected", keys: ["Delete", "or", "Backspace"] },
   { action: "Deselect / Cancel", keys: ["Esc"] },
+  { action: "Select Tool", keys: ["V"] },
+  { action: "Add Waypoint Tool", keys: ["P"] },
+  { action: "Cycle Snap Base Node (Add Mode)", keys: ["Tab"] },
+  { action: "Confirm Snapped Waypoint (Add Mode)", keys: ["Enter"] },
+  { action: "Force Axis Snap X/Y (Add Mode)", keys: ["↑", "↓", "←", "→"] },
   { action: "Pan Map", keys: ["Left Mouse Drag"] },
   { action: "Zoom Map", keys: ["Scroll Wheel"] },
+  { action: "Fit Map to Screen", keys: ["Middle Double Click"] },
   { action: "Select Node", keys: ["Left Click"] },
   { action: "Select Multiple", keys: ["Shift", "+", "Left Click"] },
 ];

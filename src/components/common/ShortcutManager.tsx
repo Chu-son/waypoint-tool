@@ -44,6 +44,14 @@ export function ShortcutManager() {
         setRightPanelActiveTab("layers");
       }
 
+      // Tool Selection
+      if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey) {
+        useAppStore.setState({ activeTool: "select" });
+      }
+      if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey) {
+        useAppStore.setState({ activeTool: "add_point" });
+      }
+
       // Modifier-based Shortcuts
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {

@@ -77,6 +77,11 @@ describe('TopMenu', () => {
         isDirty: false,
         setIsDirty: vi.fn(),
     });
+    
+    (useAppStore.setState as any) = vi.fn().mockImplementation((updates) => {
+        if (updates.showPaths !== undefined) mockSetShowPaths();
+        if (updates.showGrid !== undefined) mockSetShowGrid();
+    });
   });
 
   it('renders application name and main menu categories', () => {

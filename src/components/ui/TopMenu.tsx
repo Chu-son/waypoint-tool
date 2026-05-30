@@ -236,7 +236,10 @@ export function TopMenu() {
   ];
 
   return (
-    <div data-tauri-drag-region className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm">
+    <div 
+      className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm"
+      data-tauri-drag-region
+    >
       <div className="flex items-center gap-6" data-tauri-drag-region>
         {/* App Logo/Name */}
         <div className="flex items-center gap-2 text-text-base font-bold tracking-wide pointer-events-none">
