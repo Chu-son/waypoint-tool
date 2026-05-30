@@ -140,6 +140,8 @@ export interface AppState {
   defaultMapOpacity: number;
   lastDirectory: string | null;
 
+  enableSnapping: boolean;
+
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
   defaultExportFormats: DefaultExportFormat[];
@@ -157,6 +159,7 @@ export interface AppState {
   setDefaultMapOpacity: (opacity: number) => void;
   setLastDirectory: (dir: string | null) => void;
   setGlobalPythonPath: (path: string) => void;
+  setEnableSnapping: (enable: boolean) => void;
 
   setOptionsSchema: (schema: OptionsSchema) => void;
   addExportTemplate: (template: Omit<ExportTemplate, 'id'>) => void;

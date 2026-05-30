@@ -73,6 +73,7 @@ export function MapCanvas() {
   const setMapScale = useAppStore(state => state.setMapScale);
   
   const mapLayers = useAppStore(state => state.mapLayers);
+  const enableSnapping = useAppStore(state => state.enableSnapping);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
@@ -80,9 +81,41 @@ export function MapCanvas() {
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const latestMousePos = useRef({ x: 0, y: 0 }); // Track screen mouse pos constantly
   const containerRef = useRef<HTMLDivElement>(null);
   const rectInputKey = useRef<string>('');  // The input ID being drawn (e.g. 'sweep_rect')
   const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft'>('max');
+
+  const [snapInput, setSnapInput] = useState<string>('');
+  const [snapState, setSnapState] = useState<{
+    isSnapped: boolean;
+    axis: 'X' | 'Y' | null;
+    origin: { x: number, y: number, yaw: number } | null;
+    snappedWorldPos: { x: number, y: number } | null;
+    lockedWaypointId: string | null;
+    forcedAxis: 'X' | 'Y' | null;
+    forcedSign: 1 | -1 | null;
+  }>({ isSnapped: false, axis: null, origin: null, snappedWorldPos: null, lockedWaypointId: null, forcedAxis: null, forcedSign: null });
+
+  const getRenderableNodesList = useCallback(() => {
+    const renderableNodes: { id: string, node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
+    let globalIdx = 0;
+    rootNodeIds.forEach(id => {
+      const node = nodes[id];
+      if (!node) return;
+      if (node.type === 'manual' && node.transform) {
+        renderableNodes.push({ id, node, parentIsGenerator: false, globalIndex: globalIdx++ });
+      } else if (node.type === 'generator' && node.children_ids) {
+        node.children_ids.forEach(childId => {
+          const child = nodes[childId];
+          if (child && child.transform) {
+            renderableNodes.push({ id: childId, node: child, parentIsGenerator: true, globalIndex: globalIdx++ });
+          }
+        });
+      }
+    });
+    return renderableNodes;
+  }, [nodes, rootNodeIds]);
 
   // Fallback grid texture if no maps are loaded
   const fallbackTexture = useMemo(() => {
@@ -200,6 +233,144 @@ export function MapCanvas() {
       fitToMaps();
     }
   }, [shouldFitToMaps, fitToMaps]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isTab = e.key === 'Tab' || e.code === 'Tab';
+      const isRelevantKey = e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Escape' || isTab || e.key.startsWith('Arrow') || /^[0-9.\-]$/.test(e.key);
+
+      // Handle Tab navigation
+      if (isTab) {
+        if (activeTool === 'add_point' && interactionMode.current === 'none') {
+           e.stopPropagation();
+           e.preventDefault();
+           
+           const list = getRenderableNodesList();
+           if (list.length > 0) {
+             let curIdx = list.findIndex(r => r.id === snapState.lockedWaypointId);
+             if (curIdx === -1) curIdx = list.length - 1;
+
+             if (e.shiftKey) {
+               curIdx = (curIdx + 1) % list.length;
+             } else {
+               curIdx = (curIdx - 1 + list.length) % list.length;
+             }
+             
+             const newLockedId = list[curIdx].id;
+             const prev = list[curIdx].node.transform || null;
+             
+             // Temporarily force an immediate re-evaluation of snapping for the new locked node
+             // We can't easily call applySnapping without its dependencies being tricky in useEffect, 
+             // but we can compute the basics and update state.
+             if (prev) {
+               const { x: ox, y: oy, qx, qy, qz, qw } = prev;
+               let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+               if (!isFinite(yaw)) yaw = 0;
+               setSnapState(s => ({ ...s, lockedWaypointId: newLockedId, origin: { x: ox, y: oy, yaw }, forcedAxis: null, forcedSign: null, isSnapped: false, axis: null }));
+               // Setting isSnapped: false ensures the visual jumps back until mouse is moved, but the highlight moves instantly.
+               // Actually, we can just clear it and let them move the mouse. It's much simpler.
+             }
+           }
+           return;
+        }
+      }
+
+      // If we are not currently snapping, just exit
+      if (!snapState.isSnapped && !snapState.lockedWaypointId) {
+        if (snapInput !== '') setSnapInput('');
+        return;
+      }
+      
+      if (isRelevantKey) {
+        e.stopPropagation();
+        if (e.key === 'Backspace' || e.key === 'Tab' || e.key.startsWith('Arrow')) {
+          e.preventDefault();
+        }
+      } else {
+        return;
+      }
+
+      if (e.key.startsWith('Arrow') && snapInput !== '') {
+        if (e.key === 'ArrowUp') setSnapState(prev => ({ ...prev, forcedAxis: 'X', forcedSign: 1 }));
+        else if (e.key === 'ArrowDown') setSnapState(prev => ({ ...prev, forcedAxis: 'X', forcedSign: -1 }));
+        else if (e.key === 'ArrowRight') setSnapState(prev => ({ ...prev, forcedAxis: 'Y', forcedSign: -1 }));
+        else if (e.key === 'ArrowLeft') setSnapState(prev => ({ ...prev, forcedAxis: 'Y', forcedSign: 1 }));
+        return;
+      }
+      
+      if (e.key === 'Enter') {
+        if (snapInput === '') return;
+        
+        const { origin, axis } = snapState;
+        const effectiveAxis = snapState.forcedAxis || axis;
+        
+        if (!origin || !effectiveAxis) return;
+        
+        let finalWorldX = snapState.snappedWorldPos?.x ?? origin.x;
+        let finalWorldY = snapState.snappedWorldPos?.y ?? origin.y;
+        
+        const val = parseFloat(snapInput);
+        const effectiveSign = snapState.forcedSign || 1;
+
+        if (!isNaN(val)) {
+          if (effectiveAxis === 'X') {
+            finalWorldX = origin.x + val * effectiveSign * Math.cos(origin.yaw);
+            finalWorldY = origin.y + val * effectiveSign * Math.sin(origin.yaw);
+          } else if (effectiveAxis === 'Y') {
+            finalWorldX = origin.x - val * effectiveSign * Math.sin(origin.yaw);
+            finalWorldY = origin.y + val * effectiveSign * Math.cos(origin.yaw);
+          }
+        }
+
+        if (activeTool === 'add_point' && interactionMode.current === 'none') {
+          const id = uuidv4();
+          addNode({
+            id,
+            type: 'manual',
+            transform: { 
+              x: finalWorldX, 
+              y: finalWorldY, 
+              qx: 0, qy: 0, 
+              qz: Math.sin(origin.yaw / 2), 
+              qw: Math.cos(origin.yaw / 2) 
+            },
+            options: {}
+          });
+          selectNodes([id]);
+          setSnapInput('');
+          setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null, lockedWaypointId: id, forcedAxis: null, forcedSign: null }));
+        } else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
+          updateNode(activeNodeId.current, {
+            transform: {
+              ...nodes[activeNodeId.current]?.transform,
+              x: finalWorldX,
+              y: finalWorldY,
+              qx: nodes[activeNodeId.current]?.transform?.qx ?? 0,
+              qy: nodes[activeNodeId.current]?.transform?.qy ?? 0,
+              qz: nodes[activeNodeId.current]?.transform?.qz ?? 0,
+              qw: nodes[activeNodeId.current]?.transform?.qw ?? 1,
+            } as any
+          });
+          setSnapInput('');
+          interactionMode.current = 'none';
+          activeNodeId.current = null;
+          if (document.activeElement instanceof HTMLElement) {
+             document.activeElement.blur();
+          }
+        }
+      } else if (e.key === 'Backspace') {
+        setSnapInput(prev => prev.slice(0, -1));
+      } else if (e.key === 'Escape') {
+        setSnapInput('');
+        setSnapState(prev => ({ ...prev, forcedAxis: null, forcedSign: null }));
+      } else if (/^[0-9.\-]$/.test(e.key)) {
+        setSnapInput(prev => prev + e.key);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, [snapState, snapInput, activeTool, addNode, selectNodes, updateNode, nodes, getRenderableNodesList]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -397,6 +568,89 @@ export function MapCanvas() {
 
   };
 
+  const applySnapping = (worldX: number, worldY: number, prevTransform: import('../../types/store').Transform | null, lockedId: string | null) => {
+    if (!enableSnapping || !prevTransform) {
+      if (snapState.isSnapped) {
+        setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
+      }
+      return { x: worldX, y: worldY };
+    }
+
+    const { x: ox, y: oy, qx, qy, qz, qw } = prevTransform;
+    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+    if (!isFinite(yaw)) yaw = 0;
+
+    const dx = worldX - ox;
+    const dy = worldY - oy;
+    
+    // Inverse rotate to get local coordinates relative to previous waypoint
+    const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
+    const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
+
+    const snapThresholdWorld = 20 / scale;
+    
+    let snapped = false;
+    let axis: 'X' | 'Y' | null = null;
+    let newLocalX = localX;
+    let newLocalY = localY;
+
+    if (snapState.forcedAxis) {
+      snapped = true;
+      axis = snapState.forcedAxis;
+      if (axis === 'X') {
+        newLocalY = 0;
+        if (snapInput) {
+          const val = parseFloat(snapInput);
+          if (!isNaN(val)) newLocalX = val * (snapState.forcedSign || 1);
+        }
+      } else {
+        newLocalX = 0;
+        if (snapInput) {
+          const val = parseFloat(snapInput);
+          if (!isNaN(val)) newLocalY = val * (snapState.forcedSign || 1);
+        }
+      }
+    } else if (Math.abs(localY) < snapThresholdWorld) {
+      // Snap to local X axis (forward/back)
+      snapped = true;
+      axis = 'X';
+      newLocalY = 0;
+      if (snapInput) {
+        const val = parseFloat(snapInput);
+        if (!isNaN(val)) newLocalX = val;
+      }
+    } else if (Math.abs(localX) < snapThresholdWorld) {
+      // Snap to local Y axis (left/right)
+      snapped = true;
+      axis = 'Y';
+      newLocalX = 0;
+      if (snapInput) {
+        const val = parseFloat(snapInput);
+        if (!isNaN(val)) newLocalY = val;
+      }
+    }
+
+    if (snapped) {
+      const newWorldX = ox + (newLocalX * Math.cos(yaw) - newLocalY * Math.sin(yaw));
+      const newWorldY = oy + (newLocalX * Math.sin(yaw) + newLocalY * Math.cos(yaw));
+      
+      setSnapState(prev => ({
+        ...prev,
+        isSnapped: true,
+        axis,
+        origin: { x: ox, y: oy, yaw },
+        snappedWorldPos: { x: newWorldX, y: newWorldY },
+        lockedWaypointId: lockedId
+      }));
+      return { x: newWorldX, y: newWorldY };
+    } else {
+      if (snapState.isSnapped || snapState.lockedWaypointId !== lockedId) {
+        setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: { x: ox, y: oy, yaw }, snappedWorldPos: null, lockedWaypointId: lockedId }));
+      }
+      return { x: worldX, y: worldY };
+    }
+  };
+
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
 
@@ -404,7 +658,52 @@ export function MapCanvas() {
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
-    const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+    latestMousePos.current = { x: mouseX, y: mouseY };
+    let { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+    
+    // Snapping logic
+    const list = getRenderableNodesList();
+    let currentLockedId = snapState.lockedWaypointId;
+
+    if (activeTool === 'add_point' && !currentLockedId && interactionMode.current === 'none') {
+       if (list.length > 0) currentLockedId = list[list.length - 1].id;
+    }
+
+    const hoverRadius = 30 / scale;
+    let closestId = currentLockedId;
+    let minDist = Infinity;
+    
+    for (const item of list) {
+      if (!item.node.transform) continue;
+      if (interactionMode.current === 'drag_node' && item.id === activeNodeId.current) continue;
+      const dist = Math.hypot(item.node.transform.x - worldX, item.node.transform.y - worldY);
+      if (dist < hoverRadius && dist < minDist) {
+        minDist = dist;
+        closestId = item.id;
+      }
+    }
+
+    if (closestId !== currentLockedId) {
+       currentLockedId = closestId;
+    }
+
+    const lockedNode = currentLockedId ? list.find(r => r.id === currentLockedId)?.node : null;
+    const prev = lockedNode?.transform || null;
+
+    if (activeTool === 'add_point' && interactionMode.current === 'none') {
+       const snapped = applySnapping(worldX, worldY, prev, currentLockedId);
+       worldX = snapped.x;
+       worldY = snapped.y;
+    } else if (interactionMode.current === 'drag_node') {
+       const snapped = applySnapping(worldX, worldY, prev, currentLockedId);
+       worldX = snapped.x;
+       worldY = snapped.y;
+    } else {
+       if (snapState.isSnapped) {
+          setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
+       }
+    }
+
     setCursorPosition({ x: worldX, y: worldY });
 
     if (interactionMode.current === 'pan_map') {
@@ -414,11 +713,6 @@ export function MapCanvas() {
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } 
     else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
       const node = nodes[activeNodeId.current];
       if (node) {
         updateNode(activeNodeId.current, {
@@ -780,9 +1074,11 @@ export function MapCanvas() {
 
               // Color: generated children use green, manual uses orange/blue
               // Referenced waypoint gets a special highlight (e.g. bright orange/yellow)
-              const normalColor = isReferenced ? 0xfacc15 : (parentIsGenerator ? 0x22c55e : 0xffa500);
+              // Locked waypoint gets emerald highlight
+              const isLocked = snapState.lockedWaypointId === node.id;
+              const normalColor = isLocked ? 0x10b981 : (isReferenced ? 0xfacc15 : (parentIsGenerator ? 0x22c55e : 0xffa500));
               const selectedColor = 0x3b82f6;
-              const normalFill = isReferenced ? 0xfef08a : (parentIsGenerator ? 0x4ade80 : 0xffd700);
+              const normalFill = isLocked ? 0x34d399 : (isReferenced ? 0xfef08a : (parentIsGenerator ? 0x4ade80 : 0xffd700));
               const selectedFill = 0x60a5fa;
 
               return (
@@ -1129,8 +1425,12 @@ export function MapCanvas() {
                 rotation={yaw}
                 draw={(g) => {
                   g.clear();
-                  g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
-                  g.fillStyle = { color: 0xf472b6, alpha: 0.8 };
+                  const isLocked = snapState.lockedWaypointId === key;
+                  const strokeColor = isLocked ? 0x10b981 : 0xec4899; // emerald-500 if locked, else pink-500
+                  const fillColor = isLocked ? 0x34d399 : 0xf472b6;   // emerald-400 if locked, else pink-400
+                  
+                  g.strokeStyle = { width: 2 / safeScale, color: strokeColor };
+                  g.fillStyle = { color: fillColor, alpha: 0.8 };
                   g.moveTo(10 / safeScale, 0);
                   g.lineTo(-5 / safeScale, 5 / safeScale);
                   g.lineTo(-5 / safeScale, -5 / safeScale);
@@ -1143,6 +1443,81 @@ export function MapCanvas() {
               />
              );
           })}
+
+          {/* Render Snapping Guide */}
+          {enableSnapping && snapState.origin && (snapState.isSnapped || snapState.forcedAxis) && (() => {
+            let ex = snapState.snappedWorldPos?.x ?? snapState.origin.x;
+            let ey = snapState.snappedWorldPos?.y ?? snapState.origin.y;
+            const val = parseFloat(snapInput);
+            const effectiveAxis = snapState.forcedAxis || snapState.axis;
+            const effectiveSign = snapState.forcedSign || 1;
+            
+            if (snapInput !== '' && !isNaN(val)) {
+              if (effectiveAxis === 'X') {
+                ex = snapState.origin.x + val * effectiveSign * Math.cos(snapState.origin.yaw);
+                ey = snapState.origin.y + val * effectiveSign * Math.sin(snapState.origin.yaw);
+              } else if (effectiveAxis === 'Y') {
+                ex = snapState.origin.x - val * effectiveSign * Math.sin(snapState.origin.yaw);
+                ey = snapState.origin.y + val * effectiveSign * Math.cos(snapState.origin.yaw);
+              }
+            }
+            return (
+            <pixiContainer>
+              <pixiGraphics
+                draw={(g) => {
+                  g.clear();
+                  g.strokeStyle = { width: 1.5 / Math.max(scale, 0.001), color: 0x3b82f6, alpha: 0.8 }; // blue dotted line
+                  const { x: sx, y: sy } = snapState.origin!;
+                  
+                  const dx = ex - sx;
+                  const dy = ey - sy;
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist > 0) {
+                    const dashLen = 8 / Math.max(scale, 0.001);
+                    let drawn = 0;
+                    let isGap = false;
+                    
+                    g.moveTo(sx, sy);
+                    while (drawn < dist) {
+                      const step = Math.min(dashLen, dist - drawn);
+                      drawn += step;
+                      const curX = sx + (dx / dist) * drawn;
+                      const curY = sy + (dy / dist) * drawn;
+                      if (isGap) {
+                        g.moveTo(curX, curY);
+                      } else {
+                        g.lineTo(curX, curY);
+                      }
+                      isGap = !isGap;
+                    }
+                    g.stroke();
+                  }
+                }}
+              />
+              
+              {snapInput && (
+                <pixiContainer 
+                  x={ex + 20 / Math.max(scale, 0.001)} 
+                  y={ey} 
+                  scale={{ x: 1 / Math.max(scale, 0.001), y: -1 / Math.max(scale, 0.001) }}
+                >
+                  <pixiText 
+                    text={`Dist: ${snapInput}`} 
+                    style={
+                      new TextStyle({
+                        fill: '#3b82f6',
+                        fontSize: 16,
+                        fontFamily: 'Arial',
+                        fontWeight: 'bold',
+                        stroke: { color: '#000000', width: 3 },
+                      })
+                    } 
+                  />
+                </pixiContainer>
+              )}
+            </pixiContainer>
+            );
+          })()}
 
         </pixiContainer>
       </Application>

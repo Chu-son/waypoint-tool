@@ -26,6 +26,7 @@ export type AppState = {
   // Maps & Layers
   mapLayers: ProjectMapLayer[];
   lastDirectory: string | null;
+  enableSnapping: boolean;
 
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
@@ -78,6 +79,7 @@ export type AppState = {
   removeMapLayer: (id: string) => void;
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
   setLastDirectory: (dir: string | null) => void;
+  setEnableSnapping: (enable: boolean) => void;
   setGlobalPythonPath: (path: string) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
   toggleAttributeVisibility: (attr: string) => void;
@@ -156,6 +158,7 @@ export const useAppStore = create<AppState>()(
       // Maps & Layers
       mapLayers: [],
       lastDirectory: null,
+      enableSnapping: true,
 
       optionsSchema: null,
       exportTemplates: [],
@@ -246,6 +249,7 @@ export const useAppStore = create<AppState>()(
 
       setLastDirectory: (dir: string | null) => set({ lastDirectory: dir }),
       setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
+      setEnableSnapping: (enable: boolean) => set({ enableSnapping: enable }),
 
       setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
       
@@ -633,6 +637,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         defaultMapOpacity: state.defaultMapOpacity,
         lastDirectory: state.lastDirectory,
+        enableSnapping: state.enableSnapping,
         optionsSchema: state.optionsSchema,
         exportTemplates: state.exportTemplates,
         defaultExportFormats: state.defaultExportFormats,

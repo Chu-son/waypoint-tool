@@ -98,8 +98,11 @@ export function TopMenu() {
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
-  const setShowPaths = useAppStore((state) => state.setShowPaths);
-  const setShowGrid = useAppStore((state) => state.setShowGrid);
+  const enableSnapping = useAppStore((state) => state.enableSnapping);
+  
+  const setShowPaths = (v: boolean) => useAppStore.setState({ showPaths: v });
+  const setShowGrid = (v: boolean) => useAppStore.setState({ showGrid: v });
+  const setEnableSnapping = (v: boolean) => useAppStore.setState({ enableSnapping: v });
 
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
   const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
@@ -191,6 +194,10 @@ export function TopMenu() {
     {
       label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`,
       action: () => setShowGrid(!showGrid),
+    },
+    {
+      label: `${enableSnapping ? "✓ " : "  "}Snap to Previous Waypoint`,
+      action: () => setEnableSnapping(!enableSnapping),
     },
     {
       label: "Fit to Map",
