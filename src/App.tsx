@@ -11,6 +11,7 @@ import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
 import { SettingsModal } from "./components/ui/SettingsModal";
 import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
+import { StatusBar } from "./components/ui/StatusBar";
 import { ShortcutManager } from "./components/common/ShortcutManager";
 import { useAppStore } from "./stores/appStore";
 import { 
@@ -354,6 +355,7 @@ function App() {
           </>
         )}
       </div>
+      <StatusBar />
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}

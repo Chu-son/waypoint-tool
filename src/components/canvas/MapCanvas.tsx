@@ -69,6 +69,8 @@ export function MapCanvas() {
   const plugins = useAppStore(state => state.plugins);
   const pluginActiveProperties = useAppStore(state => state.pluginActiveProperties);
   const activeInputIndex = useAppStore(state => state.activeInputIndex);
+  const setCursorPosition = useAppStore(state => state.setCursorPosition);
+  const setMapScale = useAppStore(state => state.setMapScale);
   
   const mapLayers = useAppStore(state => state.mapLayers);
 
@@ -180,6 +182,7 @@ export function MapCanvas() {
     const newPosY = (screenH / 2) + worldCenterY * clampedScale - 400;
     
     setScale(clampedScale);
+    setMapScale(clampedScale);
     setPosition({ x: newPosX, y: newPosY });
   }, [mapLayers]);
 
@@ -396,6 +399,13 @@ export function MapCanvas() {
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
+
+    // Track cursor position globally
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+    setCursorPosition({ x: worldX, y: worldY });
 
     if (interactionMode.current === 'pan_map') {
       const dx = e.clientX - lastMousePos.current.x;
@@ -615,6 +625,7 @@ export function MapCanvas() {
     const newPosY = mouseY + worldY * newScale - 400;
 
     setScale(newScale);
+    setMapScale(newScale);
     setPosition({ x: newPosX, y: newPosY });
   };
 
@@ -661,6 +672,7 @@ export function MapCanvas() {
       onPointerLeave={() => { 
         interactionMode.current = 'none';
         activeNodeId.current = null;
+        setCursorPosition(null);
       }}
       onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}

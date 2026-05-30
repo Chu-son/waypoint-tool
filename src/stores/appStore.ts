@@ -37,6 +37,10 @@ export type AppState = {
   
   isDirty: boolean; // Tracks unsaved changes
 
+  // Cursor and Map View state
+  cursorPosition: { x: number; y: number } | null;
+  mapScale: number;
+
   // View Settings
   showPaths: boolean;
   showGrid: boolean;
@@ -82,6 +86,9 @@ export type AppState = {
   setIsDirty: (dirty: boolean) => void;
   setProjectData: (data: { rootNodeIds: string[], nodes: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[] }) => void;
   
+  setCursorPosition: (pos: { x: number; y: number } | null) => void;
+  setMapScale: (scale: number) => void;
+
   setShowPaths: (show: boolean) => void;
   setShowGrid: (show: boolean) => void;
   triggerFitToMaps: () => void;
@@ -162,6 +169,9 @@ export const useAppStore = create<AppState>()(
       insertionIndex: -1,
       isDirty: false,
       
+      cursorPosition: null,
+      mapScale: 1,
+
       showPaths: true,
       showGrid: true,
       shouldFitToMaps: 0,
@@ -260,6 +270,9 @@ export const useAppStore = create<AppState>()(
       })),
 
       setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),
+
+      setCursorPosition: (pos) => set({ cursorPosition: pos }),
+      setMapScale: (scale) => set({ mapScale: scale }),
 
       setActiveTool: (tool: AppState['activeTool']) => set(() => {
         const updates: Partial<AppState> = { activeTool: tool };
