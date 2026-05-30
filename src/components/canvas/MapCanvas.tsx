@@ -338,7 +338,7 @@ export function MapCanvas() {
           });
           selectNodes([id]);
           setSnapInput('');
-          setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null, lockedWaypointId: id, forcedAxis: null, forcedSign: null }));
+          setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: { x: finalWorldX, y: finalWorldY, yaw: origin.yaw }, snappedWorldPos: null, lockedWaypointId: id, forcedAxis: null, forcedSign: null }));
         } else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
           updateNode(activeNodeId.current, {
             transform: {
@@ -884,6 +884,24 @@ export function MapCanvas() {
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (interactionMode.current !== 'none') {
+      if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
+        const node = nodes[activeNodeId.current];
+        if (node && node.transform) {
+          const { x, y, qx, qy, qz, qw } = node.transform;
+          let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+          if (!isFinite(yaw)) yaw = 0;
+          setSnapState(prev => ({
+            ...prev,
+            isSnapped: false,
+            axis: null,
+            origin: { x, y, yaw },
+            snappedWorldPos: null,
+            lockedWaypointId: activeNodeId.current,
+            forcedAxis: null,
+            forcedSign: null
+          }));
+        }
+      }
       e.currentTarget.releasePointerCapture(e.pointerId);
       interactionMode.current = 'none';
       activeNodeId.current = null;
