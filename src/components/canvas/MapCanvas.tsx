@@ -4,6 +4,12 @@ import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { v4 as uuidv4 } from 'uuid';
 import { ProjectMapLayer } from '../../types/store';
+import { GridLayer } from './layers/GridLayer';
+import { PathLayer } from './layers/PathLayer';
+import { WaypointLayer } from './layers/WaypointLayer';
+import { PluginLayer } from './layers/PluginLayer';
+import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
+import { useSnapping } from './hooks/useSnapping';
 
 extend({
   Container,
@@ -86,36 +92,8 @@ export function MapCanvas() {
   const rectInputKey = useRef<string>('');  // The input ID being drawn (e.g. 'sweep_rect')
   const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft'>('max');
 
-  const [snapInput, setSnapInput] = useState<string>('');
-  const [snapState, setSnapState] = useState<{
-    isSnapped: boolean;
-    axis: 'X' | 'Y' | null;
-    origin: { x: number, y: number, yaw: number } | null;
-    snappedWorldPos: { x: number, y: number } | null;
-    lockedWaypointId: string | null;
-    forcedAxis: 'X' | 'Y' | null;
-    forcedSign: 1 | -1 | null;
-  }>({ isSnapped: false, axis: null, origin: null, snappedWorldPos: null, lockedWaypointId: null, forcedAxis: null, forcedSign: null });
-
-  const getRenderableNodesList = useCallback(() => {
-    const renderableNodes: { id: string, node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
-    let globalIdx = 0;
-    rootNodeIds.forEach(id => {
-      const node = nodes[id];
-      if (!node) return;
-      if (node.type === 'manual' && node.transform) {
-        renderableNodes.push({ id, node, parentIsGenerator: false, globalIndex: globalIdx++ });
-      } else if (node.type === 'generator' && node.children_ids) {
-        node.children_ids.forEach(childId => {
-          const child = nodes[childId];
-          if (child && child.transform) {
-            renderableNodes.push({ id: childId, node: child, parentIsGenerator: true, globalIndex: globalIdx++ });
-          }
-        });
-      }
-    });
-    return renderableNodes;
-  }, [nodes, rootNodeIds]);
+  const { snapInput, setSnapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
+  useSnappingKeyboardEvents(interactionMode, activeNodeId);
 
   // Fallback grid texture if no maps are loaded
   const fallbackTexture = useMemo(() => {
@@ -234,143 +212,7 @@ export function MapCanvas() {
     }
   }, [shouldFitToMaps, fitToMaps]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isTab = e.key === 'Tab' || e.code === 'Tab';
-      const isRelevantKey = e.key === 'Backspace' || e.key === 'Enter' || e.key === 'Escape' || isTab || e.key.startsWith('Arrow') || /^[0-9.\-]$/.test(e.key);
 
-      // Handle Tab navigation
-      if (isTab) {
-        if (activeTool === 'add_point' && interactionMode.current === 'none') {
-           e.stopPropagation();
-           e.preventDefault();
-           
-           const list = getRenderableNodesList();
-           if (list.length > 0) {
-             let curIdx = list.findIndex(r => r.id === snapState.lockedWaypointId);
-             if (curIdx === -1) curIdx = list.length - 1;
-
-             if (e.shiftKey) {
-               curIdx = (curIdx + 1) % list.length;
-             } else {
-               curIdx = (curIdx - 1 + list.length) % list.length;
-             }
-             
-             const newLockedId = list[curIdx].id;
-             const prev = list[curIdx].node.transform || null;
-             
-             // Temporarily force an immediate re-evaluation of snapping for the new locked node
-             // We can't easily call applySnapping without its dependencies being tricky in useEffect, 
-             // but we can compute the basics and update state.
-             if (prev) {
-               const { x: ox, y: oy, qx, qy, qz, qw } = prev;
-               let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-               if (!isFinite(yaw)) yaw = 0;
-               setSnapState(s => ({ ...s, lockedWaypointId: newLockedId, origin: { x: ox, y: oy, yaw }, forcedAxis: null, forcedSign: null, isSnapped: false, axis: null }));
-               // Setting isSnapped: false ensures the visual jumps back until mouse is moved, but the highlight moves instantly.
-               // Actually, we can just clear it and let them move the mouse. It's much simpler.
-             }
-           }
-           return;
-        }
-      }
-
-      // If we are not currently snapping, just exit
-      if (!snapState.isSnapped && !snapState.lockedWaypointId) {
-        if (snapInput !== '') setSnapInput('');
-        return;
-      }
-      
-      if (isRelevantKey) {
-        e.stopPropagation();
-        if (e.key === 'Backspace' || e.key === 'Tab' || e.key.startsWith('Arrow')) {
-          e.preventDefault();
-        }
-      } else {
-        return;
-      }
-
-      if (e.key.startsWith('Arrow') && snapInput !== '') {
-        if (e.key === 'ArrowUp') setSnapState(prev => ({ ...prev, forcedAxis: 'X', forcedSign: 1 }));
-        else if (e.key === 'ArrowDown') setSnapState(prev => ({ ...prev, forcedAxis: 'X', forcedSign: -1 }));
-        else if (e.key === 'ArrowRight') setSnapState(prev => ({ ...prev, forcedAxis: 'Y', forcedSign: -1 }));
-        else if (e.key === 'ArrowLeft') setSnapState(prev => ({ ...prev, forcedAxis: 'Y', forcedSign: 1 }));
-        return;
-      }
-      
-      if (e.key === 'Enter') {
-        if (snapInput === '') return;
-        
-        const { origin, axis } = snapState;
-        const effectiveAxis = snapState.forcedAxis || axis;
-        
-        if (!origin || !effectiveAxis) return;
-        
-        let finalWorldX = snapState.snappedWorldPos?.x ?? origin.x;
-        let finalWorldY = snapState.snappedWorldPos?.y ?? origin.y;
-        
-        const val = parseFloat(snapInput);
-        const effectiveSign = snapState.forcedSign || 1;
-
-        if (!isNaN(val)) {
-          if (effectiveAxis === 'X') {
-            finalWorldX = origin.x + val * effectiveSign * Math.cos(origin.yaw);
-            finalWorldY = origin.y + val * effectiveSign * Math.sin(origin.yaw);
-          } else if (effectiveAxis === 'Y') {
-            finalWorldX = origin.x - val * effectiveSign * Math.sin(origin.yaw);
-            finalWorldY = origin.y + val * effectiveSign * Math.cos(origin.yaw);
-          }
-        }
-
-        if (activeTool === 'add_point' && interactionMode.current === 'none') {
-          const id = uuidv4();
-          addNode({
-            id,
-            type: 'manual',
-            transform: { 
-              x: finalWorldX, 
-              y: finalWorldY, 
-              qx: 0, qy: 0, 
-              qz: Math.sin(origin.yaw / 2), 
-              qw: Math.cos(origin.yaw / 2) 
-            },
-            options: {}
-          });
-          selectNodes([id]);
-          setSnapInput('');
-          setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: { x: finalWorldX, y: finalWorldY, yaw: origin.yaw }, snappedWorldPos: null, lockedWaypointId: id, forcedAxis: null, forcedSign: null }));
-        } else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
-          updateNode(activeNodeId.current, {
-            transform: {
-              ...nodes[activeNodeId.current]?.transform,
-              x: finalWorldX,
-              y: finalWorldY,
-              qx: nodes[activeNodeId.current]?.transform?.qx ?? 0,
-              qy: nodes[activeNodeId.current]?.transform?.qy ?? 0,
-              qz: nodes[activeNodeId.current]?.transform?.qz ?? 0,
-              qw: nodes[activeNodeId.current]?.transform?.qw ?? 1,
-            } as any
-          });
-          setSnapInput('');
-          interactionMode.current = 'none';
-          activeNodeId.current = null;
-          if (document.activeElement instanceof HTMLElement) {
-             document.activeElement.blur();
-          }
-        }
-      } else if (e.key === 'Backspace') {
-        setSnapInput(prev => prev.slice(0, -1));
-      } else if (e.key === 'Escape') {
-        setSnapInput('');
-        setSnapState(prev => ({ ...prev, forcedAxis: null, forcedSign: null }));
-      } else if (/^[0-9.\-]$/.test(e.key)) {
-        setSnapInput(prev => prev + e.key);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, { capture: true });
-    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [snapState, snapInput, activeTool, addNode, selectNodes, updateNode, nodes, getRenderableNodesList]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -568,88 +410,7 @@ export function MapCanvas() {
 
   };
 
-  const applySnapping = (worldX: number, worldY: number, prevTransform: import('../../types/store').Transform | null, lockedId: string | null) => {
-    if (!enableSnapping || !prevTransform) {
-      if (snapState.isSnapped) {
-        setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
-      }
-      return { x: worldX, y: worldY };
-    }
 
-    const { x: ox, y: oy, qx, qy, qz, qw } = prevTransform;
-    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-    if (!isFinite(yaw)) yaw = 0;
-
-    const dx = worldX - ox;
-    const dy = worldY - oy;
-    
-    // Inverse rotate to get local coordinates relative to previous waypoint
-    const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-    const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-
-    const snapThresholdWorld = 20 / scale;
-    
-    let snapped = false;
-    let axis: 'X' | 'Y' | null = null;
-    let newLocalX = localX;
-    let newLocalY = localY;
-
-    if (snapState.forcedAxis) {
-      snapped = true;
-      axis = snapState.forcedAxis;
-      if (axis === 'X') {
-        newLocalY = 0;
-        if (snapInput) {
-          const val = parseFloat(snapInput);
-          if (!isNaN(val)) newLocalX = val * (snapState.forcedSign || 1);
-        }
-      } else {
-        newLocalX = 0;
-        if (snapInput) {
-          const val = parseFloat(snapInput);
-          if (!isNaN(val)) newLocalY = val * (snapState.forcedSign || 1);
-        }
-      }
-    } else if (Math.abs(localY) < snapThresholdWorld) {
-      // Snap to local X axis (forward/back)
-      snapped = true;
-      axis = 'X';
-      newLocalY = 0;
-      if (snapInput) {
-        const val = parseFloat(snapInput);
-        if (!isNaN(val)) newLocalX = val;
-      }
-    } else if (Math.abs(localX) < snapThresholdWorld) {
-      // Snap to local Y axis (left/right)
-      snapped = true;
-      axis = 'Y';
-      newLocalX = 0;
-      if (snapInput) {
-        const val = parseFloat(snapInput);
-        if (!isNaN(val)) newLocalY = val;
-      }
-    }
-
-    if (snapped) {
-      const newWorldX = ox + (newLocalX * Math.cos(yaw) - newLocalY * Math.sin(yaw));
-      const newWorldY = oy + (newLocalX * Math.sin(yaw) + newLocalY * Math.cos(yaw));
-      
-      setSnapState(prev => ({
-        ...prev,
-        isSnapped: true,
-        axis,
-        origin: { x: ox, y: oy, yaw },
-        snappedWorldPos: { x: newWorldX, y: newWorldY },
-        lockedWaypointId: lockedId
-      }));
-      return { x: newWorldX, y: newWorldY };
-    } else {
-      if (snapState.isSnapped || snapState.lockedWaypointId !== lockedId) {
-        setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: { x: ox, y: oy, yaw }, snappedWorldPos: null, lockedWaypointId: lockedId }));
-      }
-      return { x: worldX, y: worldY };
-    }
-  };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -713,7 +474,7 @@ export function MapCanvas() {
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } 
     else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
-      const node = nodes[activeNodeId.current];
+      const node = useAppStore.getState().nodes[activeNodeId.current];
       if (node) {
         updateNode(activeNodeId.current, {
           transform: { 
@@ -734,7 +495,7 @@ export function MapCanvas() {
       const mouseY = e.clientY - rect.top;
       const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
       
-      const node = nodes[activeNodeId.current];
+      const node = useAppStore.getState().nodes[activeNodeId.current];
       if (node && node.transform) {
         // Calculate angle from node center to mouse cursor
         const dx = worldX - node.transform.x;
@@ -885,7 +646,7 @@ export function MapCanvas() {
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (interactionMode.current !== 'none') {
       if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
-        const node = nodes[activeNodeId.current];
+        const node = useAppStore.getState().nodes[activeNodeId.current];
         if (node && node.transform) {
           const { x, y, qx, qy, qz, qw } = node.transform;
           let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
@@ -941,23 +702,7 @@ export function MapCanvas() {
     setPosition({ x: newPosX, y: newPosY });
   };
 
-  // Draw coordinate axes
-  const drawAxes = useCallback((g: import('pixi.js').Graphics) => {
-    g.clear();
-    const axisLength = 50 / scale; // Keep length consistent on screen
-    const lineWidth = 2 / scale; // Keep line width consistent on screen
 
-    // X axis (Red)
-    g.strokeStyle = { width: lineWidth, color: 0xef4444 };
-    g.moveTo(0, 0);
-    g.lineTo(axisLength, 0);
-    g.stroke();
-    // Y axis (Green, moving Y-up in ROS matches Positive Y in inverted container)
-    g.strokeStyle = { width: lineWidth, color: 0x22c55e };
-    g.moveTo(0, 0);
-    g.lineTo(0, axisLength);
-    g.stroke();
-  }, [scale]);
 
   const textStyle = useMemo(() => new TextStyle({
     fill: '#ffffff',
@@ -997,545 +742,61 @@ export function MapCanvas() {
           ) : (
             <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
           )}
-          {showGrid && <pixiGraphics draw={drawAxes} />}
+          {showGrid && <GridLayer scale={scale} />}
 
           {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}
-          {showPaths && (
-            <pixiGraphics
-              draw={(g) => {
-                g.clear();
-                
-                // Flatten all renderable waypoints in order with their type info
-                type PathPoint = { x: number; y: number; isGenerated: boolean };
-                const allPoints: PathPoint[] = [];
-                
-                rootNodeIds.forEach(id => {
-                  const node = nodes[id];
-                  if (!node) return;
-                  if (node.type === 'manual' && node.transform) {
-                    allPoints.push({ x: node.transform.x, y: node.transform.y, isGenerated: false });
-                  } else if (node.type === 'generator' && node.children_ids) {
-                    node.children_ids.forEach(childId => {
-                      const child = nodes[childId];
-                      if (child && child.transform) {
-                        allPoints.push({ x: child.transform.x, y: child.transform.y, isGenerated: true });
-                      }
-                    });
-                  }
-                });
-
-                // Draw continuous path with color changes at segment boundaries
-                for (let i = 1; i < allPoints.length; i++) {
-                  const prev = allPoints[i - 1];
-                  const curr = allPoints[i];
-                  const segIsGenerated = prev.isGenerated || curr.isGenerated;
-                  
-                  g.strokeStyle = {
-                    width: 2 / scale,
-                    color: segIsGenerated ? 0x22c55e : 0x94a3b8,
-                    alpha: segIsGenerated ? 0.5 : 0.6
-                  };
-                  g.moveTo(prev.x, prev.y);
-                  g.lineTo(curr.x, curr.y);
-                  g.stroke();
-                }
-              }}
-            />
-          )}
+          {showPaths && <PathLayer scale={scale} />}
 
           {/* Render Waypoints (manual root nodes and children of generator nodes) */}
-          {(() => {
-            // Collect all renderable waypoint nodes: root manuals + generator children
-            const renderableNodes: { node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
-            let globalIdx = 0;
-            rootNodeIds.forEach(id => {
-              const node = nodes[id];
-              if (!node) return;
-              if (node.type === 'manual' && node.transform) {
-                renderableNodes.push({ node, parentIsGenerator: false, globalIndex: globalIdx++ });
-              } else if (node.type === 'generator' && node.children_ids) {
-                node.children_ids.forEach(childId => {
-                  const child = nodes[childId];
-                  if (child && child.transform) {
-                    renderableNodes.push({ node: child, parentIsGenerator: true, globalIndex: globalIdx++ });
-                  }
-                });
+          <WaypointLayer 
+            scale={scale} 
+            textStyle={textStyle} 
+            lockedWaypointId={snapState.lockedWaypointId}
+            onNodePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+              if (activeTool === 'select') {
+                e.stopPropagation();
+                selectNodes([nodeId], e.shiftKey || e.metaKey);
+                interactionMode.current = 'drag_node';
+                activeNodeId.current = nodeId;
+                if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                  containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+                }
               }
-            });
-
-            return renderableNodes.map(({ node, parentIsGenerator, globalIndex }) => {
-              const isSelected = selectedNodeIds.includes(node.id);
-              
-              // Check if this node is referenced by a 'waypoint' plugin input
-              let isReferenced = false;
-              const rootIdx = rootNodeIds.indexOf(node.id);
-              if (rootIdx !== -1) {
-                // Look through manifest inputs to find which ones are type 'waypoint'
-                const activePlugin = activePluginId ? plugins[activePluginId] : null;
-                const waypointInputKeys = activePlugin?.manifest?.inputs
-                  ?.filter(inp => inp.type === 'waypoint')
-                  ?.map(inp => inp.name || inp.id) || [];
-                
-                isReferenced = waypointInputKeys.some(key => pluginInteractionData[key] === rootIdx);
+            }}
+            onNodeHandlePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+              e.stopPropagation();
+              interactionMode.current = 'set_yaw';
+              activeNodeId.current = nodeId;
+              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
               }
-
-              const transform = node.transform!;
-              const qx = transform.qx ?? 0;
-              const qy = transform.qy ?? 0;
-              const qz = transform.qz ?? 0;
-              const qw = transform.qw ?? 1;
-              let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-              if (!isFinite(yaw)) yaw = 0;
-              const px = isFinite(transform.x) ? transform.x : 0;
-              const py = isFinite(transform.y) ? transform.y : 0;
-              const safeScale = Math.max(scale, 0.001);
-
-              // Color: generated children use green, manual uses orange/blue
-              // Referenced waypoint gets a special highlight (e.g. bright orange/yellow)
-              // Locked waypoint gets emerald highlight
-              const isLocked = snapState.lockedWaypointId === node.id;
-              const normalColor = isLocked ? 0x10b981 : (isReferenced ? 0xfacc15 : (parentIsGenerator ? 0x22c55e : 0xffa500));
-              const selectedColor = 0x3b82f6;
-              const normalFill = isLocked ? 0x34d399 : (isReferenced ? 0xfef08a : (parentIsGenerator ? 0x4ade80 : 0xffd700));
-              const selectedFill = 0x60a5fa;
-
-              return (
-                <pixiContainer
-                  key={node.id}
-                  x={px}
-                  y={py}
-                  rotation={yaw}
-                >
-                  <pixiGraphics
-                    eventMode="dynamic"
-                    cursor={activeTool === 'select' ? 'pointer' : 'default'}
-                    onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
-                      if (activeTool === 'select') {
-                        e.stopPropagation();
-                        selectNodes([node.id], e.shiftKey || e.metaKey);
-                        interactionMode.current = 'drag_node';
-                        activeNodeId.current = node.id;
-                        if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                          containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                        }
-                      }
-                    }}
-                    draw={(g) => {
-                      g.clear();
-                      g.strokeStyle = { width: 2 / safeScale, color: isSelected ? selectedColor : normalColor };
-                      g.fillStyle = { color: isSelected ? selectedFill : normalFill, alpha: 0.8 };
-                      g.moveTo(10 / safeScale, 0);
-                      g.lineTo(-5 / safeScale, 5 / safeScale);
-                      g.lineTo(-5 / safeScale, -5 / safeScale);
-                      g.lineTo(10 / safeScale, 0);
-                      g.fill();
-                      g.stroke();
-                      g.circle(0, 0, 3 / safeScale);
-                      g.fill();
-                    }}
-                  />
-
-                  {isSelected && activeTool === 'select' && (
-                    <pixiGraphics
-                      x={25 / safeScale}
-                      y={0}
-                      eventMode="dynamic"
-                      cursor="grab"
-                      onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
-                        e.stopPropagation();
-                        interactionMode.current = 'set_yaw';
-                        activeNodeId.current = node.id;
-                        if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                          containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                        }
-                      }}
-                      draw={(g) => {
-                        g.clear();
-                        
-                        // Error tolerance hit area
-                        g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                        g.circle(0, 0, 15 / safeScale);
-                        g.fill();
-
-                        g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 }; // Selected handle blue
-                        g.fillStyle = { color: 0xffffff, alpha: 0.9 };
-                        g.circle(0, 0, 4 / safeScale);
-                        g.fill();
-                        g.stroke();
-                        
-                        // Connector line pointing to body
-                        g.moveTo(-15 / safeScale, 0);
-                        g.lineTo(-4 / safeScale, 0);
-                        g.stroke();
-                      }}
-                    />
-                  )}
-
-                  {showProperties && visibleAttributes.length > 0 && (
-                    <pixiContainer rotation={-yaw} scale={{ x: 1 / safeScale, y: -1 / safeScale }} x={15 / safeScale} y={-15 / safeScale}>
-                      {(() => {
-                        const lines: string[] = [];
-                        if (visibleAttributes.includes('index')) {
-                          lines.push(`Index: [${globalIndex + indexStartIndex}]`);
-                        }
-                        if (visibleAttributes.includes('transform')) {
-                          lines.push(`Transform:\n  x: ${transform.x.toFixed(3)}, y: ${transform.y.toFixed(3)}, z: ${(transform.z ?? 0).toFixed(3)}\n  yaw: ${yaw.toFixed(3)}\n  qx: ${qx.toFixed(3)}, qy: ${qy.toFixed(3)}, qz: ${qz.toFixed(3)}, qw: ${qw.toFixed(3)}`);
-                        }
-                        const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
-                        optionKeys.forEach(attr => {
-                          const key = attr.split('.')[1];
-                          const optDef = optionsSchema?.options?.find(o => o.name === key);
-                          let val = node.options?.[key];
-                          if (val === undefined && optDef && optDef.default !== undefined) {
-                            val = optDef.default;
-                          }
-                          if (val !== undefined && val !== '') {
-                            const displayLabel = optDef?.label || key;
-                            lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
-                          }
-                        });
-                        if (lines.length === 0) return null;
-                        return <pixiText text={lines.join('\n')} style={textStyle} anchor={{ x: 0, y: 1 }} />;
-                      })()}
-                    </pixiContainer>
-                  )}
-                </pixiContainer>
-              );
-            });
-          })()}
+            }}
+          />
 
           {/* Render Active Plugin Interaction Previews (Points + Rectangles) */}
-          {(activeTool === 'add_generator' || (selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator')) && Object.entries(pluginInteractionData).map(([key, data]) => {
-             if (!data) return null;
-             const safeScale = Math.max(scale, 0.001);
-
-             // Rectangle data: uses center, width, height, yaw
-             if (data.center && typeof data.width === 'number') {
-               const { center, width, height, yaw = 0 } = data;
-               if (!isFinite(center.x) || !isFinite(center.y) || !isFinite(width) || !isFinite(height)) return null;
-               
-               const halfW = width / 2;
-               const halfH = height / 2;
-               const cornerSize = 6 / safeScale;
-               
-               const corners = [
-                 { cx: -halfW, cy: halfH, corner: 'min' as const },         // top-left on screen
-                 { cx: halfW, cy: -halfH, corner: 'max' as const },         // bottom-right
-                 { cx: halfW, cy: halfH, corner: 'topRight' as const },     // top-right
-                 { cx: -halfW, cy: -halfH, corner: 'bottomLeft' as const }, // bottom-left
-               ];
-               
-               return (
-                 <pixiContainer key={`rect-${key}`} x={center.x} y={center.y} rotation={yaw}>
-                   {/* Rectangle outline + fill */}
-                   <pixiGraphics
-                     draw={(g) => {
-                       g.clear();
-                       // Semi-transparent fill
-                       g.fillStyle = { color: 0xec4899, alpha: 0.1 };
-                       g.rect(-halfW, -halfH, width, height);
-                       g.fill();
-                       // Dashed outline via segments
-                       g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
-                       const dashLen = 8 / safeScale;
-                       const sides = [
-                         [-halfW, -halfH, halfW, -halfH], [halfW, -halfH, halfW, halfH],
-                         [halfW, halfH, -halfW, halfH], [-halfW, halfH, -halfW, -halfH],
-                       ];
-                       sides.forEach(([sx, sy, ex, ey]) => {
-                         const dx = ex - sx, dy = ey - sy;
-                         const len = Math.sqrt(dx * dx + dy * dy);
-                         const nx = dx / len, ny = dy / len;
-                         let d = 0;
-                         let draw = true;
-                         while (d < len) {
-                           const segEnd = Math.min(d + dashLen, len);
-                           if (draw) {
-                             g.moveTo(sx + nx * d, sy + ny * d);
-                             g.lineTo(sx + nx * segEnd, sy + ny * segEnd);
-                           }
-                           d = segEnd;
-                           draw = !draw;
-                         }
-                       });
-                       g.stroke();
-                     }}
-                   />
-                   {/* Corner handles */}
-                    {corners.map(({ cx, cy, corner }) => (
-                     <pixiGraphics
-                       key={`corner-${corner}`}
-                       x={cx}
-                       y={cy}
-                       eventMode="dynamic"
-                       cursor="grab"
-                       onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
-                         e.stopPropagation();
-                         rectInputKey.current = key;
-                         rectDragCorner.current = corner;
-                         interactionMode.current = 'drag_rect_corner';
-                         if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                           containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                         }
-                       }}
-                       draw={(g) => {
-                         g.clear();
-                         // Larger invisible hit area
-                         g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                         g.circle(0, 0, 15 / safeScale);
-                         g.fill();
-
-                         g.fillStyle = { color: 0xffffff, alpha: 0.9 };
-                         g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
-                         g.rect(-cornerSize / 2, -cornerSize / 2, cornerSize, cornerSize);
-                         g.fill();
-                         g.stroke();
-                       }}
-                     />
-                   ))}
-                   {/* Rotation handle (MS Office style) - above top-center (screen top = +Y in Y-up world) */}
-                   {(() => {
-                     const stemLen = 20 / safeScale;
-                     const rotHandleY = halfH + stemLen;
-                     const handleR = 5 / safeScale;
-                     return (
-                       <pixiGraphics
-                         x={0}
-                         y={rotHandleY}
-                         eventMode="dynamic"
-                         cursor="grab"
-                         onPointerDown={(e: import('pixi.js').FederatedPointerEvent) => {
-                           e.stopPropagation();
-                           rectInputKey.current = key;
-                           interactionMode.current = 'set_rect_rotation';
-                           if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                             containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                           }
-                         }}
-                         draw={(g) => {
-                           g.clear();
-                           // Stem line from rect top-center up to handle
-                           g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
-                           g.moveTo(0, stemLen);
-                           g.lineTo(0, 0);
-                           g.stroke();
-                           
-                           // Larger invisible hit area
-                           g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                           g.circle(0, 0, 15 / safeScale);
-                           g.fill();
-                           
-                           // Handle circle
-                           g.fillStyle = { color: 0xffffff, alpha: 0.9 };
-                           g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
-                           g.circle(0, 0, handleR);
-                           g.fill();
-                           g.stroke();
-                           // Circular arrow arc inside handle
-                           g.strokeStyle = { width: 1.2 / safeScale, color: 0xec4899 };
-                           const arcR = handleR * 0.55;
-                           const arcSteps = 10;
-                           for (let i = 0; i < arcSteps; i++) {
-                             const a1 = -0.3 + (i / arcSteps) * 4.8;
-                             const a2 = -0.3 + ((i + 1) / arcSteps) * 4.8;
-                             if (i === 0) g.moveTo(Math.cos(a1) * arcR, Math.sin(a1) * arcR);
-                             g.lineTo(Math.cos(a2) * arcR, Math.sin(a2) * arcR);
-                           }
-                           g.stroke();
-                           // Arrowhead at end of arc
-                           const lastAngle = -0.3 + 4.8;
-                           const tipX = Math.cos(lastAngle) * arcR;
-                           const tipY = Math.sin(lastAngle) * arcR;
-                           const aSize = 2 / safeScale;
-                           g.fillStyle = { color: 0xec4899, alpha: 1 };
-                           g.moveTo(tipX, tipY);
-                           g.lineTo(tipX + aSize, tipY - aSize * 0.5);
-                           g.lineTo(tipX - aSize * 0.3, tipY - aSize);
-                           g.lineTo(tipX, tipY);
-                           g.fill();
-                         }}
-                       />
-                     );
-                   })()}
-                    {/* Dynamic interaction hints (e.g. sweep indicator) */}
-                    {(() => {
-                      // Generic hint resolution: look for properties in the manifest that target this input ID
-                      const selectedNode = selectedNodeIds.length === 1 ? nodes[selectedNodeIds[0]] : null;
-                      const selectedPluginId = selectedNode?.type === 'generator' ? selectedNode.plugin_id : activePluginId;
-                      const activePlugin = selectedPluginId ? plugins[selectedPluginId] : null;
-
-                      let startCorner = '';
-                      let sweepDir = '';
-
-                      // Iterate over properties to find hints targeting this specific input (key)
-                      activePlugin?.manifest?.properties?.forEach(prop => {
-                        if (prop.interaction_hint?.target_input === key) {
-                          const val = pluginActiveProperties[prop.name] ?? prop.default;
-                          if (prop.interaction_hint.type === 'start_corner') startCorner = String(val || '');
-                          if (prop.interaction_hint.type === 'sweep_direction') sweepDir = String(val || '');
-                        }
-                      });
-
-                      if (!startCorner && !sweepDir) return null;
-
-                      // Default to standard sweep behaviors if hints are partially present
-                      if (!startCorner) startCorner = 'Bottom-Left';
-                      if (!sweepDir) sweepDir = 'Horizontal';
-                      
-                      // Corner positions in local space (Y-up)
-                      let cx = 0, cy = 0;
-                      // NOTE: Our Y coordinate is inverted (+Y is up).
-                      if (startCorner === 'Bottom-Left') { cx = -halfW; cy = -halfH; }
-                      else if (startCorner === 'Bottom-Right') { cx = halfW; cy = -halfH; }
-                      else if (startCorner === 'Top-Left') { cx = -halfW; cy = halfH; }
-                      else if (startCorner === 'Top-Right') { cx = halfW; cy = halfH; }
-                      
-                      // Direction arrow: Horizontal = along X, Vertical = along Y
-                      let dirX = 0, dirY = 0;
-                      const arrowLen = 12 / safeScale;
-                      if (sweepDir === 'Horizontal') {
-                        dirX = cx < 0 ? arrowLen : -arrowLen; // point inward
-                      } else {
-                        dirY = cy < 0 ? arrowLen : -arrowLen; // point inward
-                      }
-                      
-                      const triSize = 5 / safeScale;
-                      const angle = Math.atan2(dirY, dirX);
-                     
-                     return (
-                       <pixiGraphics
-                         x={cx}
-                         y={cy}
-                         draw={(g) => {
-                           g.clear();
-                           // Triangle pointing in sweep direction
-                           g.fillStyle = { color: 0xf97316, alpha: 0.9 };
-                           g.strokeStyle = { width: 1 / safeScale, color: 0xf97316 };
-                           // Arrow triangle
-                           const tipX = dirX;
-                           const tipY = dirY;
-                           const perpX = -Math.sin(angle) * triSize;
-                           const perpY = Math.cos(angle) * triSize;
-                           g.moveTo(tipX, tipY);
-                           g.lineTo(tipX - Math.cos(angle) * triSize * 2 + perpX, tipY - Math.sin(angle) * triSize * 2 + perpY);
-                           g.lineTo(tipX - Math.cos(angle) * triSize * 2 - perpX, tipY - Math.sin(angle) * triSize * 2 - perpY);
-                           g.lineTo(tipX, tipY);
-                           g.fill();
-                           g.stroke();
-                         }}
-                       />
-                     );
-                   })()}
-                 </pixiContainer>
-               );
-             }
-
-             // Point data: has x, y directly
-             if (typeof data.x !== 'number' || !isFinite(data.x) || !isFinite(data.y)) return null;
-             const pqw = data.qw ?? 1, pqz = data.qz ?? 0, pqx = data.qx ?? 0, pqy = data.qy ?? 0;
-             let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
-             if (!isFinite(yaw)) yaw = 0;
-             return (
-              <pixiGraphics 
-                key={key}
-                x={data.x}
-                y={data.y}
-                rotation={yaw}
-                draw={(g) => {
-                  g.clear();
-                  const isLocked = snapState.lockedWaypointId === key;
-                  const strokeColor = isLocked ? 0x10b981 : 0xec4899; // emerald-500 if locked, else pink-500
-                  const fillColor = isLocked ? 0x34d399 : 0xf472b6;   // emerald-400 if locked, else pink-400
-                  
-                  g.strokeStyle = { width: 2 / safeScale, color: strokeColor };
-                  g.fillStyle = { color: fillColor, alpha: 0.8 };
-                  g.moveTo(10 / safeScale, 0);
-                  g.lineTo(-5 / safeScale, 5 / safeScale);
-                  g.lineTo(-5 / safeScale, -5 / safeScale);
-                  g.lineTo(10 / safeScale, 0);
-                  g.fill();
-                  g.stroke();
-                  g.circle(0, 0, 3 / safeScale);
-                  g.fill();
-                }}
-              />
-             );
-          })}
+          <PluginLayer
+            scale={scale}
+            onRectDragCornerDown={(e: import('pixi.js').FederatedPointerEvent, key: string, corner: 'min'|'max'|'topRight'|'bottomLeft') => {
+              e.stopPropagation();
+              rectInputKey.current = key;
+              rectDragCorner.current = corner;
+              interactionMode.current = 'drag_rect_corner';
+              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+              }
+            }}
+            onRectRotationDown={(e: import('pixi.js').FederatedPointerEvent, key: string) => {
+              e.stopPropagation();
+              rectInputKey.current = key;
+              interactionMode.current = 'set_rect_rotation';
+              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+              }
+            }}
+          />
 
           {/* Render Snapping Guide */}
-          {enableSnapping && snapState.origin && (snapState.isSnapped || snapState.forcedAxis) && (() => {
-            let ex = snapState.snappedWorldPos?.x ?? snapState.origin.x;
-            let ey = snapState.snappedWorldPos?.y ?? snapState.origin.y;
-            const val = parseFloat(snapInput);
-            const effectiveAxis = snapState.forcedAxis || snapState.axis;
-            const effectiveSign = snapState.forcedSign || 1;
-            
-            if (snapInput !== '' && !isNaN(val)) {
-              if (effectiveAxis === 'X') {
-                ex = snapState.origin.x + val * effectiveSign * Math.cos(snapState.origin.yaw);
-                ey = snapState.origin.y + val * effectiveSign * Math.sin(snapState.origin.yaw);
-              } else if (effectiveAxis === 'Y') {
-                ex = snapState.origin.x - val * effectiveSign * Math.sin(snapState.origin.yaw);
-                ey = snapState.origin.y + val * effectiveSign * Math.cos(snapState.origin.yaw);
-              }
-            }
-            return (
-            <pixiContainer>
-              <pixiGraphics
-                draw={(g) => {
-                  g.clear();
-                  g.strokeStyle = { width: 1.5 / Math.max(scale, 0.001), color: 0x3b82f6, alpha: 0.8 }; // blue dotted line
-                  const { x: sx, y: sy } = snapState.origin!;
-                  
-                  const dx = ex - sx;
-                  const dy = ey - sy;
-                  const dist = Math.sqrt(dx * dx + dy * dy);
-                  if (dist > 0) {
-                    const dashLen = 8 / Math.max(scale, 0.001);
-                    let drawn = 0;
-                    let isGap = false;
-                    
-                    g.moveTo(sx, sy);
-                    while (drawn < dist) {
-                      const step = Math.min(dashLen, dist - drawn);
-                      drawn += step;
-                      const curX = sx + (dx / dist) * drawn;
-                      const curY = sy + (dy / dist) * drawn;
-                      if (isGap) {
-                        g.moveTo(curX, curY);
-                      } else {
-                        g.lineTo(curX, curY);
-                      }
-                      isGap = !isGap;
-                    }
-                    g.stroke();
-                  }
-                }}
-              />
-              
-              {snapInput && (
-                <pixiContainer 
-                  x={ex + 20 / Math.max(scale, 0.001)} 
-                  y={ey} 
-                  scale={{ x: 1 / Math.max(scale, 0.001), y: -1 / Math.max(scale, 0.001) }}
-                >
-                  <pixiText 
-                    text={`Dist: ${snapInput}`} 
-                    style={
-                      new TextStyle({
-                        fill: '#3b82f6',
-                        fontSize: 16,
-                        fontFamily: 'Arial',
-                        fontWeight: 'bold',
-                        stroke: { color: '#000000', width: 3 },
-                      })
-                    } 
-                  />
-                </pixiContainer>
-              )}
-            </pixiContainer>
-            );
-          })()}
+          <SnappingGuideLayer scale={scale} snapState={snapState} snapInput={snapInput} />
 
         </pixiContainer>
       </Application>

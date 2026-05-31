@@ -19,6 +19,7 @@ const shortcuts = [
   { action: "Select Tool", keys: ["V"] },
   { action: "Add Waypoint Tool", keys: ["P"] },
   { action: "Cycle Snap Base Node (Add Mode)", keys: ["Tab"] },
+  { action: "Distance Input (Add Mode)", keys: ["0", "-", "9", ".", "-"] },
   { action: "Confirm Snapped Waypoint (Add Mode)", keys: ["Enter"] },
   { action: "Force Axis Snap X/Y (Add Mode)", keys: ["↑", "↓", "←", "→"] },
   { action: "Pan Map", keys: ["Left Mouse Drag"] },
