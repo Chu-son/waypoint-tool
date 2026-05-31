@@ -1,30 +1,36 @@
-# AIエージェント向けガイドライン (Antigravity & AI Assistants)
+# AIエージェント向けガイドライン (AGENTS & AI Assistants)
 
-このファイルは、本プロジェクトにおいてAIエージェント（Antigravity、Cursor、Windsurf、GitHub Copilot等）が自律的または支援的にコーディングを行うためのルール・プロンプト集です。
-AIとして本プロジェクトのコードを変更・提案する際は、**必ずこのガイドラインおよび `RULES.md` の内容を優先して遵守**してください。
+このファイルは、本プロジェクトにおいてAIエージェント（Antigravity、Cursor、Windsurf、GitHub Copilot等）が自律的または支援的にコーディングを行うためのプロンプト・コンテキストファイルです。
+AIとして本プロジェクトのコードを変更・提案する際は、**必ずこのガイドラインを起点として振る舞いを決定してください。**
 
-## 1. 開発ルール (`RULES.md`) の遵守
+## 1. System Overview (システムアーキテクチャの前提)
 
-コードの変更や新規機能の提案を行う際は、必ず事前に `docs/RULES.md` を確認し、そのルールに沿っているかを自己検証してください。
+本プロジェクトのコアとなるドメイン・技術スタックは以下の通りです。AIによるコード変更は、このアーキテクチャの原則に沿う必要があります。
 
-特に以下の点に注意すること：
-- **コンポーネントの配置場所**: 既存の役割ベースのディレクトリ分類（`ui/`, `canvas/`, `settings/`, `common/`）に従うこと。
-- **ショートカットの管理**: グローバルなものは `ShortcutManager` に、ローカルなものは各コンポーネント内に記述すること。
+- **Frontend**: Tauri WebView 内で動作する React + TypeScript
+  - 状態管理: **Zustand** (`src/stores/appStore.ts`) に集約し、Prop Drilling を避けること。
+  - 描画エンジン: **PixiJS** (`src/components/canvas/MapCanvas.tsx`)。UI (React) と描画 (PixiJS) の疎結合を保つこと。
+- **Backend**: Tauri (Rust)
+- **Plugin System**: 外部プロセス（Python/WASM等）と標準入出力 (JSON) 経由で通信する。
 
-## 2. 【最重要】UI（Help画面）の追従更新
+## 2. Documentation Index & AI Instructions (必須のドキュメント参照)
 
-ショートカットキーを追加、変更、または削除するコードを書いた場合は、**必ず**ユーザー向けのHelp表示も同時に更新してください。
-AIがロジックのみを修正してUIの更新を忘れるケースを防ぐため、以下のファイルをセットで修正対象として検討してください。
+**ドキュメントの重複・保守コスト増加を防ぐため、本ファイルには具体的なルールを記載していません。**
+AIエージェントは、これから実行するタスクの内容に応じて、**実装案を提示したりコードを修正する前に、必ず対象となる以下のドキュメントを自身のツール（`read_file` 等）で読み込んでください。**
 
-- 対象ファイル例: `src/components/ui/KeyboardShortcutsModal.tsx`
+- 📖 **[docs/RULES.md](./docs/RULES.md)**
+  - **いつ読むか**: UIコンポーネントを追加・修正する時。**キーボードショートカットを追加・変更する時**。
+  - **目的**: ディレクトリ分割ルールの確認。ショートカット変更時にHelp（Shortcut一覧）を追従更新する義務の確認。
+- 📖 **[docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md)**
+  - **いつ読むか**: 新規モジュールを作成する時。アーキテクチャの全体像やテスト方法が分からない時。
+  - **目的**: 命名規則（CamelCase vs PascalCase, Rustのsnake_case等）やテスト方針の確認。
+- 📖 **[docs/PLUGIN_GUIDE.md](./docs/PLUGIN_GUIDE.md)**
+  - **いつ読むか**: ジェネレーター機能（Pythonプラグイン）の修正や追加を行う時。インタラクションヒントを触る時。
+  - **目的**: プラグインと本体の通信仕様（JSON）、`manifest.json` の構造、Python SDKの使い方の確認。
+- 📖 **[docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md)**
+  - **いつ読むか**: 機能の全体的な要件や仕様の意図を確認したい時。
 
-## 3. テストの実行と保守
+## 3. 開発時のスタンス
 
-本プロジェクトでは Vite + Vitest + React Testing Library ベースのテストが存在します。
-コンポーネント（特にShortcutManagerやUIパーツ）を変更した場合は、可能な限り関連する `.test.tsx` の修正も同時に行い、テストが通る状態を維持してください。
-
-## 4. UI/UX の設計指針 (Web Application Development)
-
-- TailwindCSSは明示的な要求がない限り使用せず、既存の Vanilla CSS (`App.css`等) を用いてスタイリングを行うこと。
-- 最新のモダンで洗練されたデザイン（適切なカラーパレット、マイクロアニメーション等）を意識し、単純なMVPレベルのデザインで終わらせないこと。
-- UX向上に関わる状態管理は Zustand (`src/stores/appStore.ts`) に集約されているため、適切にStoreを利用・拡張すること。
+- 常に「Single Source of Truth」を意識し、状態管理は `appStore.ts` を正として扱ってください。
+- ドキュメントの内容に違反する提案はしないでください。分からないことがあれば、推測する前に該当するドキュメントを検索・参照してください。
