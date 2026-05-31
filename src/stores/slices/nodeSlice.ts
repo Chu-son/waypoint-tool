@@ -19,7 +19,7 @@ export type NodeSlice = {
   setInsertionIndex: (index: number) => void;
 };
 
-export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, get) => ({
+export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) => ({
   nodes: {},
   rootNodeIds: [],
   selectedNodeIds: [],

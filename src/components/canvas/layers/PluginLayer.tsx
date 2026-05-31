@@ -1,6 +1,6 @@
 import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent } from 'pixi.js';
-import React from 'react';
+
 
 interface PluginLayerProps {
   scale: number;

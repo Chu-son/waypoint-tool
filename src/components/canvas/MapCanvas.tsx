@@ -62,18 +62,16 @@ export function MapCanvas() {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
-  const visibleAttributes = useAppStore(state => state.visibleAttributes);
-  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
-  const optionsSchema = useAppStore(state => state.optionsSchema);
+
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
-  const showProperties = useAppStore((state) => state.showProperties);
+
   const shouldFitToMaps = useAppStore(state => state.shouldFitToMaps);
-  const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
+
   const activePluginId = useAppStore(state => state.activePluginId);
   const triggerFitToMaps = useAppStore(state => state.triggerFitToMaps);
   const plugins = useAppStore(state => state.plugins);
-  const pluginActiveProperties = useAppStore(state => state.pluginActiveProperties);
+
   const activeInputIndex = useAppStore(state => state.activeInputIndex);
   const setCursorPosition = useAppStore(state => state.setCursorPosition);
   const setMapScale = useAppStore(state => state.setMapScale);
@@ -92,7 +90,7 @@ export function MapCanvas() {
   const rectInputKey = useRef<string>('');  // The input ID being drawn (e.g. 'sweep_rect')
   const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft'>('max');
 
-  const { snapInput, setSnapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
+  const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
 
   // Fallback grid texture if no maps are loaded

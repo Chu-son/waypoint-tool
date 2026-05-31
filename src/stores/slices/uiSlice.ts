@@ -51,7 +51,7 @@ export type UISlice = {
   setDirty: (dirty: boolean) => void;
 };
 
-export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get) => ({
+export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => ({
   activeTool: 'select',
   isSidebarOpen: true,
   mouseCenteredZoom: true,

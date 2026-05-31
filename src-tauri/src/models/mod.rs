@@ -93,6 +93,8 @@ pub struct ProjectData {
     pub root_node_ids: Vec<String>,
     pub nodes: HashMap<String, WaypointNode>,
     pub map_layers: Option<Vec<ProjectMapLayer>>,
+    pub options_schema: Option<serde_json::Value>,
+    pub export_templates: Option<serde_json::Value>,
 }
 
 #[cfg(test)]

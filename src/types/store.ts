@@ -31,6 +31,7 @@ export type ExportTemplate = {
   extension: string;
   suffix: string;
   content: string;
+  scope?: 'global' | 'local';
 };
 
 export interface PluginSetting {

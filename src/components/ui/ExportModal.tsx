@@ -232,8 +232,9 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                       <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
                         {t.name}
                       </span>
-                      <span className="text-[10px] text-text-muted font-mono uppercase">
-                        Custom Template (.{t.extension})
+                      <span className="text-[10px] text-text-muted font-mono uppercase flex items-center gap-2">
+                        <span>{t.scope === 'local' ? '[Local]' : '[Global]'}</span>
+                        <span>Custom Template (.{t.extension})</span>
                       </span>
                     </div>
                   </div>

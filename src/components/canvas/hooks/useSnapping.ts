@@ -21,7 +21,7 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
 
   const activeTool = useAppStore(state => state.activeTool);
   const nodes = useAppStore(state => state.nodes);
-  const rootNodeIds = useAppStore(state => state.rootNodeIds);
+
   const addNode = useAppStore(state => state.addNode);
   const updateNode = useAppStore(state => state.updateNode);
   const selectNodes = useAppStore(state => state.selectNodes);

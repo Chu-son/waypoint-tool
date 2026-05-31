@@ -3,7 +3,7 @@ import { Button } from "../common/Button";
 import { Label } from "../common/Label";
 import { NumericInput } from "../NumericInput";
 import { Eye, EyeOff } from "lucide-react";
-import { WaypointNode } from "../../../../types/store";
+import { WaypointNode } from "../../../types/store";
 
 interface TransformGroupProps {
   isMultiSelection: boolean;

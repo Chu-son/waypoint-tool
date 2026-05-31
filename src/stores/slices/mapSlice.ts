@@ -26,7 +26,7 @@ export type MapSlice = {
   triggerFitToMaps: () => void;
 };
 
-export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, get) => ({
+export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) => ({
   mapLayers: [],
   defaultMapOpacity: 0.5,
   enableSnapping: true,

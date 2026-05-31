@@ -5,7 +5,7 @@ import { Input } from "../common/Input";
 import { Select } from "../common/Select";
 import { Checkbox } from "../common/Checkbox";
 import { Eye, EyeOff } from "lucide-react";
-import { OptionDef, WaypointNode } from "../../../../types/store";
+import { OptionDef, WaypointNode } from "../../../types/store";
 import { cn } from "../../../utils/cn";
 
 interface CustomOptionsGroupProps {

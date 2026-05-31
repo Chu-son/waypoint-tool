@@ -24,8 +24,7 @@ export const useAppStore = create<AppState>()(
         defaultMapOpacity: state.defaultMapOpacity,
         lastDirectory: state.lastDirectory,
         enableSnapping: state.enableSnapping,
-        optionsSchema: state.optionsSchema,
-        exportTemplates: state.exportTemplates,
+        exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'), // Treat undefined as global by default
         defaultExportFormats: state.defaultExportFormats,
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,

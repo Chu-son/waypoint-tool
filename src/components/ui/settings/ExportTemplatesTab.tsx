@@ -1,8 +1,76 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Copy, Save } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
+import { Modal, ModalHeader, ModalContent, ModalFooter } from "../common/Modal";
+import { Label } from "../common/Label";
+import { Select } from "../common/Select";
+import { useState, useEffect } from "react";
+
+function TemplateCreateModal({
+  isOpen, onClose, onSubmit, initialData
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local' }) => void;
+  initialData?: { name: string; suffix: string; extension: string; scope: 'global' | 'local' };
+}) {
+  const [name, setName] = useState(initialData?.name || "New Template");
+  const [suffix, setSuffix] = useState(initialData?.suffix || "");
+  const [extension, setExtension] = useState(initialData?.extension || "txt");
+  const [scope, setScope] = useState<'global'|'local'>(initialData?.scope || 'global');
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(initialData?.name || "New Template");
+      setSuffix(initialData?.suffix || "");
+      setExtension(initialData?.extension || "txt");
+      setScope(initialData?.scope || 'global');
+    }
+  }, [isOpen, initialData]);
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="sm">
+      <ModalHeader onClose={onClose}>
+        <div className="flex items-center gap-3">
+          <Save size={20} className="text-primary-base" />
+          <span>{initialData ? "Copy Template" : "New Template"}</span>
+        </div>
+      </ModalHeader>
+      <ModalContent className="space-y-4 p-4">
+        <div className="space-y-1">
+          <Label>Name</Label>
+          <Input value={name} onChange={e => setName(e.target.value)} />
+        </div>
+        <div className="flex gap-4">
+          <div className="space-y-1 flex-1">
+            <Label>Suffix</Label>
+            <Input value={suffix} onChange={e => setSuffix(e.target.value)} placeholder="_custom" />
+          </div>
+          <div className="space-y-1 flex-1">
+            <Label>Extension</Label>
+            <Input value={extension} onChange={e => setExtension(e.target.value)} placeholder="txt" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label>Scope</Label>
+          <Select value={scope} onChange={e => setScope(e.target.value as any)}>
+            <option value="global">Global (Available in all projects)</option>
+            <option value="local">Local (This project only)</option>
+          </Select>
+          <p className="text-[10px] text-text-muted mt-1">Once created, the scope cannot be directly changed. You can copy the template later if needed.</p>
+        </div>
+      </ModalContent>
+      <ModalFooter>
+        <Button variant="ghost" onClick={onClose} className="text-text-muted">Cancel</Button>
+        <Button onClick={() => onSubmit({ name, suffix, extension, scope })} className="bg-primary-base">Save</Button>
+      </ModalFooter>
+    </Modal>
+  );
+}
 
 export function ExportTemplatesTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -14,6 +82,39 @@ export function ExportTemplatesTab() {
   const updateDefaultExportFormat = useAppStore(
     (state) => state.updateDefaultExportFormat,
   );
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalInitialData, setModalInitialData] = useState<any>(null);
+  const [modalSourceContent, setModalSourceContent] = useState<string>("");
+
+  const handleCreateOrCopy = (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local' }) => {
+    addExportTemplate({
+      id: uuidv4(),
+      name: data.name,
+      extension: data.extension,
+      suffix: data.suffix,
+      scope: data.scope,
+      content: modalSourceContent || "{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}"
+    });
+    setIsModalOpen(false);
+  };
+
+  const openNewModal = () => {
+    setModalInitialData(null);
+    setModalSourceContent("");
+    setIsModalOpen(true);
+  };
+
+  const openCopyModal = (template: any) => {
+    setModalInitialData({
+      name: `Copy of ${template.name}`,
+      suffix: template.suffix,
+      extension: template.extension,
+      scope: template.scope || 'global'
+    });
+    setModalSourceContent(template.content);
+    setIsModalOpen(true);
+  };
 
   const insertTemplateVar = (templateId: string, text: string) => {
     const el = document.getElementById(
@@ -51,16 +152,7 @@ export function ExportTemplatesTab() {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() =>
-            addExportTemplate({
-              id: uuidv4(),
-              name: "New Template",
-              extension: "txt",
-              suffix: "",
-              content:
-                "{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}",
-            })
-          }
+          onClick={openNewModal}
         >
           <Plus size={14} className="mr-1" /> New Template
         </Button>
@@ -177,6 +269,17 @@ export function ExportTemplatesTab() {
                     placeholder="yaml"
                   />
                 </div>
+                <div className="flex items-center gap-1 bg-surface-base px-2 py-1 rounded border border-border-base/50 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                  {template.scope === 'local' ? '[Local]' : '[Global]'}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openCopyModal(template)}
+                  className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+                >
+                  <Copy size={16} />
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -259,6 +362,12 @@ export function ExportTemplatesTab() {
           </div>
         )}
       </div>
+      <TemplateCreateModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreateOrCopy}
+        initialData={modalInitialData}
+      />
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState, useAppStore } from '../appStore';
+import { AppState } from '../appStore';
 import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,7 +18,7 @@ export type ProjectSlice = {
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
   updateDefaultExportFormat: (id: string, updates: Partial<DefaultExportFormat>) => void;
-  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number }) => void;
+  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number, options_schema?: OptionsSchema | null }) => void;
   
   loadProject: () => Promise<void>;
   saveProject: () => Promise<void>;
@@ -60,25 +60,34 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   })),
 
   setProjectData: (data: any) =>
-    set((state) => ({
-      rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
-      nodes: data.nodes || {},
-      selectedNodeIds: [],
-      mapLayers: data.map_layers || data.mapLayers || state.mapLayers,
-      exportTemplates: data.export_templates || state.exportTemplates,
-      defaultExportFormats: data.default_export_formats || state.defaultExportFormats,
-      indexStartIndex: data.index_start_index ?? state.indexStartIndex,
-      decimalPrecision: data.decimal_precision ?? state.decimalPrecision,
-      isDirty: false,
-    })),
+    set((state) => {
+      // Merge global export templates with loaded local ones
+      const globalTemplates = state.exportTemplates.filter(t => t.scope !== 'local');
+      const localTemplates = (data.export_templates || []).map((t: any) => ({ ...t, scope: 'local' }));
+      
+      return {
+        rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
+        nodes: data.nodes || {},
+        selectedNodeIds: [],
+        mapLayers: data.map_layers || data.mapLayers || state.mapLayers,
+        exportTemplates: [...globalTemplates, ...localTemplates],
+        optionsSchema: data.options_schema || null,
+        defaultExportFormats: data.default_export_formats || state.defaultExportFormats,
+        indexStartIndex: data.index_start_index ?? state.indexStartIndex,
+        decimalPrecision: data.decimal_precision ?? state.decimalPrecision,
+        isDirty: false,
+      };
+    }),
 
-  resetProject: () => set({
+  resetProject: () => set((state) => ({
     rootNodeIds: [],
     nodes: {},
     selectedNodeIds: [],
     mapLayers: [],
+    optionsSchema: null,
+    exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
     isDirty: false
-  }),
+  })),
 
   loadProject: async () => {
     const { lastDirectory, setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity } = get();
@@ -99,7 +108,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         };
 
         setLastDirectory(getDirName(pathStr));
-        const projectData = await BackendAPI.loadProject(pathStr);
+        const projectData: any = await BackendAPI.loadProject(pathStr);
 
         setProjectData({
           nodes: projectData.nodes,
@@ -114,7 +123,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             visible: true,
             opacity: defaultMapOpacity,
             z_index: 0
-          }))
+          })),
+          options_schema: projectData.options_schema,
+          export_templates: projectData.export_templates
         });
         setIsDirty(false);
       }
@@ -161,6 +172,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           root_node_ids: rootNodeIds,
           nodes,
           map_layers: mapLayersToSave,
+          options_schema: get().optionsSchema,
+          export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
         };
         await BackendAPI.saveProject(finalPath, projectData);
         setIsDirty(false);

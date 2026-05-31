@@ -1,7 +1,7 @@
 import { useAppStore } from "../../../stores/appStore";
 import { Label } from "../common/Label";
 import { NumericInput } from "../NumericInput";
-import { WaypointNode } from "../../../../types/store";
+import { WaypointNode } from "../../../types/store";
 
 interface RelativeTransformGroupProps {
   node: WaypointNode;

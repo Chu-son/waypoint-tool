@@ -126,6 +126,8 @@ mod tests {
             root_node_ids: vec!["node1".to_string()],
             nodes,
             map_layers: None,
+            options_schema: None,
+            export_templates: None,
         };
 
         // Save
