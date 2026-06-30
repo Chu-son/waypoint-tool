@@ -14,6 +14,26 @@ export type MapLoadResult = {
   height: number;
 };
 
+export type ExportMapsOptions = {
+  saveDir: string;
+  format: 'ros_standard' | 'png_only';
+  mapListFilename: string | null;
+  regions: {
+    name: string;
+    rect: { x: number; y: number; width: number; height: number };
+    layerVisibility: Record<string, boolean>;
+  }[];
+  layers: {
+    id: string;
+    name: string;
+    image_base64?: string;
+    info?: any;
+    opacity: number;
+    blend_mode: string;
+    z_index: number;
+  }[];
+};
+
 export interface IBackendAPI {
   loadROSMap(yamlPath: string): Promise<MapLoadResult>;
   saveProject(path: string, data: ProjectData): Promise<void>;
@@ -32,6 +52,7 @@ export interface IBackendAPI {
   checkSdkVersion(): Promise<string>;
   updatePluginSdk(pluginFolderPath: string): Promise<string>;
   readImageBase64(path: string): Promise<string>;
+  exportMaps(options: ExportMapsOptions): Promise<void>;
 }
 
 export interface OpenDialogOptions {

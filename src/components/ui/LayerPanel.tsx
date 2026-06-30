@@ -1,9 +1,11 @@
-import { Eye, EyeOff, Trash2, FolderOpen, Layers, ChevronUp, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, Layers, ChevronUp, ChevronDown, Crop } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { BackendAPI } from "../../api";
 import { Button } from "./common/Button";
 import { Slider } from "./common/Slider";
+import { Select } from "./common/Select";
+import { Input } from "./common/Input";
 
 export function LayerPanel() {
   const mapLayers = useAppStore((state) => state.mapLayers);
@@ -13,6 +15,9 @@ export function LayerPanel() {
   const addMapLayer = useAppStore((state) => state.addMapLayer);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
+  const exportRegions = useAppStore((state) => state.exportRegions);
+  const updateExportRegion = useAppStore((state) => state.updateExportRegion);
+  const removeExportRegion = useAppStore((state) => state.removeExportRegion);
 
   const handleLoadMap = async () => {
     try {
@@ -161,7 +166,7 @@ export function LayerPanel() {
                   </div>
                 </div>
 
-                <div className="relative z-10 px-1">
+                <div className="relative z-10 px-1 flex flex-col gap-3">
                   <Slider
                     label="Layer Opacity"
                     valueDisplay={`${Math.round(layer.opacity * 100)}%`}
@@ -175,6 +180,111 @@ export function LayerPanel() {
                       })
                     }
                   />
+                  <div className="flex flex-col gap-1.5 mt-1">
+                    <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest ml-1 block">Blend Mode</span>
+                    <Select
+                      value={layer.blend_mode || 'overwrite'}
+                      onChange={(e) => updateMapLayer(layer.id, { blend_mode: e.target.value as any })}
+                      className="text-sm border-border-base/50"
+                    >
+                      <option value="overwrite">Overwrite (Ignore Unknown)</option>
+                      <option value="merge_obstacles">Merge Obstacles</option>
+                      <option value="merge_free">Merge Free Space</option>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Export Regions Section */}
+        {exportRegions.length > 0 && (
+          <div className="space-y-4 pt-4 border-t border-border-base/20">
+            <div className="flex items-center justify-between ml-1 mb-2">
+              <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] flex items-center gap-2 flex-1">
+                Export Regions
+                <div className="h-px flex-1 bg-border-base/20" />
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 ml-2 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+                onClick={() => {
+                  const allVisible = exportRegions.every(r => r.visible);
+                  exportRegions.forEach(r => updateExportRegion(r.id, { visible: !allVisible }));
+                }}
+                title={exportRegions.every(r => r.visible) ? "Hide All Regions" : "Show All Regions"}
+              >
+                {exportRegions.every(r => r.visible) ? <Eye size={14} /> : <EyeOff size={14} />}
+              </Button>
+            </div>
+            {exportRegions.map((region, index) => (
+              <div
+                key={region.id}
+                className="bg-surface-panel/40 backdrop-blur-sm border border-border-base/30 rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative"
+              >
+                {!region.visible && (
+                  <div className="absolute inset-0 bg-surface-base/40 z-1 pointer-events-none backdrop-grayscale-[0.5]" />
+                )}
+                
+                <div className="flex items-center justify-between mb-2 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <Crop size={16} className="text-emerald-400" />
+                    <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
+                      Region {index + 1}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+                      onClick={() =>
+                        updateExportRegion(region.id, { visible: !region.visible })
+                      }
+                      title="Toggle Visibility"
+                    >
+                      {region.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
+                      onClick={() => removeExportRegion(region.id)}
+                      title="Remove Region"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="relative z-10 px-1">
+                  <Input
+                    value={region.name}
+                    onChange={(e) => updateExportRegion(region.id, { name: e.target.value })}
+                    placeholder="Region Name"
+                    className="h-8 text-sm bg-surface-base border-border-base/50 focus:border-emerald-500/50"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <div className="flex-1 flex items-center gap-1">
+                      <span className="text-[10px] text-text-muted">X</span>
+                      <Input type="number" step="0.1" value={Math.round(region.rect.x * 100) / 100} onChange={(e) => updateExportRegion(region.id, { rect: { ...region.rect, x: parseFloat(e.target.value) || 0 }})} className="h-6 text-xs p-1 bg-surface-base" />
+                    </div>
+                    <div className="flex-1 flex items-center gap-1">
+                      <span className="text-[10px] text-text-muted">Y</span>
+                      <Input type="number" step="0.1" value={Math.round(region.rect.y * 100) / 100} onChange={(e) => updateExportRegion(region.id, { rect: { ...region.rect, y: parseFloat(e.target.value) || 0 }})} className="h-6 text-xs p-1 bg-surface-base" />
+                    </div>
+                    <div className="flex-1 flex items-center gap-1">
+                      <span className="text-[10px] text-text-muted">W</span>
+                      <Input type="number" step="0.1" min="0" value={Math.round(region.rect.width * 100) / 100} onChange={(e) => updateExportRegion(region.id, { rect: { ...region.rect, width: parseFloat(e.target.value) || 0 }})} className="h-6 text-xs p-1 bg-surface-base" />
+                    </div>
+                    <div className="flex-1 flex items-center gap-1">
+                      <span className="text-[10px] text-text-muted">H</span>
+                      <Input type="number" step="0.1" min="0" value={Math.round(region.rect.height * 100) / 100} onChange={(e) => updateExportRegion(region.id, { rect: { ...region.rect, height: parseFloat(e.target.value) || 0 }})} className="h-6 text-xs p-1 bg-surface-base" />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

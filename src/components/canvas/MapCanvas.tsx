@@ -9,6 +9,7 @@ import { PathLayer } from './layers/PathLayer';
 import { WaypointLayer } from './layers/WaypointLayer';
 import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
+import { ExportRegionLayer } from './layers/ExportRegionLayer';
 import { useSnapping } from './hooks/useSnapping';
 
 extend({
@@ -18,17 +19,26 @@ extend({
   Text,
 });
 
-function MapLayerSprite({ layer }: { layer: ProjectMapLayer }) {
+function MapLayerSprite({ layer, scale, textStyle }: { layer: ProjectMapLayer, scale: number, textStyle: TextStyle }) {
   const [texture, setTexture] = useState<Texture | null>(null);
+  const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
+    let newTexture: Texture | null = null;
     if (layer.image_base64) {
       const img = new Image();
       img.onload = () => {
-        setTexture(Texture.from(img));
+        newTexture = Texture.from(img);
+        setTexture(newTexture);
+        setImgSize({ w: img.width, h: img.height });
       };
       img.src = layer.image_base64;
     }
+    return () => {
+      if (newTexture) {
+        newTexture.destroy(true);
+      }
+    };
   }, [layer.image_base64]);
 
   if (!texture || !layer.visible) return null;
@@ -36,21 +46,45 @@ function MapLayerSprite({ layer }: { layer: ProjectMapLayer }) {
   // Extract metadata (with safe fallbacks)
   const { resolution = 0.05, origin = [0, 0, 0] } = layer.info || {};
   const [ox, oy, oyaw] = origin;
+  const yaw = oyaw || 0;
 
   // Render the map aligned to ROS origin
   // Anchor [0, 1] means the bottom-left of the image maps to the exact (ox, oy).
   // Y scale is inverted so that the image draws right-side up inside the Y-inverted Pixi Container.
+  // Top-left Y calculation: Origin is bottom-left, so we add height * resolution
+  // We must also account for the map's yaw rotation (yaw).
+  // Prioritize actual loaded image size (imgSize.h) over layer.height to avoid fallback values (e.g. 1000)
+  const h = imgSize.h || (texture ? texture.height : 0) || layer.height || 0;
+  const H = h * resolution;
+  const topLeftX = ox - H * Math.sin(yaw);
+  const topLeftY = oy + H * Math.cos(yaw);
+
   return (
-    <pixiSprite 
-      texture={texture} 
-      anchor={{ x: 0, y: 1 }} 
-      x={ox} 
-      y={oy} 
-      rotation={oyaw}
-      scale={{ x: resolution, y: -resolution }}
-      alpha={layer.opacity} 
-      zIndex={layer.z_index}
-    />
+    <pixiContainer zIndex={layer.z_index}>
+      <pixiSprite 
+        texture={texture} 
+        anchor={{ x: 0, y: 1 }} 
+        x={ox} 
+        y={oy} 
+        rotation={yaw}
+        scale={{ x: resolution, y: -resolution }}
+        alpha={layer.opacity} 
+      />
+      {/* Top-Left Map Layer Name */}
+      <pixiContainer
+        x={topLeftX}
+        y={topLeftY}
+        scale={{ x: 1 / scale, y: -1 / scale }}
+      >
+        <pixiText
+          text={layer.name || 'Map Layer'}
+          style={textStyle}
+          anchor={{ x: 0, y: 1 }}
+          x={4}
+          y={-4}
+        />
+      </pixiContainer>
+    </pixiContainer>
   );
 }
 
@@ -81,14 +115,15 @@ export function MapCanvas() {
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
-  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation'>('none');
+  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region'>('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const latestMousePos = useRef({ x: 0, y: 0 }); // Track screen mouse pos constantly
   const containerRef = useRef<HTMLDivElement>(null);
   const rectInputKey = useRef<string>('');  // The input ID being drawn (e.g. 'sweep_rect')
-  const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft'>('max');
+  const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft' | 'nw'|'ne'|'sw'|'se'|'n'|'s'|'e'|'w'>('max');
+  const regionDragOffset = useRef({ x: 0, y: 0 });
 
   const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
@@ -313,6 +348,37 @@ export function MapCanvas() {
       
       interactionMode.current = 'set_yaw';
       activeNodeId.current = id;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    // Left click + Add Export Region Tool
+    else if (e.button === 0 && activeTool === 'add_export_region' && interactionMode.current === 'none') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+
+      const id = uuidv4();
+      
+      // Default select all visible map layers
+      const layerVisibility: Record<string, boolean> = {};
+      useAppStore.getState().mapLayers.forEach(layer => {
+        if (layer.visible) {
+          layerVisibility[layer.id] = true;
+        }
+      });
+
+      useAppStore.getState().addExportRegion({
+        id,
+        name: `Region ${useAppStore.getState().exportRegions.length + 1}`,
+        rect: { x: worldX, y: worldY, width: 0, height: 0 },
+        visible: true,
+        layerVisibility
+      });
+
+      interactionMode.current = 'draw_export_region';
+      activeNodeId.current = id; // Store the ID we're currently drawing
+      // We will need to store origin to compute proper width/height. We can use pluginInteractionData temporarily or another ref.
+      useAppStore.getState().updatePluginInteractionData('__export_region_origin', { x: worldX, y: worldY });
       e.currentTarget.setPointerCapture(e.pointerId);
     }
     // Left click + Add Generator Tool -> Define interaction input based on active plugin type
@@ -558,6 +624,80 @@ export function MapCanvas() {
         });
       }
     }
+    else if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      
+      const current = useAppStore.getState().pluginInteractionData['__export_region_origin'];
+      if (current && current.x !== undefined) {
+        const ox = current.x;
+        const oy = current.y;
+        
+        // Calculate min/max x and y to support drawing in any direction
+        const minX = Math.min(ox, worldX);
+        const minY = Math.min(oy, worldY);
+        const maxX = Math.max(ox, worldX);
+        const maxY = Math.max(oy, worldY);
+        
+        useAppStore.getState().updateExportRegion(activeNodeId.current, {
+          rect: {
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY
+          }
+        });
+      }
+    }
+    else if (interactionMode.current === 'move_export_region' && activeNodeId.current) {
+      const region = useAppStore.getState().exportRegions.find(r => r.id === activeNodeId.current);
+      if (region) {
+        useAppStore.getState().updateExportRegion(region.id, {
+          rect: {
+            ...region.rect,
+            x: worldX - regionDragOffset.current.x,
+            y: worldY - regionDragOffset.current.y
+          }
+        });
+      }
+    }
+    else if (interactionMode.current === 'resize_export_region' && activeNodeId.current) {
+      const region = useAppStore.getState().exportRegions.find(r => r.id === activeNodeId.current);
+      if (region) {
+        let { x, y, width, height } = region.rect;
+        const handle = rectDragCorner.current;
+        
+        const originalOppositeX = (handle.includes('w')) ? x + width : x;
+        const originalOppositeY = (handle.includes('s')) ? y : y + height;
+        
+        let newX = x;
+        let newY = y;
+        let newWidth = width;
+        let newHeight = height;
+
+        if (handle === 'nw' || handle === 'sw' || handle === 'w') {
+          newX = Math.min(worldX, originalOppositeX);
+          newWidth = Math.abs(originalOppositeX - worldX);
+        } else if (handle === 'ne' || handle === 'se' || handle === 'e') {
+          newX = Math.min(worldX, originalOppositeX);
+          newWidth = Math.abs(worldX - originalOppositeX);
+        }
+
+        if (handle === 'nw' || handle === 'ne' || handle === 'n') {
+          newY = Math.min(worldY, originalOppositeY);
+          newHeight = Math.abs(originalOppositeY - worldY);
+        } else if (handle === 'sw' || handle === 'se' || handle === 's') {
+          newY = Math.min(worldY, originalOppositeY);
+          newHeight = Math.abs(worldY - originalOppositeY);
+        }
+
+        useAppStore.getState().updateExportRegion(region.id, {
+          rect: { x: newX, y: newY, width: newWidth, height: newHeight }
+        });
+      }
+    }
     else if (interactionMode.current === 'drag_rect_corner') {
       const rect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -736,7 +876,7 @@ export function MapCanvas() {
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
           {mapLayers.length > 0 ? (
-            mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} />)
+            mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)
           ) : (
             <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
           )}
@@ -789,6 +929,46 @@ export function MapCanvas() {
               interactionMode.current = 'set_rect_rotation';
               if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
                 containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+              }
+            }}
+          />
+
+          <ExportRegionLayer 
+            scale={scale} 
+            textStyle={textStyle}
+            onRegionDragDown={(e, regionId) => {
+              if (activeTool === 'add_export_region') {
+                e.stopPropagation();
+                if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+                  (e.nativeEvent as any).stopPropagation();
+                }
+                const region = useAppStore.getState().exportRegions.find(r => r.id === regionId);
+                if (region) {
+                  const rect = containerRef.current?.getBoundingClientRect();
+                  if (rect && e.nativeEvent instanceof PointerEvent) {
+                    const mouseX = e.nativeEvent.clientX - rect.left;
+                    const mouseY = e.nativeEvent.clientY - rect.top;
+                    const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+                    regionDragOffset.current = { x: worldX - region.rect.x, y: worldY - region.rect.y };
+                    interactionMode.current = 'move_export_region';
+                    activeNodeId.current = regionId;
+                    containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
+                  }
+                }
+              }
+            }}
+            onRegionResizeDown={(e, regionId, handle) => {
+              if (activeTool === 'add_export_region') {
+                e.stopPropagation();
+                if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+                  (e.nativeEvent as any).stopPropagation();
+                }
+                interactionMode.current = 'resize_export_region';
+                activeNodeId.current = regionId;
+                rectDragCorner.current = handle;
+                if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                  containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+                }
               }
             }}
           />

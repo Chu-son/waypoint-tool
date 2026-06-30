@@ -25,6 +25,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::load_ros_map,
+            commands::export_maps,
             commands::save_project,
             commands::load_project,
             commands::load_options_schema,

@@ -24,6 +24,11 @@ export type MapSlice = {
   setShowPaths: (show: boolean) => void;
   setShowGrid: (show: boolean) => void;
   triggerFitToMaps: () => void;
+
+  exportRegions: import('../../types/store').ExportRegion[];
+  addExportRegion: (region: import('../../types/store').ExportRegion) => void;
+  updateExportRegion: (id: string, updates: Partial<import('../../types/store').ExportRegion>) => void;
+  removeExportRegion: (id: string) => void;
 };
 
 export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) => ({
@@ -35,10 +40,24 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
   showPaths: true,
   showGrid: true,
   shouldFitToMaps: 0,
+  exportRegions: [],
 
   setShowPaths: (show: boolean) => set({ showPaths: show }),
   setShowGrid: (show: boolean) => set({ showGrid: show }),
   triggerFitToMaps: () => set({ shouldFitToMaps: Date.now() }),
+
+  addExportRegion: (region) => set((state) => ({
+    exportRegions: [...state.exportRegions, region],
+    isDirty: true
+  })),
+  updateExportRegion: (id, updates) => set((state) => ({
+    exportRegions: state.exportRegions.map(r => r.id === id ? { ...r, ...updates } : r),
+    isDirty: true
+  })),
+  removeExportRegion: (id) => set((state) => ({
+    exportRegions: state.exportRegions.filter(r => r.id !== id),
+    isDirty: true
+  })),
 
   setMapLayers: (layers: ProjectMapLayer[]) => set({ mapLayers: layers, isDirty: true }),
 
@@ -53,8 +72,11 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
       width,
       height,
       z_index: state.mapLayers.length,
+      blend_mode: 'normal',
     };
-    return { mapLayers: [newLayer, ...state.mapLayers], isDirty: true };
+    const newLayers = [newLayer, ...state.mapLayers];
+    const updatedLayers = newLayers.map((l, i) => ({ ...l, z_index: -(i + 1) }));
+    return { mapLayers: updatedLayers, isDirty: true };
   }),
 
   updateMapLayer: (id: string, updates: Partial<ProjectMapLayer>) => set((state) => ({
@@ -71,7 +93,8 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
     const layers = [...state.mapLayers];
     const [moved] = layers.splice(fromIndex, 1);
     layers.splice(toIndex, 0, moved);
-    return { mapLayers: layers, isDirty: true };
+    const updatedLayers = layers.map((l, i) => ({ ...l, z_index: -(i + 1) }));
+    return { mapLayers: updatedLayers, isDirty: true };
   }),
 
   setEnableSnapping: (enable: boolean) => set({ enableSnapping: enable }),

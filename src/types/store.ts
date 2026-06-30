@@ -110,6 +110,15 @@ export type MapLayer = {
   visible: boolean;
   opacity: number;
   zIndex: number;
+  blendMode?: 'normal' | 'darken' | 'lighten';
+};
+
+export type ExportRegion = {
+  id: string;
+  name: string;
+  rect: { x: number; y: number; width: number; height: number };
+  visible: boolean;
+  layerVisibility: Record<string, boolean>;
 };
 
 // In a real app, this is what the global state looks like
@@ -123,6 +132,7 @@ export interface ProjectMapLayer {
   visible: boolean;
   opacity: number;
   z_index: number;
+  blend_mode?: 'normal' | 'darken' | 'lighten';
 }
 
 export interface ProjectData {
@@ -134,7 +144,7 @@ export interface AppState {
   nodes: Record<string, ObjectNode>;
   rootNodeIds: string[];
   selectedNodeIds: string[];
-  activeTool: 'select' | 'add_point' | 'add_rect_sweep';
+  activeTool: 'select' | 'add_point' | 'add_rect_sweep' | 'add_export_region';
   
   // Maps & Layers
   mapLayers: MapLayer[];

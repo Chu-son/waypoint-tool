@@ -95,4 +95,8 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] readImageBase64 called for:', path);
     return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
   }
+
+  async exportMaps(options: any): Promise<void> {
+    console.log('[Mock Backend] exportMaps called with options:', options);
+  }
 }

@@ -11,6 +11,7 @@ import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
 import { SettingsModal } from "./components/ui/SettingsModal";
 import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
+import { ExportMapsModal } from "./components/ui/ExportMapsModal";
 import { StatusBar } from "./components/ui/StatusBar";
 import { ShortcutManager } from "./components/common/ShortcutManager";
 import { useAppStore } from "./stores/appStore";
@@ -360,6 +361,7 @@ function App() {
         isOpen={isSettingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
       />
+      <ExportMapsModal />
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setShortcutsModalOpen(false)}

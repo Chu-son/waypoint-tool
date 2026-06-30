@@ -10,7 +10,8 @@ import {
   Map,
   PenTool,
   Wand2,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Crop
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { ExportModal } from "./ExportModal";
@@ -57,6 +58,7 @@ export function ToolPanel() {
   const tools = [
     { id: "select", icon: Hand, label: "Select (V)" },
     { id: "add_point", icon: MousePointer2, label: "Add Waypoint (P)" },
+    { id: "add_export_region", icon: Crop, label: "Add Export Region" },
   ] as const;
 
   const enabledPluginsList = pluginSettings

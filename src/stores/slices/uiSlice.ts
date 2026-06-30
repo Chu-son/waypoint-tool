@@ -2,7 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 
 export type UISlice = {
-  activeTool: 'select' | 'add_point' | 'add_generator';
+  activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region';
   isSidebarOpen: boolean;
   mouseCenteredZoom: boolean;
   visibleAttributes: string[];
@@ -23,6 +23,7 @@ export type UISlice = {
   
   isSettingsModalOpen: boolean;
   isExportModalOpen: boolean;
+  isExportMapsModalOpen: boolean;
   isShortcutsModalOpen: boolean;
   settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
 
@@ -45,6 +46,7 @@ export type UISlice = {
   
   setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'export' | 'plugins') => void;
   setExportModalOpen: (open: boolean) => void;
+  setExportMapsModalOpen: (open: boolean) => void;
   setShortcutsModalOpen: (open: boolean) => void;
   
   // Note: setDirty is mapped to setIsDirty in original store
@@ -74,6 +76,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   isSettingsModalOpen: false,
   settingsModalTab: 'general',
   isExportModalOpen: false,
+  isExportMapsModalOpen: false,
   isShortcutsModalOpen: false,
 
   setDirty: (dirty: boolean) => set({ isDirty: dirty }),
@@ -124,5 +127,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
     settingsModalTab: tab || state.settingsModalTab
   })),
   setExportModalOpen: (open) => set({ isExportModalOpen: open }),
+  setExportMapsModalOpen: (open) => set({ isExportMapsModalOpen: open }),
   setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
 });

@@ -86,6 +86,25 @@ pub struct ProjectMapLayer {
     pub visible: bool,
     pub opacity: f64,
     pub z_index: usize,
+    pub blend_mode: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExportRegionRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ExportRegion {
+    pub id: String,
+    pub name: String,
+    pub rect: ExportRegionRect,
+    pub visible: bool,
+    #[serde(rename = "layerVisibility")]
+    pub layer_visibility: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -95,6 +114,7 @@ pub struct ProjectData {
     pub map_layers: Option<Vec<ProjectMapLayer>>,
     pub options_schema: Option<serde_json::Value>,
     pub export_templates: Option<serde_json::Value>,
+    pub export_regions: Option<Vec<ExportRegion>>,
 }
 
 #[cfg(test)]

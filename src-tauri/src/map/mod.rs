@@ -5,6 +5,9 @@ use image::GenericImageView;
 use base64::{Engine as _, engine::general_purpose};
 use crate::models::MapInfo;
 
+pub mod export_maps;
+pub use export_maps::*;
+
 #[derive(Debug, serde::Serialize)]
 pub struct MapLoadResult {
     pub info: MapInfo,

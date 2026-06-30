@@ -18,7 +18,7 @@ export type ProjectSlice = {
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
   updateDefaultExportFormat: (id: string, updates: Partial<DefaultExportFormat>) => void;
-  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number, options_schema?: OptionsSchema | null }) => void;
+  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number, options_schema?: OptionsSchema | null, export_regions?: any[] }) => void;
   
   loadProject: () => Promise<void>;
   saveProject: () => Promise<void>;
@@ -71,6 +71,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         selectedNodeIds: [],
         mapLayers: data.map_layers || data.mapLayers || state.mapLayers,
         exportTemplates: [...globalTemplates, ...localTemplates],
+        exportRegions: data.export_regions || [],
         optionsSchema: data.options_schema || null,
         defaultExportFormats: data.default_export_formats || state.defaultExportFormats,
         indexStartIndex: data.index_start_index ?? state.indexStartIndex,
@@ -84,6 +85,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     nodes: {},
     selectedNodeIds: [],
     mapLayers: [],
+    exportRegions: [],
     optionsSchema: null,
     exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
     isDirty: false
@@ -122,8 +124,10 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             height: layer.height || 1000,
             visible: true,
             opacity: defaultMapOpacity,
-            z_index: 0
+            z_index: 0,
+            blend_mode: layer.blend_mode || 'normal'
           })),
+          export_regions: projectData.export_regions,
           options_schema: projectData.options_schema,
           export_templates: projectData.export_templates
         });
@@ -166,12 +170,14 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           visible: layer.visible,
           opacity: layer.opacity,
           z_index: layer.z_index,
+          blend_mode: layer.blend_mode,
         }));
 
         const projectData = {
           root_node_ids: rootNodeIds,
           nodes,
           map_layers: mapLayersToSave,
+          export_regions: get().exportRegions,
           options_schema: get().optionsSchema,
           export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
         };

@@ -9,6 +9,11 @@ pub fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
 }
 
 #[command]
+pub fn export_maps(options: map::ExportMapsOptions) -> Result<(), String> {
+    map::export_maps(options)
+}
+
+#[command]
 pub fn save_project(path: String, data: ProjectData) -> Result<(), String> {
     io::save_project(&path, &data)
 }
@@ -62,6 +67,7 @@ pub fn force_exit(app: AppHandle) {
 pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
         load_ros_map,
+        export_maps,
         save_project,
         load_project,
         export_waypoints,
