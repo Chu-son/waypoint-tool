@@ -73,3 +73,20 @@ python3 -m unittest discover tests
 2. `feature/` または `fix/` ブロックでブランチを作成。
 3. 命名規則とテスト指針に従って実装。
 4. プルリクエストを作成し、レビューを受ける。
+
+## 6. キャンバスイベントの取り扱い (PixiJS & React)
+
+PixiJS のキャンバスと React の DOM イベント間での「イベントバブリング」による二重処理を防ぐため、以下のルールを厳守してください。
+
+- PixiJS の要素（`onPointerDown` 等）でイベントを捕捉し、そのイベントを背後のコンテナ（ReactのDOM側）に伝播させたくない場合は、単なる `e.stopPropagation()` だけでなく、**必ずネイティブイベントの伝播も停止させる**必要があります。
+- 修正例:
+  ```typescript
+  onPointerDown={(e) => {
+    e.stopPropagation(); // PixiJS内部の伝播を停止
+    if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+      (e.nativeEvent as any).stopPropagation(); // React/DOMへの伝播を停止
+    }
+    // ... 処理 ...
+  }}
+  ```
+- React側の `onPointerDown` ハンドラでも、他のインタラクション状態 (`interactionMode.current === 'none'`) を確認してから新規要素を作成するように防御的実装を心がけてください。
