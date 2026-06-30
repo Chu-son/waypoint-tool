@@ -1,0 +1,36 @@
+FROM ubuntu:22.04
+
+# 対話的プロンプトを無効化
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Tauri開発に必要なLinux依存パッケージのインストール
+RUN apt-get update && apt-get install -y \
+    curl wget file build-essential pkg-config \
+    libwebkit2gtk-4.1-dev \
+    libssl-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Node.js (20.x) のインストール
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Rust用環境変数の設定（Named Volumeマウント用）
+ENV RUSTUP_HOME=/opt/rust
+ENV CARGO_HOME=/opt/cargo
+ENV PATH="${CARGO_HOME}/bin:${PATH}"
+
+# Rust のインストール
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# WebKitGTKを仮想ディスプレイ(Xvfb)で安定させるための設定
+ENV WEBKIT_DISABLE_COMPOSITING_MODE=1
+ENV LIBGL_ALWAYS_SOFTWARE=1
+
+WORKDIR /workspace
+
+# 起動時に依存パッケージをインストールしてからTauriを起動
+CMD ["sh", "-c", "npm install && npm run tauri dev"]

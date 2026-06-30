@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  waypoint-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    # WebKitGTKのクラッシュを防ぐためホストのIPC名前空間を共有
+    # ※ Rootless環境等で問題が出る場合はコメントアウトまたは `private` で試してください
+    ipc: host
+    environment:
+      # NoVNCコンテナと同じDISPLAYを使用。ホストにDISPLAYが設定されていればそれを引き継ぎ、なければ :1 にフォールバック
+      - DISPLAY=${DISPLAY:-:1}
+    volumes:
+      - ./:/workspace                  # ソースコードのマウント
+      - /tmp/.X11-unix:/tmp/.X11-unix  # ホストのX11ソケットをバインドマウント
+      - node_modules:/workspace/node_modules   # キャッシュ隔離 (ホスト環境と混ざらないよう)
+      - cargo_registry:/opt/cargo/registry     # Crateキャッシュ隔離
+      - rust_target:/workspace/src-tauri/target # ビルド成果物隔離
+
+volumes:
+  node_modules:
+  cargo_registry:
+  rust_target:
