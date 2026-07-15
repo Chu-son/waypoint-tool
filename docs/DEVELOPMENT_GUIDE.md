@@ -42,7 +42,7 @@ npm run tauri dev
 - **Frontend (`src/`)**:
   - React コンポーネント: `PascalCase` (例: `MapCanvas.tsx`)
   - Hooks / Stores / Utils: `camelCase` (例: `appStore.ts`)
-  - 共通 UI クラス: `ui-` プレフィックス (例: `ui-btn-primary`)
+  - 共通 UI クラス: Tailwind CSS のユーティリティクラスと `class-variance-authority` (`cva`) を組み合わせて管理します。独自のCSSプレフィックスは使用しません。
 - **Backend (`src-tauri/`)**:
   - Rust ファイル・変数・関数: `snake_case` (Rust 標準)
 

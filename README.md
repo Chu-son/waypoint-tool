@@ -46,6 +46,3 @@ npm run tauri dev
 - **[ユーザーガイド (USER_GUIDE.md)](./docs/USER_GUIDE.md)**: アプリの具体的な使い方、設定、エクスポート手順。
 - **[プラグイン開発ガイド (PLUGIN_GUIDE.md)](./docs/PLUGIN_GUIDE.md)**: 独自の自動生成プラグインを作成する方法。
 - **[開発者ガイド (DEVELOPMENT_GUIDE.md)](./docs/DEVELOPMENT_GUIDE.md)**: コアアプリへのコントリビュート、アーキテクチャ、テスト指針。
-
----
-© 2026 ROS Waypoint Tool Project.

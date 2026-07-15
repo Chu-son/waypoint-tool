@@ -72,7 +72,7 @@ if __name__ == "__main__":
 - `Rectangle(center, width, height, yaw)`: 矩形。頂点の取得や点の内包判定が可能。
 - `Ray(origin, yaw, bidirectional)`: 仮想無限線。線分や矩形との交点取得に便利。
 
-詳細は `wpt_plugin` ディレクトリ内のソースコードおよび既存のプラグイン実装（`sweep_generator` 等）を参照してください。
+詳細は `wpt_plugin` ディレクトリ内のソースコードおよび既存のプラグイン実装（`rect_search_generator` や `zigzag_path_generator` 等）を参照してください。
 
 ## 6. プラグインの登録
 1. アプリの Settings > Plugins タブを開きます。
