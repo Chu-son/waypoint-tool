@@ -75,7 +75,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
       blend_mode: 'normal',
     };
     const newLayers = [newLayer, ...state.mapLayers];
-    const updatedLayers = newLayers.map((l, i) => ({ ...l, z_index: -(i + 1) }));
+    const updatedLayers = newLayers.map((l, i) => ({ ...l, z_index: i }));
     return { mapLayers: updatedLayers, isDirty: true };
   }),
 
@@ -93,7 +93,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
     const layers = [...state.mapLayers];
     const [moved] = layers.splice(fromIndex, 1);
     layers.splice(toIndex, 0, moved);
-    const updatedLayers = layers.map((l, i) => ({ ...l, z_index: -(i + 1) }));
+    const updatedLayers = layers.map((l, i) => ({ ...l, z_index: i }));
     return { mapLayers: updatedLayers, isDirty: true };
   }),
 

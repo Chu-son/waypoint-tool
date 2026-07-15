@@ -128,6 +128,7 @@ mod tests {
             map_layers: None,
             options_schema: None,
             export_templates: None,
+            export_regions: None,
         };
 
         // Save

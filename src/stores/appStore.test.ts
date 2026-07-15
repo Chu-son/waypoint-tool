@@ -140,6 +140,8 @@ describe('AppStore Zustand Store', () => {
     // Before: [id2, id1]. Move 0 to 1 -> [id1, id2]
     expect(state.mapLayers[0].id).toBe(id1);
     expect(state.mapLayers[1].id).toBe(id2);
+    expect(state.mapLayers[0].z_index).toBeGreaterThanOrEqual(0);
+    expect(state.mapLayers[1].z_index).toBeGreaterThanOrEqual(0);
     
     removeMapLayer(id2);
     expect(useAppStore.getState().mapLayers.length).toBe(1);
