@@ -24,16 +24,12 @@ npm run tauri dev
 
 ## 2. アーキテクチャ
 
-本ツールは「疎結合な設計」を重視しています。
+本ツールの構成概要は以下の通りです。ディレクトリ構造、データフロー、およびスライス設計の詳細については [ARCHITECTURE.md](./ARCHITECTURE.md) を参照してください。
 
-- **Frontend (Tauri WebView)**: 
-  - React + TypeScript
-  - 状態管理: **Zustand** (`src/stores/appStore.ts`)
-  - 描画エンジン: **PixiJS** (`src/components/canvas/MapCanvas.tsx`)
-  - スタイル: **Tailwind CSS v4**
-- **Backend (Rust Core)**:
-  - ファイル I/O, OS 連携, プラグイン実行。
-  - フロントエンドとは Tauri の IPC (Command) で通信。
+- **Frontend (Tauri WebView)**: React + TypeScript (状態管理: Zustand `appStore.ts`, 描画: PixiJS `MapCanvas.tsx`)
+- **Backend (Rust Core)**: Tauri IPC 通信, ファイル I/O, プラグインプロセス実行
+
+---
 
 ## 3. 命名規則 (Naming Conventions)
 
@@ -93,30 +89,7 @@ PixiJS のキャンバスと React の DOM イベント間での「イベント�
 
 ## 7. 汎用 UI パターン (UI Design Patterns)
 
-### キャンバス浮遊アクションバー (`FloatingActionBanner`)
-特定の操作モード（例: 要素コピーモード、領域選択モードなど）でキャンバスエリア左上に浮遊表示されるバナー通知・アクションUIは、共通コンポーネント `FloatingActionBanner` (`src/components/ui/common/FloatingActionBanner.tsx`) を使用して実装します。
-
-#### 特長・レイアウト原則
-- **一貫したスタイリング**: ダークガラスモルフィズム (`bg-surface-panel/95 backdrop-blur-md`) とアクセントボーダー。
-- **構造の統一**:
-  - `icon` & `title` & `subtitle` & `valueDisplay`: 現在のモードと数値を表示。
-  - `statusText`: 現在の対象や操作ガイド（例: `🎯 Waypoint [1] に適用中`）を明示。
-  - `actions`: ボタン配列（`label`, `variant`, `disabled`, `onClick`）。
-
-#### 使用例
-```tsx
-<FloatingActionBanner
-  icon={<Copy size={16} />}
-  title="X コピー中"
-  subtitle="World"
-  valueDisplay={1.2345}
-  statusText={<span>🎯 Waypoint [1] に適用中</span>}
-  actions={[
-    { label: 'ペースト確定', variant: 'primary', onClick: handleConfirm },
-    { label: '完了', variant: 'secondary', onClick: handleClose },
-  ]}
-/>
-```
+キャンバス上部に表示される一時操作バナー `FloatingActionBanner` や各種 UI コンポーネントの一覧および詳細仕様については、[COMPONENT_CATALOG.md](./COMPONENT_CATALOG.md) を参照してください。
 
 ## 8. 座標変換と Math ユーティリティ (Transform & Coordinate Systems)
 
