@@ -72,7 +72,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
       width,
       height,
       z_index: state.mapLayers.length,
-      blend_mode: 'normal',
+      blend_mode: 'overwrite',
     };
     const newLayers = [newLayer, ...state.mapLayers];
     const updatedLayers = newLayers.map((l, i) => ({ ...l, z_index: i }));

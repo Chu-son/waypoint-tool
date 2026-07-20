@@ -17,6 +17,7 @@ vi.mock('lucide-react', () => ({
   PenTool: () => <div data-testid="pentool-icon" />,
   Wand2: () => <div data-testid="wand-icon" />,
   Image: () => <div data-testid="image-icon" />,
+  Crop: () => <div data-testid="crop-icon" />,
 }));
 
 // Mock Store

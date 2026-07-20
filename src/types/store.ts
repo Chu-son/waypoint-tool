@@ -57,7 +57,7 @@ export type WaypointNode = {
 };
 
 // --- Plugin Architecture Types ---
-export type PluginInputType = 'point' | 'rectangle' | 'polygon' | 'path' | 'node_select' | 'waypoint';
+export type PluginInputType = 'point' | 'rectangle' | 'waypoint';
 
 export type PluginInputDef = {
   id: string;
@@ -76,7 +76,7 @@ export type PluginManifest = {
   type: 'python' | 'wasm';
   executable: string;
   inputs: PluginInputDef[];
-  needs?: ('map_image' | 'waypoints' | 'layers')[];
+  needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region')[];
   properties: OptionDef[];
   icon?: string;
 };
@@ -132,7 +132,7 @@ export interface ProjectMapLayer {
   visible: boolean;
   opacity: number;
   z_index: number;
-  blend_mode?: 'normal' | 'darken' | 'lighten';
+  blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
 }
 
 export interface ProjectData {

@@ -199,7 +199,7 @@ export function LayerPanel() {
         )}
 
         {/* Export Regions Section */}
-        {exportRegions.length > 0 && (
+        {(exportRegions || []).length > 0 && (
           <div className="space-y-4 pt-4 border-t border-border-base/20">
             <div className="flex items-center justify-between ml-1 mb-2">
               <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] flex items-center gap-2 flex-1">

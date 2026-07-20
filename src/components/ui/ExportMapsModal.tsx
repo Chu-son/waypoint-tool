@@ -61,7 +61,7 @@ export function ExportMapsModal() {
           image_base64: layer.image_base64,
           info: layer.info,
           opacity: layer.opacity,
-          blend_mode: layer.blend_mode || 'normal',
+          blend_mode: layer.blend_mode || 'overwrite',
           z_index: layer.z_index,
         }));
 
@@ -169,7 +169,7 @@ export function ExportMapsModal() {
                                    updateExportRegion(region.id, { layerVisibility: newVis });
                                  }}
                                />
-                               <span className="text-xs text-text-muted">{layer.name} <span className="opacity-50 text-[10px]">({layer.blend_mode || 'normal'})</span></span>
+                               <span className="text-xs text-text-muted">{layer.name} <span className="opacity-50 text-[10px]">({layer.blend_mode || 'overwrite'})</span></span>
                              </label>
                            );
                         })}

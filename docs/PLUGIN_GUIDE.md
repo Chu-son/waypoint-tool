@@ -26,7 +26,10 @@ my_plugin/
   - `type: "rectangle"`: 範囲をドラッグで指定。
 - `properties`: UI に表示されるパラメータ（数値、文字列、真偽値等）。
   - `interaction_hints`: キャンバス上にプレビュー図形を描画するためのヒント情報。
-- `needs`: マップ画像や現在の Waypoint リストなどの追加情報を要求する場合に指定。
+- `needs`: アプリ本体から追加情報（マップや選択中のポイントなど）を要求する場合に指定。現在サポートされている値は以下の通りです：
+  - `"selected_points"`: ユーザーが選択している Waypoint のインデックスリスト (`context["selected_points"]`) を注入します。
+  - `"occupancy_grid"`: 現在表示されているマップ画像から占有格子データを生成し (`context["occupancy_grid"]`) 注入します。
+  - `"occupancy_grid_in_region"`: `inputs` で指定した `rectangle` の範囲内のみの占有格子データを生成し注入します（全体を生成するより高速です）。
 
 ## 4. インタラクションヒント (Interaction Hints)
 
@@ -71,6 +74,10 @@ if __name__ == "__main__":
 - `Line(p1, p2)`: 線分。長さの取得や交点判定が可能。
 - `Rectangle(center, width, height, yaw)`: 矩形。頂点の取得や点の内包判定が可能。
 - `Ray(origin, yaw, bidirectional)`: 仮想無限線。線分や矩形との交点取得に便利。
+- `OccupancyGrid(data)`: 占有格子マップクラス（ROS Nav2互換）。
+  - `self.get_occupancy_grid(context)` で取得可能（`needs` で要求した場合）。
+  - `is_obstacle(x, y)`: ワールド座標が障害物かどうかを判定。
+  - `find_first_obstacle_on_segment(p1, p2, inflation_radius)`: 線分上で最初に出現する障害物座標を返す（回避計算に有用）。
 
 詳細は `wpt_plugin` ディレクトリ内のソースコードおよび既存のプラグイン実装（`rect_search_generator` や `zigzag_path_generator` 等）を参照してください。
 

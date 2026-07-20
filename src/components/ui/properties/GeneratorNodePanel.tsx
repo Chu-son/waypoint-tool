@@ -29,6 +29,7 @@ export function GeneratorNodePanel({
     (state) => state.pluginInteractionData,
   );
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
+  const mapLayers = useAppStore((state) => state.mapLayers);
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
@@ -82,10 +83,15 @@ export function GeneratorNodePanel({
         }
       }
 
+      const needsOccupancyGrid = plugin.manifest.needs?.some(
+        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+      );
+
       const resultingWaypoints = await BackendAPI.runPlugin(
         plugin,
         contextData,
         pythonPathToUse,
+        needsOccupancyGrid ? mapLayers : undefined,
       );
 
       if (

@@ -125,7 +125,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             visible: true,
             opacity: defaultMapOpacity,
             z_index: 0,
-            blend_mode: layer.blend_mode || 'normal'
+            blend_mode: layer.blend_mode || 'overwrite'
           })),
           export_regions: projectData.export_regions,
           options_schema: projectData.options_schema,

@@ -4,7 +4,9 @@ import math
 import traceback
 from typing import Dict, Any, List, Optional, TypedDict
 
-from .utils import quaternion_to_yaw, yaw_to_quaternion
+from .geometry import Point, Rectangle, Line
+from .utils import normalize_yaw, quaternion_to_yaw, yaw_to_quaternion
+from .occupancy_grid import OccupancyGrid
 from .geometry import Point, Rectangle
 
 class Transform(TypedDict, total=False):
@@ -77,6 +79,14 @@ class WaypointGenerator:
             height=data.get("height", 1.0),
             yaw=data.get("yaw", 0.0)
         )
+
+    def get_occupancy_grid(self, context: Dict[str, Any]) -> Optional['OccupancyGrid']:
+        """context["occupancy_grid"] を OccupancyGrid インスタンスとして返す。
+        needs に "occupancy_grid" / "occupancy_grid_in_region" を指定していない場合は None。"""
+        data = context.get("occupancy_grid")
+        if data is None:
+            return None
+        return OccupancyGrid(data)
 
     @staticmethod
     def make_waypoint(x: float, y: float, yaw: float,

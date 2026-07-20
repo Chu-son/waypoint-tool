@@ -1,5 +1,6 @@
 import { OptionsSchema, ProjectData, PluginInstance } from '../../types/store';
 import { IBackendAPI, MapLoadResult } from '../types';
+import {ProjectMapLayer} from "../../types/store";
 
 export class MockBackendAPI implements IBackendAPI {
   async loadROSMap(yamlPath: string): Promise<MapLoadResult> {
@@ -61,6 +62,7 @@ export class MockBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     _contextData: any,
     _pythonPath?: string,
+    _mapLayers?: ProjectMapLayer[]
   ): Promise<Record<string, any>[]> {
     console.log('[Mock Backend] runPlugin called for:', pluginInstance.manifest.name);
     return [];

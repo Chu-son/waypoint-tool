@@ -1,4 +1,4 @@
-import { OptionsSchema, ProjectData, PluginInstance } from '../types/store';
+import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../types/store';
 
 export type MapLoadResult = {
   info: {
@@ -46,6 +46,7 @@ export interface IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
+    mapLayers?: ProjectMapLayer[],
   ): Promise<Record<string, any>[]>;
   getPythonEnvironments(): Promise<string[]>;
   scaffoldPlugin(pluginName: string, targetDir: string): Promise<PluginInstance>;

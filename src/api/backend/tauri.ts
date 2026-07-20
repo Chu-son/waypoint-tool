@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { OptionsSchema, ProjectData, PluginInstance } from '../../types/store';
+import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../../types/store';
 import { IBackendAPI, MapLoadResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -35,8 +35,14 @@ export class TauriBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
+    mapLayers?: ProjectMapLayer[],
   ): Promise<Record<string, any>[]> {
-    return invoke('run_plugin', { pluginInstance, contextJson: JSON.stringify(contextData), pythonPath });
+    return invoke('run_plugin', {
+      pluginInstance,
+      contextJson: JSON.stringify(contextData),
+      pythonPath,
+      mapLayers,
+    });
   }
 
   async getPythonEnvironments(): Promise<string[]> {

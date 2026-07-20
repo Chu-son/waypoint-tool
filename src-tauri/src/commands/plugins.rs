@@ -176,7 +176,12 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 }
 
 #[tauri::command]
-pub fn run_plugin(plugin_instance: PluginInstance, context_json: String, python_path: Option<String>) -> Result<Vec<serde_json::Value>, String> {
+pub fn run_plugin(
+    plugin_instance: PluginInstance,
+    context_json: String,
+    python_path: Option<String>,
+    map_layers: Option<Vec<crate::plugins::models::PluginMapLayer>>,
+) -> Result<Vec<serde_json::Value>, String> {
     // 【プラグイン・アーキテクチャの背景】
     // このツールでは、外部の経路生成アルゴリズム（PythonやWebAssembly）と連携するために、
     // セキュリティと拡張性、言語非依存性を重視し、「標準入出力ストリームを介したJSON通信」を採用しています。
@@ -185,7 +190,6 @@ pub fn run_plugin(plugin_instance: PluginInstance, context_json: String, python_
     
     if plugin_instance.manifest.plugin_type == "python" {
         use std::process::{Command, Stdio};
-        use std::io::Write;
         
         let default_cmd = if cfg!(windows) { "python".to_string() } else { "python3".to_string() };
         let py_cmd = match python_path {
@@ -224,13 +228,43 @@ pub fn run_plugin(plugin_instance: PluginInstance, context_json: String, python_
             Err(e) => return Err(format!("Failed to spawn python ({}): {}", py_cmd, e)),
         };
 
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(context_json.as_bytes())
-                .map_err(|e| format!("Failed to write to plugin stdin: {}", e))?;
+        let mut context: serde_json::Value = serde_json::from_str(&context_json)
+            .map_err(|e| format!("Failed to parse context_json: {}", e))?;
+
+        let needs = &plugin_instance.manifest.needs;
+        let needs_grid = needs.iter().any(|n| n == "occupancy_grid" || n == "occupancy_grid_in_region");
+
+        if needs_grid {
+            if let Some(layers) = &map_layers {
+                let active_layers: Vec<_> = layers.iter().filter(|l| l.visible).collect();
+
+                if !active_layers.is_empty() {
+                    let grid = crate::map::occupancy::build_occupancy_grid_from_layers(&active_layers)?;
+                    context["occupancy_grid"] = serde_json::to_value(&grid)
+                        .map_err(|e| format!("Failed to serialize occupancy grid: {}", e))?;
+                }
+            }
         }
+
+        let enriched_json = serde_json::to_string(&context)
+            .map_err(|e| format!("Failed to serialize context: {}", e))?;
+
+        let stdin_handle = if let Some(mut stdin) = child.stdin.take() {
+            let json_bytes = enriched_json.into_bytes();
+            Some(std::thread::spawn(move || {
+                use std::io::Write;
+                let _ = stdin.write_all(&json_bytes);
+            }))
+        } else {
+            None
+        };
 
         let output = child.wait_with_output()
             .map_err(|e| format!("Failed to wait for python plugin: {}", e))?;
+
+        if let Some(handle) = stdin_handle {
+            let _ = handle.join();
+        }
 
         if !output.status.success() {
             let err_str = String::from_utf8_lossy(&output.stderr);
@@ -239,7 +273,9 @@ pub fn run_plugin(plugin_instance: PluginInstance, context_json: String, python_
         }
 
         let stdout_str = String::from_utf8_lossy(&output.stdout);
+        let stderr_str = String::from_utf8_lossy(&output.stderr);
         println!("[DEBUG/RUST] Execution Success stdout:\n{}", stdout_str);
+        println!("[DEBUG/RUST] Execution Success stderr:\n{}", stderr_str);
         
         let waypoints: Vec<serde_json::Value> = serde_json::from_str(&stdout_str)
             .map_err(|e| {
@@ -315,6 +351,8 @@ pub fn get_python_environments() -> Vec<String> {
 
     envs
 }
+
+
 
 #[cfg(test)]
 mod tests {

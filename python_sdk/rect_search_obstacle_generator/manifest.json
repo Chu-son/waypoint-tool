@@ -1,0 +1,53 @@
+{
+    "name": "Rect Search (Obstacle Aware)",
+    "version": "1.0.0",
+    "description": "矩形領域内でジグザグ走査パスを生成し、走査ライン上に障害物がある場合はその直前まで移動します。",
+    "type": "python",
+    "executable": "main.py",
+    "inputs": [
+        {
+            "id": "sweep_rect",
+            "label": "Sweep Rectangle",
+            "type": "rectangle"
+        }
+    ],
+    "needs": ["occupancy_grid_in_region"],
+    "properties": [
+        {
+            "name": "num_lines",
+            "label": "Number of Lines",
+            "type": "integer",
+            "default": 5
+        },
+        {
+            "name": "start_corner",
+            "label": "Start Corner",
+            "type": "string",
+            "default": "Bottom-Left",
+            "options": ["Bottom-Left", "Bottom-Right", "Top-Left", "Top-Right"],
+            "interaction_hint": {
+                "type": "start_corner",
+                "target_input": "sweep_rect"
+            }
+        },
+        {
+            "name": "sweep_direction",
+            "label": "Sweep Direction",
+            "type": "string",
+            "default": "Horizontal",
+            "options": ["Horizontal", "Vertical"],
+            "interaction_hint": {
+                "type": "sweep_direction",
+                "target_input": "sweep_rect"
+            }
+        },
+        {
+            "name": "inflation_radius",
+            "label": "Inflation Radius (m)",
+            "type": "float",
+            "default": 0.3,
+            "min": 0.0,
+            "max": 5.0
+        }
+    ]
+}

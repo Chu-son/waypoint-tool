@@ -20,9 +20,10 @@ export function PluginParamsPanel() {
   );
   const activeInputIndex = useAppStore((state) => state.activeInputIndex);
   const setActiveInputIndex = useAppStore((state) => state.setActiveInputIndex);
+  const nodes = useAppStore((state) => state.nodes);
+  const mapLayers = useAppStore((state) => state.mapLayers);
 
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
-  const nodes = useAppStore((state) => state.nodes);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const updatePluginInteractionData = useAppStore(
     (state) => state.updatePluginInteractionData,
@@ -98,7 +99,7 @@ export function PluginParamsPanel() {
   const inputs = plugin.manifest.inputs || [];
   const properties = plugin.manifest.properties || [];
   const needsSelection =
-    plugin.manifest.needs?.includes("selected_points" as any) || false;
+    plugin.manifest.needs?.includes("selected_points") || false;
 
   const handleExecute = async () => {
     if (needsSelection && selectedNodeIds.length === 0) {
@@ -167,10 +168,16 @@ export function PluginParamsPanel() {
       }
 
       // Execute plugin through backend API (passing contextual Python path)
+      // occupancy_grid 系 needs があるときはマップレイヤーを渡す
+      const needsOccupancyGrid = plugin.manifest.needs?.some(
+        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+      );
+
       const resultingWaypoints = await BackendAPI.runPlugin(
         plugin,
         contextData,
         pythonPathToUse,
+        needsOccupancyGrid ? mapLayers : undefined,
       );
 
       if (Array.isArray(resultingWaypoints) && resultingWaypoints.length > 0) {
