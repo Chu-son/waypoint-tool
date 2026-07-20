@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../../stores/appStore';
+import { Copy } from 'lucide-react';
 
 export const StatusBar: React.FC = () => {
   const cursorPosition = useAppStore(state => state.cursorPosition);
@@ -7,6 +8,7 @@ export const StatusBar: React.FC = () => {
   const nodes = useAppStore(state => state.nodes);
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const insertionIndex = useAppStore(state => state.insertionIndex);
+  const elementCopyState = useAppStore(state => state.elementCopyState);
 
   // Calculate the latest waypoint (the point immediately before the insertion point or at the very end)
   const getLatestWaypoint = () => {
@@ -47,7 +49,15 @@ export const StatusBar: React.FC = () => {
     <div className="h-6 flex items-center justify-between px-3 bg-surface-panel border-t border-border-base text-xs text-text-muted flex-shrink-0 z-50">
       {/* Left Section: Status / Tool Info */}
       <div className="flex-1 flex items-center space-x-4 overflow-hidden text-ellipsis whitespace-nowrap">
-        <span>Ready</span>
+        {elementCopyState ? (
+          <span className="text-amber-400 font-medium flex items-center gap-1.5 animate-pulse">
+            <Copy size={12} />
+            要素コピーモード: {elementCopyState.field.toUpperCase()} ({elementCopyState.coordSystem === 'world' ? 'World' : '⚓ Anchor相対'}) = {elementCopyState.value.toFixed(4)}
+            <span className="text-text-muted font-normal ml-1">(クリックで選択 → 左上ボタンで確定/完了)</span>
+          </span>
+        ) : (
+          <span>Ready</span>
+        )}
       </div>
 
       {/* Center Section: Cursor Coordinates */}

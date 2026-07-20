@@ -8,6 +8,8 @@ export type NodeSlice = {
   selectedNodeIds: string[];
   insertionIndex: number;
   
+  anchorNodeId: string | null;
+  setAnchorNode: (id: string | null) => void;
   addNode: (node: WaypointNode, parentId?: string) => void;
   updateNode: (id: string, updates: Partial<WaypointNode>) => void;
   removeNodes: (ids: string[]) => void;
@@ -24,6 +26,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
   rootNodeIds: [],
   selectedNodeIds: [],
   insertionIndex: -1,
+  anchorNodeId: null,
+
+  setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
 
   setInsertionIndex: (index: number) => set({ insertionIndex: index }),
 
@@ -96,6 +101,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
       nodes: newNodes, 
       rootNodeIds: newRootIds,
       selectedNodeIds: state.selectedNodeIds.filter(id => !idsToRemove.has(id)),
+      anchorNodeId: state.anchorNodeId && idsToRemove.has(state.anchorNodeId) ? null : state.anchorNodeId,
       isDirty: true
     };
   }),
@@ -113,6 +119,10 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
     const updates: Partial<AppState> = { selectedNodeIds: nextIds };
     if (nextIds.length > 0) {
       updates.rightPanelActiveTab = 'inspector';
+    }
+    if (state.elementCopyState) {
+      const targetId = nextIds.length === 1 ? nextIds[0] : null;
+      updates.elementCopyState = { ...state.elementCopyState, previewNodeId: targetId };
     }
     return updates;
   }),

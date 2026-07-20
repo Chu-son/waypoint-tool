@@ -27,6 +27,8 @@ const shortcuts = [
   { action: "Fit Map to Screen", keys: ["Middle Double Click"] },
   { action: "Select Node", keys: ["Left Click"] },
   { action: "Select Multiple", keys: ["Shift", "+", "Left Click"] },
+  { action: "Set / Clear Anchor", keys: ["Right Click Node"] },
+  { action: "Copy Transform Element", keys: ["Right Click Label"] },
 ];
 
 export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps) {

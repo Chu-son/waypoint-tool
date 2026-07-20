@@ -4,17 +4,23 @@ import { Label } from "../common/Label";
 import { NumericInput } from "../NumericInput";
 import { Eye, EyeOff } from "lucide-react";
 import { WaypointNode } from "../../../types/store";
+import { quaternionToYaw } from "../../../utils/transformUtils";
+import { ElementCopyField } from "../../../stores/slices/uiSlice";
 
 interface TransformGroupProps {
   isMultiSelection: boolean;
   node: WaypointNode | null;
   handleUpdate: (id: string, updates: any) => void;
+  onContextMenuLabel?: (field: ElementCopyField, e: React.MouseEvent) => void;
+  isCopyingField?: (field: ElementCopyField) => boolean;
 }
 
 export function TransformGroup({
   isMultiSelection,
   node,
   handleUpdate,
+  onContextMenuLabel,
+  isCopyingField,
 }: TransformGroupProps) {
   const visibleAttributes = useAppStore((state) => state.visibleAttributes);
   const toggleAttributeVisibility = useAppStore(
@@ -23,6 +29,8 @@ export function TransformGroup({
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const nodes = useAppStore((state) => state.nodes);
+
+  const currentYaw = node?.transform ? quaternionToYaw(node.transform) : 0;
 
   return (
     <div className="space-y-2 relative pt-2">
@@ -47,11 +55,26 @@ export function TransformGroup({
 
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <Label className="block text-xs text-text-muted mb-1">X (m)</Label>
+          <Label
+            className={`block text-xs mb-1 cursor-context-menu select-none ${
+              isCopyingField?.("x")
+                ? "text-primary-base font-bold"
+                : "text-text-muted hover:text-text-base"
+            }`}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onContextMenuLabel?.("x", e);
+            }}
+          >
+            X (m)
+          </Label>
           <NumericInput
             value={isMultiSelection ? 0 : (node?.transform?.x ?? 0)}
             precision={decimalPrecision}
             placeholder={isMultiSelection ? "Mixed" : ""}
+            className={
+              isCopyingField?.("x") ? "border-primary-base bg-primary-base/10" : ""
+            }
             onChange={(val) => {
               if (isMultiSelection) {
                 selectedNodeIds.forEach((id) => {
@@ -70,11 +93,26 @@ export function TransformGroup({
           />
         </div>
         <div>
-          <Label className="block text-xs text-text-muted mb-1">Y (m)</Label>
+          <Label
+            className={`block text-xs mb-1 cursor-context-menu select-none ${
+              isCopyingField?.("y")
+                ? "text-primary-base font-bold"
+                : "text-text-muted hover:text-text-base"
+            }`}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onContextMenuLabel?.("y", e);
+            }}
+          >
+            Y (m)
+          </Label>
           <NumericInput
             value={isMultiSelection ? 0 : (node?.transform?.y ?? 0)}
             precision={decimalPrecision}
             placeholder={isMultiSelection ? "Mixed" : ""}
+            className={
+              isCopyingField?.("y") ? "border-primary-base bg-primary-base/10" : ""
+            }
             onChange={(val) => {
               if (isMultiSelection) {
                 selectedNodeIds.forEach((id) => {
@@ -93,11 +131,26 @@ export function TransformGroup({
           />
         </div>
         <div>
-          <Label className="block text-xs text-text-muted mb-1">Z (m)</Label>
+          <Label
+            className={`block text-xs mb-1 cursor-context-menu select-none ${
+              isCopyingField?.("z")
+                ? "text-primary-base font-bold"
+                : "text-text-muted hover:text-text-base"
+            }`}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              onContextMenuLabel?.("z", e);
+            }}
+          >
+            Z (m)
+          </Label>
           <NumericInput
             value={isMultiSelection ? 0 : (node?.transform?.z ?? 0)}
             precision={decimalPrecision}
             placeholder={isMultiSelection ? "Mixed" : ""}
+            className={
+              isCopyingField?.("z") ? "border-primary-base bg-primary-base/10" : ""
+            }
             onChange={(val) => {
               if (isMultiSelection) {
                 selectedNodeIds.forEach((id) => {
@@ -117,32 +170,29 @@ export function TransformGroup({
         </div>
         <div className="col-span-3 grid grid-cols-2 gap-2">
           <div>
-            <Label className="block text-xs text-text-muted mb-1">
+            <Label
+              className={`block text-xs mb-1 cursor-context-menu select-none ${
+                isCopyingField?.("yaw")
+                  ? "text-primary-base font-bold"
+                  : "text-text-muted hover:text-text-base"
+              }`}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onContextMenuLabel?.("yaw", e);
+              }}
+            >
               Yaw (rad)
             </Label>
             <NumericInput
               step="0.01"
               precision={decimalPrecision}
-              value={
-                isMultiSelection
-                  ? 0
-                  : node?.transform
-                    ? Math.atan2(
-                        2.0 *
-                          ((node.transform.qw ?? 1) *
-                            (node.transform.qz || 0) +
-                            (node.transform.qx || 0) *
-                              (node.transform.qy || 0)),
-                        1.0 -
-                          2.0 *
-                            ((node.transform.qy || 0) *
-                              (node.transform.qy || 0) +
-                              (node.transform.qz || 0) *
-                                (node.transform.qz || 0)),
-                      )
-                    : 0
-              }
+              value={isMultiSelection ? 0 : currentYaw}
               placeholder={isMultiSelection ? "Mixed" : ""}
+              className={
+                isCopyingField?.("yaw")
+                  ? "border-primary-base bg-primary-base/10"
+                  : ""
+              }
               onChange={(val) => {
                 const halfYaw = val / 2.0;
                 const qz = Math.sin(halfYaw);
@@ -165,32 +215,29 @@ export function TransformGroup({
             />
           </div>
           <div>
-            <Label className="block text-xs text-text-muted mb-1">
+            <Label
+              className={`block text-xs mb-1 cursor-context-menu select-none ${
+                isCopyingField?.("yaw")
+                  ? "text-primary-base font-bold"
+                  : "text-text-muted hover:text-text-base"
+              }`}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                onContextMenuLabel?.("yaw", e);
+              }}
+            >
               Yaw (deg)
             </Label>
             <NumericInput
               step="1"
               precision={decimalPrecision}
-              value={
-                isMultiSelection
-                  ? 0
-                  : node?.transform
-                    ? Math.atan2(
-                        2.0 *
-                          ((node.transform.qw ?? 1) *
-                            (node.transform.qz || 0) +
-                            (node.transform.qx || 0) *
-                              (node.transform.qy || 0)),
-                        1.0 -
-                          2.0 *
-                            ((node.transform.qy || 0) *
-                              (node.transform.qy || 0) +
-                              (node.transform.qz || 0) *
-                                (node.transform.qz || 0)),
-                      ) * (180.0 / Math.PI)
-                    : 0
-              }
+              value={isMultiSelection ? 0 : currentYaw * (180.0 / Math.PI)}
               placeholder={isMultiSelection ? "Mixed" : ""}
+              className={
+                isCopyingField?.("yaw")
+                  ? "border-primary-base bg-primary-base/10"
+                  : ""
+              }
               onChange={(val) => {
                 const rad = val * (Math.PI / 180.0);
                 const halfYaw = rad / 2.0;
@@ -218,3 +265,4 @@ export function TransformGroup({
     </div>
   );
 }
+

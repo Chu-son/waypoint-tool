@@ -90,3 +90,55 @@ PixiJS のキャンバスと React の DOM イベント間での「イベント�
   }}
   ```
 - React側の `onPointerDown` ハンドラでも、他のインタラクション状態 (`interactionMode.current === 'none'`) を確認してから新規要素を作成するように防御的実装を心がけてください。
+
+## 7. 汎用 UI パターン (UI Design Patterns)
+
+### キャンバス浮遊アクションバー (`FloatingActionBanner`)
+特定の操作モード（例: 要素コピーモード、領域選択モードなど）でキャンバスエリア左上に浮遊表示されるバナー通知・アクションUIは、共通コンポーネント `FloatingActionBanner` (`src/components/ui/common/FloatingActionBanner.tsx`) を使用して実装します。
+
+#### 特長・レイアウト原則
+- **一貫したスタイリング**: ダークガラスモルフィズム (`bg-surface-panel/95 backdrop-blur-md`) とアクセントボーダー。
+- **構造の統一**:
+  - `icon` & `title` & `subtitle` & `valueDisplay`: 現在のモードと数値を表示。
+  - `statusText`: 現在の対象や操作ガイド（例: `🎯 Waypoint [1] に適用中`）を明示。
+  - `actions`: ボタン配列（`label`, `variant`, `disabled`, `onClick`）。
+
+#### 使用例
+```tsx
+<FloatingActionBanner
+  icon={<Copy size={16} />}
+  title="X コピー中"
+  subtitle="World"
+  valueDisplay={1.2345}
+  statusText={<span>🎯 Waypoint [1] に適用中</span>}
+  actions={[
+    { label: 'ペースト確定', variant: 'primary', onClick: handleConfirm },
+    { label: '完了', variant: 'secondary', onClick: handleClose },
+  ]}
+/>
+```
+
+## 8. 座標変換と Math ユーティリティ (Transform & Coordinate Systems)
+
+Waypoint やアンカー設定に伴う Quaternion, Yaw, 相対座標計算は `src/utils/transformUtils.ts` に集約しています。
+
+### 主要関数
+
+- **`quaternionToYaw(transform)`**:
+  Transform オブジェクト（`qx, qy, qz, qw`）から Z 軸まわりの回転角 Yaw (rad) を返します。
+- **`yawToQuaternion(yaw)`**:
+  Yaw 角 (rad) から Z 軸回転の Quaternion オブジェクトを返します。
+- **`calculateAnchorRelativeTransform(targetTransform, anchorTransform)`**:
+  アンカーノードの Transform を基準（回転角 Yaw）とした、ターゲットノードの相対位置 (`relX, relY, relZ, relYaw`) を算出します。
+
+#### 相対座標の算出式
+アンカー位置 $(A_x, A_y, A_z)$、アンカー角度 $\theta_A$ に対し、対象位置 $(T_x, T_y, T_z)$ のアンカーローカル相対座標 $(R_x, R_y, R_z)$ は次式で計算します：
+
+$$
+\begin{pmatrix} R_x \\ R_y \end{pmatrix} =
+\begin{pmatrix} \cos\theta_A & \sin\theta_A \\ -\sin\theta_A & \cos\theta_A \end{pmatrix}
+\begin{pmatrix} T_x - A_x \\ T_y - A_y \end{pmatrix}
+$$
+
+$$R_z = T_z - A_z, \quad R_{yaw} = \text{normalize}(\theta_T - \theta_A)$$
+

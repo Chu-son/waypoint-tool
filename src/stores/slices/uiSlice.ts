@@ -1,6 +1,16 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 
+export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
+export type ElementCopyCoordSystem = 'world' | 'anchor';
+
+export type ElementCopyState = {
+  field: ElementCopyField;
+  value: number;
+  coordSystem: ElementCopyCoordSystem;
+  previewNodeId: string | null;
+} | null;
+
 export type UISlice = {
   activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region';
   isSidebarOpen: boolean;
@@ -10,6 +20,9 @@ export type UISlice = {
   isDirty: boolean;
   decimalPrecision: number;
   toolPanelMaxColumns: number;
+  elementCopyState: ElementCopyState;
+  setElementCopyState: (state: ElementCopyState) => void;
+  clearElementCopyState: () => void;
   
   leftPanelWidth: number;
   rightPanelWidth: number;
@@ -62,6 +75,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   isDirty: false,
   decimalPrecision: 6,
   toolPanelMaxColumns: 1,
+  elementCopyState: null,
+
+  setElementCopyState: (state: ElementCopyState) => set({ elementCopyState: state }),
+  clearElementCopyState: () => set({ elementCopyState: null }),
 
   leftPanelActiveTab: 'project',
   rightPanelActiveTab: 'layers',

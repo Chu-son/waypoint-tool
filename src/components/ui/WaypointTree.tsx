@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { ChevronRight, Layers, GripVertical } from 'lucide-react';
+import { ChevronRight, Layers, GripVertical, Anchor } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -47,8 +47,25 @@ export function WaypointTree() {
   const insertionIndex = useAppStore(state => state.insertionIndex);
   const setInsertionIndex = useAppStore(state => state.setInsertionIndex);
 
+  const anchorNodeId = useAppStore(state => state.anchorNodeId);
+  const setAnchorNode = useAppStore(state => state.setAnchorNode);
+  const elementCopyState = useAppStore(state => state.elementCopyState);
+  const setElementCopyState = useAppStore(state => state.setElementCopyState);
+
   const [expandedGenerators, setExpandedGenerators] = useState<Set<string>>(new Set());
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleExpand = (id: string) => {
     setExpandedGenerators(prev => {
@@ -57,6 +74,17 @@ export function WaypointTree() {
       else next.add(id);
       return next;
     });
+  };
+
+  const handleNodeClick = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (elementCopyState) {
+      // コピーモード中: 単一選択でプレビューノードを更新
+      selectNodes([id]);
+      setElementCopyState({ ...elementCopyState, previewNodeId: id });
+      return;
+    }
+    selectNodes([id], e.shiftKey || e.metaKey);
   };
 
   const sensors = useSensors(
@@ -112,11 +140,10 @@ export function WaypointTree() {
     }
   };
 
-  // Calculate a flat global index for sequential numbering
   let globalIndex = 0;
 
   return (
-    <div className="flex-1 overflow-y-auto w-full">
+    <div className="flex-1 overflow-y-auto w-full relative">
       {rootNodeIds.length === 0 && insertionIndex === -1 && renderItems.length === 1 ? (
         <div className="text-sm text-slate-500 italic p-4 text-center">
           No items yet. Drag to create points on the map.
@@ -153,6 +180,7 @@ export function WaypointTree() {
                 if (!node) return null;
 
                 const isSelected = selectedNodeIds.includes(id);
+                const isAnchor = anchorNodeId === id;
 
                 // Generator node
                 if (node.type === 'generator') {
@@ -167,10 +195,7 @@ export function WaypointTree() {
                   return (
                     <SortableItem key={id} id={id} isDragging={activeDragId === id}>
                       <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          selectNodes([id], e.shiftKey || e.metaKey);
-                        }}
+                        onClick={(e) => handleNodeClick(id, e)}
                         className={`px-3 py-2 rounded text-sm group border transition-colors cursor-pointer ${
                           isSelected
                             ? 'bg-emerald-900/50 border-emerald-500 text-white'
@@ -202,21 +227,29 @@ export function WaypointTree() {
                             const child = nodes[childId];
                             if (!child) return null;
                             const isChildSelected = selectedNodeIds.includes(childId);
+                            const isChildAnchor = anchorNodeId === childId;
                             return (
                               <li
                                 key={childId}
-                                onClick={(e) => {
+                                onClick={(e) => handleNodeClick(childId, e)}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
                                   e.stopPropagation();
-                                  selectNodes([childId], e.shiftKey || e.metaKey);
+                                  setContextMenu({ nodeId: childId, x: e.clientX, y: e.clientY });
                                 }}
-                                className={`px-2 py-1 rounded text-xs border transition-colors cursor-pointer ${
+                                className={`px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between ${
                                   isChildSelected
                                     ? 'bg-blue-900/50 border-blue-500 text-white'
                                     : 'bg-slate-850 border-transparent hover:bg-slate-700 hover:border-slate-600 text-slate-400'
-                                }`}
+                                } ${isChildAnchor ? 'border-amber-400/60 bg-amber-950/20' : ''}`}
                               >
-                                <span className="opacity-60 font-mono mr-1">[{startIdx + childIdx + indexStartIndex}]</span>
-                                🎯 Waypoint
+                                <div className="flex items-center gap-1">
+                                  <span className="opacity-60 font-mono mr-1">[{startIdx + childIdx + indexStartIndex}]</span>
+                                  🎯 Waypoint
+                                </div>
+                                {isChildAnchor && (
+                                  <span className="text-amber-400 text-xs font-bold" title="Anchor Point">⚓</span>
+                                )}
                               </li>
                             );
                           })}
@@ -231,20 +264,25 @@ export function WaypointTree() {
                 return (
                   <SortableItem key={id} id={id} isDragging={activeDragId === id}>
                     <div
-                      onClick={(e) => {
+                      onClick={(e) => handleNodeClick(id, e)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
-                        selectNodes([id], e.shiftKey || e.metaKey);
+                        setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
                       }}
                       className={`px-3 py-2 rounded text-sm group border transition-colors cursor-pointer ${
                         isSelected
                           ? 'bg-blue-900/50 border-blue-500 text-white'
                           : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600 text-slate-300'
-                      }`}
+                      } ${isAnchor ? 'border-amber-400 bg-amber-950/30' : ''}`}
                     >
                       <div className="flex items-center justify-between">
-                        <div>
-                          <span className="opacity-75 font-mono text-xs mr-2">[{currentGlobalIndex + indexStartIndex}]</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="opacity-75 font-mono text-xs mr-1">[{currentGlobalIndex + indexStartIndex}]</span>
                           🎯 Waypoint
+                          {isAnchor && (
+                            <span className="text-amber-400 text-xs font-bold ml-1" title="Anchor Point">⚓</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <span className={`opacity-50 text-xs ${isSelected ? 'text-blue-200' : ''}`}>{id.slice(0, 6)}</span>
@@ -259,6 +297,30 @@ export function WaypointTree() {
           </SortableContext>
         </div>
       </DndContext>
+
+      {contextMenu && (
+        <div
+          ref={menuRef}
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          className="fixed z-[9999] bg-surface-panel border border-border-base rounded-lg shadow-xl py-1 min-w-[160px] text-xs text-text-base select-none"
+        >
+          <button
+            onClick={() => {
+              if (anchorNodeId === contextMenu.nodeId) {
+                setAnchorNode(null);
+              } else {
+                setAnchorNode(contextMenu.nodeId);
+              }
+              setContextMenu(null);
+            }}
+            className="w-full text-left px-3 py-2 hover:bg-surface-hover flex items-center gap-2 text-text-base transition-colors"
+          >
+            <Anchor size={14} className="text-amber-400" />
+            {anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
+
