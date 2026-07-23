@@ -69,6 +69,12 @@ pub fn force_exit(app: AppHandle) {
     app.exit(0);
 }
 
+#[command]
+pub fn open_devtools(window: tauri::WebviewWindow) {
+    #[cfg(debug_assertions)]
+    window.open_devtools();
+}
+
 pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
         load_ros_map,
@@ -86,7 +92,8 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         plugins::scaffold_plugin,
         plugins::check_sdk_version,
         plugins::update_plugin_sdk,
-        read_image_base64
+        read_image_base64,
+        open_devtools
     ]
 }
 

@@ -227,6 +227,10 @@ export function TopMenu() {
       label: "Keyboard Shortcuts",
       action: () => setShortcutsModalOpen(true),
     },
+    {
+      label: "Developer Tools",
+      action: () => invoke("open_devtools"),
+    },
     { divider: true, label: "" },
     {
       label: "About Waypoint Tool",

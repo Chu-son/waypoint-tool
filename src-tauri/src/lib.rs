@@ -40,6 +40,7 @@ pub fn run() {
             commands::update_plugin_sdk,
             commands::read_image_base64,
             commands::force_exit,
+            commands::open_devtools,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
