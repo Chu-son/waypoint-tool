@@ -1,6 +1,5 @@
-import { OptionsSchema, ProjectData, PluginInstance } from '../../types/store';
-import { IBackendAPI, MapLoadResult } from '../types';
-import {ProjectMapLayer} from "../../types/store";
+import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../../types/store';
+import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class MockBackendAPI implements IBackendAPI {
   async loadROSMap(yamlPath: string): Promise<MapLoadResult> {
@@ -100,5 +99,16 @@ export class MockBackendAPI implements IBackendAPI {
 
   async exportMaps(options: any): Promise<void> {
     console.log('[Mock Backend] exportMaps called with options:', options);
+  }
+
+  async blendMapPreview(_layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
+    console.log('[Mock Backend] blendMapPreview called');
+    return {
+      image_data_b64: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+      width: 1,
+      height: 1,
+      origin: [0, 0, 0],
+      resolution: 0.05,
+    };
   }
 }

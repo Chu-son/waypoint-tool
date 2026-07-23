@@ -1,8 +1,9 @@
-use image::{RgbaImage, Rgba};
+use image::RgbaImage;
 use base64::{engine::general_purpose, Engine as _};
 use flate2::{write::ZlibEncoder, Compression};
 use std::io::Write;
 use crate::plugins::models::{PluginMapLayer, OccupancyGridData};
+use super::blending::{classify_pixel, apply_blend_cell, CellValue};
 
 #[derive(Debug, Clone)]
 pub struct LayerForBlend {
@@ -45,27 +46,30 @@ pub fn world_to_pixel(
 }
 
 pub fn evaluate_pixel(
-    pixel: Rgba<u8>,
+    pixel: [u8; 4],
     negate: bool,
     occ_thresh: f64,
     free_thresh: f64,
-) -> i8 {
-    let alpha = pixel.0[3];
-    if alpha < 128 {
-        return -1; // Transparent = UNKNOWN
+) -> CellValue {
+    if pixel[3] < 128 {
+        return CellValue::Unknown;
     }
-    let gray = (pixel.0[0] as f32 * 0.299 + pixel.0[1] as f32 * 0.587 + pixel.0[2] as f32 * 0.114) as u8;
+    // If standard thresholds are used with default negate, use classify_pixel
+    if !negate && (occ_thresh - 0.65).abs() < 1e-4 && (free_thresh - 0.196).abs() < 1e-4 {
+        return classify_pixel(pixel);
+    }
+    let gray = (pixel[0] as f32 * 0.299 + pixel[1] as f32 * 0.587 + pixel[2] as f32 * 0.114) as u8;
     let normalized = if negate {
         gray as f64 / 255.0
     } else {
         1.0 - gray as f64 / 255.0
     };
     if normalized >= occ_thresh {
-        100
+        CellValue::Obstacle
     } else if normalized <= free_thresh {
-        0
+        CellValue::Free
     } else {
-        -1
+        CellValue::Unknown
     }
 }
 
@@ -121,48 +125,18 @@ pub fn build_occupancy_grid_from_layers(
             let world_x = base_origin[0] + (c as f64) * base_res;
             let world_y = base_origin[1] + ((height - 1 - r) as f64) * base_res;
 
-            let mut combined_cell = -1i8;
+            let mut combined_cell = CellValue::Unknown;
 
             for layer in &decoded_layers {
                 let (c_l, r_l) = world_to_pixel(world_x, world_y, layer.origin, layer.resolution, layer.image.height());
                 if c_l >= 0 && c_l < layer.image.width() as i32 && r_l >= 0 && r_l < layer.image.height() as i32 {
                     let pixel = layer.image.get_pixel(c_l as u32, r_l as u32);
-                    let cell = evaluate_pixel(*pixel, layer.negate, layer.occ_thresh, layer.free_thresh);
+                    let cell = evaluate_pixel(pixel.0, layer.negate, layer.occ_thresh, layer.free_thresh);
 
-                    let l_is_obstacle = cell == 100;
-                    let l_is_free = cell == 0;
-                    let o_is_obstacle = combined_cell == 100;
-                    let o_is_free = combined_cell == 0;
-
-                    match layer.blend_mode.as_str() {
-                        "merge_obstacles" => {
-                            if l_is_obstacle || o_is_obstacle {
-                                combined_cell = 100;
-                            } else if l_is_free || o_is_free {
-                                combined_cell = 0;
-                            } else {
-                                combined_cell = -1;
-                            }
-                        }
-                        "merge_free" => {
-                            if l_is_free || o_is_free {
-                                combined_cell = 0;
-                            } else if l_is_obstacle || o_is_obstacle {
-                                combined_cell = 100;
-                            } else {
-                                combined_cell = -1;
-                            }
-                        }
-                        _ => {
-                            // "overwrite" またはデフォルト
-                            if cell != -1 {
-                                combined_cell = cell;
-                            }
-                        }
-                    }
+                    combined_cell = apply_blend_cell(combined_cell, cell, &layer.blend_mode);
                 }
             }
-            data_raw.push(combined_cell as u8);
+            data_raw.push(combined_cell.to_occupancy_grid_val() as u8);
         }
     }
 

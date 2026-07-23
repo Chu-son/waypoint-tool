@@ -14,6 +14,11 @@ pub fn export_maps(options: map::ExportMapsOptions) -> Result<(), String> {
 }
 
 #[command]
+pub async fn blend_map_preview(layers: Vec<map::BlendPreviewLayer>) -> Result<map::BlendPreviewResult, String> {
+    map::blend_map_preview(layers)
+}
+
+#[command]
 pub fn save_project(path: String, data: ProjectData) -> Result<(), String> {
     io::save_project(&path, &data)
 }
@@ -68,6 +73,7 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
     tauri::generate_handler![
         load_ros_map,
         export_maps,
+        blend_map_preview,
         save_project,
         load_project,
         export_waypoints,

@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../../types/store';
-import { IBackendAPI, MapLoadResult } from '../types';
+import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
   async loadROSMap(yamlPath: string): Promise<MapLoadResult> {
@@ -67,5 +67,9 @@ export class TauriBackendAPI implements IBackendAPI {
 
   async exportMaps(options: any): Promise<void> {
     return invoke('export_maps', { options });
+  }
+
+  async blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
+    return invoke('blend_map_preview', { layers });
   }
 }

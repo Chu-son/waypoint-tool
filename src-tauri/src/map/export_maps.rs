@@ -2,9 +2,10 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use image::{GenericImageView, RgbaImage, Rgba, Pixel, ImageEncoder, codecs::pnm, ExtendedColorType};
+use image::{codecs::pnm, ImageEncoder, ExtendedColorType};
 use base64::{engine::general_purpose, Engine as _};
 use crate::models::MapInfo;
+use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
 
 #[derive(Debug, Deserialize)]
 pub struct ExportMapsOptions {
@@ -57,7 +58,7 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
     let mut layers = options.layers;
     layers.sort_by_key(|l| l.z_index);
 
-    for layer in layers {
+    for layer in &layers {
         if let Some(b64) = layer.image_base64.as_ref() {
             let b64_data = if b64.starts_with("data:image") {
                 b64.split(',').nth(1).unwrap_or(b64)
@@ -88,8 +89,8 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
             continue; // Skip invalid regions
         }
 
-        let mut out_img = RgbaImage::from_pixel(width_px, height_px, Rgba([205, 205, 205, 255]));
-
+        // Build active layers for this region
+        let mut active_layer_inputs = Vec::new();
         for (layer, img) in &decoded_layers {
             if let Some(visible) = region.layer_visibility.get(&layer.id) {
                 if !visible {
@@ -102,84 +103,24 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
                 None => continue,
             };
 
-            let l_res = info.resolution;
-            let l_ox = info.origin[0];
-            let l_oy = info.origin[1];
-            let l_w = img.width() as f64;
-            let l_h = img.height() as f64;
-
-            for r in 0..height_px {
-                for c in 0..width_px {
-                    let world_x = region.rect.x + (c as f64) * resolution;
-                    let world_y = region.rect.y + ((height_px - 1 - r) as f64) * resolution;
-
-                    // Map to layer pixel
-                    let c_l = ((world_x - l_ox) / l_res).round() as i32;
-                    let r_l = (l_h - 1.0 - (world_y - l_oy) / l_res).round() as i32;
-
-                    if c_l >= 0 && c_l < l_w as i32 && r_l >= 0 && r_l < l_h as i32 {
-                        let l_pixel = img.get_pixel(c_l as u32, r_l as u32);
-                        let l_rgba = l_pixel.to_rgba();
-                        
-                        // Ignore UI layer opacity for export blending, as ROS maps don't support partial transparency.
-                        // We use the image's inherent alpha channel, thresholding at 0.5.
-                        let img_alpha = l_rgba[3] as f64 / 255.0;
-                        if img_alpha < 0.5 {
-                            continue;
-                        }
-                        let alpha = 1.0;
-
-                        let out_pixel = out_img.get_pixel_mut(c, r);
-                        
-                        let l_is_obstacle = l_rgba[0] < 128;
-                        let l_is_free = l_rgba[0] > 230;
-                        let o_is_obstacle = out_pixel[0] < 128;
-                        let o_is_free = out_pixel[0] > 230;
-
-                        match layer.blend_mode.as_str() {
-                            "merge_obstacles" => {
-                                // Merge Obstacles (Preserve Free)
-                                // If either is obstacle, result is obstacle.
-                                // Else if either is free, result is free.
-                                // Else unknown.
-                                if l_is_obstacle || o_is_obstacle {
-                                    for i in 0..3 { out_pixel[i] = ((l_rgba[i] as f64) * alpha + 0.0 * (1.0 - alpha)) as u8; out_pixel[i] = out_pixel[i].min(0); } // Force black
-                                    out_pixel[0] = 0; out_pixel[1] = 0; out_pixel[2] = 0;
-                                } else if l_is_free || o_is_free {
-                                    out_pixel[0] = 254; out_pixel[1] = 254; out_pixel[2] = 254;
-                                } else {
-                                    out_pixel[0] = 205; out_pixel[1] = 205; out_pixel[2] = 205;
-                                }
-                            },
-                            "merge_free" => {
-                                // Merge Free Space
-                                // If either is free, result is free.
-                                // Else if either is obstacle, result is obstacle.
-                                // Else unknown.
-                                if l_is_free || o_is_free {
-                                    out_pixel[0] = 254; out_pixel[1] = 254; out_pixel[2] = 254;
-                                } else if l_is_obstacle || o_is_obstacle {
-                                    out_pixel[0] = 0; out_pixel[1] = 0; out_pixel[2] = 0;
-                                } else {
-                                    out_pixel[0] = 205; out_pixel[1] = 205; out_pixel[2] = 205;
-                                }
-                            },
-                            _ => { 
-                                // "overwrite" or "normal"
-                                // Overwrite with top layer, unless top layer is unknown
-                                if !l_is_obstacle && !l_is_free {
-                                    // Top is unknown, keep bottom (do nothing)
-                                } else {
-                                    for i in 0..3 {
-                                        out_pixel[i] = ((l_rgba[i] as f64) * alpha + (out_pixel[i] as f64) * (1.0 - alpha)) as u8;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            active_layer_inputs.push(LayerInput {
+                id: &layer.id,
+                image: img,
+                resolution: info.resolution,
+                origin: info.origin,
+                blend_mode: &layer.blend_mode,
+                z_index: layer.z_index,
+            });
         }
+
+        let region_rect = RectRegion {
+            x: region.rect.x,
+            y: region.rect.y,
+            width: region.rect.width,
+            height: region.rect.height,
+        };
+
+        let out_img = blend_layers_to_image(&active_layer_inputs, &region_rect, resolution);
 
         // Save image
         if options.format == "ros_standard" {

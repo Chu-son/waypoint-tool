@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
+import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 import { ProjectMapLayer } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
@@ -19,11 +20,16 @@ extend({
   Text,
 });
 
-function MapLayerSprite({ layer, scale, textStyle }: { layer: ProjectMapLayer, scale: number, textStyle: TextStyle }) {
-  const [texture, setTexture] = useState<Texture | null>(null);
-  const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
+function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: ProjectMapLayer, scale: number, textStyle: TextStyle, overrideTexture?: Texture | null }) {
+  const [texture, setTexture] = useState<Texture | null>(overrideTexture || null);
+  const [imgSize, setImgSize] = useState({ w: overrideTexture ? overrideTexture.width : 0, h: overrideTexture ? overrideTexture.height : 0 });
 
   useEffect(() => {
+    if (overrideTexture) {
+      setTexture(overrideTexture);
+      setImgSize({ w: overrideTexture.width, h: overrideTexture.height });
+      return;
+    }
     let newTexture: Texture | null = null;
     if (layer.image_base64) {
       const img = new Image();
@@ -39,7 +45,7 @@ function MapLayerSprite({ layer, scale, textStyle }: { layer: ProjectMapLayer, s
         newTexture.destroy(true);
       }
     };
-  }, [layer.image_base64]);
+  }, [layer.image_base64, overrideTexture]);
 
   if (!texture || !layer.visible) return null;
   
@@ -112,6 +118,76 @@ export function MapCanvas() {
   
   const mapLayers = useAppStore(state => state.mapLayers);
   const enableSnapping = useAppStore(state => state.enableSnapping);
+  const isExportPreview = useAppStore(state => state.isExportPreview);
+
+  const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
+  const [previewInfo, setPreviewInfo] = useState<any>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  // B案: blend_mode, z_index, visible, image_base64 のみの変更キーを生成 (opacity変化では再計算しない)
+  const previewSyncKey = useMemo(() => {
+    return JSON.stringify(
+      mapLayers.map(l => ({
+        id: l.id,
+        blend_mode: l.blend_mode || 'overwrite',
+        z_index: l.z_index,
+        visible: l.visible,
+        hasImage: !!l.image_base64,
+      }))
+    );
+  }, [mapLayers]);
+
+  useEffect(() => {
+    if (!isExportPreview) {
+      setPreviewTexture(prev => { if (prev) prev.destroy(true); return null; });
+      setIsPreviewLoading(false);
+      setPreviewError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsPreviewLoading(true);
+    setPreviewError(null);
+    console.log('[Export Preview] Generating preview... SyncKey:', previewSyncKey);
+
+    const layerInputs = mapLayers.map(l => ({
+      id: l.id,
+      image_base64: l.image_base64,
+      info: l.info,
+      blend_mode: l.blend_mode || 'overwrite',
+      z_index: l.z_index,
+      visible: l.visible,
+    }));
+
+    BackendAPI.blendMapPreview(layerInputs).then(result => {
+      if (cancelled) return;
+      console.log('[Export Preview] Backend returned preview data. Origin:', result.origin, 'Size:', result.width, 'x', result.height);
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled) return;
+        const tex = Texture.from(img);
+        setPreviewTexture(prev => { if (prev) prev.destroy(true); return tex; });
+        setPreviewInfo({ resolution: result.resolution, origin: result.origin });
+        setIsPreviewLoading(false);
+        console.log('[Export Preview] Texture loaded successfully.');
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        setPreviewError('Failed to load image texture from base64.');
+        setIsPreviewLoading(false);
+        console.error('[Export Preview] Image onload error.');
+      };
+      img.src = result.image_data_b64;
+    }).catch(err => {
+      if (cancelled) return;
+      console.error('[Export Preview] Export Preview failed:', err);
+      setPreviewError(String(err));
+      setIsPreviewLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [isExportPreview, previewSyncKey]);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
@@ -875,7 +951,31 @@ export function MapCanvas() {
       <Application preserveDrawingBuffer={true} background="#0f172a" resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
-          {mapLayers.length > 0 ? (
+          {isExportPreview ? (
+            isPreviewLoading ? (
+              <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
+            ) : previewError ? (
+              <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
+            ) : previewTexture ? (
+              <MapLayerSprite
+                layer={{
+                  id: '__export_preview__',
+                  name: 'Export Preview',
+                  visible: true,
+                  opacity: 1,
+                  image_base64: '',
+                  info: previewInfo,
+                  width: previewTexture.width,
+                  height: previewTexture.height,
+                  z_index: 0,
+                  blend_mode: 'overwrite',
+                }}
+                overrideTexture={previewTexture}
+                scale={scale}
+                textStyle={textStyle}
+              />
+            ) : null
+          ) : mapLayers.length > 0 ? (
             mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)
           ) : (
             <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />

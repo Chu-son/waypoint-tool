@@ -7,8 +7,12 @@ use crate::models::MapInfo;
 
 pub mod export_maps;
 pub mod occupancy;
+pub mod blend_preview;
+pub mod blending;
 pub use export_maps::*;
 pub use occupancy::*;
+pub use blend_preview::*;
+pub use blending::*;
 
 #[derive(Debug, serde::Serialize)]
 pub struct MapLoadResult {

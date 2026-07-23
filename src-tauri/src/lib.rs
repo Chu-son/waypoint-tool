@@ -26,6 +26,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::load_ros_map,
             commands::export_maps,
+            commands::blend_map_preview,
             commands::save_project,
             commands::load_project,
             commands::load_options_schema,
@@ -37,6 +38,7 @@ pub fn run() {
             commands::scaffold_plugin,
             commands::check_sdk_version,
             commands::update_plugin_sdk,
+            commands::read_image_base64,
             commands::force_exit,
         ])
         .run(tauri::generate_context!())

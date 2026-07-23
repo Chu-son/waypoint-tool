@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Trash2, FolderOpen, Layers, ChevronUp, ChevronDown, Crop } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, Layers, ChevronUp, ChevronDown, Crop, ScanEye } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { BackendAPI } from "../../api";
@@ -18,6 +18,8 @@ export function LayerPanel() {
   const exportRegions = useAppStore((state) => state.exportRegions);
   const updateExportRegion = useAppStore((state) => state.updateExportRegion);
   const removeExportRegion = useAppStore((state) => state.removeExportRegion);
+  const isExportPreview = useAppStore((state) => state.isExportPreview);
+  const setIsExportPreview = useAppStore((state) => state.setIsExportPreview);
 
   const handleLoadMap = async () => {
     try {
@@ -84,10 +86,25 @@ export function LayerPanel() {
           </div>
         ) : (
           <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-              Loaded Layers
-              <div className="h-px flex-1 bg-border-base/20" />
-            </h3>
+            <div className="flex items-center gap-2 ml-1">
+              <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] flex items-center gap-2 flex-1">
+                Loaded Layers
+                <div className="h-px flex-1 bg-border-base/20" />
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-6 w-6 transition-all ${
+                  isExportPreview
+                    ? 'text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20'
+                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
+                }`}
+                onClick={() => setIsExportPreview(!isExportPreview)}
+                title={isExportPreview ? "Export Preview: ON (クリックで解除)" : "Export Preview: OFF (クリックで有効化)"}
+              >
+                <ScanEye size={14} />
+              </Button>
+            </div>
             {mapLayers.map((layer, index) => (
               <div
                 key={layer.id}

@@ -12,6 +12,7 @@ export type MapSlice = {
   showPaths: boolean;
   showGrid: boolean;
   shouldFitToMaps: number;
+  isExportPreview: boolean;
 
   setMapLayers: (layers: ProjectMapLayer[]) => void;
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => void;
@@ -24,6 +25,7 @@ export type MapSlice = {
   setShowPaths: (show: boolean) => void;
   setShowGrid: (show: boolean) => void;
   triggerFitToMaps: () => void;
+  setIsExportPreview: (enabled: boolean) => void;
 
   exportRegions: import('../../types/store').ExportRegion[];
   addExportRegion: (region: import('../../types/store').ExportRegion) => void;
@@ -40,11 +42,13 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
   showPaths: true,
   showGrid: true,
   shouldFitToMaps: 0,
+  isExportPreview: false,
   exportRegions: [],
 
   setShowPaths: (show: boolean) => set({ showPaths: show }),
   setShowGrid: (show: boolean) => set({ showGrid: show }),
   triggerFitToMaps: () => set({ shouldFitToMaps: Date.now() }),
+  setIsExportPreview: (enabled: boolean) => set({ isExportPreview: enabled }),
 
   addExportRegion: (region) => set((state) => ({
     exportRegions: [...state.exportRegions, region],

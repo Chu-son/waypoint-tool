@@ -34,6 +34,23 @@ export type ExportMapsOptions = {
   }[];
 };
 
+export type BlendPreviewLayerInput = {
+  id: string;
+  image_base64?: string;
+  info?: any;
+  blend_mode: string;
+  z_index: number;
+  visible: boolean;
+};
+
+export type BlendPreviewResult = {
+  image_data_b64: string;
+  width: number;
+  height: number;
+  origin: [number, number, number];
+  resolution: number;
+};
+
 export interface IBackendAPI {
   loadROSMap(yamlPath: string): Promise<MapLoadResult>;
   saveProject(path: string, data: ProjectData): Promise<void>;
@@ -54,6 +71,7 @@ export interface IBackendAPI {
   updatePluginSdk(pluginFolderPath: string): Promise<string>;
   readImageBase64(path: string): Promise<string>;
   exportMaps(options: ExportMapsOptions): Promise<void>;
+  blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult>;
 }
 
 export interface OpenDialogOptions {
