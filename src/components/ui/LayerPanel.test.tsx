@@ -13,6 +13,8 @@ vi.mock('lucide-react', () => ({
   ChevronUp: () => <div data-testid="up-icon" />,
   ChevronDown: () => <div data-testid="down-icon" />,
   Layers: () => <div data-testid="layers-icon" />,
+  ScanEye: () => <div data-testid="scan-eye-icon" />,
+  Sparkles: () => <div data-testid="sparkles-icon" />,
 }));
 
 // Mock API

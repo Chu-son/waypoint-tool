@@ -31,6 +31,8 @@ pub fn run() {
             commands::load_project,
             commands::load_options_schema,
             commands::export_waypoints,
+            commands::read_text_file,
+            commands::write_text_file,
             commands::fetch_installed_plugins,
             commands::run_plugin,
             commands::scan_custom_plugin,

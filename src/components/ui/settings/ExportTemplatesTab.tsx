@@ -1,4 +1,4 @@
-import { Plus, Trash2, Copy, Save } from "lucide-react";
+import { Plus, Trash2, Copy, Save, Upload, Download } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "../common/Button";
@@ -7,6 +7,7 @@ import { Modal, ModalHeader, ModalContent, ModalFooter } from "../common/Modal";
 import { Label } from "../common/Label";
 import { Select } from "../common/Select";
 import { useState, useEffect } from "react";
+import { ExportTemplate } from "../../../types/store";
 
 function TemplateCreateModal({
   isOpen, onClose, onSubmit, initialData
@@ -72,6 +73,104 @@ function TemplateCreateModal({
   );
 }
 
+function TemplateImportModal({
+  isOpen,
+  onClose,
+  onSubmit,
+  importData,
+  existingTemplate,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local'; action: 'add' | 'overwrite' }) => void;
+  importData: { name: string; suffix?: string; extension: string; content: string } | null;
+  existingTemplate?: ExportTemplate;
+}) {
+  const [name, setName] = useState("");
+  const [suffix, setSuffix] = useState("");
+  const [extension, setExtension] = useState("");
+  const [scope, setScope] = useState<'global' | 'local'>('global');
+  const [action, setAction] = useState<'add' | 'overwrite'>('add');
+
+  useEffect(() => {
+    if (isOpen && importData) {
+      setName(importData.name || "Imported Template");
+      setSuffix(importData.suffix || "");
+      setExtension(importData.extension || "txt");
+      setScope('global');
+      setAction(existingTemplate ? 'overwrite' : 'add');
+    }
+  }, [isOpen, importData, existingTemplate]);
+
+  if (!isOpen || !importData) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="sm">
+      <ModalHeader onClose={onClose}>
+        <div className="flex items-center gap-3">
+          <Upload size={20} className="text-primary-base" />
+          <span>Import Export Template</span>
+        </div>
+      </ModalHeader>
+      <ModalContent className="space-y-4 p-4">
+        {existingTemplate && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs space-y-2">
+            <p className="font-bold">A template with the name "{importData.name}" already exists.</p>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="importAction"
+                  checked={action === 'overwrite'}
+                  onChange={() => setAction('overwrite')}
+                />
+                <span>Overwrite existing template</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="importAction"
+                  checked={action === 'add'}
+                  onChange={() => {
+                    setAction('add');
+                    setName(`${importData.name} (Imported)`);
+                  }}
+                />
+                <span>Add as a new template</span>
+              </label>
+            </div>
+          </div>
+        )}
+        <div className="space-y-1">
+          <Label>Name</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="flex gap-4">
+          <div className="space-y-1 flex-1">
+            <Label>Suffix</Label>
+            <Input value={suffix} onChange={(e) => setSuffix(e.target.value)} placeholder="_custom" />
+          </div>
+          <div className="space-y-1 flex-1">
+            <Label>Extension</Label>
+            <Input value={extension} onChange={(e) => setExtension(e.target.value)} placeholder="txt" />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label>Target Scope</Label>
+          <Select value={scope} onChange={(e) => setScope(e.target.value as any)}>
+            <option value="global">Global (Available in all projects)</option>
+            <option value="local">Local (This project only)</option>
+          </Select>
+        </div>
+      </ModalContent>
+      <ModalFooter>
+        <Button variant="ghost" onClick={onClose} className="text-text-muted">Cancel</Button>
+        <Button onClick={() => onSubmit({ name, suffix, extension, scope, action })} className="bg-primary-base">Import</Button>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
 export function ExportTemplatesTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
   const globalExportTemplates = useAppStore((state) => state.exportTemplates);
@@ -86,6 +185,10 @@ export function ExportTemplatesTab() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialData, setModalInitialData] = useState<any>(null);
   const [modalSourceContent, setModalSourceContent] = useState<string>("");
+
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importData, setImportData] = useState<any>(null);
+  const [existingImportTemplate, setExistingImportTemplate] = useState<ExportTemplate | undefined>(undefined);
 
   const handleCreateOrCopy = (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local' }) => {
     addExportTemplate({
@@ -114,6 +217,93 @@ export function ExportTemplatesTab() {
     });
     setModalSourceContent(template.content);
     setIsModalOpen(true);
+  };
+
+  const handleExportTemplate = async (template: ExportTemplate) => {
+    try {
+      const { DialogAPI, BackendAPI } = await import("../../../api");
+      const safeName = template.name.replace(/[^a-zA-Z0-9_\-]/g, "_") || "template";
+      const savePath = await DialogAPI.save({
+        defaultPath: `${safeName}.wpt_template`,
+        filters: [{ name: "Waypoint Export Template", extensions: ["wpt_template"] }],
+      });
+      if (!savePath) return;
+
+      const dataToExport = {
+        name: template.name,
+        extension: template.extension,
+        suffix: template.suffix || "",
+        content: template.content,
+      };
+
+      await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
+      alert("テンプレートをエクスポートしました。");
+    } catch (err) {
+      console.error("Failed to export template:", err);
+      alert(`エクスポートに失敗しました。\n詳細: ${String(err)}`);
+    }
+  };
+
+  const handleImportTemplate = async () => {
+    try {
+      const { DialogAPI, BackendAPI } = await import("../../../api");
+      const selectedPath = await DialogAPI.open({
+        multiple: false,
+        filters: [{ name: "Waypoint Export Template", extensions: ["wpt_template"] }],
+      });
+      if (!selectedPath) return;
+
+      const pathStr = typeof selectedPath === "string" ? selectedPath : (selectedPath as any).path;
+      if (!pathStr) return;
+
+      const fileContent = await BackendAPI.readTextFile(pathStr);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(fileContent);
+      } catch {
+        alert("ファイルの形式が不正です（JSONではありません）。");
+        return;
+      }
+
+      if (!parsed || typeof parsed !== "object" || !parsed.name || !parsed.extension || typeof parsed.content !== "string") {
+        alert("有効な Waypoint テンプレートファイルではありません。");
+        return;
+      }
+
+      const existing = globalExportTemplates.find((t) => t.name === parsed.name);
+      setImportData(parsed);
+      setExistingImportTemplate(existing);
+      setIsImportModalOpen(true);
+    } catch (err) {
+      console.error("Failed to import template:", err);
+      alert(`インポートに失敗しました。\n詳細: ${String(err)}`);
+    }
+  };
+
+  const handleImportSubmit = (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local'; action: 'add' | 'overwrite' }) => {
+    if (!importData) return;
+
+    if (data.action === 'overwrite' && existingImportTemplate) {
+      updateExportTemplate(existingImportTemplate.id, {
+        name: data.name,
+        suffix: data.suffix,
+        extension: data.extension,
+        scope: data.scope,
+        content: importData.content,
+      });
+    } else {
+      addExportTemplate({
+        id: uuidv4(),
+        name: data.name,
+        suffix: data.suffix,
+        extension: data.extension,
+        scope: data.scope,
+        content: importData.content,
+      });
+    }
+
+    setIsImportModalOpen(false);
+    alert("テンプレートのインポートが完了しました。");
   };
 
   const insertTemplateVar = (templateId: string, text: string) => {
@@ -149,13 +339,22 @@ export function ExportTemplatesTab() {
             Define Handlebars templates for custom waypoint export formats.
           </p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={openNewModal}
-        >
-          <Plus size={14} className="mr-1" /> New Template
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleImportTemplate}
+          >
+            <Upload size={14} className="mr-1" /> Import
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={openNewModal}
+          >
+            <Plus size={14} className="mr-1" /> New Template
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -277,14 +476,25 @@ export function ExportTemplatesTab() {
                   size="icon"
                   onClick={() => openCopyModal(template)}
                   className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+                  title="Copy Template"
                 >
                   <Copy size={16} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
+                  onClick={() => handleExportTemplate(template)}
+                  className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+                  title="Export Template"
+                >
+                  <Download size={16} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeExportTemplate(template.id)}
                   className="h-8 w-8 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
+                  title="Delete Template"
                 >
                   <Trash2 size={16} />
                 </Button>
@@ -367,6 +577,13 @@ export function ExportTemplatesTab() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateOrCopy}
         initialData={modalInitialData}
+      />
+      <TemplateImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSubmit={handleImportSubmit}
+        importData={importData}
+        existingTemplate={existingImportTemplate}
       />
     </div>
   );

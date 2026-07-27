@@ -70,6 +70,8 @@ export interface IBackendAPI {
   checkSdkVersion(): Promise<string>;
   updatePluginSdk(pluginFolderPath: string): Promise<string>;
   readImageBase64(path: string): Promise<string>;
+  readTextFile(path: string): Promise<string>;
+  writeTextFile(path: string, content: string): Promise<void>;
   exportMaps(options: ExportMapsOptions): Promise<void>;
   blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult>;
 }

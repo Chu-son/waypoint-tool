@@ -65,6 +65,14 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('read_image_base64', { path });
   }
 
+  async readTextFile(path: string): Promise<string> {
+    return invoke('read_text_file', { path });
+  }
+
+  async writeTextFile(path: string, content: String): Promise<void> {
+    return invoke('write_text_file', { path, content });
+  }
+
   async exportMaps(options: any): Promise<void> {
     return invoke('export_maps', { options });
   }

@@ -92,9 +92,24 @@ export class MockBackendAPI implements IBackendAPI {
     return "Mock SDK Updated successfully";
   }
 
+  private mockFiles: Record<string, string> = {};
+
   async readImageBase64(path: string): Promise<string> {
     console.log('[Mock Backend] readImageBase64 called for:', path);
     return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+  }
+
+  async readTextFile(path: string): Promise<string> {
+    console.log('[Mock Backend] readTextFile called for:', path);
+    if (path in this.mockFiles) {
+      return this.mockFiles[path];
+    }
+    return '';
+  }
+
+  async writeTextFile(path: string, content: string): Promise<void> {
+    console.log('[Mock Backend] writeTextFile called for:', path);
+    this.mockFiles[path] = content;
   }
 
   async exportMaps(options: any): Promise<void> {

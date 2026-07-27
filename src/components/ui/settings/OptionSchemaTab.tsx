@@ -1,7 +1,7 @@
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2, Upload, Download } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
-import { OptionDef } from "../../../types/store";
+import { OptionDef, OptionsSchema } from "../../../types/store";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
 import { Select } from "../common/Select";
@@ -92,6 +92,86 @@ export function OptionSchemaTab() {
     setLocalOptions(localOptions.filter((_, i) => i !== index));
   };
 
+  const handleExportSchema = async () => {
+    try {
+      const { DialogAPI, BackendAPI } = await import("../../../api");
+      const savePath = await DialogAPI.save({
+        defaultPath: "options_schema.wpt_schema",
+        filters: [{ name: "Options Schema", extensions: ["wpt_schema"] }],
+      });
+      if (!savePath) return;
+
+      const dataToExport = {
+        options: localOptions,
+      };
+
+      await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
+      alert("オプションスキーマをエクスポートしました。");
+    } catch (err) {
+      console.error("Failed to export options schema:", err);
+      alert(`エクスポートに失敗しました。\n詳細: ${String(err)}`);
+    }
+  };
+
+  const handleImportSchema = async () => {
+    try {
+      const { DialogAPI, BackendAPI } = await import("../../../api");
+      const selectedPath = await DialogAPI.open({
+        multiple: false,
+        defaultPath: lastDirectory || undefined,
+        filters: [
+          {
+            name: "Options Schema",
+            extensions: ["wpt_schema", "yaml", "yml"],
+          },
+        ],
+      });
+      if (!selectedPath) return;
+
+      const pathStr = typeof selectedPath === "string" ? selectedPath : (selectedPath as any).path;
+      if (!pathStr) return;
+
+      const lastSlash = Math.max(pathStr.lastIndexOf("/"), pathStr.lastIndexOf("\\"));
+      const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
+      useAppStore.getState().setLastDirectory(dir);
+
+      let schema: OptionsSchema;
+
+      if (pathStr.endsWith(".yaml") || pathStr.endsWith(".yml")) {
+        schema = await BackendAPI.loadOptionsSchema(pathStr);
+      } else {
+        const fileContent = await BackendAPI.readTextFile(pathStr);
+        let parsed: any;
+        try {
+          parsed = JSON.parse(fileContent);
+        } catch {
+          alert("ファイルの形式が不正です（JSONではありません）。");
+          return;
+        }
+        if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.options)) {
+          alert("有効な Options Schema ファイルではありません。");
+          return;
+        }
+        schema = parsed as OptionsSchema;
+      }
+
+      if (localOptions.length > 0) {
+        const confirmOverwrite = await DialogAPI.ask(
+          "現在のスキーマ設定を上書きしますか？",
+          { title: "スキーマのインポート" }
+        );
+        if (!confirmOverwrite) return;
+      }
+
+      setGlobalOptionsSchema(schema);
+      setLocalOptions(schema.options || []);
+      alert("オプションスキーマのインポートが完了しました。");
+    } catch (err) {
+      console.error("Failed to import options schema:", err);
+      alert(`オプションスキーマのインポートに失敗しました。\nエラー詳細: ${String(err)}`);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="flex justify-between items-center bg-surface-panel p-4 rounded-xl border border-border-base/50 shadow-sm">
@@ -107,47 +187,16 @@ export function OptionSchemaTab() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={async () => {
-              try {
-                const { DialogAPI, BackendAPI } = await import("../../../api");
-                const selectedPath = await DialogAPI.open({
-                  multiple: false,
-                  defaultPath: lastDirectory || undefined,
-                  filters: [
-                    {
-                      name: "Options Schema YAML",
-                      extensions: ["yaml", "yml"],
-                    },
-                  ],
-                });
-                if (selectedPath) {
-                  const pathStr =
-                    typeof selectedPath === "string"
-                      ? selectedPath
-                      : (selectedPath as any).path;
-                  if (!pathStr) return;
-
-                  const lastSlash = Math.max(
-                    pathStr.lastIndexOf("/"),
-                    pathStr.lastIndexOf("\\"),
-                  );
-                  const dir =
-                    lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
-                  useAppStore.getState().setLastDirectory(dir);
-
-                  const schema = await BackendAPI.loadOptionsSchema(pathStr);
-                  setGlobalOptionsSchema(schema);
-                  // localOptions will be updated by useEffect
-                }
-              } catch (err) {
-                console.error("Failed to load options schema:", err);
-                alert(
-                  `オプションスキーマの読み込みに失敗しました。\nエラー詳細: ${String(err)}`,
-                );
-              }
-            }}
+            onClick={handleImportSchema}
           >
-            <Plus size={14} className="mr-1" /> Load File
+            <Upload size={14} className="mr-1" /> Import
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleExportSchema}
+          >
+            <Download size={14} className="mr-1" /> Export
           </Button>
           <Button
             variant="secondary"

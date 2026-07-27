@@ -61,6 +61,16 @@ pub fn read_image_base64(path: String) -> Result<String, String> {
     Ok(format!("data:{};base64,{}", mime_type, base64_str))
 }
 
+#[command]
+pub fn read_text_file(path: String) -> Result<String, String> {
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read text file: {}", e))
+}
+
+#[command]
+pub fn write_text_file(path: String, content: String) -> Result<(), String> {
+    fs::write(&path, content).map_err(|e| format!("Failed to write text file: {}", e))
+}
+
 pub mod plugins;
 pub use plugins::*;
 
@@ -84,6 +94,8 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         load_project,
         export_waypoints,
         load_options_schema,
+        read_text_file,
+        write_text_file,
         force_exit,
         plugins::fetch_installed_plugins,
         plugins::run_plugin,
@@ -137,5 +149,19 @@ mod tests {
         assert!(res.is_ok());
         let s = res.unwrap();
         assert!(s.starts_with("data:application/octet-stream;base64,"));
+    }
+
+    #[test]
+    fn test_read_write_text_file() {
+        let tmp = TempDir::new().unwrap();
+        let file_path = tmp.path().join("test.txt");
+        let path_str = file_path.to_string_lossy().to_string();
+
+        let write_res = write_text_file(path_str.clone(), "Hello World".to_string());
+        assert!(write_res.is_ok());
+
+        let read_res = read_text_file(path_str);
+        assert!(read_res.is_ok());
+        assert_eq!(read_res.unwrap(), "Hello World");
     }
 }
