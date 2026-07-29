@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libayatana-appindicator3-dev \
     librsvg2-dev \
     python3 python3-pip \
+    fonts-ipafont-gothic fonts-ipafont-mincho \
     && rm -rf /var/lib/apt/lists/*
 
 # Node.js (20.x) のインストール
