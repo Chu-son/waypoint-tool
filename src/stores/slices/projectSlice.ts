@@ -65,6 +65,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       const globalTemplates = state.exportTemplates.filter(t => t.scope !== 'local');
       const localTemplates = (data.export_templates || []).map((t: any) => ({ ...t, scope: 'local' }));
       
+      // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
+      state.clearHistory();
+
       return {
         rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
         nodes: data.nodes || {},
@@ -80,16 +83,21 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       };
     }),
 
-  resetProject: () => set((state) => ({
-    rootNodeIds: [],
-    nodes: {},
-    selectedNodeIds: [],
-    mapLayers: [],
-    exportRegions: [],
-    optionsSchema: null,
-    exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
-    isDirty: false
-  })),
+  resetProject: () => set((state) => {
+    // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
+    state.clearHistory();
+
+    return {
+      rootNodeIds: [],
+      nodes: {},
+      selectedNodeIds: [],
+      mapLayers: [],
+      exportRegions: [],
+      optionsSchema: null,
+      exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
+      isDirty: false
+    };
+  }),
 
   loadProject: async () => {
     const { lastDirectory, setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity } = get();

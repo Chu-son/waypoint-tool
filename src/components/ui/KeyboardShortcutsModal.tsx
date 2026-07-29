@@ -14,6 +14,8 @@ const shortcuts = [
   { action: "Save Project", keys: ["Ctrl", "S"] },
   { action: "Export Waypoints", keys: ["Ctrl", "E"] },
   { action: "Select All Nodes", keys: ["Ctrl", "A"] },
+  { action: "Undo", keys: ["Ctrl", "Z"] },
+  { action: "Redo", keys: ["Ctrl", "Y"] },
   { action: "Delete Selected", keys: ["Delete", "or", "Backspace"] },
   { action: "Deselect / Cancel", keys: ["Esc"] },
   { action: "Select Tool", keys: ["V"] },

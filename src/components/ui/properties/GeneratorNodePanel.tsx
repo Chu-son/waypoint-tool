@@ -98,42 +98,44 @@ export function GeneratorNodePanel({
         Array.isArray(resultingWaypoints) &&
         resultingWaypoints.length > 0
       ) {
-        if (node.children_ids && node.children_ids.length > 0) {
-          removeNodes(node.children_ids);
-        }
-
-        const newChildIds: string[] = [];
-        resultingWaypoints.forEach((wp) => {
-          let qx = wp.qx ?? 0,
-            qy = wp.qy ?? 0,
-            qz = wp.qz ?? 0,
-            qw = wp.qw ?? 1;
-          if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-            const halfYaw = wp.yaw / 2.0;
-            qz = Math.sin(halfYaw);
-            qw = Math.cos(halfYaw);
+        useAppStore.getState().runInHistoryTransaction(() => {
+          if (node.children_ids && node.children_ids.length > 0) {
+            removeNodes(node.children_ids);
           }
-          const id = uuidv4();
-          newChildIds.push(id);
-          useAppStore.getState().addNode(
-            {
-              id,
-              type: "manual",
-              transform: wp.transform || {
-                x: wp.x ?? 0,
-                y: wp.y ?? 0,
-                qx,
-                qy,
-                qz,
-                qw,
-              },
-              options: wp.options || {},
-            },
-            node.id,
-          );
-        });
 
-        handleUpdate(node.id, { generator_params: contextData });
+          const newChildIds: string[] = [];
+          resultingWaypoints.forEach((wp) => {
+            let qx = wp.qx ?? 0,
+              qy = wp.qy ?? 0,
+              qz = wp.qz ?? 0,
+              qw = wp.qw ?? 1;
+            if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
+              const halfYaw = wp.yaw / 2.0;
+              qz = Math.sin(halfYaw);
+              qw = Math.cos(halfYaw);
+            }
+            const id = uuidv4();
+            newChildIds.push(id);
+            useAppStore.getState().addNode(
+              {
+                id,
+                type: "manual",
+                transform: wp.transform || {
+                  x: wp.x ?? 0,
+                  y: wp.y ?? 0,
+                  qx,
+                  qy,
+                  qz,
+                  qw,
+                },
+                options: wp.options || {},
+              },
+              node.id,
+            );
+          });
+
+          handleUpdate(node.id, { generator_params: contextData });
+        });
       } else {
         alert("Plugin executed but returned 0 waypoints.");
       }

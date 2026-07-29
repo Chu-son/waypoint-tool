@@ -859,6 +859,9 @@ export function MapCanvas() {
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (interactionMode.current !== 'none') {
+      if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
+        useAppStore.getState().endHistoryTransaction();
+      }
       if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
         const node = useAppStore.getState().nodes[activeNodeId.current];
         if (node && node.transform) {
@@ -941,6 +944,9 @@ export function MapCanvas() {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={() => { 
+        if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
+          useAppStore.getState().endHistoryTransaction();
+        }
         interactionMode.current = 'none';
         activeNodeId.current = null;
         setCursorPosition(null);
@@ -994,6 +1000,7 @@ export function MapCanvas() {
               if (activeTool === 'select') {
                 e.stopPropagation();
                 selectNodes([nodeId], e.shiftKey || e.metaKey);
+                useAppStore.getState().beginHistoryTransaction();
                 interactionMode.current = 'drag_node';
                 activeNodeId.current = nodeId;
                 if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
@@ -1003,6 +1010,7 @@ export function MapCanvas() {
             }}
             onNodeHandlePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
               e.stopPropagation();
+              useAppStore.getState().beginHistoryTransaction();
               interactionMode.current = 'set_yaw';
               activeNodeId.current = nodeId;
               if (containerRef.current && e.nativeEvent instanceof PointerEvent) {

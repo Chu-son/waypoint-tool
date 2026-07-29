@@ -12,6 +12,8 @@ export function ShortcutManager() {
     saveProject,
     resetProject,
     setRightPanelActiveTab,
+    undo,
+    redo,
   } = useAppStore();
 
   useEffect(() => {
@@ -75,6 +77,14 @@ export function ShortcutManager() {
             e.preventDefault();
             resetProject();
             break;
+          case "z":
+            e.preventDefault();
+            undo();
+            break;
+          case "y":
+            e.preventDefault();
+            redo();
+            break;
         }
       }
     };
@@ -91,6 +101,8 @@ export function ShortcutManager() {
     saveProject,
     resetProject,
     setRightPanelActiveTab,
+    undo,
+    redo,
   ]);
 
   return null;

@@ -132,7 +132,9 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     const result = await runParse();
     if (!result) return;
 
-    result.nodes.forEach((node) => addNode(node));
+    useAppStore.getState().runInHistoryTransaction(() => {
+      result.nodes.forEach((node) => addNode(node));
+    });
 
     const errorSummary = result.errors.length > 0 ? `\n(${result.errors.length}件をスキップしました)` : "";
     alert(`${result.nodes.length}件のウェイポイントをインポートしました。${errorSummary}`);

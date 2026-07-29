@@ -63,6 +63,8 @@ export function RelativeTransformGroup({
           <NumericInput
             value={relX}
             precision={decimalPrecision}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
               const newDx = val * Math.cos(pYaw) - relY * Math.sin(pYaw);
               const newDy = val * Math.sin(pYaw) + relY * Math.cos(pYaw);
@@ -77,6 +79,8 @@ export function RelativeTransformGroup({
           <NumericInput
             value={relY}
             precision={decimalPrecision}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
               const newDx = relX * Math.cos(pYaw) - val * Math.sin(pYaw);
               const newDy = relX * Math.sin(pYaw) + val * Math.cos(pYaw);
@@ -91,6 +95,8 @@ export function RelativeTransformGroup({
           <NumericInput
             value={dz}
             precision={decimalPrecision}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
               handleUpdate(node.id, {
                 transform: { ...node.transform!, z: pz + val },
@@ -107,6 +113,8 @@ export function RelativeTransformGroup({
               step="0.01"
               precision={decimalPrecision}
               value={relYaw}
+              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
               onChange={(val) => {
                 const newYaw = pYaw + val;
                 const halfYaw = newYaw / 2.0;
@@ -126,6 +134,8 @@ export function RelativeTransformGroup({
               step="1"
               precision={decimalPrecision}
               value={relYaw * (180.0 / Math.PI)}
+              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
               onChange={(val) => {
                 const valRad = val * (Math.PI / 180.0);
                 const newYaw = pYaw + valRad;

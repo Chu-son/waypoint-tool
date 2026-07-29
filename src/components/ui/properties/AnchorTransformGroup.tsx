@@ -55,6 +55,8 @@ export function AnchorTransformGroup({
             value={relX}
             precision={decimalPrecision}
             className={isCopyingField?.('x') ? 'border-amber-400 bg-amber-950/20' : ''}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
               const newDx = val * Math.cos(aYaw) - relY * Math.sin(aYaw);
               const newDy = val * Math.sin(aYaw) + relY * Math.cos(aYaw);
@@ -80,6 +82,8 @@ export function AnchorTransformGroup({
             value={relY}
             precision={decimalPrecision}
             className={isCopyingField?.('y') ? 'border-amber-400 bg-amber-950/20' : ''}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
               const newDx = relX * Math.cos(aYaw) - val * Math.sin(aYaw);
               const newDy = relX * Math.sin(aYaw) + val * Math.cos(aYaw);
@@ -105,6 +109,8 @@ export function AnchorTransformGroup({
             value={dz}
             precision={decimalPrecision}
             className={isCopyingField?.('z') ? 'border-amber-400 bg-amber-950/20' : ''}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
               handleUpdate(node.id, {
                 transform: { ...node.transform!, z: az + val },
@@ -130,6 +136,8 @@ export function AnchorTransformGroup({
               precision={decimalPrecision}
               value={relYaw}
               className={isCopyingField?.('yaw') ? 'border-amber-400 bg-amber-950/20' : ''}
+              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
               onChange={(val) => {
                 const newYaw = aYaw + val;
                 const q = yawToQuaternion(newYaw);
@@ -156,6 +164,8 @@ export function AnchorTransformGroup({
               precision={decimalPrecision}
               value={relYaw * (180.0 / Math.PI)}
               className={isCopyingField?.('yaw') ? 'border-amber-400 bg-amber-950/20' : ''}
+              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
               onChange={(val) => {
                 const valRad = val * (Math.PI / 180.0);
                 const newYaw = aYaw + valRad;

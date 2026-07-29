@@ -46,22 +46,24 @@ export function CustomOptionsGroup({
             const handleChange = (
               val: string | number | boolean | Array<string | number | boolean>,
             ) => {
-              const currentState = useAppStore.getState();
-              if (isMultiSelection) {
-                selectedNodeIds.forEach((id) => {
-                  const n = currentState.nodes[id];
-                  if (n) {
-                    handleUpdate(id, {
-                      options: { ...(n.options || {}), [opt.name]: val },
-                    });
-                  }
-                });
-              } else {
-                const n = currentState.nodes[node!.id];
-                handleUpdate(node!.id, {
-                  options: { ...(n.options || {}), [opt.name]: val },
-                });
-              }
+              useAppStore.getState().runInHistoryTransaction(() => {
+                const currentState = useAppStore.getState();
+                if (isMultiSelection) {
+                  selectedNodeIds.forEach((id) => {
+                    const n = currentState.nodes[id];
+                    if (n) {
+                      handleUpdate(id, {
+                        options: { ...(n.options || {}), [opt.name]: val },
+                      });
+                    }
+                  });
+                } else {
+                  const n = currentState.nodes[node!.id];
+                  handleUpdate(node!.id, {
+                    options: { ...(n.options || {}), [opt.name]: val },
+                  });
+                }
+              });
             };
 
             return (
@@ -107,6 +109,8 @@ export function CustomOptionsGroup({
                             : String(opt.default)
                           : "csv"
                     }
+                    onFocus={() => useAppStore.getState().beginHistoryTransaction()}
+                    onBlur={() => useAppStore.getState().endHistoryTransaction()}
                     onChange={(e) => {
                       const rawArr = e.target.value
                         .split(",")
@@ -155,6 +159,8 @@ export function CustomOptionsGroup({
                     placeholder={
                       isMultiSelection ? "Mixed" : String(opt.default || "")
                     }
+                    onFocus={() => useAppStore.getState().beginHistoryTransaction()}
+                    onBlur={() => useAppStore.getState().endHistoryTransaction()}
                     onChange={(e) => {
                       const val =
                         opt.type === "float"
@@ -175,6 +181,8 @@ export function CustomOptionsGroup({
                     placeholder={
                       isMultiSelection ? "Mixed" : String(opt.default || "")
                     }
+                    onFocus={() => useAppStore.getState().beginHistoryTransaction()}
+                    onBlur={() => useAppStore.getState().endHistoryTransaction()}
                     onChange={(e) => handleChange(e.target.value)}
                     className={cn(
                       String(nodeOptVal).trim() === "" &&

@@ -121,9 +121,13 @@ describe('PluginParamsPanel', () => {
 
     (useAppStore.getState as any).mockReturnValue({
       addNode: mockAddNode,
+      removeNodes: vi.fn(),
+      reorderNodes: vi.fn(),
+      rootNodeIds: [],
       selectNodes: mockSelectNodes,
       setActiveTool: mockSetActiveTool,
       setPluginActiveProperties: vi.fn(),
+      runInHistoryTransaction: (fn: () => void) => fn(),
     });
 
     (BackendAPI.runPlugin as any).mockResolvedValue([

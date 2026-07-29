@@ -45,6 +45,8 @@ describe('TopMenu', () => {
   const mockSetShowGrid = vi.fn();
   const mockSelectAllNodes = vi.fn();
   const mockRemoveNodes = vi.fn();
+  const mockUndo = vi.fn();
+  const mockRedo = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -56,6 +58,10 @@ describe('TopMenu', () => {
       isLeftPanelOpen: true,
       isRightPanelOpen: true,
       showProperties: true,
+      historyPast: [],
+      historyFuture: [],
+      undo: mockUndo,
+      redo: mockRedo,
       loadProject: mockLoadProject,
       saveProject: mockSaveProject,
       setExportModalOpen: mockSetExportModalOpen,
@@ -136,6 +142,10 @@ describe('TopMenu', () => {
         selectedNodeIds: ['n1'],
         removeNodes: mockRemoveNodes,
         selectAllNodes: mockSelectAllNodes,
+        historyPast: [],
+        historyFuture: [],
+        undo: mockUndo,
+        redo: mockRedo,
     }));
 
     render(<TopMenu />);

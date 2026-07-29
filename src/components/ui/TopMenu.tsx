@@ -13,6 +13,7 @@ type MenuOption = {
   shortcut?: string;
   divider?: boolean;
   danger?: boolean;
+  disabled?: boolean;
 };
 
 function DropdownMenu({
@@ -65,13 +66,17 @@ function DropdownMenu({
             ) : (
               <button
                 key={i}
+                disabled={opt.disabled}
                 onClick={() => {
+                  if (opt.disabled) return;
                   opt.action?.();
                   onClose();
                 }}
                 className={cn(
                   "w-full text-left px-4 py-1.5 text-[13px] flex justify-between items-center transition-colors group",
-                  opt.danger ? "text-danger-base hover:bg-danger-base/10" : "text-text-muted hover:bg-primary-base hover:text-white"
+                  opt.disabled
+                    ? "text-text-muted/40 cursor-not-allowed hover:bg-transparent hover:text-text-muted/40"
+                    : opt.danger ? "text-danger-base hover:bg-danger-base/10" : "text-text-muted hover:bg-primary-base hover:text-white"
                 )}
               >
                 <span>{opt.label}</span>
@@ -120,6 +125,10 @@ export function TopMenu() {
   const triggerFitToMaps = useAppStore((state) => state.triggerFitToMaps);
   const loadProject = useAppStore((state) => state.loadProject);
   const saveProject = useAppStore((state) => state.saveProject);
+  const undo = useAppStore((state) => state.undo);
+  const redo = useAppStore((state) => state.redo);
+  const canUndo = useAppStore((state) => state.historyPast.length > 0);
+  const canRedo = useAppStore((state) => state.historyFuture.length > 0);
 
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -166,6 +175,19 @@ export function TopMenu() {
   ];
 
   const editOptions: MenuOption[] = [
+    {
+      label: "Undo",
+      action: undo,
+      shortcut: "Ctrl+Z",
+      disabled: !canUndo,
+    },
+    {
+      label: "Redo",
+      action: redo,
+      shortcut: "Ctrl+Y",
+      disabled: !canRedo,
+    },
+    { divider: true, label: "" },
     {
       label: "Select All",
       action: selectAllNodes,

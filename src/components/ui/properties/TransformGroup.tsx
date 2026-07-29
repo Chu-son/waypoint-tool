@@ -75,20 +75,24 @@ export function TransformGroup({
             className={
               isCopyingField?.("x") ? "border-primary-base bg-primary-base/10" : ""
             }
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
-              if (isMultiSelection) {
-                selectedNodeIds.forEach((id) => {
-                  const n = nodes[id];
-                  if (n && n.transform)
-                    handleUpdate(id, {
-                      transform: { ...n.transform, x: val },
-                    });
-                });
-              } else {
-                handleUpdate(node!.id, {
-                  transform: { ...node!.transform!, x: val },
-                });
-              }
+              useAppStore.getState().runInHistoryTransaction(() => {
+                if (isMultiSelection) {
+                  selectedNodeIds.forEach((id) => {
+                    const n = nodes[id];
+                    if (n && n.transform)
+                      handleUpdate(id, {
+                        transform: { ...n.transform, x: val },
+                      });
+                  });
+                } else {
+                  handleUpdate(node!.id, {
+                    transform: { ...node!.transform!, x: val },
+                  });
+                }
+              });
             }}
           />
         </div>
@@ -113,20 +117,24 @@ export function TransformGroup({
             className={
               isCopyingField?.("y") ? "border-primary-base bg-primary-base/10" : ""
             }
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
-              if (isMultiSelection) {
-                selectedNodeIds.forEach((id) => {
-                  const n = nodes[id];
-                  if (n && n.transform)
-                    handleUpdate(id, {
-                      transform: { ...n.transform, y: val },
-                    });
-                });
-              } else {
-                handleUpdate(node!.id, {
-                  transform: { ...node!.transform!, y: val },
-                });
-              }
+              useAppStore.getState().runInHistoryTransaction(() => {
+                if (isMultiSelection) {
+                  selectedNodeIds.forEach((id) => {
+                    const n = nodes[id];
+                    if (n && n.transform)
+                      handleUpdate(id, {
+                        transform: { ...n.transform, y: val },
+                      });
+                  });
+                } else {
+                  handleUpdate(node!.id, {
+                    transform: { ...node!.transform!, y: val },
+                  });
+                }
+              });
             }}
           />
         </div>
@@ -151,20 +159,24 @@ export function TransformGroup({
             className={
               isCopyingField?.("z") ? "border-primary-base bg-primary-base/10" : ""
             }
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => {
-              if (isMultiSelection) {
-                selectedNodeIds.forEach((id) => {
-                  const n = nodes[id];
-                  if (n && n.transform)
-                    handleUpdate(id, {
-                      transform: { ...n.transform, z: val },
-                    });
-                });
-              } else {
-                handleUpdate(node!.id, {
-                  transform: { ...node!.transform!, z: val },
-                });
-              }
+              useAppStore.getState().runInHistoryTransaction(() => {
+                if (isMultiSelection) {
+                  selectedNodeIds.forEach((id) => {
+                    const n = nodes[id];
+                    if (n && n.transform)
+                      handleUpdate(id, {
+                        transform: { ...n.transform, z: val },
+                      });
+                  });
+                } else {
+                  handleUpdate(node!.id, {
+                    transform: { ...node!.transform!, z: val },
+                  });
+                }
+              });
             }}
           />
         </div>
@@ -193,24 +205,28 @@ export function TransformGroup({
                   ? "border-primary-base bg-primary-base/10"
                   : ""
               }
+              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
               onChange={(val) => {
                 const halfYaw = val / 2.0;
                 const qz = Math.sin(halfYaw);
                 const qw = Math.cos(halfYaw);
 
-                if (isMultiSelection) {
-                  selectedNodeIds.forEach((id) => {
-                    const n = nodes[id];
-                    if (n && n.transform)
-                      handleUpdate(id, {
-                        transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
-                      });
-                  });
-                } else {
-                  handleUpdate(node!.id, {
-                    transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
-                  });
-                }
+                useAppStore.getState().runInHistoryTransaction(() => {
+                  if (isMultiSelection) {
+                    selectedNodeIds.forEach((id) => {
+                      const n = nodes[id];
+                      if (n && n.transform)
+                        handleUpdate(id, {
+                          transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
+                        });
+                    });
+                  } else {
+                    handleUpdate(node!.id, {
+                      transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
+                    });
+                  }
+                });
               }}
             />
           </div>
@@ -238,25 +254,29 @@ export function TransformGroup({
                   ? "border-primary-base bg-primary-base/10"
                   : ""
               }
+              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
               onChange={(val) => {
                 const rad = val * (Math.PI / 180.0);
                 const halfYaw = rad / 2.0;
                 const qz = Math.sin(halfYaw);
                 const qw = Math.cos(halfYaw);
 
-                if (isMultiSelection) {
-                  selectedNodeIds.forEach((id) => {
-                    const n = nodes[id];
-                    if (n && n.transform)
-                      handleUpdate(id, {
-                        transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
-                      });
-                  });
-                } else {
-                  handleUpdate(node!.id, {
-                    transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
-                  });
-                }
+                useAppStore.getState().runInHistoryTransaction(() => {
+                  if (isMultiSelection) {
+                    selectedNodeIds.forEach((id) => {
+                      const n = nodes[id];
+                      if (n && n.transform)
+                        handleUpdate(id, {
+                          transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
+                        });
+                    });
+                  } else {
+                    handleUpdate(node!.id, {
+                      transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
+                    });
+                  }
+                });
               }}
             />
           </div>

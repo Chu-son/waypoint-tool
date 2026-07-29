@@ -184,59 +184,61 @@ export function PluginParamsPanel() {
         // Create Parent Generator Node
         const parentId = uuidv4();
         const store = useAppStore.getState();
-        
-        // Remove consumed nodes first
-        if (idsToConsume.length > 0) {
-          store.removeNodes(idsToConsume);
-        }
 
-        store.addNode({
-          id: parentId,
-          type: "generator",
-          plugin_id: plugin.id,
-          generator_params: contextData,
-          children_ids: [],
-        });
-        
-        // If we have an insert index, we need to move the newly added node to that index
-        if (insertIndex !== -1) {
-          const currentRootIds = useAppStore.getState().rootNodeIds;
-          const newIdx = currentRootIds.indexOf(parentId);
-          if (newIdx !== -1 && newIdx !== insertIndex) {
-            store.reorderNodes(newIdx, insertIndex);
-          }
-        }
-
-        // Build new child nodes
-        resultingWaypoints.forEach((wp) => {
-          let qx = wp.qx ?? 0,
-            qy = wp.qy ?? 0,
-            qz = wp.qz ?? 0,
-            qw = wp.qw ?? 1;
-          // If python returned Euler yaw and skipped quaternions, convert it
-          if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-            const halfYaw = wp.yaw / 2.0;
-            qz = Math.sin(halfYaw);
-            qw = Math.cos(halfYaw);
+        store.runInHistoryTransaction(() => {
+          // Remove consumed nodes first
+          if (idsToConsume.length > 0) {
+            store.removeNodes(idsToConsume);
           }
 
-          const id = uuidv4();
-          useAppStore.getState().addNode(
-            {
-              id,
-              type: "manual",
-              transform: wp.transform || {
-                x: wp.x ?? 0,
-                y: wp.y ?? 0,
-                qx,
-                qy,
-                qz,
-                qw,
+          store.addNode({
+            id: parentId,
+            type: "generator",
+            plugin_id: plugin.id,
+            generator_params: contextData,
+            children_ids: [],
+          });
+
+          // If we have an insert index, we need to move the newly added node to that index
+          if (insertIndex !== -1) {
+            const currentRootIds = useAppStore.getState().rootNodeIds;
+            const newIdx = currentRootIds.indexOf(parentId);
+            if (newIdx !== -1 && newIdx !== insertIndex) {
+              store.reorderNodes(newIdx, insertIndex);
+            }
+          }
+
+          // Build new child nodes
+          resultingWaypoints.forEach((wp) => {
+            let qx = wp.qx ?? 0,
+              qy = wp.qy ?? 0,
+              qz = wp.qz ?? 0,
+              qw = wp.qw ?? 1;
+            // If python returned Euler yaw and skipped quaternions, convert it
+            if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
+              const halfYaw = wp.yaw / 2.0;
+              qz = Math.sin(halfYaw);
+              qw = Math.cos(halfYaw);
+            }
+
+            const id = uuidv4();
+            useAppStore.getState().addNode(
+              {
+                id,
+                type: "manual",
+                transform: wp.transform || {
+                  x: wp.x ?? 0,
+                  y: wp.y ?? 0,
+                  qx,
+                  qy,
+                  qz,
+                  qw,
+                },
+                options: wp.options || {},
               },
-              options: wp.options || {},
-            },
-            parentId,
-          ); // append to parent
+              parentId,
+            ); // append to parent
+          });
         });
 
         // Auto select the newly generated parent node

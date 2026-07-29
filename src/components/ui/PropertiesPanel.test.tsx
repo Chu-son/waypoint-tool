@@ -89,6 +89,9 @@ describe('PropertiesPanel', () => {
         setPluginActiveProperties: vi.fn(),
         addNode: mockAddNode,
         nodes: { 'gen-1': mockGeneratorNode }, // needed for handleUpdate inside handleRegenerate
+        runInHistoryTransaction: (fn: () => void) => fn(),
+        beginHistoryTransaction: vi.fn(),
+        endHistoryTransaction: vi.fn(),
     });
   });
 
@@ -179,6 +182,9 @@ describe('PropertiesPanel', () => {
         toggleAttributeVisibility: vi.fn(),
         clearPluginInteractionData: vi.fn(),
         setPluginActiveProperties: vi.fn(),
+        runInHistoryTransaction: (fn: () => void) => fn(),
+        beginHistoryTransaction: vi.fn(),
+        endHistoryTransaction: vi.fn(),
       });
 
       render(<PropertiesPanel />);

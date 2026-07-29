@@ -21,7 +21,7 @@ export type NodeSlice = {
   setInsertionIndex: (index: number) => void;
 };
 
-export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) => ({
+export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, get) => ({
   nodes: {},
   rootNodeIds: [],
   selectedNodeIds: [],
@@ -32,7 +32,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
 
   setInsertionIndex: (index: number) => set({ insertionIndex: index }),
 
-  addNode: (node: WaypointNode, parentId?: string) => set((state) => {
+  addNode: (node: WaypointNode, parentId?: string) => {
+    get().pushHistorySnapshot();
+    set((state) => {
     const newNodes = { ...state.nodes, [node.id]: node };
     let newRootIds = [...state.rootNodeIds];
     
@@ -53,24 +55,33 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
       insertionIndex: state.insertionIndex !== -1 ? state.insertionIndex + 1 : -1,
       isDirty: true 
     };
-  }),
+    });
+  },
 
-  updateNode: (id: string, updates: Partial<WaypointNode>) => set((state) => ({
-    nodes: {
-      ...state.nodes,
-      [id]: { ...state.nodes[id], ...updates }
-    },
-    isDirty: true
-  })),
+  updateNode: (id: string, updates: Partial<WaypointNode>) => {
+    get().pushHistorySnapshot();
+    set((state) => ({
+      nodes: {
+        ...state.nodes,
+        [id]: { ...state.nodes[id], ...updates }
+      },
+      isDirty: true
+    }));
+  },
 
-  reorderNodes: (fromIndex: number, toIndex: number) => set((state) => {
-    const newRootIds = [...state.rootNodeIds];
-    const [moved] = newRootIds.splice(fromIndex, 1);
-    newRootIds.splice(toIndex, 0, moved);
-    return { rootNodeIds: newRootIds, isDirty: true };
-  }),
+  reorderNodes: (fromIndex: number, toIndex: number) => {
+    get().pushHistorySnapshot();
+    set((state) => {
+      const newRootIds = [...state.rootNodeIds];
+      const [moved] = newRootIds.splice(fromIndex, 1);
+      newRootIds.splice(toIndex, 0, moved);
+      return { rootNodeIds: newRootIds, isDirty: true };
+    });
+  },
 
-  removeNodes: (ids: string[]) => set((state) => {
+  removeNodes: (ids: string[]) => {
+    get().pushHistorySnapshot();
+    set((state) => {
     const newNodes = { ...state.nodes };
     let newRootIds = [...state.rootNodeIds];
     
@@ -104,7 +115,8 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
       anchorNodeId: state.anchorNodeId && idsToRemove.has(state.anchorNodeId) ? null : state.anchorNodeId,
       isDirty: true
     };
-  }),
+    });
+  },
 
   selectNodes: (ids: string[], multi = false) => set((state) => {
     const nextIds = multi ? (() => {
@@ -133,7 +145,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
   
   deselectAllNodes: () => set({ selectedNodeIds: [] }),
 
-  explodeGenerator: (id: string) => set((state) => {
+  explodeGenerator: (id: string) => {
+    get().pushHistorySnapshot();
+    set((state) => {
     const node = state.nodes[id];
     if (!node || node.type !== 'generator') return {};
 
@@ -165,5 +179,6 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set) 
       selectedNodeIds: state.selectedNodeIds.filter(sid => sid !== id),
       isDirty: true
     };
-  }),
+    });
+  },
 });
