@@ -3,6 +3,7 @@ import {
   MousePointer2,
   Hand,
   Download,
+  Upload,
   Settings,
   MoreHorizontal,
   Puzzle,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { ExportModal } from "./ExportModal";
+import { ImportModal } from "./ImportModal";
 import { Panel } from "./common/Panel";
 import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
@@ -23,6 +25,8 @@ export function ToolPanel() {
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
   const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
   const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
+  const isImportModalOpen = useAppStore((state) => state.isImportModalOpen);
+  const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
 
   const activeTool = useAppStore((state) => state.activeTool);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
@@ -53,6 +57,10 @@ export function ToolPanel() {
 
   const handleExportWaypointsClick = () => {
     setExportModalOpen(true);
+  };
+
+  const handleImportWaypointsClick = () => {
+    setImportModalOpen(true);
   };
 
   const tools = [
@@ -217,6 +225,19 @@ export function ToolPanel() {
 
       <div className="mt-auto mb-4 border-t border-border-base pt-4 flex flex-col items-center w-full gap-3">
         <Button
+          onClick={handleImportWaypointsClick}
+          title="Import Waypoints"
+          variant="icon"
+          size="icon"
+          className="rounded-xl group"
+        >
+          <Upload
+            size={20}
+            className="group-hover:scale-110 transition-transform text-purple-400"
+          />
+        </Button>
+
+        <Button
           onClick={handleExportWaypointsClick}
           title="Export Waypoints"
           variant="icon"
@@ -246,6 +267,10 @@ export function ToolPanel() {
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setExportModalOpen(false)}
+      />
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setImportModalOpen(false)}
       />
     </Panel>
   );

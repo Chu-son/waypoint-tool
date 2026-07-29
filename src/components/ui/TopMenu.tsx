@@ -106,6 +106,7 @@ export function TopMenu() {
 
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
   const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
+  const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
   const setExportMapsModalOpen = useAppStore((state) => state.setExportMapsModalOpen);
   const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
   const selectAllNodes = useAppStore((state) => state.selectAllNodes);
@@ -157,6 +158,7 @@ export function TopMenu() {
     { label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
     { divider: true, label: "" },
     { label: "Export Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
+    { label: "Import Waypoints...", action: () => setImportModalOpen(true) },
     { label: "Export Maps...", action: () => setExportMapsModalOpen(true) },
     { label: "Settings...", action: () => setSettingsModalOpen(true, "general") },
     { divider: true, label: "" },

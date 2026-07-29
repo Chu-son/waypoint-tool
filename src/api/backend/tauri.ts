@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../../types/store';
+import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -21,6 +21,14 @@ export class TauriBackendAPI implements IBackendAPI {
 
   async exportWaypoints(path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void> {
     return invoke('export_waypoints', { path, waypoints, template: template || null, imageDataB64: imageB64 || null });
+  }
+
+  async importWaypointsRaw(path: string): Promise<any> {
+    return invoke('import_waypoints', { path });
+  }
+
+  async inferImportMapping(templateContent: string): Promise<ImportFieldMapping> {
+    return invoke('infer_import_mapping', { template: templateContent });
   }
 
   async fetchInstalledPlugins(): Promise<PluginInstance[]> {

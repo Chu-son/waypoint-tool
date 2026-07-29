@@ -36,6 +36,7 @@ export type UISlice = {
   
   isSettingsModalOpen: boolean;
   isExportModalOpen: boolean;
+  isImportModalOpen: boolean;
   isExportMapsModalOpen: boolean;
   isShortcutsModalOpen: boolean;
   settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
@@ -59,6 +60,7 @@ export type UISlice = {
   
   setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'export' | 'plugins') => void;
   setExportModalOpen: (open: boolean) => void;
+  setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;
   setShortcutsModalOpen: (open: boolean) => void;
   
@@ -93,6 +95,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   isSettingsModalOpen: false,
   settingsModalTab: 'general',
   isExportModalOpen: false,
+  isImportModalOpen: false,
   isExportMapsModalOpen: false,
   isShortcutsModalOpen: false,
 
@@ -144,6 +147,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
     settingsModalTab: tab || state.settingsModalTab
   })),
   setExportModalOpen: (open) => set({ isExportModalOpen: open }),
+  setImportModalOpen: (open) => set({ isImportModalOpen: open }),
   setExportMapsModalOpen: (open) => set({ isExportMapsModalOpen: open }),
   setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
 });

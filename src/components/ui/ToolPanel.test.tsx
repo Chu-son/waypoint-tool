@@ -9,6 +9,7 @@ vi.mock('lucide-react', () => ({
   Hand: () => <div data-testid="hand-icon" />,
   Plus: () => <div data-testid="add-icon" />,
   Download: () => <div data-testid="download-icon" />,
+  Upload: () => <div data-testid="upload-icon" />,
   Settings: () => <div data-testid="settings-icon" />,
   MoreHorizontal: () => <div data-testid="more-icon" />,
   Puzzle: () => <div data-testid="puzzle-icon" />,
@@ -29,11 +30,15 @@ vi.mock('../../stores/appStore', () => ({
 vi.mock('./ExportModal', () => ({
   ExportModal: ({ isOpen }: any) => isOpen ? <div data-testid="export-modal" /> : null,
 }));
+vi.mock('./ImportModal', () => ({
+  ImportModal: ({ isOpen }: any) => isOpen ? <div data-testid="import-modal" /> : null,
+}));
 
 describe('ToolPanel', () => {
   const mockSetActiveTool = vi.fn();
   const mockSetActivePlugin = vi.fn();
   const mockSetExportModalOpen = vi.fn();
+  const mockSetImportModalOpen = vi.fn();
   const mockSetSettingsModalOpen = vi.fn();
 
   const mockPlugins = {
@@ -57,9 +62,11 @@ describe('ToolPanel', () => {
       pluginSettings: [],
       toolPanelMaxColumns: 1,
       isExportModalOpen: false,
+      isImportModalOpen: false,
       setActiveTool: mockSetActiveTool,
       setActivePlugin: mockSetActivePlugin,
       setExportModalOpen: mockSetExportModalOpen,
+      setImportModalOpen: mockSetImportModalOpen,
       setSettingsModalOpen: mockSetSettingsModalOpen,
     }));
     

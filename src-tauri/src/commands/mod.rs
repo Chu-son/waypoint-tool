@@ -39,6 +39,16 @@ pub fn export_waypoints(path: String, waypoints: Vec<serde_json::Value>, templat
 }
 
 #[command]
+pub fn import_waypoints(path: String) -> Result<serde_json::Value, String> {
+    io::import_waypoints(&path)
+}
+
+#[command]
+pub fn infer_import_mapping(template: String) -> Result<serde_json::Value, String> {
+    io::infer_import_mapping(&template)
+}
+
+#[command]
 pub fn read_image_base64(path: String) -> Result<String, String> {
     let bytes = fs::read(&path).map_err(|e| format!("Failed to read image file: {}", e))?;
     
@@ -93,6 +103,8 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         save_project,
         load_project,
         export_waypoints,
+        import_waypoints,
+        infer_import_mapping,
         load_options_schema,
         read_text_file,
         write_text_file,

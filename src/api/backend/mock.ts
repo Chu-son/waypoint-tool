@@ -37,6 +37,16 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] exportWaypoints called to path:', _path, _waypoints.length, 'points');
   }
 
+  async importWaypointsRaw(path: string): Promise<any> {
+    console.log('[Mock Backend] importWaypointsRaw called with path:', path);
+    return [];
+  }
+
+  async inferImportMapping(templateContent: string): Promise<any> {
+    console.log('[Mock Backend] inferImportMapping called, template length:', templateContent.length);
+    return { itemsPath: '', x: 'x', y: 'y', z: 'z', yaw: 'yaw', optionsPath: 'options' };
+  }
+
   async fetchInstalledPlugins(): Promise<PluginInstance[]> {
     console.log('[Mock Backend] fetchInstalledPlugins called');
     return [{

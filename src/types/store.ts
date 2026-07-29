@@ -25,6 +25,20 @@ export type OptionsSchema = {
   options: OptionDef[];
 };
 
+export type ImportFieldMapping = {
+  itemsPath?: string;
+  id?: string;
+  x: string;
+  y: string;
+  z?: string;
+  yaw?: string;
+  qx?: string;
+  qy?: string;
+  qz?: string;
+  qw?: string;
+  optionsPath?: string;
+};
+
 export type ExportTemplate = {
   id: string;
   name: string;
@@ -32,6 +46,7 @@ export type ExportTemplate = {
   suffix: string;
   content: string;
   scope?: 'global' | 'local';
+  importMapping?: ImportFieldMapping;
 };
 
 export interface PluginSetting {

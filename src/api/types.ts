@@ -1,4 +1,4 @@
-import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../types/store';
+import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../types/store';
 
 export type MapLoadResult = {
   info: {
@@ -57,6 +57,8 @@ export interface IBackendAPI {
   loadProject(path: string): Promise<ProjectData>;
   loadOptionsSchema(yamlPath: string): Promise<OptionsSchema>;
   exportWaypoints(path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void>;
+  importWaypointsRaw(path: string): Promise<any>;
+  inferImportMapping(templateContent: string): Promise<ImportFieldMapping>;
   fetchInstalledPlugins(): Promise<PluginInstance[]>;
   scanCustomPlugin(path: string): Promise<PluginInstance>;
   runPlugin(
