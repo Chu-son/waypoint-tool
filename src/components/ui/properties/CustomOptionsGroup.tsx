@@ -1,12 +1,10 @@
 import { useAppStore } from "../../../stores/appStore";
-import { Button } from "../common/Button";
-import { Label } from "../common/Label";
 import { Input } from "../common/Input";
 import { Select } from "../common/Select";
 import { Checkbox } from "../common/Checkbox";
-import { Eye, EyeOff } from "lucide-react";
 import { OptionDef, WaypointNode } from "../../../types/store";
 import { cn } from "../../../utils/cn";
+import { PropertySectionHeader } from "./PropertySectionHeader";
 
 interface CustomOptionsGroupProps {
   isMultiSelection: boolean;
@@ -28,9 +26,7 @@ export function CustomOptionsGroup({
 
   return (
     <div className="space-y-2 pt-4 border-t border-border-base">
-      <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider flex justify-between items-center">
-        Custom Options
-      </h3>
+      <PropertySectionHeader title="Custom Options" />
 
       {!optionsSchema ? (
         <div className="text-xs text-text-muted italic p-2 bg-surface-panel rounded border border-border-base">
@@ -68,29 +64,22 @@ export function CustomOptionsGroup({
 
             return (
               <div key={opt.name}>
-                <div className="flex justify-between items-center mb-1">
-                  <Label className="text-xs text-text-muted">
-                    {opt.label || opt.name}{" "}
-                    <span className="opacity-50 text-[10px] ml-1 uppercase">
-                      ({opt.type})
-                    </span>
-                  </Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 text-text-muted hover:text-text-base"
-                    onClick={() =>
-                      toggleAttributeVisibility(`options.${opt.name}`)
-                    }
-                    title={`Toggle ${opt.name} on Canvas`}
-                  >
-                    {visibleAttributes.includes(`options.${opt.name}`) ? (
-                      <Eye size={12} />
-                    ) : (
-                      <EyeOff size={12} />
-                    )}
-                  </Button>
-                </div>
+                <PropertySectionHeader
+                  title={
+                    <>
+                      {opt.label || opt.name}
+                      <span className="opacity-50 text-[10px] ml-1 uppercase font-normal">
+                        ({opt.type})
+                      </span>
+                    </>
+                  }
+                  isVisible={visibleAttributes.includes(`options.${opt.name}`)}
+                  onToggleVisible={() =>
+                    toggleAttributeVisibility(`options.${opt.name}`)
+                  }
+                  toggleTitle={`Toggle ${opt.name} on Canvas`}
+                  className="mb-1"
+                />
 
                 {opt.type === "list" ? (
                   <Input

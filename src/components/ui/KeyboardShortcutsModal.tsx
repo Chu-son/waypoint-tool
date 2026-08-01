@@ -48,12 +48,11 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-3">
-          <Keyboard size={20} className="text-primary-base" />
-          <span>Keyboard Shortcuts</span>
-        </div>
-      </ModalHeader>
+      <ModalHeader
+        onClose={onClose}
+        icon={<Keyboard size={20} className="text-primary-base" />}
+        title="Keyboard Shortcuts"
+      />
       
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6">

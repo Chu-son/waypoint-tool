@@ -4,10 +4,10 @@ import { useAppStore } from "../../stores/appStore";
 import { BackendAPI, DialogAPI } from "../../api";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
 import { Button } from "./common/Button";
-import { Checkbox } from "./common/Checkbox";
 import { Label } from "./common/Label";
 import { Input } from "./common/Input";
 import { Select } from "./common/Select";
+import { OptionCard } from "./common/OptionCard";
 import { ExportTemplate, ImportFieldMapping } from "../../types/store";
 import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from "../../utils/importUtils";
 
@@ -143,12 +143,11 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-3">
-          <Upload size={20} className="text-primary-base" />
-          <span>Import Waypoints</span>
-        </div>
-      </ModalHeader>
+      <ModalHeader
+        onClose={onClose}
+        icon={<Upload size={20} className="text-primary-base" />}
+        title="Import Waypoints"
+      />
 
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -223,22 +222,12 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
           )}
 
           <div className="pt-2 border-t border-border-base/30">
-            <label className="flex items-start gap-4 p-4 rounded-xl bg-primary-base/5 border border-primary-base/10 hover:border-primary-base/30 hover:bg-primary-base/[0.08] transition-all cursor-pointer group">
-              <div className="pt-1">
-                <Checkbox
-                  checked={applyOptionsSchema}
-                  onChange={(e) => setApplyOptionsSchema(e.target.checked)}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-text-base group-hover:text-primary-base transition-colors">
-                  Apply Custom Option Schema
-                </p>
-                <p className="text-[11px] text-text-muted/80 leading-relaxed">
-                  Coerces option values to the schema's declared types and fills in missing values with their defaults.
-                </p>
-              </div>
-            </label>
+            <OptionCard
+              checked={applyOptionsSchema}
+              onChange={setApplyOptionsSchema}
+              title="Apply Custom Option Schema"
+              description="Coerces option values to the schema's declared types and fills in missing values with their defaults."
+            />
           </div>
 
           {preview && (

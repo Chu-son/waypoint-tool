@@ -200,21 +200,22 @@ export function ToolPanel() {
                     activePluginId === plugin.id &&
                     activeTool === "add_generator";
                   return (
-                    <button
+                    <Button
                       key={plugin.id}
+                      variant="ghost"
                       onClick={() => {
                         setActiveTool("add_generator");
                         setActivePlugin(plugin.id);
                         setIsMoreMenuOpen(false);
                       }}
                       className={cn(
-                        "w-full px-4 py-2 text-left text-sm flex items-center gap-3 transition-colors",
+                        "w-full px-4 py-2 text-left justify-start text-sm flex items-center gap-3 transition-colors",
                         isActive ? "bg-primary-base/20 text-primary-base font-bold" : "text-text-muted hover:bg-surface-hover hover:text-text-base"
                       )}
                     >
                       {renderPluginIcon(plugin.id, 14, isActive ? "text-primary-base" : "text-text-muted")}
                       <span className="truncate">{plugin.manifest.name}</span>
-                    </button>
+                    </Button>
                   );
                 })}
               </Panel>

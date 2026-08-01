@@ -41,12 +41,12 @@ export function PluginListPanel() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto w-full flex flex-col bg-slate-800/30">
-      <div className="p-3 shrink-0 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">
-        <span className="text-xs font-semibold text-slate-400">Available Generators</span>
+    <div className="flex-1 overflow-y-auto w-full flex flex-col bg-surface-panel/30">
+      <div className="p-3 shrink-0 border-b border-border-base/30 flex justify-between items-center bg-surface-panel/50">
+        <span className="text-xs font-semibold text-text-muted">Available Generators</span>
         <button
           onClick={() => setSettingsModalOpen(true, 'plugins')}
-          className="text-slate-400 hover:text-white transition-colors"
+          className="text-text-muted hover:text-text-base transition-colors"
           title="Open Settings"
         >
           <Settings size={14} />
@@ -55,7 +55,7 @@ export function PluginListPanel() {
 
       <div className="flex-1 p-2 space-y-1">
         {enabledPluginsList.length === 0 ? (
-          <div className="p-4 text-center text-slate-500 text-xs italic">
+          <div className="p-4 text-center text-text-muted/60 text-xs italic">
             No enabled plugins found.
           </div>
         ) : (
@@ -66,21 +66,21 @@ export function PluginListPanel() {
                 key={plugin.id}
                 className={`group flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer ${
                   isActive 
-                  ? "bg-primary/20 border-primary shadow-[0_0_10px_rgba(59,130,246,0.2)]" 
-                  : "bg-slate-900/40 border-slate-700 hover:border-slate-500 hover:bg-slate-800/60"
+                  ? "bg-primary-base/20 border-primary-base shadow-lg shadow-primary-base/10" 
+                  : "bg-surface-base/40 border-border-base hover:border-border-base/60 hover:bg-surface-hover"
                 }`}
                 onClick={() => {
                   setActiveTool("add_generator");
                   setActivePlugin(plugin.id);
                 }}
               >
-                <div className={`p-2 rounded-lg shrink-0 ${isActive ? "bg-primary text-white" : "bg-slate-800 text-slate-400"}`}>
+                <div className={`p-2 rounded-lg shrink-0 ${isActive ? "bg-primary-base text-white" : "bg-surface-hover text-text-muted"}`}>
                   {renderPluginIcon(plugin.id, 18)}
                 </div>
                 
                 <div className="flex-1 overflow-hidden">
                   <div className="flex items-center justify-between gap-2">
-                    <span className={`text-xs font-bold truncate ${isActive ? "text-primary-300" : "text-slate-200"}`}>
+                    <span className={`text-xs font-bold truncate ${isActive ? "text-primary-base" : "text-text-base"}`}>
                       {plugin.manifest.name}
                     </span>
                     <button
@@ -88,14 +88,14 @@ export function PluginListPanel() {
                         e.stopPropagation();
                         setSettingsModalOpen(true, 'plugins');
                       }}
-                      className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-300 transition-all p-1"
+                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-text-base transition-all p-1"
                       title="Plugin Details"
                     >
                       <ExternalLink size={12} />
                     </button>
                   </div>
                   {plugin.manifest.description && (
-                    <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                    <p className="text-[10px] text-text-muted/70 truncate mt-0.5">
                       {plugin.manifest.description}
                     </p>
                   )}
@@ -105,8 +105,6 @@ export function PluginListPanel() {
           })
         )}
       </div>
-
-
     </div>
   );
 }

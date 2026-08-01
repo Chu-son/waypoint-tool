@@ -1,9 +1,9 @@
 import { useAppStore } from '../../../stores/appStore';
-import { Label } from '../common/Label';
-import { NumericInput } from '../NumericInput';
 import { WaypointNode } from '../../../types/store';
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from '../../../utils/transformUtils';
 import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import { TransformField } from './TransformField';
+import { PropertySectionHeader } from './PropertySectionHeader';
 
 interface AnchorTransformGroupProps {
   node: WaypointNode;
@@ -31,151 +31,110 @@ export function AnchorTransformGroup({
 
   const { relX, relY, relZ: dz, relYaw } = calculateAnchorRelativeTransform(node.transform, anchorNode.transform);
 
+  const handleFieldChange = (field: "x" | "y" | "z", val: number) => {
+    if (field === "x") {
+      const newDx = val * Math.cos(aYaw) - relY * Math.sin(aYaw);
+      const newDy = val * Math.sin(aYaw) + relY * Math.cos(aYaw);
+      handleUpdate(node.id, {
+        transform: { ...node.transform!, x: ax + newDx, y: ay + newDy },
+      });
+    } else if (field === "y") {
+      const newDx = relX * Math.cos(aYaw) - val * Math.sin(aYaw);
+      const newDy = relX * Math.sin(aYaw) + val * Math.cos(aYaw);
+      handleUpdate(node.id, {
+        transform: { ...node.transform!, x: ax + newDx, y: ay + newDy },
+      });
+    } else if (field === "z") {
+      handleUpdate(node.id, {
+        transform: { ...node.transform!, z: az + val },
+      });
+    }
+  };
+
+  const handleYawChange = (val: number, isDeg: boolean) => {
+    const valRad = isDeg ? val * (Math.PI / 180.0) : val;
+    const newYaw = aYaw + valRad;
+    const q = yawToQuaternion(newYaw);
+    handleUpdate(node.id, {
+      transform: { ...node.transform!, ...q },
+    });
+  };
+
   return (
     <div className="space-y-2 pt-4 border-t border-amber-500/30 relative">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-          <span>⚓</span> Transform (From Anchor)
-        </h3>
-      </div>
+      <PropertySectionHeader
+        title={
+          <>
+            <span>⚓</span> Transform (From Anchor)
+          </>
+        }
+        className="text-amber-400"
+      />
+
       <div className="grid grid-cols-3 gap-2">
-        <div>
-          <Label
-            className={`block text-xs mb-1 cursor-context-menu select-none ${
-              isCopyingField?.('x') ? 'text-amber-400 font-bold' : 'text-text-muted hover:text-text-base'
-            }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenuLabel?.('x', e);
-            }}
-          >
-            Local X (m)
-          </Label>
-          <NumericInput
-            value={relX}
-            precision={decimalPrecision}
-            className={isCopyingField?.('x') ? 'border-amber-400 bg-amber-950/20' : ''}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-            onChange={(val) => {
-              const newDx = val * Math.cos(aYaw) - relY * Math.sin(aYaw);
-              const newDy = val * Math.sin(aYaw) + relY * Math.cos(aYaw);
-              handleUpdate(node.id, {
-                transform: { ...node.transform!, x: ax + newDx, y: ay + newDy },
-              });
-            }}
-          />
-        </div>
-        <div>
-          <Label
-            className={`block text-xs mb-1 cursor-context-menu select-none ${
-              isCopyingField?.('y') ? 'text-amber-400 font-bold' : 'text-text-muted hover:text-text-base'
-            }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenuLabel?.('y', e);
-            }}
-          >
-            Local Y (m)
-          </Label>
-          <NumericInput
-            value={relY}
-            precision={decimalPrecision}
-            className={isCopyingField?.('y') ? 'border-amber-400 bg-amber-950/20' : ''}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-            onChange={(val) => {
-              const newDx = relX * Math.cos(aYaw) - val * Math.sin(aYaw);
-              const newDy = relX * Math.sin(aYaw) + val * Math.cos(aYaw);
-              handleUpdate(node.id, {
-                transform: { ...node.transform!, x: ax + newDx, y: ay + newDy },
-              });
-            }}
-          />
-        </div>
-        <div>
-          <Label
-            className={`block text-xs mb-1 cursor-context-menu select-none ${
-              isCopyingField?.('z') ? 'text-amber-400 font-bold' : 'text-text-muted hover:text-text-base'
-            }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenuLabel?.('z', e);
-            }}
-          >
-            Delta Z (m)
-          </Label>
-          <NumericInput
-            value={dz}
-            precision={decimalPrecision}
-            className={isCopyingField?.('z') ? 'border-amber-400 bg-amber-950/20' : ''}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-            onChange={(val) => {
-              handleUpdate(node.id, {
-                transform: { ...node.transform!, z: az + val },
-              });
-            }}
-          />
-        </div>
+        <TransformField
+          label="Local X (m)"
+          fieldId="x"
+          value={relX}
+          precision={decimalPrecision}
+          variant="anchor"
+          isCopying={isCopyingField?.('x')}
+          onContextMenu={(e) => onContextMenuLabel?.('x', e)}
+          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          onChange={(val) => handleFieldChange("x", val)}
+        />
+        <TransformField
+          label="Local Y (m)"
+          fieldId="y"
+          value={relY}
+          precision={decimalPrecision}
+          variant="anchor"
+          isCopying={isCopyingField?.('y')}
+          onContextMenu={(e) => onContextMenuLabel?.('y', e)}
+          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          onChange={(val) => handleFieldChange("y", val)}
+        />
+        <TransformField
+          label="Delta Z (m)"
+          fieldId="z"
+          value={dz}
+          precision={decimalPrecision}
+          variant="anchor"
+          isCopying={isCopyingField?.('z')}
+          onContextMenu={(e) => onContextMenuLabel?.('z', e)}
+          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          onChange={(val) => handleFieldChange("z", val)}
+        />
         <div className="col-span-3 grid grid-cols-2 gap-2">
-          <div>
-            <Label
-              className={`block text-xs mb-1 cursor-context-menu select-none ${
-                isCopyingField?.('yaw') ? 'text-amber-400 font-bold' : 'text-text-muted hover:text-text-base'
-              }`}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onContextMenuLabel?.('yaw', e);
-              }}
-            >
-              Delta Yaw (rad)
-            </Label>
-            <NumericInput
-              step="0.01"
-              precision={decimalPrecision}
-              value={relYaw}
-              className={isCopyingField?.('yaw') ? 'border-amber-400 bg-amber-950/20' : ''}
-              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-              onChange={(val) => {
-                const newYaw = aYaw + val;
-                const q = yawToQuaternion(newYaw);
-                handleUpdate(node.id, {
-                  transform: { ...node.transform!, ...q },
-                });
-              }}
-            />
-          </div>
-          <div>
-            <Label
-              className={`block text-xs mb-1 cursor-context-menu select-none ${
-                isCopyingField?.('yaw') ? 'text-amber-400 font-bold' : 'text-text-muted hover:text-text-base'
-              }`}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onContextMenuLabel?.('yaw', e);
-              }}
-            >
-              Delta Yaw (deg)
-            </Label>
-            <NumericInput
-              step="1"
-              precision={decimalPrecision}
-              value={relYaw * (180.0 / Math.PI)}
-              className={isCopyingField?.('yaw') ? 'border-amber-400 bg-amber-950/20' : ''}
-              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-              onChange={(val) => {
-                const valRad = val * (Math.PI / 180.0);
-                const newYaw = aYaw + valRad;
-                const q = yawToQuaternion(newYaw);
-                handleUpdate(node.id, {
-                  transform: { ...node.transform!, ...q },
-                });
-              }}
-            />
-          </div>
+          <TransformField
+            label="Delta Yaw (rad)"
+            fieldId="yaw"
+            value={relYaw}
+            precision={decimalPrecision}
+            step="0.01"
+            variant="anchor"
+            isCopying={isCopyingField?.('yaw')}
+            onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            onChange={(val) => handleYawChange(val, false)}
+          />
+          <TransformField
+            label="Delta Yaw (deg)"
+            fieldId="yaw"
+            value={relYaw * (180.0 / Math.PI)}
+            precision={decimalPrecision}
+            step="1"
+            variant="anchor"
+            isCopying={isCopyingField?.('yaw')}
+            onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            onChange={(val) => handleYawChange(val, true)}
+          />
         </div>
       </div>
     </div>

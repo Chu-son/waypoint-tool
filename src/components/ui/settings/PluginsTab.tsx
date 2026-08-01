@@ -1,10 +1,12 @@
 import { Plus, Trash2, RefreshCw, Sparkles, Map, PenTool, Wand2, Puzzle, Image as ImageIcon, Check, AlertCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../common/Button";
-import { Input } from "../common/Input";
 import { Label } from "../common/Label";
 import { Select } from "../common/Select";
 import { cn } from "../../../utils/cn";
+import { TabSectionHeader } from "./TabSectionHeader";
+import { EmptyState } from "../common/EmptyState";
+import { BrowseInput } from "../common/BrowseInput";
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -20,145 +22,143 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex justify-between items-center bg-surface-panel p-4 rounded-xl border border-border-base/50 shadow-sm">
-        <div>
-          <h3 className="text-lg font-bold text-text-base tracking-tight">Installed Plugins</h3>
-          <p className="text-xs text-text-muted mt-0.5 font-medium">
-            Manage Generator plugins order and visibility on the Tool Panel.
-          </p>
-        </div>
-        <div className="flex gap-2.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={async () => {
-              try {
-                const reloadPlugins = useAppStore.getState().reloadPlugins;
-                await reloadPlugins();
-              } catch (err) {
-                alert(`リロードに失敗しました: ${String(err)}`);
-              }
-            }}
-            className="text-text-muted hover:text-text-base border-border-base/30"
-          >
-            <RefreshCw size={14} className="mr-1" /> Reload All
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={async () => {
-              const { DialogAPI, BackendAPI } = await import("../../../api");
-              const confirmed = await DialogAPI.ask(
-                "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
-                { title: "セキュリティ警告", kind: "warning" }
-              );
-              if (!confirmed) {
-                return;
-              }
-              try {
-                const selectedPath = await DialogAPI.open({
-                  multiple: false,
-                  directory: true,
-                  defaultPath: lastDirectory || undefined,
-                });
-                if (selectedPath) {
-                  const pathStr =
+      <TabSectionHeader
+        title="Installed Plugins"
+        subtitle="Manage Generator plugins order and visibility on the Tool Panel."
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const reloadPlugins = useAppStore.getState().reloadPlugins;
+                  await reloadPlugins();
+                } catch (err) {
+                  alert(`リロードに失敗しました: ${String(err)}`);
+                }
+              }}
+              className="text-text-muted hover:text-text-base border-border-base/30"
+            >
+              <RefreshCw size={14} className="mr-1" /> Reload All
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                const { DialogAPI, BackendAPI } = await import("../../../api");
+                const confirmed = await DialogAPI.ask(
+                  "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
+                  { title: "セキュリティ警告", kind: "warning" }
+                );
+                if (!confirmed) {
+                  return;
+                }
+                try {
+                  const selectedPath = await DialogAPI.open({
+                    multiple: false,
+                    directory: true,
+                    defaultPath: lastDirectory || undefined,
+                  });
+                  if (selectedPath) {
+                    const pathStr =
+                      typeof selectedPath === "string"
+                        ? selectedPath
+                        : (selectedPath as any).path;
+                    if (!pathStr) return;
+
+                    const customPlugin = await BackendAPI.scanCustomPlugin(pathStr);
+                    const newMap = { ...plugins, [customPlugin.id]: customPlugin };
+                    setPlugins(newMap);
+
+                    if (!pluginSettings.find((s) => s.id === customPlugin.id)) {
+                      setPluginSettings([
+                        ...pluginSettings,
+                        {
+                          id: customPlugin.id,
+                          path: pathStr,
+                          enabled: true,
+                          order: pluginSettings.length,
+                          isBuiltin: false,
+                        },
+                      ]);
+                    }
+                  }
+                } catch (err) {
+                  console.error("Failed to load custom plugin:", err);
+                  alert(
+                    `Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`,
+                  );
+                }
+              }}
+            >
+              <Plus size={14} className="mr-1" /> Add Folder
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={async () => {
+                const { DialogAPI, BackendAPI } = await import("../../../api");
+                const confirmed = await DialogAPI.ask(
+                  "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
+                  { title: "セキュリティ警告", kind: "warning" }
+                );
+                if (!confirmed) {
+                  return;
+                }
+                try {
+                  const selectedPath = await DialogAPI.open({
+                    multiple: false,
+                    directory: true,
+                    defaultPath: lastDirectory || undefined,
+                  });
+                  if (!selectedPath) return;
+                  const targetDir =
                     typeof selectedPath === "string"
                       ? selectedPath
                       : (selectedPath as any).path;
-                  if (!pathStr) return;
+                  if (!targetDir) return;
 
-                  const customPlugin = await BackendAPI.scanCustomPlugin(pathStr);
-                  const newMap = { ...plugins, [customPlugin.id]: customPlugin };
+                  const pluginName = prompt(
+                    `プラグイン名を入力してください:\n(作成先: ${targetDir})`,
+                  );
+                  if (!pluginName || !pluginName.trim()) return;
+
+                  const newPlugin = await BackendAPI.scaffoldPlugin(
+                    pluginName.trim(),
+                    targetDir,
+                  );
+                  const newMap = { ...plugins, [newPlugin.id]: newPlugin };
                   setPlugins(newMap);
 
-                  if (!pluginSettings.find((s) => s.id === customPlugin.id)) {
+                  if (!pluginSettings.find((s) => s.id === newPlugin.id)) {
                     setPluginSettings([
                       ...pluginSettings,
                       {
-                        id: customPlugin.id,
-                        path: pathStr,
+                        id: newPlugin.id,
+                        path: newPlugin.folder_path,
                         enabled: true,
                         order: pluginSettings.length,
                         isBuiltin: false,
                       },
                     ]);
                   }
+                  alert(
+                    `Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`,
+                  );
+                } catch (err) {
+                  console.error("Failed to scaffold plugin:", err);
+                  alert(
+                    `プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`,
+                  );
                 }
-              } catch (err) {
-                console.error("Failed to load custom plugin:", err);
-                alert(
-                  `Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`,
-                );
-              }
-            }}
-          >
-            <Plus size={14} className="mr-1" /> Add Folder
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={async () => {
-              const { DialogAPI, BackendAPI } = await import("../../../api");
-              const confirmed = await DialogAPI.ask(
-                "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
-                { title: "セキュリティ警告", kind: "warning" }
-              );
-              if (!confirmed) {
-                return;
-              }
-              try {
-                const selectedPath = await DialogAPI.open({
-                  multiple: false,
-                  directory: true,
-                  defaultPath: lastDirectory || undefined,
-                });
-                if (!selectedPath) return;
-                const targetDir =
-                  typeof selectedPath === "string"
-                    ? selectedPath
-                    : (selectedPath as any).path;
-                if (!targetDir) return;
-
-                const pluginName = prompt(
-                  `プラグイン名を入力してください:\n(作成先: ${targetDir})`,
-                );
-                if (!pluginName || !pluginName.trim()) return;
-
-                const newPlugin = await BackendAPI.scaffoldPlugin(
-                  pluginName.trim(),
-                  targetDir,
-                );
-                const newMap = { ...plugins, [newPlugin.id]: newPlugin };
-                setPlugins(newMap);
-
-                if (!pluginSettings.find((s) => s.id === newPlugin.id)) {
-                  setPluginSettings([
-                    ...pluginSettings,
-                    {
-                      id: newPlugin.id,
-                      path: newPlugin.folder_path,
-                      enabled: true,
-                      order: pluginSettings.length,
-                      isBuiltin: false,
-                    },
-                  ]);
-                }
-                alert(
-                  `Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`,
-                );
-              } catch (err) {
-                console.error("Failed to scaffold plugin:", err);
-                alert(
-                  `プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`,
-                );
-              }
-            }}
-          >
-            <Plus size={14} className="mr-1" /> Create New
-          </Button>
-        </div>
-      </div>
+              }}
+            >
+              <Plus size={14} className="mr-1" /> Create New
+            </Button>
+          </>
+        }
+      />
 
       {/* Missing Plugins Cleanup Banner */}
       {(() => {
@@ -203,9 +203,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
 
       <div className="space-y-4">
         {pluginSettings.length === 0 ? (
-          <div className="text-center py-12 text-text-muted/60 text-sm bg-surface-panel/30 rounded-2xl border-2 border-dashed border-border-base/50 animate-pulse">
-            No plugins installed.
-          </div>
+          <EmptyState message="No plugins installed." />
         ) : (
           [...pluginSettings]
             .sort((a, b) => a.order - b.order)
@@ -410,46 +408,21 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                       {/* Interpreter Override */}
                       {plugin && plugin.manifest.type === "python" && (
                         <div className="col-span-12 md:col-span-7 space-y-2.5">
-                          <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">Python Interpreter Override</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              type="text"
-                              list="python-envs"
-                              value={setting.pythonOverridePath || ""}
-                              onChange={(e) => {
-                                const newSettings = pluginSettings.map((s) =>
-                                  s.id === setting.id ? { ...s, pythonOverridePath: e.target.value } : s,
-                                );
-                                setPluginSettings(newSettings);
-                              }}
-                              className="h-8 text-[11px] flex-1 font-mono"
-                              placeholder={`Global: ${globalPythonPath}`}
-                            />
-                            <Button
-                              variant="secondary"
-                              onClick={async () => {
-                                const { DialogAPI } = await import("../../../api");
-                                const selectedPath = await DialogAPI.open({
-                                  multiple: false,
-                                  directory: false,
-                                });
-                                if (selectedPath) {
-                                  const pathStr =
-                                    typeof selectedPath === "string"
-                                      ? selectedPath
-                                      : (selectedPath as any).path;
-                                  const newSettings = pluginSettings.map((s) =>
-                                    s.id === setting.id ? { ...s, pythonOverridePath: pathStr } : s,
-                                  );
-                                  setPluginSettings(newSettings);
-                                }
-                              }}
-                              className="h-8 px-3 text-[10px]"
-                            >
-                              Browse
-                            </Button>
-                          </div>
-                        </div>
+                           <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">Python Interpreter Override</Label>
+                           <BrowseInput
+                             value={setting.pythonOverridePath || ""}
+                             onChange={(val) => {
+                               const newSettings = pluginSettings.map((s) =>
+                                 s.id === setting.id ? { ...s, pythonOverridePath: val } : s
+                               );
+                               setPluginSettings(newSettings);
+                             }}
+                             placeholder={`Global: ${globalPythonPath}`}
+                             list="python-envs"
+                             size="sm"
+                             inputClassName="font-mono"
+                           />
+                         </div>
                       )}
                     </div>
 

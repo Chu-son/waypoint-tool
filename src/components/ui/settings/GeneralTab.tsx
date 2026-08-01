@@ -1,8 +1,8 @@
 import { useAppStore } from "../../../stores/appStore";
-import { Label } from "../common/Label";
-import { Input } from "../common/Input";
 import { Select } from "../common/Select";
-import { Button } from "../common/Button";
+import { FormField } from "../common/FormField";
+import { Slider } from "../common/Slider";
+import { BrowseInput } from "../common/BrowseInput";
 
 export function GeneralTab() {
   const defaultMapOpacity = useAppStore((state) => state.defaultMapOpacity);
@@ -22,40 +22,33 @@ export function GeneralTab() {
 
   return (
     <div className="space-y-6 max-w-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="space-y-3">
-        <Label className="flex justify-between text-sm font-semibold text-text-base">
-          <span>Default Map Opacity</span>
-          <span className="text-primary-base">{Math.round(defaultMapOpacity * 100)}%</span>
-        </Label>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
+      <FormField
+        label="Default Map Opacity"
+        labelRight={`${Math.round(defaultMapOpacity * 100)}%`}
+        description="The default transparency applied to newly loaded map layers."
+      >
+        <Slider
+          min={0}
+          max={1}
+          step={0.05}
           value={defaultMapOpacity}
           onChange={(e) => setDefaultMapOpacity(parseFloat(e.target.value))}
-          className="w-full h-1.5 bg-surface-hover rounded-lg appearance-none cursor-pointer accent-primary-base transition-all hover:accent-primary-hover"
         />
-        <p className="text-[11px] text-text-muted opacity-80 leading-relaxed px-1">
-          The default transparency applied to newly loaded map layers.
-        </p>
-      </div>
-      <div className="space-y-3">
-        <Label className="text-sm font-semibold text-text-base">
-          Last Used Directory
-        </Label>
+      </FormField>
+
+      <FormField
+        label="Last Used Directory"
+        description="Remembered location for Save/Open dialogs across sessions."
+      >
         <div className="p-3 bg-surface-base/50 border border-border-base/50 rounded-lg text-[11px] text-text-muted font-mono break-all line-clamp-2 shadow-inner">
           {lastDirectory || "None"}
         </div>
-        <p className="text-[11px] text-text-muted opacity-80 leading-relaxed px-1">
-          Remembered location for Save/Open dialogs across sessions.
-        </p>
-      </div>
+      </FormField>
 
-      <div className="space-y-3">
-        <Label className="text-sm font-semibold text-text-base">
-          Waypoint Index Start
-        </Label>
+      <FormField
+        label="Waypoint Index Start"
+        description="Determines the starting index count for Waypoints across the Canvas and Exports."
+      >
         <Select
           value={indexStartIndex}
           onChange={(e) => setIndexStartIndex(parseInt(e.target.value) as 0 | 1)}
@@ -64,22 +57,17 @@ export function GeneralTab() {
           <option value={0}>0 (0-indexed)</option>
           <option value={1}>1 (1-indexed)</option>
         </Select>
-        <p className="text-[11px] text-text-muted opacity-80 leading-relaxed px-1">
-          Determines the starting index count for Waypoints across the Canvas
-          and Exports.
-        </p>
-      </div>
+      </FormField>
 
-      <div className="space-y-3">
-        <Label className="flex justify-between text-sm font-semibold text-text-base">
-          <span>Decimal Precision</span>
-          <span className="text-primary-base">{decimalPrecision}</span>
-        </Label>
-        <input
-          type="range"
-          min="0"
-          max="12"
-          step="1"
+      <FormField
+        label="Decimal Precision"
+        labelRight={String(decimalPrecision)}
+        description="Number of decimal places shown in numeric input fields (Inspector, Properties)."
+      >
+        <Slider
+          min={0}
+          max={12}
+          step={1}
           value={decimalPrecision}
           onChange={(e) =>
             useAppStore.setState({
@@ -87,73 +75,34 @@ export function GeneralTab() {
               isDirty: true,
             })
           }
-          className="w-full h-1.5 bg-surface-hover rounded-lg appearance-none cursor-pointer accent-primary-base transition-all hover:accent-primary-hover"
         />
-        <p className="text-[11px] text-text-muted opacity-80 leading-relaxed px-1">
-          Number of decimal places shown in numeric input fields (Inspector,
-          Properties).
-        </p>
-      </div>
+      </FormField>
 
-      <div className="space-y-3">
-        <Label className="flex justify-between text-sm font-semibold text-text-base">
-          <span>Toolbar Max Columns</span>
-          <span className="text-primary-base">{toolPanelMaxColumns}</span>
-        </Label>
-        <input
-          type="range"
-          min="1"
-          max="5"
-          step="1"
+      <FormField
+        label="Toolbar Max Columns"
+        labelRight={String(toolPanelMaxColumns)}
+        description="Maximum column wrapping allowed on the Main Tool Panel before overflowing."
+      >
+        <Slider
+          min={1}
+          max={5}
+          step={1}
           value={toolPanelMaxColumns}
           onChange={(e) => setToolPanelMaxColumns(parseInt(e.target.value))}
-          className="w-full h-1.5 bg-surface-hover rounded-lg appearance-none cursor-pointer accent-primary-base transition-all hover:accent-primary-hover"
         />
-        <p className="text-[11px] text-text-muted opacity-80 leading-relaxed px-1">
-          Maximum column wrapping allowed on the Main Tool Panel before
-          overflowing.
-        </p>
-      </div>
+      </FormField>
 
-      <div className="space-y-3">
-        <Label className="text-sm font-semibold text-text-base">
-          Global Python Interpreter Path
-        </Label>
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            list="python-envs"
-            value={globalPythonPath}
-            onChange={(e) => setGlobalPythonPath(e.target.value)}
-            className="h-10 text-sm"
-            placeholder="e.g. python, python3, /usr/bin/python3.10"
-          />
-          <Button
-            variant="secondary"
-            onClick={async () => {
-              const { DialogAPI } = await import("../../../api");
-              const selectedPath = await DialogAPI.open({
-                multiple: false,
-                directory: false,
-              });
-              if (selectedPath) {
-                setGlobalPythonPath(
-                  typeof selectedPath === "string"
-                    ? selectedPath
-                    : (selectedPath as any).path,
-                );
-              }
-            }}
-            className="h-10 px-6 shrink-0"
-          >
-            Browse
-          </Button>
-        </div>
-        <p className="text-[11px] text-text-muted opacity-80 leading-relaxed px-1">
-          The default command or path used to execute Python plugins (e.g.{" "}
-          `python`, `python3` or absolute path to a virtual environment).
-        </p>
-      </div>
+      <FormField
+        label="Global Python Interpreter Path"
+        description="The default command or path used to execute Python plugins (e.g. `python`, `python3` or absolute path to a virtual environment)."
+      >
+        <BrowseInput
+          value={globalPythonPath}
+          onChange={setGlobalPythonPath}
+          placeholder="e.g. python, python3, /usr/bin/python3.10"
+          list="python-envs"
+        />
+      </FormField>
     </div>
   );
 }

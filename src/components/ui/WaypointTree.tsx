@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { ChevronRight, Layers, GripVertical, Anchor } from 'lucide-react';
+import { Button } from './common/Button';
 import {
   DndContext,
   closestCenter,
@@ -198,31 +199,31 @@ export function WaypointTree() {
                         onClick={(e) => handleNodeClick(id, e)}
                         className={`px-3 py-2 rounded text-sm group border transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-emerald-900/50 border-emerald-500 text-white'
-                            : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600 text-slate-300'
+                            ? 'bg-emerald-500/20 border-emerald-500 text-text-base'
+                            : 'bg-surface-panel border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-base'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1">
                             <button
                               onClick={(e) => { e.stopPropagation(); toggleExpand(id); }}
-                              className="text-slate-400 hover:text-white transition-colors"
+                              className="text-text-muted hover:text-text-base transition-colors"
                             >
                               <ChevronRight size={14} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                             </button>
                             <Layers size={14} className="text-emerald-400" />
                             <span className="font-medium text-xs">{pluginName}</span>
-                            <span className="text-[10px] text-slate-500 ml-1">({childIds.length} pts)</span>
+                            <span className="text-[10px] text-text-muted/70 ml-1">({childIds.length} pts)</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={`opacity-50 text-xs ${isSelected ? 'text-emerald-200' : ''}`}>{id.slice(0, 6)}</span>
-                            <GripVertical size={14} className="text-slate-600 group-hover:text-slate-400 cursor-grab active:cursor-grabbing" />
+                            <span className={`opacity-50 text-xs ${isSelected ? 'text-emerald-400' : ''}`}>{id.slice(0, 6)}</span>
+                            <GripVertical size={14} className="text-text-muted/40 group-hover:text-text-muted cursor-grab active:cursor-grabbing" />
                           </div>
                         </div>
                       </div>
                       
                       {isExpanded && childIds.length > 0 && (
-                        <ul className="ml-4 mt-1 space-y-0.5 border-l-2 border-emerald-800/50 pl-2">
+                        <ul className="ml-4 mt-1 space-y-0.5 border-l-2 border-emerald-500/30 pl-2">
                           {childIds.map((childId, childIdx) => {
                             const child = nodes[childId];
                             if (!child) return null;
@@ -239,8 +240,8 @@ export function WaypointTree() {
                                 }}
                                 className={`px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between ${
                                   isChildSelected
-                                    ? 'bg-blue-900/50 border-blue-500 text-white'
-                                    : 'bg-slate-850 border-transparent hover:bg-slate-700 hover:border-slate-600 text-slate-400'
+                                    ? 'bg-primary-base/20 border-primary-base text-text-base'
+                                    : 'bg-surface-panel/80 border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-muted'
                                 } ${isChildAnchor ? 'border-amber-400/60 bg-amber-950/20' : ''}`}
                               >
                                 <div className="flex items-center gap-1">
@@ -272,9 +273,9 @@ export function WaypointTree() {
                       }}
                       className={`px-3 py-2 rounded text-sm group border transition-colors cursor-pointer ${
                         isSelected
-                          ? 'bg-blue-900/50 border-blue-500 text-white'
-                          : 'bg-slate-800 border-transparent hover:bg-slate-700 hover:border-slate-600 text-slate-300'
-                      } ${isAnchor ? 'border-amber-400 bg-amber-950/30' : ''}`}
+                          ? 'bg-primary-base/20 border-primary-base text-text-base'
+                          : 'bg-surface-panel border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-base'
+                      } ${isAnchor ? 'border-amber-400/60 bg-amber-950/20' : ''}`}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
@@ -285,8 +286,8 @@ export function WaypointTree() {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`opacity-50 text-xs ${isSelected ? 'text-blue-200' : ''}`}>{id.slice(0, 6)}</span>
-                          <GripVertical size={14} className="text-slate-600 group-hover:text-slate-400 cursor-grab active:cursor-grabbing" />
+                          <span className={`opacity-50 text-xs ${isSelected ? 'text-primary-base/80' : ''}`}>{id.slice(0, 6)}</span>
+                          <GripVertical size={14} className="text-text-muted/40 group-hover:text-text-muted cursor-grab active:cursor-grabbing" />
                         </div>
                       </div>
                     </div>
@@ -304,7 +305,8 @@ export function WaypointTree() {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           className="fixed z-[9999] bg-surface-panel border border-border-base rounded-lg shadow-xl py-1 min-w-[160px] text-xs text-text-base select-none"
         >
-          <button
+          <Button
+            variant="ghost"
             onClick={() => {
               if (anchorNodeId === contextMenu.nodeId) {
                 setAnchorNode(null);
@@ -313,11 +315,11 @@ export function WaypointTree() {
               }
               setContextMenu(null);
             }}
-            className="w-full text-left px-3 py-2 hover:bg-surface-hover flex items-center gap-2 text-text-base transition-colors"
+            className="w-full justify-start px-3 py-2 text-left text-xs flex items-center gap-2 text-text-base hover:bg-surface-hover rounded-none border-none transition-colors"
           >
             <Anchor size={14} className="text-amber-400" />
             {anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -7,6 +7,8 @@ import { Input } from "../common/Input";
 import { Select } from "../common/Select";
 import { Label } from "../common/Label";
 import { cn } from "../../../utils/cn";
+import { TabSectionHeader } from "./TabSectionHeader";
+import { EmptyState } from "../common/EmptyState";
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -48,24 +50,13 @@ export function OptionSchemaTab() {
       return;
     }
     if (hasInvalidDefaults) {
-      alert("Invalid default values detected. Please match the selected type.");
+      alert("Some options have default values that do not match their type.");
       return;
     }
 
-    const parsedOptions = localOptions.map((opt) => {
-      let parsedDefault = opt.default;
-      if (opt.default === "") parsedDefault = undefined;
-      else if (opt.type === "integer")
-        parsedDefault = parseInt(String(opt.default), 10);
-      else if (opt.type === "float")
-        parsedDefault = parseFloat(String(opt.default));
-      else if (opt.type === "boolean")
-        parsedDefault = String(opt.default).toLowerCase() === "true";
-      return { ...opt, default: parsedDefault };
-    });
-
-    setGlobalOptionsSchema({ options: parsedOptions });
-    alert("Schema applied successfully.");
+    setGlobalOptionsSchema({ options: localOptions });
+    useAppStore.setState({ isDirty: true });
+    alert("オプションスキーマを保存しました。");
   };
 
   const handleAddOption = () => {
@@ -82,22 +73,22 @@ export function OptionSchemaTab() {
     ]);
   };
 
-  const handleUpdateOption = (index: number, updates: Partial<OptionDef>) => {
-    const newOptions = [...localOptions];
-    newOptions[index] = { ...newOptions[index], ...updates };
-    setLocalOptions(newOptions);
-  };
-
   const handleRemoveOption = (index: number) => {
     setLocalOptions(localOptions.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateOption = (index: number, updates: Partial<OptionDef>) => {
+    setLocalOptions(
+      localOptions.map((opt, i) => (i === index ? { ...opt, ...updates } : opt)),
+    );
   };
 
   const handleExportSchema = async () => {
     try {
       const { DialogAPI, BackendAPI } = await import("../../../api");
       const savePath = await DialogAPI.save({
-        defaultPath: "options_schema.wpt_schema",
-        filters: [{ name: "Options Schema", extensions: ["wpt_schema"] }],
+        defaultPath: "options_schema.json",
+        filters: [{ name: "Options Schema", extensions: ["json"] }],
       });
       if (!savePath) return;
 
@@ -122,7 +113,7 @@ export function OptionSchemaTab() {
         filters: [
           {
             name: "Options Schema",
-            extensions: ["wpt_schema", "yaml", "yml"],
+            extensions: ["json", "yaml", "yml"],
           },
         ],
       });
@@ -155,65 +146,52 @@ export function OptionSchemaTab() {
         schema = parsed as OptionsSchema;
       }
 
-      if (localOptions.length > 0) {
-        const confirmOverwrite = await DialogAPI.ask(
-          "現在のスキーマ設定を上書きしますか？",
-          { title: "スキーマのインポート" }
-        );
-        if (!confirmOverwrite) return;
-      }
-
-      setGlobalOptionsSchema(schema);
       setLocalOptions(schema.options || []);
-      alert("オプションスキーマのインポートが完了しました。");
+      alert("オプションスキーマをインポートしました。");
     } catch (err) {
       console.error("Failed to import options schema:", err);
-      alert(`オプションスキーマのインポートに失敗しました。\nエラー詳細: ${String(err)}`);
+      alert(`インポートに失敗しました。\n詳細: ${String(err)}`);
     }
   };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex justify-between items-center bg-surface-panel p-4 rounded-xl border border-border-base/50 shadow-sm">
-        <div>
-          <h3 className="text-lg font-bold text-text-base tracking-tight">
-            Waypoint Options Schema
-          </h3>
-          <p className="text-xs text-text-muted mt-0.5 font-medium">
-            Define custom properties that can be attached to waypoints.
-          </p>
-        </div>
-        <div className="flex gap-2.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleImportSchema}
-          >
-            <Upload size={14} className="mr-1" /> Import
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleExportSchema}
-          >
-            <Download size={14} className="mr-1" /> Export
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleAddOption}
-          >
-            <Plus size={14} className="mr-1" /> Add Field
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleSaveOptions}
-          >
-            <Save size={14} className="mr-1" /> Apply
-          </Button>
-        </div>
-      </div>
+      <TabSectionHeader
+        title="Waypoint Options Schema"
+        subtitle="Define custom properties that can be attached to waypoints."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleImportSchema}
+            >
+              <Upload size={14} className="mr-1" /> Import
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportSchema}
+            >
+              <Download size={14} className="mr-1" /> Export
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleAddOption}
+            >
+              <Plus size={14} className="mr-1" /> Add Field
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveOptions}
+            >
+              <Save size={14} className="mr-1" /> Apply
+            </Button>
+          </>
+        }
+      />
 
       <div className="space-y-3 px-1">
         {localOptions.map((opt, i) => (
@@ -391,9 +369,7 @@ export function OptionSchemaTab() {
           </div>
         ))}
         {localOptions.length === 0 && (
-          <div className="text-center py-12 text-text-muted/60 text-sm bg-surface-panel/30 rounded-2xl border-2 border-dashed border-border-base/40 animate-pulse">
-            No custom options defined. Click "Add Field" to create one.
-          </div>
+          <EmptyState message="No custom options defined. Click 'Add Field' to create one." />
         )}
       </div>
     </div>

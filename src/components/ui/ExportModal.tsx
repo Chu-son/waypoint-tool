@@ -8,6 +8,7 @@ import { Button } from "./common/Button";
 import { Checkbox } from "./common/Checkbox";
 import { Label } from "./common/Label";
 import { cn } from "../../utils/cn";
+import { OptionCard } from "./common/OptionCard";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -180,12 +181,11 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-3">
-          <Save size={20} className="text-primary-base" />
-          <span>Export Waypoints</span>
-        </div>
-      </ModalHeader>
+      <ModalHeader
+        onClose={onClose}
+        icon={<Save size={20} className="text-primary-base" />}
+        title="Export Waypoints"
+      />
 
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -247,22 +247,12 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           </div>
 
           <div className="pt-6 border-t border-border-base/30">
-            <label className="flex items-start gap-4 p-4 rounded-xl bg-primary-base/5 border border-primary-base/10 hover:border-primary-base/30 hover:bg-primary-base/[0.08] transition-all cursor-pointer group">
-              <div className="pt-1">
-                <Checkbox
-                  checked={includeImage}
-                  onChange={(e) => setIncludeImage(e.target.checked)}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-bold text-text-base group-hover:text-primary-base transition-colors">
-                  Include High-Res Map Shot
-                </p>
-                <p className="text-[11px] text-text-muted/80 leading-relaxed">
-                  Generates a dedicated `.png` capture highlighting all exported waypoints on top of the map layer.
-                </p>
-              </div>
-            </label>
+            <OptionCard
+              checked={includeImage}
+              onChange={setIncludeImage}
+              title="Include High-Res Map Shot"
+              description="Generates a dedicated `.png` capture highlighting all exported waypoints on top of the map layer."
+            />
           </div>
         </div>
       </ModalContent>

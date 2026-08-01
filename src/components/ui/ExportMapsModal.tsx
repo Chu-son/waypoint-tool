@@ -7,6 +7,7 @@ import { Button } from "./common/Button";
 import { Checkbox } from "./common/Checkbox";
 import { Label } from "./common/Label";
 import { Input } from "./common/Input";
+import { OptionCard } from "./common/OptionCard";
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);
@@ -84,12 +85,11 @@ export function ExportMapsModal() {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-3">
-          <Download size={20} className="text-emerald-400" />
-          <span>Export Maps</span>
-        </div>
-      </ModalHeader>
+      <ModalHeader
+        onClose={onClose}
+        icon={<Download size={20} className="text-emerald-400" />}
+        title="Export Maps"
+      />
 
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -182,31 +182,22 @@ export function ExportMapsModal() {
           </div>
 
           <div className="pt-6 border-t border-border-base/30">
-            <label className="flex items-start gap-4 p-4 rounded-xl bg-primary-base/5 border border-primary-base/10 hover:border-primary-base/30 hover:bg-primary-base/[0.08] transition-all cursor-pointer group">
-              <div className="pt-1">
-                <Checkbox
-                  checked={outputMapList}
-                  onChange={(e) => setOutputMapList(e.target.checked)}
+            <OptionCard
+              checked={outputMapList}
+              onChange={setOutputMapList}
+              title="Generate Map List File"
+              description="Creates a text file containing the names of all exported maps."
+            >
+              {outputMapList && (
+                <Input
+                  value={mapListFilename}
+                  onChange={(e) => setMapListFilename(e.target.value)}
+                  placeholder="map_list.txt"
+                  className="h-8 text-sm mt-2 font-mono"
+                  onClick={(e) => e.preventDefault()}
                 />
-              </div>
-              <div className="space-y-2 w-full">
-                <p className="text-sm font-bold text-text-base group-hover:text-primary-base transition-colors">
-                  Generate Map List File
-                </p>
-                <p className="text-[11px] text-text-muted/80 leading-relaxed">
-                  Creates a text file containing the names of all exported maps.
-                </p>
-                {outputMapList && (
-                  <Input 
-                    value={mapListFilename}
-                    onChange={(e) => setMapListFilename(e.target.value)}
-                    placeholder="map_list.txt"
-                    className="h-8 text-sm mt-2"
-                    onClick={e => e.preventDefault()}
-                  />
-                )}
-              </div>
-            </label>
+              )}
+            </OptionCard>
           </div>
         </div>
       </ModalContent>

@@ -56,48 +56,27 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       </ModalHeader>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Tabs Sidebar */}
         <div className="w-56 bg-surface-panel/40 border-r border-border-base/40 p-3 shrink-0 space-y-1">
-          <Button
-            variant={activeTab === "general" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("general")}
-            className={cn(
-              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
-              activeTab === "general" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-            )}
-          >
-            General
-          </Button>
-          <Button
-            variant={activeTab === "options" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("options")}
-            className={cn(
-              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
-              activeTab === "options" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-            )}
-          >
-            Option Schema
-          </Button>
-          <Button
-            variant={activeTab === "export" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("export")}
-            className={cn(
-              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
-              activeTab === "export" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-            )}
-          >
-            Export Templates
-          </Button>
-          <Button
-            variant={activeTab === "plugins" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("plugins")}
-            className={cn(
-              "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
-              activeTab === "plugins" ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm" : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-            )}
-          >
-            Plugins
-          </Button>
+          {([
+            { id: "general", label: "General" },
+            { id: "options", label: "Option Schema" },
+            { id: "export", label: "Export Templates" },
+            { id: "plugins", label: "Plugins" },
+          ] as const).map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? "secondary" : "ghost"}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
+                activeTab === tab.id
+                  ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm"
+                  : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
+              )}
+            >
+              {tab.label}
+            </Button>
+          ))}
         </div>
 
         {/* Content Area */}

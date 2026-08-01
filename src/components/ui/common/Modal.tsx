@@ -54,16 +54,19 @@ export function Modal({
 
 export interface ModalHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   onClose?: () => void;
+  icon?: React.ReactNode;
+  title?: string;
 }
 
-export function ModalHeader({ className, onClose, children, ...props }: ModalHeaderProps) {
+export function ModalHeader({ className, onClose, icon, title, children, ...props }: ModalHeaderProps) {
   return (
     <div
       className={cn("px-6 py-4 border-b border-border-base flex items-center justify-between bg-surface-base/30", className)}
       {...props}
     >
-      <div className="text-lg font-bold text-text-base">
-        {children}
+      <div className="text-lg font-bold text-text-base flex items-center gap-2">
+        {icon && <span className="flex items-center shrink-0">{icon}</span>}
+        {title ? <span>{title}</span> : children}
       </div>
       {onClose && (
         <button

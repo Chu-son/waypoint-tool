@@ -8,6 +8,8 @@ import { Label } from "../common/Label";
 import { Select } from "../common/Select";
 import { useState, useEffect } from "react";
 import { ExportTemplate } from "../../../types/store";
+import { TabSectionHeader } from "./TabSectionHeader";
+import { EmptyState } from "../common/EmptyState";
 
 function TemplateCreateModal({
   isOpen, onClose, onSubmit, initialData
@@ -35,12 +37,11 @@ function TemplateCreateModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-3">
-          <Save size={20} className="text-primary-base" />
-          <span>{initialData ? "Copy Template" : "New Template"}</span>
-        </div>
-      </ModalHeader>
+      <ModalHeader
+        onClose={onClose}
+        icon={<Save size={20} className="text-primary-base" />}
+        title={initialData ? "Copy Template" : "New Template"}
+      />
       <ModalContent className="space-y-4 p-4">
         <div className="space-y-1">
           <Label>Name</Label>
@@ -106,12 +107,11 @@ function TemplateImportModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
-      <ModalHeader onClose={onClose}>
-        <div className="flex items-center gap-3">
-          <Upload size={20} className="text-primary-base" />
-          <span>Import Export Template</span>
-        </div>
-      </ModalHeader>
+      <ModalHeader
+        onClose={onClose}
+        icon={<Upload size={20} className="text-primary-base" />}
+        title="Import Export Template"
+      />
       <ModalContent className="space-y-4 p-4">
         {existingTemplate && (
           <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs space-y-2">
@@ -330,32 +330,28 @@ export function ExportTemplatesTab() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex justify-between items-center bg-surface-panel p-4 rounded-xl border border-border-base/50 shadow-sm">
-        <div>
-          <h3 className="text-lg font-bold text-text-base tracking-tight">
-            Custom Export Templates
-          </h3>
-          <p className="text-xs text-text-muted mt-0.5 font-medium">
-            Define Handlebars templates for custom waypoint export formats.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleImportTemplate}
-          >
-            <Upload size={14} className="mr-1" /> Import
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={openNewModal}
-          >
-            <Plus size={14} className="mr-1" /> New Template
-          </Button>
-        </div>
-      </div>
+      <TabSectionHeader
+        title="Custom Export Templates"
+        subtitle="Define Handlebars templates for custom waypoint export formats."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleImportTemplate}
+            >
+              <Upload size={14} className="mr-1" /> Import
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={openNewModal}
+            >
+              <Plus size={14} className="mr-1" /> New Template
+            </Button>
+          </>
+        }
+      />
 
       <div className="space-y-3">
         <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider ml-1 px-1 flex items-center gap-2">
@@ -567,9 +563,7 @@ export function ExportTemplatesTab() {
           </div>
         ))}
         {globalExportTemplates.length === 0 && (
-          <div className="text-center py-12 text-text-muted/60 text-sm bg-surface-panel/30 rounded-2xl border-2 border-dashed border-border-base/50 animate-pulse">
-            No custom templates defined. Click "New Template" to start.
-          </div>
+          <EmptyState message="No custom templates defined. Click 'New Template' to start." />
         )}
       </div>
       <TemplateCreateModal

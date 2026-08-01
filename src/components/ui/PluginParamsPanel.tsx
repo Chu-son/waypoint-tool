@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { BackendAPI } from "../../api";
-import { Play, Settings2, X, AlertCircle, RefreshCcw } from "lucide-react";
+import { Play, Settings2, X, RefreshCcw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";
 import { PluginInputEditor } from "./PluginInputEditor";
 import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
 import { Label } from "./common/Label";
+import { AlertBox } from "./common/AlertBox";
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
@@ -399,37 +400,21 @@ export function PluginParamsPanel() {
           })}
 
         {needsSelection && (
-          <div className="mt-4 p-3 bg-primary-base/10 border border-primary-base/30 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertCircle
-                size={14}
-                className="text-primary-base mt-0.5 shrink-0"
-              />
-              <div>
-                <h4 className="text-xs font-bold text-primary-base">
-                  Requires Waypoint Selection
-                </h4>
-                <p className="text-[10px] text-primary-base/70 mt-0.5">
-                  You currently have{" "}
-                  <strong className="text-primary-base">
-                    {selectedNodeIds.length}
-                  </strong>{" "}
-                  points selected.
-                </p>
-              </div>
-            </div>
-          </div>
+          <AlertBox title="Requires Waypoint Selection" className="mt-4">
+            You currently have{" "}
+            <strong className="text-primary-base">
+              {selectedNodeIds.length}
+            </strong>{" "}
+            points selected.
+          </AlertBox>
         )}
 
         {errorInfo && (
-          <div className="mt-4 p-3 bg-red-950/20 border border-red-900/50 rounded-lg">
-            <h4 className="text-xs font-bold text-red-500 mb-1">
-              Execution Error
-            </h4>
-            <div className="text-[10px] font-mono text-red-400 whitespace-pre-wrap break-all overflow-auto max-h-32">
+          <AlertBox title="Execution Error" variant="danger" className="mt-4">
+            <div className="font-mono whitespace-pre-wrap break-all overflow-auto max-h-32">
               {errorInfo}
             </div>
-          </div>
+          </AlertBox>
         )}
       </div>
 

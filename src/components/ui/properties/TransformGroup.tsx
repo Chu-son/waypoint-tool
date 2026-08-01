@@ -1,11 +1,9 @@
 import { useAppStore } from "../../../stores/appStore";
-import { Button } from "../common/Button";
-import { Label } from "../common/Label";
-import { NumericInput } from "../NumericInput";
-import { Eye, EyeOff } from "lucide-react";
 import { WaypointNode } from "../../../types/store";
 import { quaternionToYaw } from "../../../utils/transformUtils";
 import { ElementCopyField } from "../../../stores/slices/uiSlice";
+import { TransformField } from "./TransformField";
+import { PropertySectionHeader } from "./PropertySectionHeader";
 
 interface TransformGroupProps {
   isMultiSelection: boolean;
@@ -32,257 +30,122 @@ export function TransformGroup({
 
   const currentYaw = node?.transform ? quaternionToYaw(node.transform) : 0;
 
+  const handleFieldChange = (field: "x" | "y" | "z", val: number) => {
+    useAppStore.getState().runInHistoryTransaction(() => {
+      if (isMultiSelection) {
+        selectedNodeIds.forEach((id) => {
+          const n = nodes[id];
+          if (n && n.transform)
+            handleUpdate(id, {
+              transform: { ...n.transform, [field]: val },
+            });
+        });
+      } else {
+        handleUpdate(node!.id, {
+          transform: { ...node!.transform!, [field]: val },
+        });
+      }
+    });
+  };
+
+  const handleYawChange = (val: number, isDeg: boolean) => {
+    const rad = isDeg ? val * (Math.PI / 180.0) : val;
+    const halfYaw = rad / 2.0;
+    const qz = Math.sin(halfYaw);
+    const qw = Math.cos(halfYaw);
+
+    useAppStore.getState().runInHistoryTransaction(() => {
+      if (isMultiSelection) {
+        selectedNodeIds.forEach((id) => {
+          const n = nodes[id];
+          if (n && n.transform)
+            handleUpdate(id, {
+              transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
+            });
+        });
+      } else {
+        handleUpdate(node!.id, {
+          transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
+        });
+      }
+    });
+  };
+
   return (
     <div className="space-y-2 relative pt-2">
-      <div className="flex justify-between items-center">
-        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Transform (World)
-        </h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-text-muted hover:text-text-base"
-          onClick={() => toggleAttributeVisibility("transform")}
-          title="Toggle Transform on Canvas"
-        >
-          {visibleAttributes.includes("transform") ? (
-            <Eye size={14} />
-          ) : (
-            <EyeOff size={14} />
-          )}
-        </Button>
-      </div>
+      <PropertySectionHeader
+        title="Transform (World)"
+        isVisible={visibleAttributes.includes("transform")}
+        onToggleVisible={() => toggleAttributeVisibility("transform")}
+        toggleTitle="Toggle Transform on Canvas"
+      />
 
       <div className="grid grid-cols-3 gap-2">
-        <div>
-          <Label
-            className={`block text-xs mb-1 cursor-context-menu select-none ${
-              isCopyingField?.("x")
-                ? "text-primary-base font-bold"
-                : "text-text-muted hover:text-text-base"
-            }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenuLabel?.("x", e);
-            }}
-          >
-            X (m)
-          </Label>
-          <NumericInput
-            value={isMultiSelection ? 0 : (node?.transform?.x ?? 0)}
-            precision={decimalPrecision}
-            placeholder={isMultiSelection ? "Mixed" : ""}
-            className={
-              isCopyingField?.("x") ? "border-primary-base bg-primary-base/10" : ""
-            }
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-            onChange={(val) => {
-              useAppStore.getState().runInHistoryTransaction(() => {
-                if (isMultiSelection) {
-                  selectedNodeIds.forEach((id) => {
-                    const n = nodes[id];
-                    if (n && n.transform)
-                      handleUpdate(id, {
-                        transform: { ...n.transform, x: val },
-                      });
-                  });
-                } else {
-                  handleUpdate(node!.id, {
-                    transform: { ...node!.transform!, x: val },
-                  });
-                }
-              });
-            }}
-          />
-        </div>
-        <div>
-          <Label
-            className={`block text-xs mb-1 cursor-context-menu select-none ${
-              isCopyingField?.("y")
-                ? "text-primary-base font-bold"
-                : "text-text-muted hover:text-text-base"
-            }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenuLabel?.("y", e);
-            }}
-          >
-            Y (m)
-          </Label>
-          <NumericInput
-            value={isMultiSelection ? 0 : (node?.transform?.y ?? 0)}
-            precision={decimalPrecision}
-            placeholder={isMultiSelection ? "Mixed" : ""}
-            className={
-              isCopyingField?.("y") ? "border-primary-base bg-primary-base/10" : ""
-            }
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-            onChange={(val) => {
-              useAppStore.getState().runInHistoryTransaction(() => {
-                if (isMultiSelection) {
-                  selectedNodeIds.forEach((id) => {
-                    const n = nodes[id];
-                    if (n && n.transform)
-                      handleUpdate(id, {
-                        transform: { ...n.transform, y: val },
-                      });
-                  });
-                } else {
-                  handleUpdate(node!.id, {
-                    transform: { ...node!.transform!, y: val },
-                  });
-                }
-              });
-            }}
-          />
-        </div>
-        <div>
-          <Label
-            className={`block text-xs mb-1 cursor-context-menu select-none ${
-              isCopyingField?.("z")
-                ? "text-primary-base font-bold"
-                : "text-text-muted hover:text-text-base"
-            }`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              onContextMenuLabel?.("z", e);
-            }}
-          >
-            Z (m)
-          </Label>
-          <NumericInput
-            value={isMultiSelection ? 0 : (node?.transform?.z ?? 0)}
-            precision={decimalPrecision}
-            placeholder={isMultiSelection ? "Mixed" : ""}
-            className={
-              isCopyingField?.("z") ? "border-primary-base bg-primary-base/10" : ""
-            }
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-            onChange={(val) => {
-              useAppStore.getState().runInHistoryTransaction(() => {
-                if (isMultiSelection) {
-                  selectedNodeIds.forEach((id) => {
-                    const n = nodes[id];
-                    if (n && n.transform)
-                      handleUpdate(id, {
-                        transform: { ...n.transform, z: val },
-                      });
-                  });
-                } else {
-                  handleUpdate(node!.id, {
-                    transform: { ...node!.transform!, z: val },
-                  });
-                }
-              });
-            }}
-          />
-        </div>
+        <TransformField
+          label="X (m)"
+          fieldId="x"
+          value={isMultiSelection ? 0 : (node?.transform?.x ?? 0)}
+          precision={decimalPrecision}
+          placeholder={isMultiSelection ? "Mixed" : ""}
+          isCopying={isCopyingField?.("x")}
+          onContextMenu={(e) => onContextMenuLabel?.("x", e)}
+          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          onChange={(val) => handleFieldChange("x", val)}
+        />
+        <TransformField
+          label="Y (m)"
+          fieldId="y"
+          value={isMultiSelection ? 0 : (node?.transform?.y ?? 0)}
+          precision={decimalPrecision}
+          placeholder={isMultiSelection ? "Mixed" : ""}
+          isCopying={isCopyingField?.("y")}
+          onContextMenu={(e) => onContextMenuLabel?.("y", e)}
+          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          onChange={(val) => handleFieldChange("y", val)}
+        />
+        <TransformField
+          label="Z (m)"
+          fieldId="z"
+          value={isMultiSelection ? 0 : (node?.transform?.z ?? 0)}
+          precision={decimalPrecision}
+          placeholder={isMultiSelection ? "Mixed" : ""}
+          isCopying={isCopyingField?.("z")}
+          onContextMenu={(e) => onContextMenuLabel?.("z", e)}
+          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          onChange={(val) => handleFieldChange("z", val)}
+        />
         <div className="col-span-3 grid grid-cols-2 gap-2">
-          <div>
-            <Label
-              className={`block text-xs mb-1 cursor-context-menu select-none ${
-                isCopyingField?.("yaw")
-                  ? "text-primary-base font-bold"
-                  : "text-text-muted hover:text-text-base"
-              }`}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onContextMenuLabel?.("yaw", e);
-              }}
-            >
-              Yaw (rad)
-            </Label>
-            <NumericInput
-              step="0.01"
-              precision={decimalPrecision}
-              value={isMultiSelection ? 0 : currentYaw}
-              placeholder={isMultiSelection ? "Mixed" : ""}
-              className={
-                isCopyingField?.("yaw")
-                  ? "border-primary-base bg-primary-base/10"
-                  : ""
-              }
-              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-              onChange={(val) => {
-                const halfYaw = val / 2.0;
-                const qz = Math.sin(halfYaw);
-                const qw = Math.cos(halfYaw);
-
-                useAppStore.getState().runInHistoryTransaction(() => {
-                  if (isMultiSelection) {
-                    selectedNodeIds.forEach((id) => {
-                      const n = nodes[id];
-                      if (n && n.transform)
-                        handleUpdate(id, {
-                          transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
-                        });
-                    });
-                  } else {
-                    handleUpdate(node!.id, {
-                      transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
-                    });
-                  }
-                });
-              }}
-            />
-          </div>
-          <div>
-            <Label
-              className={`block text-xs mb-1 cursor-context-menu select-none ${
-                isCopyingField?.("yaw")
-                  ? "text-primary-base font-bold"
-                  : "text-text-muted hover:text-text-base"
-              }`}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                onContextMenuLabel?.("yaw", e);
-              }}
-            >
-              Yaw (deg)
-            </Label>
-            <NumericInput
-              step="1"
-              precision={decimalPrecision}
-              value={isMultiSelection ? 0 : currentYaw * (180.0 / Math.PI)}
-              placeholder={isMultiSelection ? "Mixed" : ""}
-              className={
-                isCopyingField?.("yaw")
-                  ? "border-primary-base bg-primary-base/10"
-                  : ""
-              }
-              onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-              onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-              onChange={(val) => {
-                const rad = val * (Math.PI / 180.0);
-                const halfYaw = rad / 2.0;
-                const qz = Math.sin(halfYaw);
-                const qw = Math.cos(halfYaw);
-
-                useAppStore.getState().runInHistoryTransaction(() => {
-                  if (isMultiSelection) {
-                    selectedNodeIds.forEach((id) => {
-                      const n = nodes[id];
-                      if (n && n.transform)
-                        handleUpdate(id, {
-                          transform: { ...n.transform, qx: 0, qy: 0, qz, qw },
-                        });
-                    });
-                  } else {
-                    handleUpdate(node!.id, {
-                      transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
-                    });
-                  }
-                });
-              }}
-            />
-          </div>
+          <TransformField
+            label="Yaw (rad)"
+            fieldId="yaw"
+            value={isMultiSelection ? 0 : currentYaw}
+            precision={decimalPrecision}
+            placeholder={isMultiSelection ? "Mixed" : ""}
+            step="0.01"
+            isCopying={isCopyingField?.("yaw")}
+            onContextMenu={(e) => onContextMenuLabel?.("yaw", e)}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            onChange={(val) => handleYawChange(val, false)}
+          />
+          <TransformField
+            label="Yaw (deg)"
+            fieldId="yaw"
+            value={isMultiSelection ? 0 : currentYaw * (180.0 / Math.PI)}
+            precision={decimalPrecision}
+            placeholder={isMultiSelection ? "Mixed" : ""}
+            step="1"
+            isCopying={isCopyingField?.("yaw")}
+            onContextMenu={(e) => onContextMenuLabel?.("yaw", e)}
+            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
+            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            onChange={(val) => handleYawChange(val, true)}
+          />
         </div>
       </div>
     </div>
   );
 }
-

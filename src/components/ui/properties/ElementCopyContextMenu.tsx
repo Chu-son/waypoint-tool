@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import { Button } from '../common/Button';
 
 interface ElementCopyContextMenuProps {
   field: ElementCopyField;
@@ -55,7 +56,8 @@ export function ElementCopyContextMenu({
       <div className="px-3 py-1.5 font-semibold text-text-muted border-b border-border-base mb-1">
         {fieldUpper} の要素コピー
       </div>
-      <button
+      <Button
+        variant="ghost"
         onClick={() => {
           setElementCopyState({
             field,
@@ -65,13 +67,14 @@ export function ElementCopyContextMenu({
           });
           onClose();
         }}
-        className="w-full text-left px-3 py-2 hover:bg-surface-hover flex items-center justify-between text-text-base transition-colors"
+        className="w-full text-left justify-between px-3 py-2 hover:bg-surface-hover text-text-base transition-colors"
       >
         <span>World 座標値でコピー</span>
         <span className="font-mono text-text-muted ml-2">{worldValue.toFixed(4)}</span>
-      </button>
+      </Button>
       {anchorAvailable && anchorRelValue !== undefined && (
-        <button
+        <Button
+          variant="ghost"
           onClick={() => {
             setElementCopyState({
               field,
@@ -81,11 +84,11 @@ export function ElementCopyContextMenu({
             });
             onClose();
           }}
-          className="w-full text-left px-3 py-2 hover:bg-surface-hover flex items-center justify-between text-amber-300 transition-colors"
+          className="w-full text-left justify-between px-3 py-2 hover:bg-surface-hover text-amber-300 transition-colors"
         >
           <span>⚓ アンカー相対値でコピー</span>
           <span className="font-mono text-amber-400/80 ml-2">{anchorRelValue.toFixed(4)}</span>
-        </button>
+        </Button>
       )}
     </div>
   );
