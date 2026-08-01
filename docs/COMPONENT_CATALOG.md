@@ -96,7 +96,7 @@
   - **概要**: アプリケーション最上部のメニューバー (File, Edit, View, Help) およびプロジェクトタイトル表示。
   - **主要Props**: なし
 - **`ToolPanel`** ([`src/components/ui/ToolPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ToolPanel.tsx))
-  - **概要**: 画面左側に配置されるメインツール切り替えバー (Select, Add Waypoint, Pan, Generator一覧等)。
+  - **概要**: 画面左端に配置されるメインツール切り替えバー (Select, Add Waypoint, Export Region, Import/Export/Settings等)。
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/LayerPanel.tsx))
   - **概要**: ロード中のマップレイヤー管理パネル（表示切り替え、不透明度調整、順序追加・削除）。

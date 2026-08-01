@@ -10,14 +10,10 @@ export function GeneralTab() {
     useAppStore.setState({ defaultMapOpacity: opacity, isDirty: true });
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
-  const toolPanelMaxColumns = useAppStore((state) => state.toolPanelMaxColumns);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const globalPythonPath = useAppStore((state) => state.globalPythonPath);
 
   const setIndexStartIndex = useAppStore((state) => state.setIndexStartIndex);
-  const setToolPanelMaxColumns = useAppStore(
-    (state) => state.setToolPanelMaxColumns,
-  );
   const setGlobalPythonPath = useAppStore((state) => state.setGlobalPythonPath);
 
   return (
@@ -75,20 +71,6 @@ export function GeneralTab() {
               isDirty: true,
             })
           }
-        />
-      </FormField>
-
-      <FormField
-        label="Toolbar Max Columns"
-        labelRight={String(toolPanelMaxColumns)}
-        description="Maximum column wrapping allowed on the Main Tool Panel before overflowing."
-      >
-        <Slider
-          min={1}
-          max={5}
-          step={1}
-          value={toolPanelMaxColumns}
-          onChange={(e) => setToolPanelMaxColumns(parseInt(e.target.value))}
         />
       </FormField>
 

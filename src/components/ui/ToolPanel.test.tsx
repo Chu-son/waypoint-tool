@@ -41,18 +41,6 @@ describe('ToolPanel', () => {
   const mockSetImportModalOpen = vi.fn();
   const mockSetSettingsModalOpen = vi.fn();
 
-  const mockPlugins = {
-    'p1': { id: 'p1', manifest: { name: 'Plugin 1', icon: 'Sparkles' } },
-    'p2': { id: 'p2', manifest: { name: 'Plugin 2', icon: 'Wand2' } },
-    'p-overflow': { id: 'p-overflow', manifest: { name: 'Plugin Overflow', icon: 'Puzzle' } },
-  };
-
-  const mockPluginSettings = [
-    { id: 'p1', enabled: true, order: 0 },
-    { id: 'p2', enabled: true, order: 1 },
-    { id: 'p-overflow', enabled: true, order: 2 },
-  ];
-
   beforeEach(() => {
     vi.clearAllMocks();
     (useAppStore as any).mockImplementation((selector: any) => selector({
@@ -60,7 +48,6 @@ describe('ToolPanel', () => {
       activePluginId: null,
       plugins: {},
       pluginSettings: [],
-      toolPanelMaxColumns: 1,
       isExportModalOpen: false,
       isImportModalOpen: false,
       setActiveTool: mockSetActiveTool,
@@ -69,10 +56,6 @@ describe('ToolPanel', () => {
       setImportModalOpen: mockSetImportModalOpen,
       setSettingsModalOpen: mockSetSettingsModalOpen,
     }));
-    
-    // Default window height for 2 rows of plugins (maxRows will be around 2-3)
-    // window.innerHeight - 300 / 48
-    Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 500 });
   });
 
   it('renders basic tools and handles switching', () => {
@@ -82,69 +65,6 @@ describe('ToolPanel', () => {
 
     expect(mockSetActiveTool).toHaveBeenCalledWith('add_point');
     expect(mockSetActivePlugin).toHaveBeenCalledWith(null);
-  });
-
-  it('renders enabled plugins in the grid', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'select',
-      plugins: mockPlugins,
-      pluginSettings: mockPluginSettings,
-      toolPanelMaxColumns: 1,
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-    }));
-
-    render(<ToolPanel />);
-    expect(screen.getByTitle('Plugin 1')).toBeInTheDocument();
-    expect(screen.getByTitle('Plugin 2')).toBeInTheDocument();
-  });
-
-  it('handles plugin switching', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'select',
-      plugins: mockPlugins,
-      pluginSettings: mockPluginSettings,
-      toolPanelMaxColumns: 1,
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-    }));
-
-    render(<ToolPanel />);
-    const p1Btn = screen.getByTitle('Plugin 1');
-    fireEvent.click(p1Btn);
-
-    expect(mockSetActiveTool).toHaveBeenCalledWith('add_generator');
-    expect(mockSetActivePlugin).toHaveBeenCalledWith('p1');
-  });
-
-  it('handles overflow plugins in more menu', () => {
-    // Force small height to trigger overflow
-    Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 350 });
-    // available = 350 - 300 = 50. rows = 50/48 = 1.
-    
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'select',
-      plugins: mockPlugins,
-      pluginSettings: mockPluginSettings,
-      toolPanelMaxColumns: 1,
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-    }));
-
-    render(<ToolPanel />);
-    
-    // Plugin 1 is visible, Plugin 2 and overflow are in More menu
-    expect(screen.getByTitle('Plugin 1')).toBeInTheDocument();
-    expect(screen.queryByTitle('Plugin 2')).not.toBeInTheDocument();
-
-    const moreBtn = screen.getByTitle(/more plugins/i);
-    fireEvent.click(moreBtn);
-
-    expect(screen.getByText('Plugin 2')).toBeInTheDocument();
-    expect(screen.getByText('Plugin Overflow')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('Plugin 2'));
-    expect(mockSetActivePlugin).toHaveBeenCalledWith('p2');
   });
 
   it('opens export modal and settings modal', () => {

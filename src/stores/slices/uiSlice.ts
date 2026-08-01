@@ -19,7 +19,6 @@ export type UISlice = {
   indexStartIndex: 0 | 1;
   isDirty: boolean;
   decimalPrecision: number;
-  toolPanelMaxColumns: number;
   elementCopyState: ElementCopyState;
   setElementCopyState: (state: ElementCopyState) => void;
   clearElementCopyState: () => void;
@@ -45,7 +44,6 @@ export type UISlice = {
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
   setIsDirty: (dirty: boolean) => void;
-  setToolPanelMaxColumns: (max: number) => void;
   
   setLeftPanelActiveTab: (tab: string) => void;
   setRightPanelActiveTab: (tab: string) => void;
@@ -76,7 +74,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   indexStartIndex: 0,
   isDirty: false,
   decimalPrecision: 6,
-  toolPanelMaxColumns: 1,
   elementCopyState: null,
 
   setElementCopyState: (state: ElementCopyState) => set({ elementCopyState: state }),
@@ -118,7 +115,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   }),
 
   setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
-  setToolPanelMaxColumns: (max: number) => set({ toolPanelMaxColumns: max, isDirty: true }),
 
   setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
   setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),

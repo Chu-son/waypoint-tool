@@ -32,7 +32,6 @@ export const useAppStore = create<AppState>()(
         showPaths: state.showPaths,
         showGrid: state.showGrid,
         pluginSettings: state.pluginSettings,
-        toolPanelMaxColumns: state.toolPanelMaxColumns,
         globalPythonPath: state.globalPythonPath,
         decimalPrecision: state.decimalPrecision,
         leftPanelViewMode: state.leftPanelViewMode,
