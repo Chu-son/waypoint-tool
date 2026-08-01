@@ -160,3 +160,48 @@ const buttonVariants = cva(
 * [ ] **className の結合**: `className` prop を受け取り、`cn()` で内部クラスと結合しているか？
 * [ ] **DOM伝搬**: 最小粒度要素である場合、`forwardRef` を使って `ref` を渡しているか？
 * [ ] **カタログ更新**: 新規共通コンポーネントの場合、`docs/COMPONENT_CATALOG.md` にエントリを追加したか？
+
+---
+
+## 6. 宣言的コンポーネント記述指針
+
+本プロジェクトでは、Tailwind CSSのクラス文字列を直接JSXに長く並べる「命令的スタイリング」を避け、意味のある単位でコンポーネント化する「宣言的UI記述」を徹底します。
+
+### ① 宣言的記述の原則
+* **意図（What）を記述する**: JSX上では `<LayerCard>`, `<FieldLabel>`, `<AlertBox>` のように、「何を表示しているか」がひと目でわかるコンポーネント名を使用します。
+* **実装（How）を閉じ込める**: Tailwind クラスによるレイアウトや装飾は、共通コンポーネント（`src/components/ui/common/`）またはファイル内のローカルサブコンポーネント内にカプセル化します。
+
+### ② ローカルコンポーネント化の基準
+以下に該当する場合は、ファイル外に切り出さずともファイル内ローカルコンポーネント（非export）として抽出し、メインコンポーネントのJSXをシンプルに保ってください。
+1. ほぼ同じJSX構造や複雑なスタイリングが **2回以上出現する** 場合
+2. JSXの単一ブロックが **40行を超える** 大きなカードや複雑な行要素である場合
+3. 状態によるクラス切り替え（`cn(..., isActive && "...")` 等）が複雑な場合
+
+### ③ 既存共通コンポーネント（`common/`）の積極活用
+以下のパターンではインラインの `<div className="...">` を使わず、必ず `common/` 内の既存コンポーネントを適用してください。
+
+| パターン | 使用する `common/` コンポーネント |
+|---|---|
+| フォーム項目（ラベル＋入力要素の並び） | `FormField`, `InlineFieldRow`, `LabeledNumericInput` |
+| セクションタイトル・大文字見出し | `FieldLabel`, `SectionDivider` |
+| 警告・エラー・情報メッセージ枠 | `AlertBox` (variant: info, warning, danger) |
+| 空データ・選択なし状態の表示 | `EmptyState` |
+| ファイル・ディレクトリ参照入力 | `BrowseInput` |
+| トグルスイッチ | `ToggleSwitch` |
+
+```tsx
+// ❌ 悪い例: div とインラインクラスによる命令的記述
+<div className="space-y-1">
+  <span className="text-xs font-bold text-text-muted uppercase tracking-widest block">Output Path</span>
+  <div className="flex gap-2">
+    <input className="w-full rounded border border-border-base bg-surface-base px-3 py-2 text-sm" value={path} readOnly />
+    <button className="px-3 py-2 bg-surface-panel border rounded text-xs">Browse</button>
+  </div>
+</div>
+
+// ✅ 良い例: common/ 部品を活用した宣言的記述
+<FormField label="Output Path">
+  <BrowseInput value={path} onBrowse={handleBrowse} />
+</FormField>
+```
+

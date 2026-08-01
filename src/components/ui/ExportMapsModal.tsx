@@ -5,9 +5,10 @@ import { BackendAPI, DialogAPI } from "../../api";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
 import { Button } from "./common/Button";
 import { Checkbox } from "./common/Checkbox";
-import { Label } from "./common/Label";
 import { Input } from "./common/Input";
 import { OptionCard } from "./common/OptionCard";
+import { FieldLabel } from "./common/FieldLabel";
+import { EmptyState } from "./common/EmptyState";
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);
@@ -94,9 +95,7 @@ export function ExportMapsModal() {
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="space-y-4">
-            <Label className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1 block">
-              Export Format
-            </Label>
+            <FieldLabel>Export Format</FieldLabel>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer text-sm">
                 <input 
@@ -121,9 +120,7 @@ export function ExportMapsModal() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between ml-1">
-              <Label className="text-xs font-bold text-text-muted uppercase tracking-widest block m-0">
-                Export Regions & Layer Selection
-              </Label>
+              <FieldLabel>Export Regions & Layer Selection</FieldLabel>
               {exportRegions.length > 0 && (
                 <Button
                   variant="ghost"
@@ -141,9 +138,7 @@ export function ExportMapsModal() {
               )}
             </div>
             {exportRegions.length === 0 ? (
-              <div className="text-sm text-text-muted bg-surface-base/30 p-4 rounded-xl border border-border-base/40">
-                No export regions defined. Use the 'Add Export Region' tool to draw regions on the canvas first.
-              </div>
+              <EmptyState message="No export regions defined. Use the 'Add Export Region' tool to draw regions on the canvas first." />
             ) : (
               <div className="space-y-2">
                 {exportRegions.map(region => (
@@ -157,7 +152,7 @@ export function ExportMapsModal() {
                     </label>
                     {selectedRegions[region.id] && (
                       <div className="mt-3 pl-7 space-y-2 border-l-2 border-border-base/30 ml-2">
-                        <span className="text-[10px] text-text-muted uppercase font-bold tracking-widest mb-1 block">Included Layers</span>
+                        <FieldLabel>Included Layers</FieldLabel>
                         {mapLayers.map(layer => {
                            const isIncluded = region.layerVisibility?.[layer.id] !== false; // Default true
                            return (
@@ -211,9 +206,10 @@ export function ExportMapsModal() {
           Cancel
         </Button>
         <Button
+          variant="primary"
           onClick={handleExport}
           disabled={exportRegions.length === 0 || Object.values(selectedRegions).every(v => !v)}
-          className="min-w-40 shadow-lg bg-emerald-500 hover:bg-emerald-600 hover:scale-105 active:scale-95 shadow-emerald-500/20 text-white border-transparent"
+          className="min-w-40"
         >
           <FolderOpen size={16} className="mr-2" />
           Select Output Folder

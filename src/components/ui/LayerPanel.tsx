@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Trash2, FolderOpen, Layers, ChevronUp, ChevronDown, Crop, ScanEye } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI } from "../../api";
 import { BackendAPI } from "../../api";
@@ -6,7 +6,34 @@ import { Button } from "./common/Button";
 import { Slider } from "./common/Slider";
 import { Select } from "./common/Select";
 import { Input } from "./common/Input";
+import { FieldLabel } from "./common/FieldLabel";
+import { EmptyState } from "./common/EmptyState";
 import { ProjectMapLayer, ExportRegion } from "../../types/store";
+import { cn } from "../../utils/cn";
+
+function CardFrame({
+  visible = true,
+  children,
+  className,
+}: {
+  visible?: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "bg-surface-panel/40 backdrop-blur-sm border border-border-base/30 rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative",
+        className
+      )}
+    >
+      {!visible && (
+        <div className="absolute inset-0 bg-surface-base/40 z-1 pointer-events-none backdrop-grayscale-[0.5]" />
+      )}
+      {children}
+    </div>
+  );
+}
 
 export function LayerPanel() {
   const mapLayers = useAppStore((state) => state.mapLayers);
@@ -80,18 +107,14 @@ export function LayerPanel() {
 
       <div className="flex-1 overflow-y-auto w-full p-4 space-y-4">
         {mapLayers.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-text-muted/40 animate-in fade-in zoom-in-95 duration-700">
-            <Layers size={48} className="mb-4 stroke-[1px] opacity-20" />
-            <p className="text-sm font-medium tracking-tight">No maps loaded.</p>
-            <p className="text-[10px] uppercase tracking-widest mt-1 opacity-50">Upload YAML to start</p>
-          </div>
+          <EmptyState message="No maps loaded. Upload YAML to start." />
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-2 ml-1">
-              <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] flex items-center gap-2 flex-1">
+              <FieldLabel className="flex items-center gap-2 flex-1">
                 Loaded Layers
                 <div className="h-px flex-1 bg-border-base/20" />
-              </h3>
+              </FieldLabel>
               <Button
                 variant="ghost"
                 size="icon"
@@ -135,10 +158,10 @@ export function LayerPanel() {
         {(exportRegions || []).length > 0 && (
           <div className="space-y-4 pt-4 border-t border-border-base/20">
             <div className="flex items-center justify-between ml-1 mb-2">
-              <h3 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.2em] flex items-center gap-2 flex-1">
+              <FieldLabel className="flex items-center gap-2 flex-1">
                 Export Regions
                 <div className="h-px flex-1 bg-border-base/20" />
-              </h3>
+              </FieldLabel>
               <Button
                 variant="ghost"
                 size="icon"
@@ -169,7 +192,7 @@ export function LayerPanel() {
   );
 }
 
-// --- Local Helper Components to keep LayerPanel clean ---
+// --- Local Helper Components ---
 
 interface LayerCardProps {
   layer: ProjectMapLayer;
@@ -195,11 +218,7 @@ function LayerCard({
   onUpdateLayer,
 }: LayerCardProps) {
   return (
-    <div className="bg-surface-panel/40 backdrop-blur-sm border border-border-base/30 rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative">
-      {!layer.visible && (
-        <div className="absolute inset-0 bg-surface-base/40 z-1 pointer-events-none backdrop-grayscale-[0.5]" />
-      )}
-      
+    <CardFrame visible={layer.visible}>
       <div className="flex items-center justify-between mb-4 relative z-10">
         <div className="flex items-center gap-3">
           <div className="flex flex-col gap-0.5">
@@ -270,7 +289,7 @@ function LayerCard({
           onChange={(e) => onUpdateLayer({ opacity: parseFloat(e.target.value) })}
         />
         <div className="flex flex-col gap-1.5 mt-1">
-          <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest ml-1 block">Blend Mode</span>
+          <FieldLabel>Blend Mode</FieldLabel>
           <Select
             value={layer.blend_mode || 'overwrite'}
             onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
@@ -282,7 +301,7 @@ function LayerCard({
           </Select>
         </div>
       </div>
-    </div>
+    </CardFrame>
   );
 }
 
@@ -302,11 +321,7 @@ function RegionCard({
   onUpdateRegion,
 }: RegionCardProps) {
   return (
-    <div className="bg-surface-panel/40 backdrop-blur-sm border border-border-base/30 rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative">
-      {!region.visible && (
-        <div className="absolute inset-0 bg-surface-base/40 z-1 pointer-events-none backdrop-grayscale-[0.5]" />
-      )}
-      
+    <CardFrame visible={region.visible}>
       <div className="flex items-center justify-between mb-2 relative z-10">
         <div className="flex items-center gap-2">
           <Crop size={16} className="text-emerald-400" />
@@ -369,7 +384,7 @@ function RegionCard({
           />
         </div>
       </div>
-    </div>
+    </CardFrame>
   );
 }
 

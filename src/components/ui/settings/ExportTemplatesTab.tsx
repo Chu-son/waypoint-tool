@@ -12,6 +12,8 @@ import { TabSectionHeader } from "./TabSectionHeader";
 import { EmptyState } from "../common/EmptyState";
 import { SectionDivider } from "../common/SectionDivider";
 import { InlineFieldRow } from "../common/InlineFieldRow";
+import { FieldLabel } from "../common/FieldLabel";
+import { AlertBox } from "../common/AlertBox";
 
 function TemplateCreateModal({
   isOpen, onClose, onSubmit, initialData
@@ -116,9 +118,8 @@ function TemplateImportModal({
       />
       <ModalContent className="space-y-4 p-4">
         {existingTemplate && (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300 text-xs space-y-2">
-            <p className="font-bold">A template with the name "{importData.name}" already exists.</p>
-            <div className="space-y-1">
+          <AlertBox variant="warning" title={`A template with the name "${importData.name}" already exists.`}>
+            <div className="space-y-1 mt-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
@@ -141,7 +142,7 @@ function TemplateImportModal({
                 <span>Add as a new template</span>
               </label>
             </div>
-          </div>
+          </AlertBox>
         )}
         <div className="space-y-1">
           <Label>Name</Label>
@@ -391,23 +392,13 @@ export function ExportTemplatesTab() {
         </div>
       </div>
 
-      <div className="bg-primary-base/5 border border-primary-base/20 p-4 rounded-xl flex gap-3 items-start animate-in zoom-in-95 duration-500 delay-150">
-        <div className="w-8 h-8 rounded-lg bg-primary-base/10 flex items-center justify-center shrink-0">
-          <code className="text-primary-base font-bold">#</code>
-        </div>
-        <div className="text-xs text-text-base leading-relaxed">
-          <h4 className="font-bold text-primary-base mb-1">
-            Handlebars Iteration Syntax
-          </h4>
-          <p>
-            Wrap your logic inside{" "}
-            <code className="bg-surface-base/50 text-primary-base px-1.5 py-0.5 rounded border border-primary-base/20 font-mono font-bold">
-              {"{{#each waypoints}}"} ... {"{{/each}}"}
-            </code>{" "}
-            to render all elements.
-          </p>
-        </div>
-      </div>
+      <AlertBox variant="info" title="Handlebars Iteration Syntax">
+        Wrap your logic inside{" "}
+        <code className="bg-surface-base/50 text-primary-base px-1.5 py-0.5 rounded border border-primary-base/20 font-mono font-bold">
+          {"{{#each waypoints}}"} ... {"{{/each}}"}
+        </code>{" "}
+        to render all elements.
+      </AlertBox>
 
       <div className="space-y-5">
         <SectionDivider title="Custom Templates" />
@@ -502,9 +493,7 @@ export function ExportTemplatesTab() {
               />
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-1.5 items-center">
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mr-2">
-                    Core Fields
-                  </span>
+                  <FieldLabel className="mr-2">Core Fields</FieldLabel>
                   {[
                     "{{index}}",
                     "{{id}}",
@@ -530,9 +519,7 @@ export function ExportTemplatesTab() {
                 {globalOptionsSchema?.options &&
                   globalOptionsSchema.options.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
-                      <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mr-2">
-                        Custom Options
-                      </span>
+                      <FieldLabel className="mr-2">Custom Options</FieldLabel>
                       {globalOptionsSchema.options.map((o) => (
                         <button
                           key={o.name}

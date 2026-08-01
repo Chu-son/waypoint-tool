@@ -1,4 +1,4 @@
-import { FolderOpen, Upload, Wand2 } from "lucide-react";
+import { Upload, Wand2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { BackendAPI, DialogAPI } from "../../api";
@@ -8,6 +8,9 @@ import { Label } from "./common/Label";
 import { Input } from "./common/Input";
 import { Select } from "./common/Select";
 import { OptionCard } from "./common/OptionCard";
+import { FieldLabel } from "./common/FieldLabel";
+import { BrowseInput } from "./common/BrowseInput";
+import { AlertBox } from "./common/AlertBox";
 import { ExportTemplate, ImportFieldMapping } from "../../types/store";
 import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from "../../utils/importUtils";
 
@@ -152,22 +155,16 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="space-y-3">
-            <Label className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1 block">
-              Source File
-            </Label>
-            <div className="flex items-center gap-3">
-              <Input readOnly value={filePath ?? ""} placeholder="No file selected" className="flex-1" />
-              <Button variant="ghost" onClick={handleSelectFile} className="shrink-0">
-                <FolderOpen size={16} className="mr-2" />
-                Browse...
-              </Button>
-            </div>
+            <FieldLabel>Source File</FieldLabel>
+            <BrowseInput
+              value={filePath ?? ""}
+              placeholder="No file selected"
+              onBrowseClick={handleSelectFile}
+            />
           </div>
 
           <div className="space-y-3">
-            <Label className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1 block">
-              File Format / Template
-            </Label>
+            <FieldLabel>File Format / Template</FieldLabel>
             <Select value={formatId} onChange={(e) => void handleSelectFormat(e.target.value)}>
               {useAppStore
                 .getState()
@@ -188,9 +185,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
           {isCustomTemplate && (
             <div className="space-y-4 bg-surface-base/30 p-4 rounded-xl border border-border-base/40 shadow-inner">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-text-muted uppercase tracking-widest block">
-                  Field Mapping
-                </Label>
+                <FieldLabel>Field Mapping</FieldLabel>
                 <Button
                   variant="ghost"
                   onClick={() => selectedTemplate && autoDetectMapping(selectedTemplate)}
@@ -202,7 +197,9 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                 </Button>
               </div>
               {mappingError && (
-                <p className="text-[11px] text-danger-base/90 leading-relaxed">{mappingError}</p>
+                <AlertBox variant="danger" title="Mapping Error">
+                  {mappingError}
+                </AlertBox>
               )}
               <div className="grid grid-cols-2 gap-3">
                 {MAPPING_FIELDS.map(({ key, label, hint }) => (
@@ -231,18 +228,18 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
           </div>
 
           {preview && (
-            <div className="space-y-2 p-4 rounded-xl bg-surface-panel/40 border border-border-base/20">
-              <p className="text-sm font-bold text-text-base">
-                {preview.count} waypoint(s) ready to import
-              </p>
+            <AlertBox
+              variant={preview.errors.length > 0 ? "warning" : "info"}
+              title={`${preview.count} waypoint(s) ready to import`}
+            >
               {preview.errors.length > 0 && (
-                <ul className="text-[11px] text-danger-base/90 list-disc list-inside space-y-0.5">
+                <ul className="list-disc list-inside space-y-0.5 mt-1">
                   {preview.errors.map((e, i) => (
                     <li key={i}>{e}</li>
                   ))}
                 </ul>
               )}
-            </div>
+            </AlertBox>
           )}
         </div>
       </ModalContent>

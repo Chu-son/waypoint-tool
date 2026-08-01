@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { ElementCopyField } from '../../../stores/slices/uiSlice';
 import { Button } from '../common/Button';
+import { FieldLabel } from '../common/FieldLabel';
+import { cn } from '../../../utils/cn';
 
 interface ElementCopyContextMenuProps {
   field: ElementCopyField;
@@ -10,6 +12,34 @@ interface ElementCopyContextMenuProps {
   anchorAvailable: boolean;
   position: { x: number; y: number };
   onClose: () => void;
+}
+
+function CopyMenuItem({
+  label,
+  value,
+  isAnchor,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  isAnchor?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      onClick={onClick}
+      className={cn(
+        "w-full text-left justify-between px-3 py-2 hover:bg-surface-hover transition-colors",
+        isAnchor ? "text-amber-300" : "text-text-base"
+      )}
+    >
+      <span>{label}</span>
+      <span className={cn("font-mono ml-2", isAnchor ? "text-amber-400/80" : "text-text-muted")}>
+        {value.toFixed(4)}
+      </span>
+    </Button>
+  );
 }
 
 export function ElementCopyContextMenu({
@@ -53,11 +83,12 @@ export function ElementCopyContextMenu({
       style={{ top: position.y, left: position.x }}
       className="fixed z-[9999] bg-surface-panel border border-border-base rounded-lg shadow-xl py-1 min-w-[220px] text-xs text-text-base select-none"
     >
-      <div className="px-3 py-1.5 font-semibold text-text-muted border-b border-border-base mb-1">
-        {fieldUpper} の要素コピー
+      <div className="px-3 py-1.5 border-b border-border-base mb-1">
+        <FieldLabel>{fieldUpper} の要素コピー</FieldLabel>
       </div>
-      <Button
-        variant="ghost"
+      <CopyMenuItem
+        label="World 座標値でコピー"
+        value={worldValue}
         onClick={() => {
           setElementCopyState({
             field,
@@ -67,14 +98,12 @@ export function ElementCopyContextMenu({
           });
           onClose();
         }}
-        className="w-full text-left justify-between px-3 py-2 hover:bg-surface-hover text-text-base transition-colors"
-      >
-        <span>World 座標値でコピー</span>
-        <span className="font-mono text-text-muted ml-2">{worldValue.toFixed(4)}</span>
-      </Button>
+      />
       {anchorAvailable && anchorRelValue !== undefined && (
-        <Button
-          variant="ghost"
+        <CopyMenuItem
+          label="⚓ アンカー相対値でコピー"
+          value={anchorRelValue}
+          isAnchor
           onClick={() => {
             setElementCopyState({
               field,
@@ -84,11 +113,7 @@ export function ElementCopyContextMenu({
             });
             onClose();
           }}
-          className="w-full text-left justify-between px-3 py-2 hover:bg-surface-hover text-amber-300 transition-colors"
-        >
-          <span>⚓ アンカー相対値でコピー</span>
-          <span className="font-mono text-amber-400/80 ml-2">{anchorRelValue.toFixed(4)}</span>
-        </Button>
+        />
       )}
     </div>
   );

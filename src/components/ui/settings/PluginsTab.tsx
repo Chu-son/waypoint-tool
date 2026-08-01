@@ -1,13 +1,14 @@
 import { Plus, Trash2, RefreshCw, Sparkles, Map, PenTool, Wand2, Puzzle, Image as ImageIcon, Check, AlertCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../common/Button";
-import { Label } from "../common/Label";
 import { Select } from "../common/Select";
 import { cn } from "../../../utils/cn";
 import { TabSectionHeader } from "./TabSectionHeader";
 import { EmptyState } from "../common/EmptyState";
 import { BrowseInput } from "../common/BrowseInput";
 import { ToggleSwitch } from "../common/ToggleSwitch";
+import { FieldLabel } from "../common/FieldLabel";
+import { AlertBox } from "../common/AlertBox";
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -166,37 +167,32 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
         const missingCount = pluginSettings.filter(s => !plugins[s.id]).length;
         if (missingCount > 0) {
           return (
-            <div className="bg-danger-base/10 border border-danger-base/20 rounded-xl p-4 flex items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-danger-base/20 flex items-center justify-center text-danger-base shrink-0">
-                  <AlertCircle size={18} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-danger-base leading-tight">Missing Plugin Sources</h4>
-                  <p className="text-[11px] text-danger-base/80 mt-0.5">
-                    {missingCount} {missingCount === 1 ? 'plugin setting doesn\'t' : 'plugin settings don\'t'} match any installed folder.
-                  </p>
-                </div>
-              </div>
-               <Button
-                variant="secondary"
-                size="sm"
-                onClick={async () => {
-                  const { DialogAPI } = await import("../../../api");
-                  const confirmed = await DialogAPI.ask(
-                    `${missingCount}個の欠落したプラグイン設定を削除します。よろしいですか？`,
-                    { title: "一括削除の確認", kind: "warning" }
-                  );
-                  if (confirmed) {
-                    const nextSettings = pluginSettings.filter(s => !!plugins[s.id]);
-                    setPluginSettings(nextSettings);
-                  }
-                }}
-                className="bg-danger-base/10 hover:bg-danger-base/20 border-danger-base/20 text-danger-base hover:text-danger-base"
-              >
-                Cleanup All
-              </Button>
-            </div>
+            <AlertBox
+              variant="danger"
+              title="Missing Plugin Sources"
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    const { DialogAPI } = await import("../../../api");
+                    const confirmed = await DialogAPI.ask(
+                      `${missingCount}個の欠落したプラグイン設定を削除します。よろしいですか？`,
+                      { title: "一括削除の確認", kind: "warning" }
+                    );
+                    if (confirmed) {
+                      const nextSettings = pluginSettings.filter(s => !!plugins[s.id]);
+                      setPluginSettings(nextSettings);
+                    }
+                  }}
+                  className="bg-danger-base/10 hover:bg-danger-base/20 border-danger-base/20 text-danger-base hover:text-danger-base"
+                >
+                  Cleanup All
+                </Button>
+              }
+            >
+              {missingCount} {missingCount === 1 ? 'plugin setting doesn\'t' : 'plugin settings don\'t'} match any installed folder.
+            </AlertBox>
           );
         }
         return null;
@@ -313,7 +309,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                     <div className="grid grid-cols-12 gap-6 pt-1">
                       {/* Icon Config */}
                       <div className="col-span-12 md:col-span-5 space-y-2.5">
-                        <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">Plugin Icon</Label>
+                        <FieldLabel>Plugin Icon</FieldLabel>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-surface-base/50 border border-border-base/40 flex items-center justify-center shrink-0 overflow-hidden shadow-subtle group/icon">
                             {setting.icon?.startsWith("data:image/") ? (
@@ -399,7 +395,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                       {/* Interpreter Override */}
                       {plugin && plugin.manifest.type === "python" && (
                         <div className="col-span-12 md:col-span-7 space-y-2.5">
-                           <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">Python Interpreter Override</Label>
+                           <FieldLabel>Python Interpreter Override</FieldLabel>
                            <BrowseInput
                              value={setting.pythonOverridePath || ""}
                              onChange={(val) => {
@@ -477,10 +473,9 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                     )}
 
                     {!plugin && (
-                      <div className="mt-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger-base/10 text-danger-base border border-danger-base/20 text-xs font-semibold">
-                        <AlertCircle size={14} />
-                        <span>Plugin source not found. Was it deleted or moved?</span>
-                      </div>
+                      <AlertBox variant="danger" title="Source Not Found">
+                        Plugin source not found. Was it deleted or moved?
+                      </AlertBox>
                     )}
                   </div>
                 </div>

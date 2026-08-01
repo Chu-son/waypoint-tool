@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { MoreHorizontal, Columns, Layout } from "lucide-react";
 import { Button } from "./common/Button";
+import { FieldLabel } from "./common/FieldLabel";
 import { cn } from "../../utils/cn";
 
 export interface PanelTab {
@@ -18,6 +19,60 @@ interface PanelContainerProps {
   onViewModeChange: (mode: "tabs" | "split") => void;
   onClose?: () => void;
   closeIcon?: ReactNode;
+}
+
+function TabButton({
+  panel,
+  isActive,
+  onClick,
+}: {
+  panel: PanelTab;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "text-[11px] font-bold uppercase tracking-wider pb-1 flex items-center gap-1.5 shrink-0 transition-all border-b-2",
+        isActive
+          ? "text-primary-base border-primary-base"
+          : "text-text-muted border-transparent hover:text-text-base"
+      )}
+    >
+      <span className={cn("transition-transform", isActive ? "scale-110" : "")}>
+        {panel.icon}
+      </span>
+      {panel.title}
+    </button>
+  );
+}
+
+function ViewModeMenuItem({
+  icon,
+  label,
+  isActive,
+  onClick,
+}: {
+  icon: ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full px-4 py-2 text-left text-xs flex items-center gap-2 transition-colors",
+        isActive
+          ? "text-primary-base font-bold bg-primary-base/10"
+          : "text-text-muted hover:bg-surface-hover hover:text-text-base"
+      )}
+    >
+      {icon}
+      {label}
+    </button>
+  );
 }
 
 export function PanelContainer({
@@ -52,30 +107,16 @@ export function PanelContainer({
           {viewMode === "tabs" ? (
             <div className="flex space-x-4 overflow-x-auto no-scrollbar">
               {panels.map((panel) => (
-                <button
+                <TabButton
                   key={panel.id}
+                  panel={panel}
+                  isActive={activeTabId === panel.id}
                   onClick={() => onTabChange(panel.id)}
-                  className={cn(
-                    "text-[11px] font-bold uppercase tracking-wider pb-1 flex items-center gap-1.5 shrink-0 transition-all border-b-2",
-                    activeTabId === panel.id
-                      ? "text-primary-base border-primary-base"
-                      : "text-text-muted border-transparent hover:text-text-base"
-                  )}
-                >
-                  <span className={cn(
-                    "transition-transform",
-                    activeTabId === panel.id ? "scale-110" : ""
-                  )}>
-                    {panel.icon}
-                  </span>
-                  {panel.title}
-                </button>
+                />
               ))}
             </div>
           ) : (
-            <h2 className="text-[11px] font-bold uppercase tracking-widest text-text-muted truncate ml-1">
-              Split View
-            </h2>
+            <FieldLabel className="ml-1">Split View</FieldLabel>
           )}
         </div>
 
@@ -99,32 +140,24 @@ export function PanelContainer({
                 onClick={() => setIsMenuOpen(false)} 
               />
               <div className="absolute right-0 mt-2 w-48 bg-surface-panel/95 backdrop-blur-md border border-border-base rounded-lg shadow-2xl py-1 z-20 animate-in fade-in zoom-in duration-100 origin-top-right">
-                <button
+                <ViewModeMenuItem
+                  icon={<Layout size={14} />}
+                  label="Tab View"
+                  isActive={viewMode === "tabs"}
                   onClick={() => {
                     onViewModeChange("tabs");
                     setIsMenuOpen(false);
                   }}
-                  className={cn(
-                    "w-full px-4 py-2 text-left text-xs flex items-center gap-2 transition-colors",
-                    viewMode === "tabs" ? "text-primary-base font-bold bg-primary-base/10" : "text-text-muted hover:bg-surface-hover hover:text-text-base"
-                  )}
-                >
-                  <Layout size={14} />
-                  Tab View
-                </button>
-                <button
+                />
+                <ViewModeMenuItem
+                  icon={<Columns size={14} className="rotate-90" />}
+                  label="Split View (Vertical)"
+                  isActive={viewMode === "split"}
                   onClick={() => {
                     onViewModeChange("split");
                     setIsMenuOpen(false);
                   }}
-                  className={cn(
-                    "w-full px-4 py-2 text-left text-xs flex items-center gap-2 transition-colors",
-                    viewMode === "split" ? "text-primary-base font-bold bg-primary-base/10" : "text-text-muted hover:bg-surface-hover hover:text-text-base"
-                  )}
-                >
-                  <Columns size={14} className="rotate-90" />
-                  Split View (Vertical)
-                </button>
+                />
               </div>
             </>
           )}
@@ -142,9 +175,7 @@ export function PanelContainer({
             {panels.map((panel) => (
               <div key={panel.id} className="flex-1 flex flex-col overflow-hidden min-h-0">
                 <div className="px-3 py-1.5 bg-surface-panel/30 border-b border-border-base/20 flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-text-muted">
-                    {panel.title}
-                  </span>
+                  <FieldLabel>{panel.title}</FieldLabel>
                 </div>
                 <div className="flex-1 overflow-hidden flex flex-col">
                   {panel.component}

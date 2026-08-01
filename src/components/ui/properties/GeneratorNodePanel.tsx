@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { BackendAPI } from "../../../api";
 import { Button } from "../common/Button";
+import { AlertBox } from "../common/AlertBox";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
 import { Play, Settings2, RefreshCcw, BoxSelect } from "lucide-react";
@@ -198,11 +199,12 @@ export function GeneratorNodePanel({
             );
           })}
 
-          <div className="pt-4 mt-6 border-t border-border-base">
+          <div className="pt-4 mt-6 border-t border-border-base space-y-2">
             <Button
+              variant="primary"
               disabled={isExecuting}
               onClick={handleRegenerate}
-              className="w-full h-9 gap-2 shadow transition-colors bg-emerald-600 hover:bg-emerald-500"
+              className="w-full h-9 gap-2"
             >
               {isExecuting ? (
                 <RefreshCcw size={14} className="animate-spin" />
@@ -212,7 +214,7 @@ export function GeneratorNodePanel({
               {isExecuting ? "Re-Generating..." : "Re-Generate Path"}
             </Button>
             <Button
-              variant="secondary"
+              variant="danger"
               onClick={async () => {
                 const { DialogAPI } = await import("../../../api");
                 const confirmed = await DialogAPI.ask(
@@ -223,7 +225,7 @@ export function GeneratorNodePanel({
                   explodeGenerator(node.id);
                 }
               }}
-              className="w-full h-9 gap-2 mt-2 border-red-900/50 hover:bg-red-950/30 text-red-400 hover:text-red-300 transition-colors"
+              className="w-full h-9 gap-2"
               title="Explode into individual manual waypoints"
             >
               <BoxSelect size={14} />
@@ -232,10 +234,9 @@ export function GeneratorNodePanel({
           </div>
         </div>
       ) : (
-        <div className="text-xs text-red-400 italic bg-red-950/20 p-3 rounded border border-red-900/50">
-          Plugin "{pluginId}" is no longer available or loaded. Cannot edit
-          parameters.
-        </div>
+        <AlertBox variant="danger" title="Plugin Not Loaded">
+          Plugin "{pluginId}" is no longer available or loaded. Cannot edit parameters.
+        </AlertBox>
       )}
     </div>
   );

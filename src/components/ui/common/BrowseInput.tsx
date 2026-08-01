@@ -4,7 +4,8 @@ import { cn } from "../../../utils/cn";
 
 interface BrowseInputProps {
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
+  onBrowseClick?: () => void;
   placeholder?: string;
   list?: string;
   dialogOptions?: {
@@ -20,6 +21,7 @@ interface BrowseInputProps {
 export function BrowseInput({
   value,
   onChange,
+  onBrowseClick,
   placeholder,
   list,
   dialogOptions = { directory: false },
@@ -29,6 +31,10 @@ export function BrowseInput({
   buttonClassName,
 }: BrowseInputProps) {
   const handleBrowse = async () => {
+    if (onBrowseClick) {
+      onBrowseClick();
+      return;
+    }
     try {
       const { DialogAPI } = await import("../../../api");
       const selectedPath = await DialogAPI.open({
@@ -42,7 +48,7 @@ export function BrowseInput({
           typeof selectedPath === "string"
             ? selectedPath
             : (selectedPath as any).path;
-        if (pathStr) {
+        if (pathStr && onChange) {
           onChange(pathStr);
         }
       }
@@ -59,7 +65,7 @@ export function BrowseInput({
         type="text"
         list={list}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange?.(e.target.value)}
         className={cn(isSm ? "h-8 text-[11px]" : "h-10 text-sm", inputClassName)}
         placeholder={placeholder}
       />

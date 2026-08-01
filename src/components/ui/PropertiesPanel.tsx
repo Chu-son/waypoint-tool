@@ -8,6 +8,7 @@ import { AnchorTransformGroup } from "./properties/AnchorTransformGroup";
 import { CustomOptionsGroup } from "./properties/CustomOptionsGroup";
 import { ElementCopyContextMenu } from "./properties/ElementCopyContextMenu";
 import { ElementCopyField } from "../../stores/slices/uiSlice";
+import { EmptyState } from "./common/EmptyState";
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from "../../utils/transformUtils";
 import { WaypointNode } from "../../types/store";
 
@@ -97,9 +98,7 @@ export function PropertiesPanel() {
   if (selectedNodeIds.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
-        <div className="text-sm text-text-muted italic mb-4">
-          No item selected.
-        </div>
+        <EmptyState message="No item selected." />
       </div>
     );
   }

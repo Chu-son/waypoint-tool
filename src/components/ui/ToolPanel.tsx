@@ -19,7 +19,35 @@ import { ExportModal } from "./ExportModal";
 import { ImportModal } from "./ImportModal";
 import { Panel } from "./common/Panel";
 import { Button } from "./common/Button";
+import { FieldLabel } from "./common/FieldLabel";
 import { cn } from "../../utils/cn";
+
+function ToolIconButton({
+  isActive,
+  title,
+  onClick,
+  children,
+}: {
+  isActive?: boolean;
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      title={title}
+      variant={isActive ? "primary" : "icon"}
+      size="icon"
+      className={cn(
+        "rounded-xl transition-all flex-shrink-0 group",
+        isActive && "shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-primary-base/50"
+      )}
+    >
+      {children}
+    </Button>
+  );
+}
 
 export function ToolPanel() {
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
@@ -42,9 +70,6 @@ export function ToolPanel() {
   // Calculate dynamic rows
   useEffect(() => {
     const calcRows = () => {
-      // Top tools: ~150px
-      // Bottom tools: ~120px
-      // Each icon height approx 48px (40px + 8px gap)
       const availableHeight = window.innerHeight - 300;
       setMaxRows(Math.max(1, Math.floor(availableHeight / 48)));
     };
@@ -108,38 +133,27 @@ export function ToolPanel() {
       className="flex flex-col items-center py-4 px-2 gap-4 z-10 transition-all duration-300 relative border-r"
       style={{ minWidth: "4rem", width: "auto" }}
     >
-      <div className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-2">
-        Tools
-      </div>
+      <FieldLabel className="mb-2">Tools</FieldLabel>
 
       {tools.map((tool) => {
         const Icon = tool.icon;
-        const isActive = activeTool === tool.id;
+        const isActive = activeTool === tool.id && !activePluginId;
 
         return (
-          <Button
+          <ToolIconButton
             key={tool.id}
+            title={tool.label}
+            isActive={isActive}
             onClick={() => {
               setActiveTool(tool.id);
               setActivePlugin(null);
             }}
-            title={tool.label}
-            variant={isActive && !activePluginId ? "primary" : "icon"}
-            size="icon"
-            className={cn(
-              "rounded-xl transition-all group flex-shrink-0",
-              isActive && !activePluginId && "shadow-[0_0_15px_rgba(59,130,246,0.5)]"
-            )}
           >
             <Icon
               size={20}
-              className={
-                isActive && !activePluginId
-                  ? ""
-                  : "group-hover:scale-110 transition-transform"
-              }
+              className={isActive ? "" : "group-hover:scale-110 transition-transform"}
             />
-          </Button>
+          </ToolIconButton>
         );
       })}
 
@@ -156,23 +170,18 @@ export function ToolPanel() {
           const isActive =
             activePluginId === plugin.id && activeTool === "add_generator";
           return (
-            <Button
+            <ToolIconButton
               key={plugin.id}
+              title={plugin.manifest.name}
+              isActive={isActive}
               onClick={() => {
                 setActiveTool("add_generator");
                 setActivePlugin(plugin.id);
                 setIsMoreMenuOpen(false);
               }}
-              title={plugin.manifest.name}
-              variant={isActive ? "primary" : "icon"}
-              size="icon"
-              className={cn(
-                "rounded-xl transition-all flex-shrink-0",
-                isActive && "shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-primary-base/50"
-              )}
             >
               {renderPluginIcon(plugin.id, 18)}
-            </Button>
+            </ToolIconButton>
           );
         })}
 
@@ -234,7 +243,7 @@ export function ToolPanel() {
         >
           <Upload
             size={20}
-            className="group-hover:scale-110 transition-transform text-purple-400"
+            className="group-hover:scale-110 transition-transform text-primary-base"
           />
         </Button>
 
@@ -247,7 +256,7 @@ export function ToolPanel() {
         >
           <Download
             size={20}
-            className="group-hover:scale-110 transition-transform text-purple-400"
+            className="group-hover:scale-110 transition-transform text-primary-base"
           />
         </Button>
 

@@ -1,5 +1,85 @@
 import { useAppStore } from "../../stores/appStore";
 import { Settings, Puzzle, Sparkles, Map, PenTool, Wand2, Image as ImageIcon, ExternalLink } from "lucide-react";
+import { EmptyState } from "./common/EmptyState";
+import { cn } from "../../utils/cn";
+
+function PluginIcon({ iconStr, size, className }: { iconStr: string; size: number; className?: string }) {
+  if (iconStr.startsWith("data:image/")) {
+    return <img src={iconStr} alt="plugin-icon" style={{ width: size, height: size, objectFit: 'contain' }} className={className} />;
+  }
+
+  switch (iconStr) {
+    case "Sparkles": return <Sparkles size={size} className={className} />;
+    case "Map": return <Map size={size} className={className} />;
+    case "PenTool": return <PenTool size={size} className={className} />;
+    case "Wand2": return <Wand2 size={size} className={className} />;
+    case "ImageIcon": return <ImageIcon size={size} className={className} />;
+    default: return <Puzzle size={size} className={className} />;
+  }
+}
+
+function PluginCard({
+  plugin,
+  iconStr,
+  isActive,
+  onSelect,
+  onOpenDetails,
+}: {
+  plugin: any;
+  iconStr: string;
+  isActive: boolean;
+  onSelect: () => void;
+  onOpenDetails: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer",
+        isActive
+          ? "bg-primary-base/20 border-primary-base shadow-lg shadow-primary-base/10"
+          : "bg-surface-base/40 border-border-base hover:border-border-base/60 hover:bg-surface-hover"
+      )}
+      onClick={onSelect}
+    >
+      <div
+        className={cn(
+          "p-2 rounded-lg shrink-0",
+          isActive ? "bg-primary-base text-white" : "bg-surface-hover text-text-muted"
+        )}
+      >
+        <PluginIcon iconStr={iconStr} size={18} />
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={cn(
+              "text-xs font-bold truncate",
+              isActive ? "text-primary-base" : "text-text-base"
+            )}
+          >
+            {plugin.manifest.name}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails();
+            }}
+            className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-text-base transition-all p-1"
+            title="Plugin Details"
+          >
+            <ExternalLink size={12} />
+          </button>
+        </div>
+        {plugin.manifest.description && (
+          <p className="text-[10px] text-text-muted/70 truncate mt-0.5">
+            {plugin.manifest.description}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function PluginListPanel() {
   const plugins = useAppStore((state) => state.plugins);
@@ -17,27 +97,10 @@ export function PluginListPanel() {
     .map((s) => plugins[s.id])
     .filter(Boolean);
 
-  const getPluginIcon = (pluginId: string) => {
+  const getPluginIconStr = (pluginId: string) => {
     const setting = pluginSettings.find(s => s.id === pluginId);
     const manifestIcon = plugins[pluginId]?.manifest?.icon;
     return setting?.icon || manifestIcon || "Puzzle";
-  };
-
-  const renderPluginIcon = (pluginId: string, size: number, className: string = "") => {
-    const iconStr = getPluginIcon(pluginId);
-    
-    if (iconStr.startsWith("data:image/")) {
-      return <img src={iconStr} alt="plugin-icon" style={{ width: size, height: size, objectFit: 'contain' }} className={className} />;
-    }
-
-    switch (iconStr) {
-      case "Sparkles": return <Sparkles size={size} className={className} />;
-      case "Map": return <Map size={size} className={className} />;
-      case "PenTool": return <PenTool size={size} className={className} />;
-      case "Wand2": return <Wand2 size={size} className={className} />;
-      case "ImageIcon": return <ImageIcon size={size} className={className} />;
-      default: return <Puzzle size={size} className={className} />;
-    }
   };
 
   return (
@@ -55,52 +118,22 @@ export function PluginListPanel() {
 
       <div className="flex-1 p-2 space-y-1">
         {enabledPluginsList.length === 0 ? (
-          <div className="p-4 text-center text-text-muted/60 text-xs italic">
-            No enabled plugins found.
-          </div>
+          <EmptyState message="No enabled plugins found." />
         ) : (
           enabledPluginsList.map((plugin) => {
             const isActive = activePluginId === plugin.id && activeTool === "add_generator";
             return (
-              <div
+              <PluginCard
                 key={plugin.id}
-                className={`group flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer ${
-                  isActive 
-                  ? "bg-primary-base/20 border-primary-base shadow-lg shadow-primary-base/10" 
-                  : "bg-surface-base/40 border-border-base hover:border-border-base/60 hover:bg-surface-hover"
-                }`}
-                onClick={() => {
+                plugin={plugin}
+                iconStr={getPluginIconStr(plugin.id)}
+                isActive={isActive}
+                onSelect={() => {
                   setActiveTool("add_generator");
                   setActivePlugin(plugin.id);
                 }}
-              >
-                <div className={`p-2 rounded-lg shrink-0 ${isActive ? "bg-primary-base text-white" : "bg-surface-hover text-text-muted"}`}>
-                  {renderPluginIcon(plugin.id, 18)}
-                </div>
-                
-                <div className="flex-1 overflow-hidden">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-xs font-bold truncate ${isActive ? "text-primary-base" : "text-text-base"}`}>
-                      {plugin.manifest.name}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSettingsModalOpen(true, 'plugins');
-                      }}
-                      className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-text-base transition-all p-1"
-                      title="Plugin Details"
-                    >
-                      <ExternalLink size={12} />
-                    </button>
-                  </div>
-                  {plugin.manifest.description && (
-                    <p className="text-[10px] text-text-muted/70 truncate mt-0.5">
-                      {plugin.manifest.description}
-                    </p>
-                  )}
-                </div>
-              </div>
+                onOpenDetails={() => setSettingsModalOpen(true, 'plugins')}
+              />
             );
           })
         )}

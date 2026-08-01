@@ -97,6 +97,43 @@ function DropdownMenu({
   );
 }
 
+function AppBrand() {
+  return (
+    <div className="flex items-center gap-2 text-text-base font-bold tracking-wide pointer-events-none">
+      <MousePointer2
+        size={16}
+        className="text-primary-base rotate-45 transform fill-primary-base"
+      />
+      <span className="text-[14px]">Waypoint Tool</span>
+    </div>
+  );
+}
+
+function WindowControls({ onExit }: { onExit: () => void }) {
+  return (
+    <div className="flex items-center ml-auto">
+      <button
+        onClick={() => getCurrentWindow().minimize()}
+        className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md"
+      >
+        <Minus size={16} />
+      </button>
+      <button
+        onClick={() => getCurrentWindow().toggleMaximize()}
+        className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md mx-1"
+      >
+        <Square size={14} />
+      </button>
+      <button
+        onClick={onExit}
+        className="p-1 hover:bg-danger-base hover:text-white text-text-muted transition-colors rounded-md"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  );
+}
+
 export function TopMenu() {
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const removeNodes = useAppStore((state) => state.removeNodes);
@@ -155,113 +192,73 @@ export function TopMenu() {
       if (!confirmed) return;
     }
     useAppStore.getState().setIsDirty(false);
-    try {
-      // saveWindowState is removed as it's handled by the store's exitApp action or not needed here
-    } catch (e) {}
     invoke("force_exit");
   };
 
-  const fileOptions: MenuOption[] = [
-    { label: "New Project...", action: () => useAppStore.getState().resetProject(), shortcut: "Ctrl+N" },
-    { label: "Open Project...", action: loadProject, shortcut: "Ctrl+O" },
-    { label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
-    { divider: true, label: "" },
-    { label: "Export Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
-    { label: "Import Waypoints...", action: () => setImportModalOpen(true) },
-    { label: "Export Maps...", action: () => setExportMapsModalOpen(true) },
-    { label: "Settings...", action: () => setSettingsModalOpen(true, "general") },
-    { divider: true, label: "" },
-    { label: "Exit", action: handleExit, danger: true, shortcut: "Alt+F4" },
-  ];
-
-  const editOptions: MenuOption[] = [
+  const menuSections = [
     {
-      label: "Undo",
-      action: undo,
-      shortcut: "Ctrl+Z",
-      disabled: !canUndo,
+      label: "File",
+      options: [
+        { label: "New Project...", action: () => useAppStore.getState().resetProject(), shortcut: "Ctrl+N" },
+        { label: "Open Project...", action: loadProject, shortcut: "Ctrl+O" },
+        { label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
+        { divider: true, label: "" },
+        { label: "Export Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
+        { label: "Import Waypoints...", action: () => setImportModalOpen(true) },
+        { label: "Export Maps...", action: () => setExportMapsModalOpen(true) },
+        { label: "Settings...", action: () => setSettingsModalOpen(true, "general") },
+        { divider: true, label: "" },
+        { label: "Exit", action: handleExit, danger: true, shortcut: "Alt+F4" },
+      ],
     },
     {
-      label: "Redo",
-      action: redo,
-      shortcut: "Ctrl+Y",
-      disabled: !canRedo,
-    },
-    { divider: true, label: "" },
-    {
-      label: "Select All",
-      action: selectAllNodes,
-      shortcut: "Ctrl+A",
-    },
-    {
-      label: "Deselect All",
-      action: () => useAppStore.setState({ selectedNodeIds: [] }),
-    },
-    { divider: true, label: "" },
-    {
-      label: "Delete Selected",
-      action: () => {
-        if (selectedNodeIds.length > 0) removeNodes(selectedNodeIds);
-      },
-      shortcut: "Del / Backspace",
-    },
-  ];
-
-  const viewOptions: MenuOption[] = [
-    {
-      label: `${showProperties ? "✓ " : "  "}Show Properties`,
-      action: () => setShowProperties(!showProperties),
-    },
-    { divider: true, label: "" },
-    {
-      label: `${showPaths ? "✓ " : "  "}Show Paths`,
-      action: () => setShowPaths(!showPaths),
+      label: "Edit",
+      options: [
+        { label: "Undo", action: undo, shortcut: "Ctrl+Z", disabled: !canUndo },
+        { label: "Redo", action: redo, shortcut: "Ctrl+Y", disabled: !canRedo },
+        { divider: true, label: "" },
+        { label: "Select All", action: selectAllNodes, shortcut: "Ctrl+A" },
+        { label: "Deselect All", action: () => useAppStore.setState({ selectedNodeIds: [] }) },
+        { divider: true, label: "" },
+        {
+          label: "Delete Selected",
+          action: () => {
+            if (selectedNodeIds.length > 0) removeNodes(selectedNodeIds);
+          },
+          shortcut: "Del / Backspace",
+        },
+      ],
     },
     {
-      label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`,
-      action: () => setShowGrid(!showGrid),
+      label: "View",
+      options: [
+        { label: `${showProperties ? "✓ " : "  "}Show Properties`, action: () => setShowProperties(!showProperties) },
+        { divider: true, label: "" },
+        { label: `${showPaths ? "✓ " : "  "}Show Paths`, action: () => setShowPaths(!showPaths) },
+        { label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`, action: () => setShowGrid(!showGrid) },
+        { label: `${enableSnapping ? "✓ " : "  "}Snap to Previous Waypoint`, action: () => setEnableSnapping(!enableSnapping) },
+        { label: "Fit to Map", action: triggerFitToMaps, shortcut: "Mid D-Click" },
+        { divider: true, label: "" },
+        { label: `${isLeftPanelOpen ? "✓ " : "  "}Show Left Panel`, action: () => setLeftPanelOpen(!isLeftPanelOpen) },
+        { label: `${isRightPanelOpen ? "✓ " : "  "}Show Right Panel`, action: () => setRightPanelOpen(!isRightPanelOpen) },
+        { divider: true, label: "" },
+        { label: "Reset Window Layout", action: resetWindowLayout },
+      ],
     },
     {
-      label: `${enableSnapping ? "✓ " : "  "}Snap to Previous Waypoint`,
-      action: () => setEnableSnapping(!enableSnapping),
-    },
-    {
-      label: "Fit to Map",
-      action: triggerFitToMaps,
-      shortcut: "Mid D-Click",
-    },
-    { divider: true, label: "" },
-    {
-      label: `${isLeftPanelOpen ? "✓ " : "  "}Show Left Panel`,
-      action: () => setLeftPanelOpen(!isLeftPanelOpen),
-    },
-    {
-      label: `${isRightPanelOpen ? "✓ " : "  "}Show Right Panel`,
-      action: () => setRightPanelOpen(!isRightPanelOpen),
-    },
-    { divider: true, label: "" },
-    {
-      label: "Reset Window Layout",
-      action: resetWindowLayout,
-    },
-  ];
-
-  const helpOptions: MenuOption[] = [
-    {
-      label: "Keyboard Shortcuts",
-      action: () => setShortcutsModalOpen(true),
-    },
-    {
-      label: "Developer Tools",
-      action: () => invoke("open_devtools"),
-    },
-    { divider: true, label: "" },
-    {
-      label: "About Waypoint Tool",
-      action: async () => {
-        const version = await getVersion();
-        alert(`Waypoint Tool v${version}`);
-      },
+      label: "Help",
+      options: [
+        { label: "Keyboard Shortcuts", action: () => setShortcutsModalOpen(true) },
+        { label: "Developer Tools", action: () => invoke("open_devtools") },
+        { divider: true, label: "" },
+        {
+          label: "About Waypoint Tool",
+          action: async () => {
+            const version = await getVersion();
+            alert(`Waypoint Tool v${version}`);
+          },
+        },
+      ],
     },
   ];
 
@@ -271,73 +268,24 @@ export function TopMenu() {
       data-tauri-drag-region
     >
       <div className="flex items-center gap-6" data-tauri-drag-region>
-        {/* App Logo/Name */}
-        <div className="flex items-center gap-2 text-text-base font-bold tracking-wide pointer-events-none">
-          <MousePointer2
-            size={16}
-            className="text-primary-base rotate-45 transform fill-primary-base"
-          />
-          <span className="text-[14px]">Waypoint Tool</span>
-        </div>
+        <AppBrand />
 
-        {/* Windows-style Application Menu */}
         <div className="flex gap-1 items-center">
-          <DropdownMenu
-            label="File"
-            options={fileOptions}
-            isOpen={activeMenu === "File"}
-            onClick={() => toggleMenu("File")}
-            onClose={closeMenu}
-            onMouseEnter={() => handleMouseEnter("File")}
-          />
-          <DropdownMenu
-            label="Edit"
-            options={editOptions}
-            isOpen={activeMenu === "Edit"}
-            onClick={() => toggleMenu("Edit")}
-            onClose={closeMenu}
-            onMouseEnter={() => handleMouseEnter("Edit")}
-          />
-          <DropdownMenu
-            label="View"
-            options={viewOptions}
-            isOpen={activeMenu === "View"}
-            onClick={() => toggleMenu("View")}
-            onClose={closeMenu}
-            onMouseEnter={() => handleMouseEnter("View")}
-          />
-          <DropdownMenu
-            label="Help"
-            options={helpOptions}
-            isOpen={activeMenu === "Help"}
-            onClick={() => toggleMenu("Help")}
-            onClose={closeMenu}
-            onMouseEnter={() => handleMouseEnter("Help")}
-          />
+          {menuSections.map((section) => (
+            <DropdownMenu
+              key={section.label}
+              label={section.label}
+              options={section.options}
+              isOpen={activeMenu === section.label}
+              onClick={() => toggleMenu(section.label)}
+              onClose={closeMenu}
+              onMouseEnter={() => handleMouseEnter(section.label)}
+            />
+          ))}
         </div>
       </div>
 
-      {/* Window Controls (Tauri) */}
-      <div className="flex items-center ml-auto">
-        <button
-          onClick={() => getCurrentWindow().minimize()}
-          className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md"
-        >
-          <Minus size={16} />
-        </button>
-        <button
-          onClick={() => getCurrentWindow().toggleMaximize()}
-          className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md mx-1"
-        >
-          <Square size={14} />
-        </button>
-        <button
-          onClick={handleExit}
-          className="p-1 hover:bg-danger-base hover:text-white text-text-muted transition-colors rounded-md"
-        >
-          <X size={16} />
-        </button>
-      </div>
+      <WindowControls onExit={handleExit} />
     </div>
   );
 }
