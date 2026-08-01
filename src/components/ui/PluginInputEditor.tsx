@@ -1,10 +1,11 @@
 import React from "react";
-import { NumericInput } from "./NumericInput";
 import { Label } from "./common/Label";
 import { cn } from "../../utils/cn";
 import { useAppStore } from "../../stores/appStore";
 import { Select } from "./common/Select";
 import { Input } from "./common/Input";
+import { LabeledNumericInput } from "./common/LabeledNumericInput";
+import { quaternionToYaw } from "../../utils/transformUtils";
 
 export interface PluginInput {
   id: string;
@@ -88,30 +89,11 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         {input.type === "point" && (
           <div className="bg-surface-base p-2 rounded-md border border-border-base/50">
             {interactionData ? (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                    X (m)
-                  </label>
-                  <NumericInput
-                    value={interactionData.x ?? 0}
-                    precision={decimalPrecision}
-                    onChange={(val) => onUpdate({ ...interactionData, x: val })}
-                    className="h-7 text-[11px]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                    Y (m)
-                  </label>
-                  <NumericInput
-                    value={interactionData.y ?? 0}
-                    precision={decimalPrecision}
-                    onChange={(val) => onUpdate({ ...interactionData, y: val })}
-                    className="h-7 text-[11px]"
-                  />
-                </div>
-              </div>
+              <PointForm
+                data={interactionData}
+                onChange={onUpdate}
+                precision={decimalPrecision}
+              />
             ) : (
               <div className="py-1 text-center text-text-muted/50 italic text-[11px]">
                 Click on map to define
@@ -123,93 +105,12 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         {input.type === "rectangle" && (
           <div className="bg-surface-base p-2 rounded-md border border-border-base/50">
             {interactionData?.center ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="col-span-1">
-                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                      Width (m)
-                    </label>
-                    <NumericInput
-                      value={interactionData.width ?? 0}
-                      precision={decimalPrecision}
-                      onChange={(val) =>
-                        onUpdate({
-                          ...interactionData,
-                          width: Math.max(0, val),
-                        })
-                      }
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
-                  <div className="col-span-1">
-                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                      Height (m)
-                    </label>
-                    <NumericInput
-                      value={interactionData.height ?? 0}
-                      precision={decimalPrecision}
-                      onChange={(val) =>
-                        onUpdate({
-                          ...interactionData,
-                          height: Math.max(0, val),
-                        })
-                      }
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                      Center X
-                    </label>
-                    <NumericInput
-                      value={interactionData.center?.x ?? 0}
-                      precision={decimalPrecision}
-                      onChange={(val) =>
-                        onUpdate({
-                          ...interactionData,
-                          center: { ...interactionData.center, x: val },
-                        })
-                      }
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                      Center Y
-                    </label>
-                    <NumericInput
-                      value={interactionData.center?.y ?? 0}
-                      precision={decimalPrecision}
-                      onChange={(val) =>
-                        onUpdate({
-                          ...interactionData,
-                          center: { ...interactionData.center, y: val },
-                        })
-                      }
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[9px] text-text-muted uppercase mb-0.5 font-bold tracking-wider">
-                      Yaw (degrees)
-                    </label>
-                    <NumericInput
-                      value={((interactionData.yaw ?? 0) * 180) / Math.PI}
-                      precision={1}
-                      onChange={(val) =>
-                        onUpdate({
-                          ...interactionData,
-                          yaw: (val * Math.PI) / 180,
-                        })
-                      }
-                      className="h-7 text-[11px]"
-                    />
-                  </div>
-                </div>
-                <div className="text-center text-text-muted text-[9px] mt-1 font-sans border-t border-border-base/30 pt-1">
-                  Drag ◻ corners · Drag ↻ handle to rotate
-                </div>
-              </div>
+              <RectangleForm
+                data={interactionData}
+                onChange={onUpdate}
+                precision={decimalPrecision}
+                showFooterHint
+              />
             ) : (
               <div className="py-1 text-center text-text-muted/50 italic text-[11px]">
                 Click and drag on map to draw
@@ -220,49 +121,14 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
 
         {input.type === "waypoint" && (
           <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
-            <Select
-              value={interactionData ?? ""}
-              onChange={(e) => {
-                const val = e.target.value === "" ? null : parseInt(e.target.value);
-                onUpdate(val);
-              }}
-              className="h-8 text-[11px] mb-2"
-            >
-              <option value="">-- Select Waypoint --</option>
-              {rootNodeIds.map((id, idx) => {
-                const n = nodes[id];
-                if (n && n.type === "manual") {
-                  return (
-                    <option key={id} value={idx}>
-                      Waypoint {idx + indexStartIndex}
-                    </option>
-                  );
-                }
-                return null;
-              })}
-            </Select>
-            <div className="flex items-center gap-2">
-              <label className="text-[10px] text-text-muted shrink-0">Index:</label>
-              <Input
-                type="number"
-                min={indexStartIndex}
-                max={rootNodeIds.length - 1 + indexStartIndex}
-                value={interactionData !== null ? interactionData + indexStartIndex : ""}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) {
-                    const idx = val - indexStartIndex;
-                    if (idx >= 0 && idx < rootNodeIds.length) {
-                      onUpdate(idx);
-                    }
-                  } else {
-                    onUpdate(null);
-                  }
-                }}
-                className="h-7 text-[11px]"
-                placeholder="Direct Input"
-              />
-            </div>
+            <WaypointSelectForm
+              value={interactionData}
+              onChange={onUpdate}
+              rootNodeIds={rootNodeIds}
+              nodes={nodes}
+              indexStartIndex={indexStartIndex}
+              showDirectInput
+            />
           </div>
         )}
       </div>
@@ -281,157 +147,232 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
 
       {input.type === "waypoint" && (
         <div className="space-y-2">
-          <Select
-            value={interactionData ?? ""}
-            onChange={(e) => {
-              const val = e.target.value === "" ? null : parseInt(e.target.value);
-              onUpdate(val);
-            }}
-            className="h-8 text-xs"
-          >
-            <option value="">-- Select Waypoint --</option>
-            {rootNodeIds.map((id, idx) => {
-              const n = nodes[id];
-              if (n && n.type === "manual") {
-                return (
-                  <option key={id} value={idx}>
-                    Waypoint {idx + indexStartIndex}
-                  </option>
-                );
-              }
-              return null;
-            })}
-          </Select>
+          <WaypointSelectForm
+            value={interactionData}
+            onChange={onUpdate}
+            rootNodeIds={rootNodeIds}
+            nodes={nodes}
+            indexStartIndex={indexStartIndex}
+          />
         </div>
       )}
 
       {input.type === "point" && interactionData && (
-        <div className="grid grid-cols-3 gap-2">
-          <div>
-            <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-              X (m)
-            </label>
-            <NumericInput
-              value={interactionData.x ?? 0}
-              precision={decimalPrecision}
-              onChange={(val) => onUpdate({ ...interactionData, x: val })}
-              className="h-8 text-xs"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-              Y (m)
-            </label>
-            <NumericInput
-              value={interactionData.y ?? 0}
-              precision={decimalPrecision}
-              onChange={(val) => onUpdate({ ...interactionData, y: val })}
-              className="h-8 text-xs"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-              Yaw (rad)
-            </label>
-            <NumericInput
-              step="0.01"
-              value={Math.atan2(
-                2.0 *
-                  ((interactionData.qw ?? 1) * (interactionData.qz ?? 0) +
-                    (interactionData.qx ?? 0) * (interactionData.qy ?? 0)),
-                1.0 -
-                  2.0 *
-                    ((interactionData.qy ?? 0) * (interactionData.qy ?? 0) +
-                      (interactionData.qz ?? 0) * (interactionData.qz ?? 0)),
-              )}
-              precision={decimalPrecision}
-              onChange={(val) => {
-                const qz = Math.sin(val / 2);
-                const qw = Math.cos(val / 2);
-                onUpdate({ ...interactionData, qx: 0, qy: 0, qz, qw });
-              }}
-              className="h-8 text-xs"
-            />
-          </div>
-        </div>
+        <PointForm
+          data={interactionData}
+          onChange={onUpdate}
+          precision={decimalPrecision}
+          includeYaw
+          columns={3}
+          inputSize="md"
+        />
       )}
 
-      {input.type === "rectangle" &&
-        (interactionData?.center || interactionData?.origin) && (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-                Center X
-              </label>
-              <NumericInput
-                value={interactionData.center.x ?? 0}
-                precision={decimalPrecision}
-                onChange={(val) =>
-                  onUpdate({
-                    ...interactionData,
-                    center: { ...interactionData.center, x: val },
-                  })
-                }
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-                Center Y
-              </label>
-              <NumericInput
-                value={interactionData.center.y ?? 0}
-                precision={decimalPrecision}
-                onChange={(val) =>
-                  onUpdate({
-                    ...interactionData,
-                    center: { ...interactionData.center, y: val },
-                  })
-                }
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-                Width
-              </label>
-              <NumericInput
-                value={interactionData.width ?? 0}
-                precision={decimalPrecision}
-                onChange={(val) =>
-                  onUpdate({ ...interactionData, width: Math.max(0, val) })
-                }
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-                Height
-              </label>
-              <NumericInput
-                value={interactionData.height ?? 0}
-                precision={decimalPrecision}
-                onChange={(val) =>
-                  onUpdate({ ...interactionData, height: Math.max(0, val) })
-                }
-                className="h-8 text-xs"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-[10px] text-text-muted mb-0.5 font-medium uppercase tracking-wider">
-                Yaw (degrees)
-              </label>
-              <NumericInput
-                value={((interactionData.yaw ?? 0) * 180) / Math.PI}
-                precision={1}
-                onChange={(val) =>
-                  onUpdate({ ...interactionData, yaw: (val * Math.PI) / 180 })
-                }
-                className="h-8 text-xs"
-              />
-            </div>
-          </div>
-        )}
+      {input.type === "rectangle" && (interactionData?.center || interactionData?.origin) && (
+        <RectangleForm
+          data={interactionData}
+          onChange={onUpdate}
+          precision={decimalPrecision}
+          inputSize="md"
+        />
+      )}
     </div>
   );
 };
+
+// ----------------------------------------------------------------------
+// Sub-components
+// ----------------------------------------------------------------------
+
+interface PointFormProps {
+  data: any;
+  onChange: (val: any) => void;
+  precision?: number;
+  includeYaw?: boolean;
+  columns?: number;
+  inputSize?: "sm" | "md";
+}
+
+function PointForm({
+  data,
+  onChange,
+  precision = 2,
+  includeYaw = false,
+  columns = 2,
+  inputSize = "sm",
+}: PointFormProps) {
+  const inputClassName = inputSize === "md" ? "h-8 text-xs" : "h-7 text-[11px]";
+  const gridClass = columns === 3 ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2";
+
+  return (
+    <div className={gridClass}>
+      <LabeledNumericInput
+        label="X (m)"
+        value={data.x ?? 0}
+        precision={precision}
+        onChange={(val) => onChange({ ...data, x: val })}
+        inputClassName={inputClassName}
+      />
+      <LabeledNumericInput
+        label="Y (m)"
+        value={data.y ?? 0}
+        precision={precision}
+        onChange={(val) => onChange({ ...data, y: val })}
+        inputClassName={inputClassName}
+      />
+      {includeYaw && (
+        <LabeledNumericInput
+          label="Yaw (rad)"
+          value={quaternionToYaw(data)}
+          precision={precision}
+          step="0.01"
+          onChange={(val) => {
+            const qz = Math.sin(val / 2);
+            const qw = Math.cos(val / 2);
+            onChange({ ...data, qx: 0, qy: 0, qz, qw });
+          }}
+          inputClassName={inputClassName}
+        />
+      )}
+    </div>
+  );
+}
+
+interface RectangleFormProps {
+  data: any;
+  onChange: (val: any) => void;
+  precision?: number;
+  showFooterHint?: boolean;
+  inputSize?: "sm" | "md";
+}
+
+function RectangleForm({
+  data,
+  onChange,
+  precision = 2,
+  showFooterHint = false,
+  inputSize = "sm",
+}: RectangleFormProps) {
+  const inputClassName = inputSize === "md" ? "h-8 text-xs" : "h-7 text-[11px]";
+
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <LabeledNumericInput
+          label="Width (m)"
+          value={data.width ?? 0}
+          precision={precision}
+          onChange={(val) => onChange({ ...data, width: Math.max(0, val) })}
+          inputClassName={inputClassName}
+        />
+        <LabeledNumericInput
+          label="Height (m)"
+          value={data.height ?? 0}
+          precision={precision}
+          onChange={(val) => onChange({ ...data, height: Math.max(0, val) })}
+          inputClassName={inputClassName}
+        />
+        <LabeledNumericInput
+          label="Center X"
+          value={data.center?.x ?? 0}
+          precision={precision}
+          onChange={(val) =>
+            onChange({ ...data, center: { ...data.center, x: val } })
+          }
+          inputClassName={inputClassName}
+        />
+        <LabeledNumericInput
+          label="Center Y"
+          value={data.center?.y ?? 0}
+          precision={precision}
+          onChange={(val) =>
+            onChange({ ...data, center: { ...data.center, y: val } })
+          }
+          inputClassName={inputClassName}
+        />
+        <div className="col-span-2">
+          <LabeledNumericInput
+            label="Yaw (degrees)"
+            value={((data.yaw ?? 0) * 180) / Math.PI}
+            precision={1}
+            onChange={(val) => onChange({ ...data, yaw: (val * Math.PI) / 180 })}
+            inputClassName={inputClassName}
+          />
+        </div>
+      </div>
+      {showFooterHint && (
+        <div className="text-center text-text-muted text-[9px] mt-1 font-sans border-t border-border-base/30 pt-1">
+          Drag ◻ corners · Drag ↻ handle to rotate
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface WaypointSelectFormProps {
+  value: any;
+  onChange: (val: any) => void;
+  rootNodeIds: string[];
+  nodes: Record<string, any>;
+  indexStartIndex: number;
+  showDirectInput?: boolean;
+}
+
+function WaypointSelectForm({
+  value,
+  onChange,
+  rootNodeIds,
+  nodes,
+  indexStartIndex,
+  showDirectInput = false,
+}: WaypointSelectFormProps) {
+  return (
+    <>
+      <Select
+        value={value ?? ""}
+        onChange={(e) => {
+          const val = e.target.value === "" ? null : parseInt(e.target.value);
+          onChange(val);
+        }}
+        className="h-8 text-[11px] mb-2"
+      >
+        <option value="">-- Select Waypoint --</option>
+        {rootNodeIds.map((id, idx) => {
+          const n = nodes[id];
+          if (n && n.type === "manual") {
+            return (
+              <option key={id} value={idx}>
+                Waypoint {idx + indexStartIndex}
+              </option>
+            );
+          }
+          return null;
+        })}
+      </Select>
+      {showDirectInput && (
+        <div className="flex items-center gap-2">
+          <label className="text-[10px] text-text-muted shrink-0">Index:</label>
+          <Input
+            type="number"
+            min={indexStartIndex}
+            max={rootNodeIds.length - 1 + indexStartIndex}
+            value={value !== null ? value + indexStartIndex : ""}
+            onChange={(e) => {
+              const val = parseInt(e.target.value);
+              if (!isNaN(val)) {
+                const idx = val - indexStartIndex;
+                if (idx >= 0 && idx < rootNodeIds.length) {
+                  onChange(idx);
+                }
+              } else {
+                onChange(null);
+              }
+            }}
+            className="h-7 text-[11px]"
+            placeholder="Direct Input"
+          />
+        </div>
+      )}
+    </>
+  );
+}

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { ChevronRight, Layers, GripVertical, Anchor } from 'lucide-react';
 import { Button } from './common/Button';
+import { cn } from '../../utils/cn';
 import {
   DndContext,
   closestCenter,
@@ -167,12 +168,7 @@ export function WaypointTree() {
                 if (id === '__insertion_bar__') {
                   return (
                     <SortableItem key={id} id={id} isDragging={activeDragId === id}>
-                      <div className="py-1 cursor-ns-resize group relative flex items-center justify-center">
-                        <div className="h-1 bg-emerald-500/50 group-hover:bg-emerald-400 rounded-full w-full transition-colors" />
-                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-panel text-[10px] px-3 py-0.5 rounded-full border border-emerald-500/50 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none">
-                          Insert Here
-                        </div>
-                      </div>
+                      <InsertionBar />
                     </SortableItem>
                   );
                 }
@@ -195,32 +191,22 @@ export function WaypointTree() {
 
                   return (
                     <SortableItem key={id} id={id} isDragging={activeDragId === id}>
-                      <div
+                      <TreeItemRow
+                        isSelected={isSelected}
+                        variant="generator"
                         onClick={(e) => handleNodeClick(id, e)}
-                        className={`px-3 py-2 rounded text-sm group border transition-colors cursor-pointer ${
-                          isSelected
-                            ? 'bg-emerald-500/20 border-emerald-500 text-text-base'
-                            : 'bg-surface-panel border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-base'
-                        }`}
+                        idTag={id.slice(0, 6)}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleExpand(id); }}
-                              className="text-text-muted hover:text-text-base transition-colors"
-                            >
-                              <ChevronRight size={14} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                            </button>
-                            <Layers size={14} className="text-emerald-400" />
-                            <span className="font-medium text-xs">{pluginName}</span>
-                            <span className="text-[10px] text-text-muted/70 ml-1">({childIds.length} pts)</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className={`opacity-50 text-xs ${isSelected ? 'text-emerald-400' : ''}`}>{id.slice(0, 6)}</span>
-                            <GripVertical size={14} className="text-text-muted/40 group-hover:text-text-muted cursor-grab active:cursor-grabbing" />
-                          </div>
-                        </div>
-                      </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleExpand(id); }}
+                          className="text-text-muted hover:text-text-base transition-colors"
+                        >
+                          <ChevronRight size={14} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+                        <Layers size={14} className="text-emerald-400" />
+                        <span className="font-medium text-xs">{pluginName}</span>
+                        <span className="text-[10px] text-text-muted/70 ml-1">({childIds.length} pts)</span>
+                      </TreeItemRow>
                       
                       {isExpanded && childIds.length > 0 && (
                         <ul className="ml-4 mt-1 space-y-0.5 border-l-2 border-emerald-500/30 pl-2">
@@ -238,11 +224,13 @@ export function WaypointTree() {
                                   e.stopPropagation();
                                   setContextMenu({ nodeId: childId, x: e.clientX, y: e.clientY });
                                 }}
-                                className={`px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between ${
+                                className={cn(
+                                  "px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between",
                                   isChildSelected
-                                    ? 'bg-primary-base/20 border-primary-base text-text-base'
-                                    : 'bg-surface-panel/80 border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-muted'
-                                } ${isChildAnchor ? 'border-amber-400/60 bg-amber-950/20' : ''}`}
+                                    ? "bg-primary-base/20 border-primary-base text-text-base"
+                                    : "bg-surface-panel/80 border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-muted",
+                                  isChildAnchor && "border-amber-400/60 bg-amber-950/20"
+                                )}
                               >
                                 <div className="flex items-center gap-1">
                                   <span className="opacity-60 font-mono mr-1">[{startIdx + childIdx + indexStartIndex}]</span>
@@ -264,33 +252,24 @@ export function WaypointTree() {
                 const currentGlobalIndex = globalIndex++;
                 return (
                   <SortableItem key={id} id={id} isDragging={activeDragId === id}>
-                    <div
+                    <TreeItemRow
+                      isSelected={isSelected}
+                      isAnchor={isAnchor}
+                      variant="primary"
                       onClick={(e) => handleNodeClick(id, e)}
                       onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
                       }}
-                      className={`px-3 py-2 rounded text-sm group border transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-primary-base/20 border-primary-base text-text-base'
-                          : 'bg-surface-panel border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-base'
-                      } ${isAnchor ? 'border-amber-400/60 bg-amber-950/20' : ''}`}
+                      idTag={id.slice(0, 6)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="opacity-75 font-mono text-xs mr-1">[{currentGlobalIndex + indexStartIndex}]</span>
-                          🎯 Waypoint
-                          {isAnchor && (
-                            <span className="text-amber-400 text-xs font-bold ml-1" title="Anchor Point">⚓</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`opacity-50 text-xs ${isSelected ? 'text-primary-base/80' : ''}`}>{id.slice(0, 6)}</span>
-                          <GripVertical size={14} className="text-text-muted/40 group-hover:text-text-muted cursor-grab active:cursor-grabbing" />
-                        </div>
-                      </div>
-                    </div>
+                      <span className="opacity-75 font-mono text-xs mr-1">[{currentGlobalIndex + indexStartIndex}]</span>
+                      🎯 Waypoint
+                      {isAnchor && (
+                        <span className="text-amber-400 text-xs font-bold ml-1" title="Anchor Point">⚓</span>
+                      )}
+                    </TreeItemRow>
                   </SortableItem>
                 );
               })}
@@ -322,6 +301,81 @@ export function WaypointTree() {
           </Button>
         </div>
       )}
+    </div>
+  );
+}
+
+interface TreeItemRowProps {
+  isSelected: boolean;
+  isAnchor?: boolean;
+  variant?: "primary" | "generator";
+  onClick?: (e: React.MouseEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  children: React.ReactNode;
+  idTag?: string;
+  showGrip?: boolean;
+}
+
+function TreeItemRow({
+  isSelected,
+  isAnchor,
+  variant = "primary",
+  onClick,
+  onContextMenu,
+  children,
+  idTag,
+  showGrip = true,
+}: TreeItemRowProps) {
+  const selectedBg =
+    variant === "generator"
+      ? "bg-emerald-500/20 border-emerald-500 text-text-base"
+      : "bg-primary-base/20 border-primary-base text-text-base";
+  const anchorBorder = isAnchor ? "border-amber-400/60 bg-amber-950/20" : "";
+
+  return (
+    <div
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      className={cn(
+        "px-3 py-2 rounded text-sm group border transition-colors cursor-pointer select-none",
+        isSelected
+          ? selectedBg
+          : "bg-surface-panel border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-base",
+        anchorBorder
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">{children}</div>
+        <div className="flex items-center gap-2">
+          {idTag && (
+            <span
+              className={cn(
+                "opacity-50 text-xs",
+                isSelected && (variant === "generator" ? "text-emerald-400" : "text-primary-base/80")
+              )}
+            >
+              {idTag}
+            </span>
+          )}
+          {showGrip && (
+            <GripVertical
+              size={14}
+              className="text-text-muted/40 group-hover:text-text-muted cursor-grab active:cursor-grabbing"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InsertionBar() {
+  return (
+    <div className="py-1 cursor-ns-resize group relative flex items-center justify-center">
+      <div className="h-1 bg-emerald-500/50 group-hover:bg-emerald-400 rounded-full w-full transition-colors" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-panel text-[10px] px-3 py-0.5 rounded-full border border-emerald-500/50 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none">
+        Insert Here
+      </div>
     </div>
   );
 }

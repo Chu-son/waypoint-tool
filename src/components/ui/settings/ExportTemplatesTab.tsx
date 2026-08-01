@@ -10,6 +10,8 @@ import { useState, useEffect } from "react";
 import { ExportTemplate } from "../../../types/store";
 import { TabSectionHeader } from "./TabSectionHeader";
 import { EmptyState } from "../common/EmptyState";
+import { SectionDivider } from "../common/SectionDivider";
+import { InlineFieldRow } from "../common/InlineFieldRow";
 
 function TemplateCreateModal({
   isOpen, onClose, onSubmit, initialData
@@ -354,10 +356,7 @@ export function ExportTemplatesTab() {
       />
 
       <div className="space-y-3">
-        <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider ml-1 px-1 flex items-center gap-2">
-          <span>Default Formats</span>
-          <div className="h-px flex-1 bg-border-base/30" />
-        </h4>
+        <SectionDivider title="Default Formats" />
         <div className="grid gap-3">
           {defaultExportFormats.map((format) => (
             <div
@@ -373,10 +372,7 @@ export function ExportTemplatesTab() {
                 </span>
               </div>
               <div className="flex items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] text-text-muted font-bold uppercase tracking-tight">
-                    Suffix
-                  </span>
+                <InlineFieldRow label="Suffix">
                   <Input
                     type="text"
                     value={format.suffix}
@@ -388,7 +384,7 @@ export function ExportTemplatesTab() {
                     className="h-8 text-[11px] w-28 font-mono"
                     placeholder="_yaml"
                   />
-                </div>
+                </InlineFieldRow>
               </div>
             </div>
           ))}
@@ -414,10 +410,7 @@ export function ExportTemplatesTab() {
       </div>
 
       <div className="space-y-5">
-        <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider ml-1 px-1 flex items-center gap-2">
-          <span>Custom Templates</span>
-          <div className="h-px flex-1 bg-border-base/30" />
-        </h4>
+        <SectionDivider title="Custom Templates" />
         {globalExportTemplates.map((template) => (
           <div
             key={template.id}
@@ -436,8 +429,7 @@ export function ExportTemplatesTab() {
                 placeholder="Template Name"
               />
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-tight">Suffix</span>
+                <InlineFieldRow label="Suffix">
                   <Input
                     type="text"
                     value={template.suffix || ""}
@@ -449,9 +441,8 @@ export function ExportTemplatesTab() {
                     className="h-8 text-[11px] w-24 font-mono"
                     placeholder="_custom"
                   />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-tight">Ext</span>
+                </InlineFieldRow>
+                <InlineFieldRow label="Ext">
                   <Input
                     type="text"
                     value={template.extension}
@@ -463,7 +454,7 @@ export function ExportTemplatesTab() {
                     className="h-8 text-[11px] w-16 font-mono"
                     placeholder="yaml"
                   />
-                </div>
+                </InlineFieldRow>
                 <div className="flex items-center gap-1 bg-surface-base px-2 py-1 rounded border border-border-base/50 text-[10px] font-bold uppercase tracking-wider text-text-muted">
                   {template.scope === 'local' ? '[Local]' : '[Global]'}
                 </div>

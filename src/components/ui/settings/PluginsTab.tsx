@@ -7,6 +7,7 @@ import { cn } from "../../../utils/cn";
 import { TabSectionHeader } from "./TabSectionHeader";
 import { EmptyState } from "../common/EmptyState";
 import { BrowseInput } from "../common/BrowseInput";
+import { ToggleSwitch } from "../common/ToggleSwitch";
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -222,25 +223,15 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   <div className="p-4 flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => {
+                        <ToggleSwitch
+                          checked={isEnabled}
+                          onChange={(checked) => {
                             const newSettings = pluginSettings.map((s) =>
-                              s.id === setting.id ? { ...s, enabled: !s.enabled } : s,
+                              s.id === setting.id ? { ...s, enabled: checked } : s,
                             );
                             setPluginSettings(newSettings);
                           }}
-                          className={cn(
-                            "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-base/50",
-                            isEnabled ? "bg-primary-base" : "bg-surface-hover"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                              isEnabled ? "translate-x-5" : "translate-x-0"
-                            )}
-                          />
-                        </button>
+                        />
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-text-base text-[15px]">

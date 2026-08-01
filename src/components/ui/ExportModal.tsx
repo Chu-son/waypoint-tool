@@ -198,47 +198,27 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                 .getState()
                 .defaultExportFormats.filter((f) => f.enabled)
                 .map((f) => (
-                  <label
+                  <FormatSelectRow
                     key={f.id}
-                    className="flex items-center justify-between p-3 px-4 rounded-lg bg-surface-panel/40 border border-border-base/20 hover:border-primary-base/30 hover:bg-surface-panel/60 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Checkbox
-                        checked={selectedFormats.includes(f.id)}
-                        onChange={() => toggleFormat(f.id)}
-                      />
-                      <div className="flex flex-col">
-                        <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
-                          {f.name}
-                        </span>
-                        <span className="text-[10px] text-text-muted font-mono uppercase">
-                          Standard Format (.{f.extension})
-                        </span>
-                      </div>
-                    </div>
-                  </label>
+                    checked={selectedFormats.includes(f.id)}
+                    onChange={() => toggleFormat(f.id)}
+                    title={f.name}
+                    subtitle={`Standard Format (.${f.extension})`}
+                  />
                 ))}
               {exportTemplates.map((t) => (
-                <label
+                <FormatSelectRow
                   key={t.id}
-                  className="flex items-center justify-between p-3 px-4 rounded-lg bg-surface-panel/40 border border-border-base/20 hover:border-primary-base/30 hover:bg-surface-panel/60 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-4">
-                    <Checkbox
-                      checked={selectedFormats.includes(t.id)}
-                      onChange={() => toggleFormat(t.id)}
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
-                        {t.name}
-                      </span>
-                      <span className="text-[10px] text-text-muted font-mono uppercase flex items-center gap-2">
-                        <span>{t.scope === 'local' ? '[Local]' : '[Global]'}</span>
-                        <span>Custom Template (.{t.extension})</span>
-                      </span>
-                    </div>
-                  </div>
-                </label>
+                  checked={selectedFormats.includes(t.id)}
+                  onChange={() => toggleFormat(t.id)}
+                  title={t.name}
+                  subtitle={
+                    <>
+                      <span>{t.scope === 'local' ? '[Local]' : '[Global]'}</span>
+                      <span>Custom Template (.{t.extension})</span>
+                    </>
+                  }
+                />
               ))}
             </div>
             <p className="text-[11px] text-text-muted/80 leading-relaxed px-2">
@@ -278,5 +258,30 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
         </Button>
       </ModalFooter>
     </Modal>
+  );
+}
+
+interface FormatSelectRowProps {
+  checked: boolean;
+  onChange: () => void;
+  title: string;
+  subtitle: React.ReactNode;
+}
+
+function FormatSelectRow({ checked, onChange, title, subtitle }: FormatSelectRowProps) {
+  return (
+    <label className="flex items-center justify-between p-3 px-4 rounded-lg bg-surface-panel/40 border border-border-base/20 hover:border-primary-base/30 hover:bg-surface-panel/60 transition-all cursor-pointer group">
+      <div className="flex items-center gap-4">
+        <Checkbox checked={checked} onChange={onChange} />
+        <div className="flex flex-col">
+          <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
+            {title}
+          </span>
+          <span className="text-[10px] text-text-muted font-mono uppercase flex items-center gap-2">
+            {subtitle}
+          </span>
+        </div>
+      </div>
+    </label>
   );
 }

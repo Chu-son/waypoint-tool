@@ -5,10 +5,10 @@ import { OptionDef, OptionsSchema } from "../../../types/store";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
 import { Select } from "../common/Select";
-import { Label } from "../common/Label";
 import { cn } from "../../../utils/cn";
 import { TabSectionHeader } from "./TabSectionHeader";
 import { EmptyState } from "../common/EmptyState";
+import { FieldLabel } from "../common/FieldLabel";
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -201,10 +201,7 @@ export function OptionSchemaTab() {
           >
             <div className="flex-1 space-y-4">
               <div className="grid grid-cols-12 gap-3">
-                <div className="col-span-3 space-y-1.5">
-                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
-                    Key Name
-                  </Label>
+                <SchemaFieldCell label="Key Name" className="col-span-3">
                   <Input
                     type="text"
                     value={opt.name}
@@ -222,11 +219,8 @@ export function OptionSchemaTab() {
                     )}
                     placeholder="e.g. velocity"
                   />
-                </div>
-                <div className="col-span-3 space-y-1.5">
-                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
-                    Label
-                  </Label>
+                </SchemaFieldCell>
+                <SchemaFieldCell label="Label" className="col-span-3">
                   <Input
                     type="text"
                     value={opt.label}
@@ -236,11 +230,8 @@ export function OptionSchemaTab() {
                     className="h-9 text-xs"
                     placeholder="e.g. Target Speed"
                   />
-                </div>
-                <div className="col-span-3 space-y-1.5">
-                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
-                    Type
-                  </Label>
+                </SchemaFieldCell>
+                <SchemaFieldCell label="Type" className="col-span-3">
                   <Select
                     value={opt.type}
                     onChange={(e) =>
@@ -254,11 +245,8 @@ export function OptionSchemaTab() {
                     <option value="boolean">Boolean</option>
                     <option value="list">List (Array)</option>
                   </Select>
-                </div>
-                <div className="col-span-3 space-y-1.5">
-                  <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
-                    Default
-                  </Label>
+                </SchemaFieldCell>
+                <SchemaFieldCell label="Default" className="col-span-3">
                   <Input
                     type="text"
                     value={
@@ -307,14 +295,11 @@ export function OptionSchemaTab() {
                           : "0"
                     }
                   />
-                </div>
+                </SchemaFieldCell>
               </div>
               {opt.type === "list" && (
                 <div className="flex gap-2 mt-1">
-                  <div className="w-48 space-y-1.5">
-                    <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
-                      List Item Type
-                    </Label>
+                  <SchemaFieldCell label="List Item Type" className="w-48">
                     <Select
                       value={opt.item_type || "string"}
                       onChange={(e) =>
@@ -329,15 +314,12 @@ export function OptionSchemaTab() {
                       <option value="integer">Integer</option>
                       <option value="boolean">Boolean</option>
                     </Select>
-                  </div>
+                  </SchemaFieldCell>
                 </div>
               )}
               {opt.type === "string" && (
                 <div className="flex gap-2 mt-1">
-                  <div className="flex-1 space-y-1.5">
-                    <Label className="text-[10px] font-bold text-text-muted uppercase tracking-wider ml-1">
-                      Dropdown Enums (csv, optional)
-                    </Label>
+                  <SchemaFieldCell label="Dropdown Enums (csv, optional)" className="flex-1">
                     <Input
                       type="text"
                       value={
@@ -354,7 +336,7 @@ export function OptionSchemaTab() {
                       className="h-9 text-xs"
                       placeholder="e.g. none, docking"
                     />
-                  </div>
+                  </SchemaFieldCell>
                 </div>
               )}
             </div>
@@ -372,6 +354,23 @@ export function OptionSchemaTab() {
           <EmptyState message="No custom options defined. Click 'Add Field' to create one." />
         )}
       </div>
+    </div>
+  );
+}
+
+function SchemaFieldCell({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <FieldLabel className="ml-1">{label}</FieldLabel>
+      {children}
     </div>
   );
 }
