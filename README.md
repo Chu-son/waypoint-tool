@@ -6,10 +6,6 @@
   <img src="./docs/images/main-app.png" alt="ROS Waypoint Tool Main Interface" width="800"/>
 </p>
 
-<p align="center">
-  <img src="./docs/images/waypoints-demo.png" alt="Waypoint を配置した使用イメージ" width="800"/>
-</p>
-
 ## 概要
 
 ROS Waypoint Tool は、ロボットの経路設計を直感的な GUI で行えるデスクトップアプリケーションです。
@@ -97,6 +93,5 @@ npm run tauri build
 ## ドキュメント
 
 - **[ユーザーガイド (USER_GUIDE.md)](./docs/USER_GUIDE.md)**: アプリの全機能の使い方と操作手順。
-- **[システム要件定義 (REQUIREMENTS.md)](./docs/REQUIREMENTS.md)**: 要件・機能仕様の一覧。
 - **[プラグイン開発ガイド (PLUGIN_GUIDE.md)](./docs/PLUGIN_GUIDE.md)**: Python / WASM プラグインの作成方法。
 - **[開発者ガイド (DEVELOPMENT_GUIDE.md)](./docs/DEVELOPMENT_GUIDE.md)**: 開発手順・アーキテクチャ・テスト指針。
