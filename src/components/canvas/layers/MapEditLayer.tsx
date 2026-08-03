@@ -1,5 +1,7 @@
 import { FederatedPointerEvent } from 'pixi.js';
 import { EditLayer, EditObject } from '../../../types/store';
+import { CanvasHandle } from '../common/CanvasHandle';
+import { computePointsBoundingBox } from '../../../utils/geometry';
 
 interface MapEditLayerProps {
   scale: number;
@@ -69,57 +71,30 @@ export function MapEditLayer({
           {/* Corner resize handles (when selected) */}
           {isSelected &&
             rectCorners.map((c) => (
-              <pixiGraphics
+              <CanvasHandle
                 key={c.name}
                 x={c.x}
                 y={c.y}
-                eventMode="dynamic"
+                scale={scale}
+                type="square"
+                colorHex={0x3b82f6}
                 cursor="pointer"
                 onPointerDown={(e: FederatedPointerEvent) =>
                   onObjectResizeHandlePointerDown?.(e, layerId, obj.id, c.name)
                 }
-                draw={(g) => {
-                  g.clear();
-                  g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                  g.circle(0, 0, 10 / safeScale);
-                  g.fill();
-
-                  g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 };
-                  g.fillStyle = { color: 0xffffff, alpha: 1.0 };
-                  g.rect(-3 / safeScale, -3 / safeScale, 6 / safeScale, 6 / safeScale);
-                  g.fill();
-                  g.stroke();
-                }}
               />
             ))}
 
           {/* Rotation handle (when selected) */}
           {isSelected && (
-            <pixiGraphics
+            <CanvasHandle
               x={handleOffset}
               y={0}
-              eventMode="dynamic"
+              scale={scale}
+              type="circle"
+              colorHex={0x3b82f6}
               cursor="grab"
               onPointerDown={(e: FederatedPointerEvent) => onObjectHandlePointerDown?.(e, layerId, obj.id)}
-              draw={(g) => {
-                g.clear();
-                // Invisible hit circle
-                g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                g.circle(0, 0, 15 / safeScale);
-                g.fill();
-
-                // Visible handle dot
-                g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 };
-                g.fillStyle = { color: 0xffffff, alpha: 0.9 };
-                g.circle(0, 0, 4 / safeScale);
-                g.fill();
-                g.stroke();
-
-                // Connecting line
-                g.moveTo(-15 / safeScale, 0);
-                g.lineTo(-4 / safeScale, 0);
-                g.stroke();
-              }}
             />
           )}
         </pixiContainer>
@@ -153,27 +128,17 @@ export function MapEditLayer({
           />
           {isSelected &&
             quadHandles.map((qh) => (
-              <pixiGraphics
+              <CanvasHandle
                 key={qh.name}
                 x={qh.x}
                 y={qh.y}
-                eventMode="dynamic"
+                scale={scale}
+                type="circle"
+                colorHex={0x3b82f6}
                 cursor="pointer"
                 onPointerDown={(e: FederatedPointerEvent) =>
                   onObjectResizeHandlePointerDown?.(e, layerId, obj.id, qh.name)
                 }
-                draw={(g) => {
-                  g.clear();
-                  g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                  g.circle(0, 0, 10 / safeScale);
-                  g.fill();
-
-                  g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 };
-                  g.fillStyle = { color: 0xffffff, alpha: 1.0 };
-                  g.circle(0, 0, 4 / safeScale);
-                  g.fill();
-                  g.stroke();
-                }}
               />
             ))}
         </pixiContainer>
@@ -181,19 +146,12 @@ export function MapEditLayer({
     } else if (obj.type === 'freehand') {
       if (!obj.points.length) return null;
 
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      obj.points.forEach((p) => {
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.y > maxY) maxY = p.y;
-      });
-
+      const bbox = computePointsBoundingBox(obj.points);
       const freehandCorners = [
-        { name: 'nw', x: minX, y: minY },
-        { name: 'ne', x: maxX, y: minY },
-        { name: 'se', x: maxX, y: maxY },
-        { name: 'sw', x: minX, y: maxY },
+        { name: 'nw', x: bbox.minX, y: bbox.minY },
+        { name: 'ne', x: bbox.maxX, y: bbox.minY },
+        { name: 'se', x: bbox.maxX, y: bbox.maxY },
+        { name: 'sw', x: bbox.minX, y: bbox.maxY },
       ];
 
       return (
@@ -227,34 +185,24 @@ export function MapEditLayer({
 
               if (isSelected) {
                 g.strokeStyle = { width: 1 / safeScale, color: 0x3b82f6, alpha: 0.8 };
-                g.rect(minX, minY, maxX - minX, maxY - minY);
+                g.rect(bbox.minX, bbox.minY, bbox.width, bbox.height);
                 g.stroke();
               }
             }}
           />
           {isSelected &&
             freehandCorners.map((fc) => (
-              <pixiGraphics
+              <CanvasHandle
                 key={fc.name}
                 x={fc.x}
                 y={fc.y}
-                eventMode="dynamic"
+                scale={scale}
+                type="square"
+                colorHex={0x3b82f6}
                 cursor="pointer"
                 onPointerDown={(e: FederatedPointerEvent) =>
                   onObjectResizeHandlePointerDown?.(e, layerId, obj.id, fc.name)
                 }
-                draw={(g) => {
-                  g.clear();
-                  g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                  g.circle(0, 0, 10 / safeScale);
-                  g.fill();
-
-                  g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 };
-                  g.fillStyle = { color: 0xffffff, alpha: 1.0 };
-                  g.rect(-3 / safeScale, -3 / safeScale, 6 / safeScale, 6 / safeScale);
-                  g.fill();
-                  g.stroke();
-                }}
               />
             ))}
         </pixiContainer>

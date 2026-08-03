@@ -9,7 +9,7 @@ import { Input } from "./common/Input";
 import { OptionCard } from "./common/OptionCard";
 import { FieldLabel } from "./common/FieldLabel";
 import { EmptyState } from "./common/EmptyState";
-import { rasterizeEditLayerToExportLayer } from "../../utils/mapRasterize";
+import { prepareLayersForExport } from "../../utils/mapRasterize";
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);
@@ -58,26 +58,7 @@ export function ExportMapsModal() {
             layerVisibility: {},
           }));
 
-        // Extract visible map layers (untouched base images)
-        const visibleMapLayers = mapLayers
-          .filter(layer => layer.visible)
-          .map(layer => ({
-            id: layer.id,
-            name: layer.name,
-            image_base64: layer.image_base64,
-            info: layer.info,
-            opacity: 1.0,
-            blend_mode: layer.blend_mode || 'overwrite',
-            z_index: layer.z_index,
-          }));
-
-        // Rasterize visible EditLayers into standalone transparent layers
-        const editLayerExports = await Promise.all(
-          editLayers.map(el => rasterizeEditLayerToExportLayer(el))
-        );
-        const validEditLayers = editLayerExports.filter((l): l is NonNullable<typeof l> => l !== null);
-
-        const layersToExport = [...visibleMapLayers, ...validEditLayers];
+        const layersToExport = await prepareLayersForExport(mapLayers, editLayers);
 
         await BackendAPI.exportMaps({
           saveDir: dirPath,

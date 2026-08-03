@@ -1,5 +1,6 @@
 import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent } from 'pixi.js';
+import { CanvasHandle } from '../common/CanvasHandle';
 
 
 interface PluginLayerProps {
@@ -33,7 +34,6 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
           
           const halfW = width / 2;
           const halfH = height / 2;
-          const cornerSize = 6 / safeScale;
           
           const corners = [
             { cx: -halfW, cy: halfH, corner: 'min' as const },
@@ -76,25 +76,15 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                 }}
               />
               {corners.map(({ cx, cy, corner }) => (
-                <pixiGraphics
+                <CanvasHandle
                   key={`corner-${corner}`}
                   x={cx}
                   y={cy}
-                  eventMode="dynamic"
+                  scale={scale}
+                  type="square"
+                  colorHex={0xec4899}
                   cursor="grab"
                   onPointerDown={(e: FederatedPointerEvent) => onRectDragCornerDown(e, key, corner)}
-                  draw={(g) => {
-                    g.clear();
-                    g.fillStyle = { color: 0xffffff, alpha: 0.001 };
-                    g.circle(0, 0, 15 / safeScale);
-                    g.fill();
-
-                    g.fillStyle = { color: 0xffffff, alpha: 0.9 };
-                    g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
-                    g.rect(-cornerSize / 2, -cornerSize / 2, cornerSize, cornerSize);
-                    g.fill();
-                    g.stroke();
-                  }}
                 />
               ))}
               {(() => {

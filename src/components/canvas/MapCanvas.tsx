@@ -16,7 +16,8 @@ import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
 import { useMapEditCircle } from './hooks/useMapEditCircle';
 import { useMapEditFreehand } from './hooks/useMapEditFreehand';
-import { rasterizeEditLayerToExportLayer } from '../../utils/mapRasterize';
+import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { computePointsBoundingBox } from '../../utils/geometry';
 
 extend({
   Container,
@@ -184,27 +185,8 @@ export function MapCanvas() {
     setPreviewError(null);
     console.log('[Export Preview] Generating preview... SyncKey:', previewSyncKey);
 
-    Promise.all([
-      Promise.resolve(
-        mapLayers
-          .filter(l => l.visible)
-          .map(l => ({
-            id: l.id,
-            image_base64: l.image_base64,
-            info: l.info,
-            blend_mode: l.blend_mode || 'overwrite',
-            z_index: l.z_index,
-            visible: true,
-          }))
-      ),
-      Promise.all(editLayers.map(el => rasterizeEditLayerToExportLayer(el))),
-    ]).then(([visibleMapLayers, editLayerExports]) => {
+    prepareLayersForExport(mapLayers, editLayers).then(layerInputs => {
       if (cancelled) return null;
-      const validEditLayers = editLayerExports
-        .filter((l): l is NonNullable<typeof l> => l !== null)
-        .map(l => ({ ...l, visible: true }));
-
-      const layerInputs = [...visibleMapLayers, ...validEditLayers];
       return BackendAPI.blendMapPreview(layerInputs);
     }).then(result => {
       if (cancelled || !result) return;
@@ -869,17 +851,11 @@ export function MapCanvas() {
             radius: newRadius,
           });
         } else if (initialObject.type === 'freehand') {
-          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-          initialObject.points.forEach((p: { x: number; y: number }) => {
-            if (p.x < minX) minX = p.x;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.y > maxY) maxY = p.y;
-          });
-          const initialWidth = Math.max(0.01, maxX - minX);
-          const initialHeight = Math.max(0.01, maxY - minY);
-          const centerWorldX = (minX + maxX) / 2;
-          const centerWorldY = (minY + maxY) / 2;
+          const bbox = computePointsBoundingBox(initialObject.points);
+          const initialWidth = Math.max(0.01, bbox.width);
+          const initialHeight = Math.max(0.01, bbox.height);
+          const centerWorldX = bbox.cx;
+          const centerWorldY = bbox.cy;
 
           const curDx = Math.abs(curWorldPos.x - centerWorldX);
           const curDy = Math.abs(curWorldPos.y - centerWorldY);

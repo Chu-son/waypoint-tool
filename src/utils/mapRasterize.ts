@@ -248,6 +248,36 @@ export async function rasterizeEditLayerToExportLayer(
 }
 
 /**
+ * Prepares visible MapLayers and standalone rasterized EditLayers for export or preview.
+ */
+export async function prepareLayersForExport(
+  mapLayers: ProjectMapLayer[],
+  editLayers: EditLayer[]
+) {
+  const visibleMapLayers = mapLayers
+    .filter((l) => l.visible)
+    .map((l) => ({
+      id: l.id,
+      name: l.name,
+      image_base64: l.image_base64,
+      info: l.info,
+      opacity: 1.0,
+      blend_mode: l.blend_mode || 'overwrite',
+      z_index: l.z_index,
+      visible: true,
+    }));
+
+  const editLayerExports = await Promise.all(
+    editLayers.map((el) => rasterizeEditLayerToExportLayer(el))
+  );
+  const validEditLayers = editLayerExports
+    .filter((l): l is NonNullable<typeof l> => l !== null)
+    .map((l) => ({ ...l, visible: true }));
+
+  return [...visibleMapLayers, ...validEditLayers];
+}
+
+/**
  * Pre-composites visible EditLayers onto their target MapLayers (Legacy compatibility).
  */
 export async function preCompositeEditLayers(
