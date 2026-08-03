@@ -39,6 +39,9 @@ export const useAppStore = create<AppState>()(
         leftPanelWidth: state.leftPanelWidth,
         rightPanelWidth: state.rightPanelWidth,
         showProperties: state.showProperties,
+        mapEditFillValue: state.mapEditFillValue,
+        mapEditBrushSize: state.mapEditBrushSize,
+        mapEditSubTool: state.mapEditSubTool,
       }),
     }
   )

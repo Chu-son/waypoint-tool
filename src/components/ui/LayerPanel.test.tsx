@@ -15,6 +15,8 @@ vi.mock('lucide-react', () => ({
   Layers: () => <div data-testid="layers-icon" />,
   ScanEye: () => <div data-testid="scan-eye-icon" />,
   Sparkles: () => <div data-testid="sparkles-icon" />,
+  Pencil: () => <div data-testid="pencil-icon" />,
+  Crop: () => <div data-testid="crop-icon" />,
 }));
 
 // Mock API
@@ -49,11 +51,16 @@ describe('LayerPanel', () => {
     vi.clearAllMocks();
     (useAppStore as any).mockImplementation((selector: any) => selector({
       mapLayers: [],
+      editLayers: [],
       lastDirectory: '/test/dir',
       updateMapLayer: mockUpdateMapLayer,
       removeMapLayer: mockRemoveMapLayer,
       reorderMapLayers: mockReorderMapLayers,
       addMapLayer: mockAddMapLayer,
+      addEditLayer: vi.fn(),
+      removeEditLayer: vi.fn(),
+      updateEditLayer: vi.fn(),
+      reorderEditLayers: vi.fn(),
       setLastDirectory: mockSetLastDirectory,
     }));
   });

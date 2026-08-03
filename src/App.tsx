@@ -14,6 +14,7 @@ import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
 import { ExportMapsModal } from "./components/ui/ExportMapsModal";
 import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
+import { MapEditOverlay } from "./components/ui/MapEditOverlay";
 import { ShortcutManager } from "./components/common/ShortcutManager";
 import { useAppStore } from "./stores/appStore";
 import { 
@@ -299,6 +300,7 @@ function App() {
         {/* Main Center Area */}
         <div className="flex-1 bg-surface-base relative overflow-hidden flex flex-col">
           <ElementCopyOverlay />
+          <MapEditOverlay />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
             {!isLeftPanelOpen ? (

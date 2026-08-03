@@ -112,6 +112,7 @@ pub struct ProjectData {
     pub root_node_ids: Vec<String>,
     pub nodes: HashMap<String, WaypointNode>,
     pub map_layers: Option<Vec<ProjectMapLayer>>,
+    pub edit_layers: Option<serde_json::Value>,
     pub options_schema: Option<serde_json::Value>,
     pub export_templates: Option<serde_json::Value>,
     pub export_regions: Option<Vec<ExportRegion>>,

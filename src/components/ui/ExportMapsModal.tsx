@@ -9,6 +9,7 @@ import { Input } from "./common/Input";
 import { OptionCard } from "./common/OptionCard";
 import { FieldLabel } from "./common/FieldLabel";
 import { EmptyState } from "./common/EmptyState";
+import { rasterizeEditLayerToExportLayer } from "../../utils/mapRasterize";
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);
@@ -16,7 +17,7 @@ export function ExportMapsModal() {
 
   const exportRegions = useAppStore((state) => state.exportRegions);
   const mapLayers = useAppStore((state) => state.mapLayers);
-  const updateExportRegion = useAppStore((state) => state.updateExportRegion);
+  const editLayers = useAppStore((state) => state.editLayers);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
 
@@ -54,18 +55,29 @@ export function ExportMapsModal() {
           .map(r => ({
             name: r.name,
             rect: r.rect,
-            layerVisibility: r.layerVisibility || {},
+            layerVisibility: {},
           }));
 
-        const layersToExport = mapLayers.map(layer => ({
-          id: layer.id,
-          name: layer.name,
-          image_base64: layer.image_base64,
-          info: layer.info,
-          opacity: layer.opacity,
-          blend_mode: layer.blend_mode || 'overwrite',
-          z_index: layer.z_index,
-        }));
+        // Extract visible map layers (untouched base images)
+        const visibleMapLayers = mapLayers
+          .filter(layer => layer.visible)
+          .map(layer => ({
+            id: layer.id,
+            name: layer.name,
+            image_base64: layer.image_base64,
+            info: layer.info,
+            opacity: 1.0,
+            blend_mode: layer.blend_mode || 'overwrite',
+            z_index: layer.z_index,
+          }));
+
+        // Rasterize visible EditLayers into standalone transparent layers
+        const editLayerExports = await Promise.all(
+          editLayers.map(el => rasterizeEditLayerToExportLayer(el))
+        );
+        const validEditLayers = editLayerExports.filter((l): l is NonNullable<typeof l> => l !== null);
+
+        const layersToExport = [...visibleMapLayers, ...validEditLayers];
 
         await BackendAPI.exportMaps({
           saveDir: dirPath,
@@ -120,7 +132,7 @@ export function ExportMapsModal() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between ml-1">
-              <FieldLabel>Export Regions & Layer Selection</FieldLabel>
+              <FieldLabel>Export Regions</FieldLabel>
               {exportRegions.length > 0 && (
                 <Button
                   variant="ghost"
@@ -142,7 +154,7 @@ export function ExportMapsModal() {
             ) : (
               <div className="space-y-2">
                 {exportRegions.map(region => (
-                  <div key={region.id} className="bg-surface-panel/40 border border-border-base/20 rounded-lg p-3">
+                  <div key={region.id} className="bg-surface-panel/40 border border-border-base/20 rounded-lg p-3 flex items-center justify-between">
                     <label className="flex items-center gap-3 cursor-pointer">
                       <Checkbox
                         checked={selectedRegions[region.id] || false}
@@ -150,26 +162,6 @@ export function ExportMapsModal() {
                       />
                       <span className="font-bold text-sm text-text-base">{region.name}</span>
                     </label>
-                    {selectedRegions[region.id] && (
-                      <div className="mt-3 pl-7 space-y-2 border-l-2 border-border-base/30 ml-2">
-                        <FieldLabel>Included Layers</FieldLabel>
-                        {mapLayers.map(layer => {
-                           const isIncluded = region.layerVisibility?.[layer.id] !== false; // Default true
-                           return (
-                             <label key={layer.id} className="flex items-center gap-2 cursor-pointer">
-                               <Checkbox
-                                 checked={isIncluded}
-                                 onChange={(e) => {
-                                   const newVis = { ...(region.layerVisibility || {}), [layer.id]: e.target.checked };
-                                   updateExportRegion(region.id, { layerVisibility: newVis });
-                                 }}
-                               />
-                               <span className="text-xs text-text-muted">{layer.name} <span className="opacity-50 text-[10px]">({layer.blend_mode || 'overwrite'})</span></span>
-                             </label>
-                           );
-                        })}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>

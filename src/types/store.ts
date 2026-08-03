@@ -133,7 +133,7 @@ export type ExportRegion = {
   name: string;
   rect: { x: number; y: number; width: number; height: number };
   visible: boolean;
-  layerVisibility: Record<string, boolean>;
+  layerVisibility?: Record<string, boolean>; // Deprecated
 };
 
 // In a real app, this is what the global state looks like
@@ -148,6 +148,48 @@ export interface ProjectMapLayer {
   opacity: number;
   z_index: number;
   blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
+}
+
+export type EditObjectType = 'rect' | 'circle' | 'freehand';
+
+interface EditObjectBase {
+  id: string;
+  type: EditObjectType;
+  fillValue: number; // 0~255 (0=black=obstacle, 255=white=free space)
+}
+
+export interface RectEditObject extends EditObjectBase {
+  type: 'rect';
+  cx: number;     // Center world coordinate X (meters)
+  cy: number;     // Center world coordinate Y (meters)
+  width: number;  // Width in world units (meters)
+  height: number; // Height in world units (meters)
+  angle: number;  // Radians (relative to center point)
+}
+
+export interface CircleEditObject extends EditObjectBase {
+  type: 'circle';
+  cx: number;     // Center world coordinate X (meters)
+  cy: number;     // Center world coordinate Y (meters)
+  radius: number; // Radius in world units (meters)
+}
+
+export interface FreehandEditObject extends EditObjectBase {
+  type: 'freehand';
+  points: Array<{ x: number; y: number }>; // World coordinate point sequence
+  brushRadius: number; // Brush radius in world units (meters)
+}
+
+export type EditObject = RectEditObject | CircleEditObject | FreehandEditObject;
+
+export interface EditLayer {
+  id: string;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  z_index: number; // Index within EditLayers
+  targetMapLayerId?: string | null; // Optional / Deprecated
+  editObjects: EditObject[];
 }
 
 export interface ProjectData {

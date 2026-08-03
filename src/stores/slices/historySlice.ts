@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { WaypointNode } from '../../types/store';
+import { WaypointNode, EditLayer } from '../../types/store';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -9,6 +9,7 @@ export type HistorySnapshot = {
   rootNodeIds: string[];
   selectedNodeIds: string[];
   anchorNodeId: string | null;
+  editLayers: EditLayer[];
 };
 
 export type HistorySlice = {
@@ -30,6 +31,7 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   rootNodeIds: state.rootNodeIds,
   selectedNodeIds: state.selectedNodeIds,
   anchorNodeId: state.anchorNodeId,
+  editLayers: structuredClone(state.editLayers ?? []),
 });
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => ({
@@ -85,6 +87,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       rootNodeIds: snapshot.rootNodeIds,
       selectedNodeIds: snapshot.selectedNodeIds,
       anchorNodeId: snapshot.anchorNodeId,
+      editLayers: snapshot.editLayers,
       isDirty: true,
     };
   }),
@@ -102,6 +105,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       rootNodeIds: snapshot.rootNodeIds,
       selectedNodeIds: snapshot.selectedNodeIds,
       anchorNodeId: snapshot.anchorNodeId,
+      editLayers: snapshot.editLayers,
       isDirty: true,
     };
   }),

@@ -40,6 +40,23 @@ export type UISlice = {
   isShortcutsModalOpen: boolean;
   settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
 
+  // Map Edit UI State
+  isMapEditMode: boolean;
+  mapEditSubTool: 'rect' | 'circle' | 'freehand';
+  mapEditFillValue: number;
+  mapEditBrushSize: number;
+  activeEditLayerId: string | null;
+  activeMapLayerId: string | null;
+  selectedEditObjectId: string | null;
+
+  setMapEditMode: (enabled: boolean) => void;
+  setMapEditSubTool: (tool: 'rect' | 'circle' | 'freehand') => void;
+  setMapEditFillValue: (value: number) => void;
+  setMapEditBrushSize: (size: number) => void;
+  setActiveEditLayerId: (id: string | null) => void;
+  setActiveMapLayerId: (id: string | null) => void;
+  setSelectedEditObjectId: (id: string | null) => void;
+
   setActiveTool: (tool: AppState['activeTool']) => void;
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
@@ -95,6 +112,22 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   isImportModalOpen: false,
   isExportMapsModalOpen: false,
   isShortcutsModalOpen: false,
+
+  isMapEditMode: false,
+  mapEditSubTool: 'rect',
+  mapEditFillValue: 0,
+  mapEditBrushSize: 10,
+  activeEditLayerId: null,
+  activeMapLayerId: null,
+  selectedEditObjectId: null,
+
+  setMapEditMode: (enabled) => set({ isMapEditMode: enabled }),
+  setMapEditSubTool: (tool) => set({ mapEditSubTool: tool }),
+  setMapEditFillValue: (value) => set({ mapEditFillValue: value }),
+  setMapEditBrushSize: (size) => set({ mapEditBrushSize: size }),
+  setActiveEditLayerId: (id) => set({ activeEditLayerId: id }),
+  setActiveMapLayerId: (id) => set({ activeMapLayerId: id }),
+  setSelectedEditObjectId: (id) => set({ selectedEditObjectId: id }),
 
   setDirty: (dirty: boolean) => set({ isDirty: dirty }),
   setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),

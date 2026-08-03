@@ -4,14 +4,19 @@ import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
-import { ProjectMapLayer } from '../../types/store';
+import { ProjectMapLayer, EditObject } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
 import { WaypointLayer } from './layers/WaypointLayer';
 import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
+import { MapEditLayer } from './layers/MapEditLayer';
 import { useSnapping } from './hooks/useSnapping';
+import { useMapEditRect } from './hooks/useMapEditRect';
+import { useMapEditCircle } from './hooks/useMapEditCircle';
+import { useMapEditFreehand } from './hooks/useMapEditFreehand';
+import { rasterizeEditLayerToExportLayer } from '../../utils/mapRasterize';
 
 extend({
   Container,
@@ -117,17 +122,35 @@ export function MapCanvas() {
   const setMapScale = useAppStore(state => state.setMapScale);
   
   const mapLayers = useAppStore(state => state.mapLayers);
+  const editLayers = useAppStore(state => state.editLayers);
   const enableSnapping = useAppStore(state => state.enableSnapping);
   const isExportPreview = useAppStore(state => state.isExportPreview);
+
+  const isMapEditMode = useAppStore(state => state.isMapEditMode);
+  const mapEditSubTool = useAppStore(state => state.mapEditSubTool);
+  const activeEditLayerId = useAppStore(state => state.activeEditLayerId);
+  const selectedEditObjectId = useAppStore(state => state.selectedEditObjectId);
+  const setSelectedEditObjectId = useAppStore(state => state.setSelectedEditObjectId);
+  const setActiveEditLayerId = useAppStore(state => state.setActiveEditLayerId);
+  const updateEditObject = useAppStore(state => state.updateEditObject);
 
   const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
   const [previewInfo, setPreviewInfo] = useState<any>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  // B案: blend_mode, z_index, visible, image_base64 のみの変更キーを生成 (opacity変化では再計算しない)
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
+
+  const screenToWorld = useCallback((screenX: number, screenY: number) => {
+    let worldX = (screenX - (position.x + 400)) / scale;
+    let worldY = ((position.y + 400) - screenY) / scale;
+    return { x: worldX, y: worldY };
+  }, [position, scale]);
+
+  // B案: blend_mode, z_index, visible, image_base64, editLayers のみの変更キーを生成
   const previewSyncKey = useMemo(() => {
-    return JSON.stringify(
+    const mapKey = JSON.stringify(
       mapLayers.map(l => ({
         id: l.id,
         blend_mode: l.blend_mode || 'overwrite',
@@ -136,7 +159,17 @@ export function MapCanvas() {
         hasImage: !!l.image_base64,
       }))
     );
-  }, [mapLayers]);
+    const editKey = JSON.stringify(
+      editLayers.map(l => ({
+        id: l.id,
+        visible: l.visible,
+        z_index: l.z_index,
+        objCount: l.editObjects.length,
+        objIds: l.editObjects.map(o => o.id).join(','),
+      }))
+    );
+    return `${mapKey}::${editKey}`;
+  }, [mapLayers, editLayers]);
 
   useEffect(() => {
     if (!isExportPreview) {
@@ -151,17 +184,30 @@ export function MapCanvas() {
     setPreviewError(null);
     console.log('[Export Preview] Generating preview... SyncKey:', previewSyncKey);
 
-    const layerInputs = mapLayers.map(l => ({
-      id: l.id,
-      image_base64: l.image_base64,
-      info: l.info,
-      blend_mode: l.blend_mode || 'overwrite',
-      z_index: l.z_index,
-      visible: l.visible,
-    }));
+    Promise.all([
+      Promise.resolve(
+        mapLayers
+          .filter(l => l.visible)
+          .map(l => ({
+            id: l.id,
+            image_base64: l.image_base64,
+            info: l.info,
+            blend_mode: l.blend_mode || 'overwrite',
+            z_index: l.z_index,
+            visible: true,
+          }))
+      ),
+      Promise.all(editLayers.map(el => rasterizeEditLayerToExportLayer(el))),
+    ]).then(([visibleMapLayers, editLayerExports]) => {
+      if (cancelled) return null;
+      const validEditLayers = editLayerExports
+        .filter((l): l is NonNullable<typeof l> => l !== null)
+        .map(l => ({ ...l, visible: true }));
 
-    BackendAPI.blendMapPreview(layerInputs).then(result => {
-      if (cancelled) return;
+      const layerInputs = [...visibleMapLayers, ...validEditLayers];
+      return BackendAPI.blendMapPreview(layerInputs);
+    }).then(result => {
+      if (cancelled || !result) return;
       console.log('[Export Preview] Backend returned preview data. Origin:', result.origin, 'Size:', result.width, 'x', result.height);
       const img = new Image();
       img.onload = () => {
@@ -187,10 +233,8 @@ export function MapCanvas() {
     });
 
     return () => { cancelled = true; };
-  }, [isExportPreview, previewSyncKey]);
+  }, [isExportPreview, previewSyncKey, mapLayers, editLayers]);
 
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(1);
   const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region'>('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
@@ -203,6 +247,132 @@ export function MapCanvas() {
 
   const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
+
+  // Map Edit hooks
+  const {
+    rectPreview,
+    handleRectDrawStart,
+    handleRectDrawMove,
+    handleRectDrawEnd,
+    handleRotateStart,
+    handleRotateMove,
+    handleRotateEnd,
+  } = useMapEditRect();
+
+  const {
+    circlePreview,
+    handleCircleDrawStart,
+    handleCircleDrawMove,
+    handleCircleDrawEnd,
+  } = useMapEditCircle();
+
+  const {
+    freehandPreview,
+    brushPreviewPos,
+    brushRadiusWorld,
+    setBrushPreviewPos,
+    handleFreehandDrawStart,
+    handleFreehandDrawMove,
+    handleFreehandDrawEnd,
+  } = useMapEditFreehand();
+
+  const movingEditObject = useRef<{
+    layerId: string;
+    objId: string;
+    startWorldPos: { x: number; y: number };
+    initialCenterOrPoints: any;
+  } | null>(null);
+
+  const resizingEditObject = useRef<{
+    layerId: string;
+    objId: string;
+    handle: string;
+    initialObject: EditObject;
+    startWorldPos: { x: number; y: number };
+  } | null>(null);
+
+  const handleEditObjectPointerDown = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string) => {
+      if (!useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      setSelectedEditObjectId(objId);
+      setActiveEditLayerId(layerId);
+
+      const targetLayer = useAppStore.getState().editLayers.find((l) => l.id === layerId);
+      const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
+      if (!targetObj) return;
+
+      const screenX = e.nativeEvent.clientX;
+      const screenY = e.nativeEvent.clientY;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const worldPos = screenToWorld(screenX - rect.left, screenY - rect.top);
+
+      movingEditObject.current = {
+        layerId,
+        objId,
+        startWorldPos: worldPos,
+        initialCenterOrPoints: structuredClone(
+          targetObj.type === 'freehand' ? targetObj.points : { cx: targetObj.cx, cy: targetObj.cy }
+        ),
+      };
+
+      interactionMode.current = 'edit_map_move_object' as any;
+      useAppStore.getState().beginHistoryTransaction();
+      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+    [setSelectedEditObjectId, setActiveEditLayerId, screenToWorld]
+  );
+
+  const handleEditObjectHandlePointerDown = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string) => {
+      if (!useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      const targetLayer = useAppStore.getState().editLayers.find((l) => l.id === layerId);
+      const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
+      if (!targetObj || targetObj.type !== 'rect') return;
+
+      handleRotateStart(layerId, objId, { cx: targetObj.cx, cy: targetObj.cy });
+      interactionMode.current = 'edit_map_set_rect_rotation' as any;
+      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+    [handleRotateStart]
+  );
+
+  const handleEditObjectResizeHandlePointerDown = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string, handle: string) => {
+      if (!useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      const targetLayer = useAppStore.getState().editLayers.find((l) => l.id === layerId);
+      const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
+      if (!targetObj) return;
+
+      const screenX = e.nativeEvent.clientX;
+      const screenY = e.nativeEvent.clientY;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const worldPos = screenToWorld(screenX - rect.left, screenY - rect.top);
+
+      resizingEditObject.current = {
+        layerId,
+        objId,
+        handle,
+        initialObject: structuredClone(targetObj),
+        startWorldPos: worldPos,
+      };
+
+      interactionMode.current = 'edit_map_resize_object' as any;
+      useAppStore.getState().beginHistoryTransaction();
+      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+    [screenToWorld]
+  );
 
   // Fallback grid texture if no maps are loaded
   const fallbackTexture = useMemo(() => {
@@ -224,14 +394,6 @@ export function MapCanvas() {
     }
     return Texture.from(canvas);
   }, []);
-
-  const screenToWorld = useCallback((screenX: number, screenY: number) => {
-    let worldX = (screenX - (position.x + 400)) / scale;
-    // container Y is inverted: screenY = -worldY * scale + position.y + 400
-    // => worldY = ((position.y + 400) - screenY) / scale
-    let worldY = ((position.y + 400) - screenY) / scale;
-    return { x: worldX, y: worldY };
-  }, [position, scale]);
 
   const fitToMaps = useCallback(() => {
     if (!containerRef.current) return;
@@ -325,6 +487,36 @@ export function MapCanvas() {
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
+
+    if (isMapEditMode) {
+      if (e.button === 1) {
+        // Middle click = Pan map
+        interactionMode.current = 'pan_map';
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+        return;
+      }
+      if (e.button === 0 && interactionMode.current === 'none') {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const worldPos = screenToWorld(mouseX, mouseY);
+
+        if (mapEditSubTool === 'rect') {
+          handleRectDrawStart(worldPos);
+          interactionMode.current = 'edit_map_draw_rect' as any;
+        } else if (mapEditSubTool === 'circle') {
+          handleCircleDrawStart(worldPos);
+          interactionMode.current = 'edit_map_draw_circle' as any;
+        } else if (mapEditSubTool === 'freehand') {
+          handleFreehandDrawStart(worldPos);
+          interactionMode.current = 'edit_map_freehand' as any;
+        }
+        e.currentTarget.setPointerCapture(e.pointerId);
+        return;
+      }
+      return;
+    }
     
     // Left click + Select Tool + Generator node selected -> Check rectangle handle hits FIRST (before pan_map)
     if (e.button === 0 && activeTool === 'select' && selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator') {
@@ -607,6 +799,107 @@ export function MapCanvas() {
 
     setCursorPosition({ x: worldX, y: worldY });
 
+    if (isMapEditMode) {
+      setBrushPreviewPos({ x: worldX, y: worldY });
+      if (interactionMode.current === 'pan_map') {
+        const dx = e.clientX - lastMousePos.current.x;
+        const dy = e.clientY - lastMousePos.current.y;
+        setPosition((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      if (interactionMode.current === ('edit_map_draw_rect' as any)) {
+        handleRectDrawMove({ x: worldX, y: worldY });
+        return;
+      }
+      if (interactionMode.current === ('edit_map_set_rect_rotation' as any)) {
+        handleRotateMove({ x: worldX, y: worldY });
+        return;
+      }
+      if (interactionMode.current === ('edit_map_draw_circle' as any)) {
+        handleCircleDrawMove({ x: worldX, y: worldY });
+        return;
+      }
+      if (interactionMode.current === ('edit_map_freehand' as any)) {
+        handleFreehandDrawMove({ x: worldX, y: worldY });
+        return;
+      }
+      if (interactionMode.current === ('edit_map_move_object' as any) && movingEditObject.current) {
+        const { layerId, objId, startWorldPos, initialCenterOrPoints } = movingEditObject.current;
+        const dx = worldX - startWorldPos.x;
+        const dy = worldY - startWorldPos.y;
+
+        if (Array.isArray(initialCenterOrPoints)) {
+          const newPoints = initialCenterOrPoints.map((p: any) => ({ x: p.x + dx, y: p.y + dy }));
+          updateEditObject(layerId, objId, { points: newPoints });
+        } else {
+          updateEditObject(layerId, objId, {
+            cx: initialCenterOrPoints.cx + dx,
+            cy: initialCenterOrPoints.cy + dy,
+          });
+        }
+        return;
+      }
+      if (interactionMode.current === ('edit_map_resize_object' as any) && resizingEditObject.current) {
+        const { layerId, objId, initialObject } = resizingEditObject.current;
+        const curWorldPos = { x: worldX, y: worldY };
+
+        if (initialObject.type === 'rect') {
+          const dx = curWorldPos.x - initialObject.cx;
+          const dy = curWorldPos.y - initialObject.cy;
+
+          const cos = Math.cos(-initialObject.angle);
+          const sin = Math.sin(-initialObject.angle);
+          const localDx = dx * cos - dy * sin;
+          const localDy = dx * sin + dy * cos;
+
+          const newWidth = Math.max(0.05, Math.abs(localDx) * 2);
+          const newHeight = Math.max(0.05, Math.abs(localDy) * 2);
+
+          updateEditObject(layerId, objId, {
+            width: newWidth,
+            height: newHeight,
+          });
+        } else if (initialObject.type === 'circle') {
+          const dx = curWorldPos.x - initialObject.cx;
+          const dy = curWorldPos.y - initialObject.cy;
+          const newRadius = Math.max(0.05, Math.hypot(dx, dy));
+
+          updateEditObject(layerId, objId, {
+            radius: newRadius,
+          });
+        } else if (initialObject.type === 'freehand') {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          initialObject.points.forEach((p: { x: number; y: number }) => {
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+          });
+          const initialWidth = Math.max(0.01, maxX - minX);
+          const initialHeight = Math.max(0.01, maxY - minY);
+          const centerWorldX = (minX + maxX) / 2;
+          const centerWorldY = (minY + maxY) / 2;
+
+          const curDx = Math.abs(curWorldPos.x - centerWorldX);
+          const curDy = Math.abs(curWorldPos.y - centerWorldY);
+          const scaleX = Math.max(0.1, (curDx * 2) / initialWidth);
+          const scaleY = Math.max(0.1, (curDy * 2) / initialHeight);
+
+          const scaledPoints = initialObject.points.map((p: { x: number; y: number }) => ({
+            x: centerWorldX + (p.x - centerWorldX) * scaleX,
+            y: centerWorldY + (p.y - centerWorldY) * scaleY,
+          }));
+
+          updateEditObject(layerId, objId, {
+            points: scaledPoints,
+          });
+        }
+        return;
+      }
+      return;
+    }
+
     if (interactionMode.current === 'pan_map') {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
@@ -858,6 +1151,31 @@ export function MapCanvas() {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isMapEditMode) {
+      if (interactionMode.current === ('edit_map_draw_rect' as any)) {
+        handleRectDrawEnd();
+      } else if (interactionMode.current === ('edit_map_set_rect_rotation' as any)) {
+        handleRotateEnd();
+      } else if (interactionMode.current === ('edit_map_draw_circle' as any)) {
+        handleCircleDrawEnd();
+      } else if (interactionMode.current === ('edit_map_freehand' as any)) {
+        handleFreehandDrawEnd();
+      } else if (interactionMode.current === ('edit_map_move_object' as any) && movingEditObject.current) {
+        movingEditObject.current = null;
+        useAppStore.getState().endHistoryTransaction();
+        useAppStore.getState().pushHistorySnapshot();
+      } else if (interactionMode.current === ('edit_map_resize_object' as any) && resizingEditObject.current) {
+        resizingEditObject.current = null;
+        useAppStore.getState().endHistoryTransaction();
+        useAppStore.getState().pushHistorySnapshot();
+      }
+      if (interactionMode.current !== 'none') {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        interactionMode.current = 'none';
+      }
+      return;
+    }
+
     if (interactionMode.current !== 'none') {
       if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
         useAppStore.getState().endHistoryTransaction();
@@ -986,6 +1304,19 @@ export function MapCanvas() {
           ) : (
             <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
           )}
+          <MapEditLayer
+            scale={scale}
+            editLayers={editLayers}
+            activeEditLayerId={activeEditLayerId}
+            selectedEditObjectId={selectedEditObjectId}
+            previewObject={rectPreview || circlePreview || freehandPreview}
+            brushPreviewPos={isMapEditMode && mapEditSubTool === 'freehand' ? brushPreviewPos : null}
+            brushPreviewRadius={brushRadiusWorld}
+            isExportPreview={isExportPreview}
+            onObjectPointerDown={handleEditObjectPointerDown}
+            onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
+            onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
+          />
           {showGrid && <GridLayer scale={scale} />}
 
           {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}
@@ -997,6 +1328,7 @@ export function MapCanvas() {
             textStyle={textStyle} 
             lockedWaypointId={snapState.lockedWaypointId}
             onNodePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+              if (isMapEditMode) return;
               if (activeTool === 'select') {
                 e.stopPropagation();
                 selectNodes([nodeId], e.shiftKey || e.metaKey);
@@ -1009,6 +1341,7 @@ export function MapCanvas() {
               }
             }}
             onNodeHandlePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+              if (isMapEditMode) return;
               e.stopPropagation();
               useAppStore.getState().beginHistoryTransaction();
               interactionMode.current = 'set_yaw';

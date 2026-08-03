@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { ProjectMapLayer } from '../../types/store';
+import { ProjectMapLayer, EditLayer, EditObject } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 
 export type MapSlice = {
@@ -14,11 +14,23 @@ export type MapSlice = {
   shouldFitToMaps: number;
   isExportPreview: boolean;
 
+  editLayers: EditLayer[];
+
   setMapLayers: (layers: ProjectMapLayer[]) => void;
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => void;
   updateMapLayer: (id: string, updates: Partial<ProjectMapLayer>) => void;
   removeMapLayer: (id: string) => void;
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
+
+  setEditLayers: (layers: EditLayer[]) => void;
+  addEditLayer: (name: string) => EditLayer;
+  removeEditLayer: (id: string) => void;
+  updateEditLayer: (id: string, updates: Partial<Omit<EditLayer, 'editObjects'>>) => void;
+  reorderEditLayers: (fromIndex: number, toIndex: number) => void;
+  addEditObject: (layerId: string, obj: EditObject) => void;
+  removeEditObject: (layerId: string, objId: string) => void;
+  updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => void;
+
   setEnableSnapping: (enable: boolean) => void;
   setCursorPosition: (pos: { x: number; y: number } | null) => void;
   setMapScale: (scale: number) => void;
@@ -33,7 +45,7 @@ export type MapSlice = {
   removeExportRegion: (id: string) => void;
 };
 
-export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) => ({
+export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, get) => ({
   mapLayers: [],
   defaultMapOpacity: 0.5,
   enableSnapping: true,
@@ -44,6 +56,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
   shouldFitToMaps: 0,
   isExportPreview: false,
   exportRegions: [],
+  editLayers: [],
 
   setShowPaths: (show: boolean) => set({ showPaths: show }),
   setShowGrid: (show: boolean) => set({ showGrid: show }),
@@ -100,6 +113,65 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set) =>
     const updatedLayers = layers.map((l, i) => ({ ...l, z_index: i }));
     return { mapLayers: updatedLayers, isDirty: true };
   }),
+
+  setEditLayers: (layers: EditLayer[]) => set({ editLayers: layers, isDirty: true }),
+
+  addEditLayer: (name: string) => {
+    const newLayer: EditLayer = {
+      id: uuidv4(),
+      name,
+      visible: true,
+      opacity: 1.0,
+      z_index: get().editLayers.length,
+      editObjects: [],
+    };
+    set((state) => ({ editLayers: [...state.editLayers, newLayer], isDirty: true }));
+    return newLayer;
+  },
+
+  removeEditLayer: (id: string) => set((state) => ({
+    editLayers: state.editLayers.filter(l => l.id !== id),
+    isDirty: true
+  })),
+
+  updateEditLayer: (id: string, updates: Partial<Omit<EditLayer, 'editObjects'>>) => set((state) => ({
+    editLayers: state.editLayers.map(l => l.id === id ? { ...l, ...updates } : l),
+    isDirty: true
+  })),
+
+  reorderEditLayers: (fromIndex: number, toIndex: number) => set((state) => {
+    const layers = [...state.editLayers];
+    const [moved] = layers.splice(fromIndex, 1);
+    layers.splice(toIndex, 0, moved);
+    const updatedLayers = layers.map((l, i) => ({ ...l, z_index: i }));
+    return { editLayers: updatedLayers, isDirty: true };
+  }),
+
+  addEditObject: (layerId: string, obj: EditObject) => set((state) => ({
+    editLayers: state.editLayers.map(l =>
+      l.id === layerId ? { ...l, editObjects: [...l.editObjects, obj] } : l
+    ),
+    isDirty: true
+  })),
+
+  removeEditObject: (layerId: string, objId: string) => set((state) => ({
+    editLayers: state.editLayers.map(l =>
+      l.id === layerId ? { ...l, editObjects: l.editObjects.filter(o => o.id !== objId) } : l
+    ),
+    isDirty: true
+  })),
+
+  updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => set((state) => ({
+    editLayers: state.editLayers.map(l =>
+      l.id === layerId
+        ? {
+            ...l,
+            editObjects: l.editObjects.map(o => (o.id === objId ? ({ ...o, ...updates } as EditObject) : o)),
+          }
+        : l
+    ),
+    isDirty: true
+  })),
 
   setEnableSnapping: (enable: boolean) => set({ enableSnapping: enable }),
 

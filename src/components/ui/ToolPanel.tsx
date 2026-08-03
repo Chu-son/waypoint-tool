@@ -4,7 +4,7 @@ import {
   Download,
   Upload,
   Settings,
-  Crop
+  Crop,
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { ExportModal } from "./ExportModal";
@@ -69,10 +69,10 @@ export function ToolPanel() {
 
   return (
     <Panel
-      className="flex flex-col items-center py-4 px-2 gap-4 z-10 transition-all duration-300 relative border-r"
+      className="flex flex-col items-center py-4 px-2 gap-3 z-10 transition-all duration-300 relative border-r"
       style={{ minWidth: "4rem", width: "auto" }}
     >
-      <FieldLabel className="mb-2">Tools</FieldLabel>
+      <FieldLabel className="mb-1">Tools</FieldLabel>
 
       {tools.map((tool) => {
         const Icon = tool.icon;

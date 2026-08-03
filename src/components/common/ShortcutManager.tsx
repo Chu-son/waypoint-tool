@@ -14,6 +14,11 @@ export function ShortcutManager() {
     setRightPanelActiveTab,
     undo,
     redo,
+    selectedEditObjectId,
+    activeEditLayerId,
+    removeEditObject,
+    setSelectedEditObjectId,
+    pushHistorySnapshot,
   } = useAppStore();
 
   useEffect(() => {
@@ -28,19 +33,26 @@ export function ShortcutManager() {
 
       // Basic Actions
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedNodeIds.length > 0) {
+        if (selectedEditObjectId && activeEditLayerId) {
+          removeEditObject(activeEditLayerId, selectedEditObjectId);
+          if (setSelectedEditObjectId) setSelectedEditObjectId(null);
+          if (pushHistorySnapshot) pushHistorySnapshot();
+        } else if (selectedNodeIds.length > 0) {
           removeNodes(selectedNodeIds);
         }
       }
 
       if (e.key === "Escape") {
+        if (selectedEditObjectId && setSelectedEditObjectId) {
+          setSelectedEditObjectId(null);
+        }
         if (selectedNodeIds.length > 0) {
-          useAppStore.setState({ selectedNodeIds: [] });
+          useAppStore.setState?.({ selectedNodeIds: [] });
         }
         if (activeTool !== "select") {
-          useAppStore.setState({ activeTool: "select" });
+          useAppStore.setState?.({ activeTool: "select" });
         }
-        useAppStore.setState({ pluginInteractionData: {} });
+        useAppStore.setState?.({ pluginInteractionData: {} });
         
         // Return to Layers panel on Escape
         setRightPanelActiveTab("layers");

@@ -19,6 +19,9 @@ vi.mock('lucide-react', () => ({
   Wand2: () => <div data-testid="wand-icon" />,
   Image: () => <div data-testid="image-icon" />,
   Crop: () => <div data-testid="crop-icon" />,
+  Pencil: () => <div data-testid="pencil-icon" />,
+  Square: () => <div data-testid="square-icon" />,
+  Circle: () => <div data-testid="circle-icon" />,
 }));
 
 // Mock Store
@@ -50,6 +53,14 @@ describe('ToolPanel', () => {
       pluginSettings: [],
       isExportModalOpen: false,
       isImportModalOpen: false,
+      isMapEditMode: false,
+      mapEditSubTool: 'rect',
+      mapEditFillValue: 0,
+      mapEditBrushSize: 10,
+      setMapEditMode: vi.fn(),
+      setMapEditSubTool: vi.fn(),
+      setMapEditFillValue: vi.fn(),
+      setMapEditBrushSize: vi.fn(),
       setActiveTool: mockSetActiveTool,
       setActivePlugin: mockSetActivePlugin,
       setExportModalOpen: mockSetExportModalOpen,
