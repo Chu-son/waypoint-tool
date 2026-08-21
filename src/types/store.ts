@@ -71,6 +71,28 @@ export type WaypointNode = {
   plugin_id?: string; // Add plugin reference for generator nodes
 };
 
+// --- Robot Footprint Types ---
+export type CircularFootprint = {
+  type: 'circular';
+  radius: number; // in meters
+};
+
+export type RectangularFootprint = {
+  type: 'rectangular';
+  length: number;    // X direction (front-to-back, in meters)
+  width: number;     // Y direction (left-to-right, in meters)
+  offset_x?: number; // Offset of robot center from footprint origin (in meters)
+  offset_y?: number; // Offset of robot center from footprint origin (in meters)
+};
+
+export type PolygonFootprint = {
+  type: 'polygon';
+  points: Array<[number, number]>; // [[x, y], ...] in robot local frame (in meters)
+};
+
+export type RobotFootprint = CircularFootprint | RectangularFootprint | PolygonFootprint;
+// -----------------------------
+
 // --- Plugin Architecture Types ---
 export type PluginInputType = 'point' | 'rectangle' | 'waypoint';
 
@@ -91,7 +113,7 @@ export type PluginManifest = {
   type: 'python' | 'wasm';
   executable: string;
   inputs: PluginInputDef[];
-  needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region')[];
+  needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region' | 'robot_footprint')[];
   properties: OptionDef[];
   icon?: string;
 };
@@ -196,6 +218,7 @@ export interface ProjectData {
   root_node_ids: string[];
   nodes: Record<string, ObjectNode>;
   map_layers?: ProjectMapLayer[];
+  robot_footprint?: RobotFootprint;
 }
 export interface AppState {
   nodes: Record<string, ObjectNode>;

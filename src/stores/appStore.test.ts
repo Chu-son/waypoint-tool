@@ -296,4 +296,39 @@ describe('AppStore Zustand Store', () => {
     expect(state.nodes['child-2']).toBeDefined();
     expect(state.isDirty).toBe(true);
   });
+
+  // --- ロボットフットプリント ---
+
+  it('should set and update robot footprint', () => {
+    const { setRobotFootprint } = useAppStore.getState();
+    expect(useAppStore.getState().robotFootprint).toEqual({ type: 'circular', radius: 0.3 });
+
+    setRobotFootprint({ type: 'rectangular', length: 0.8, width: 0.5, offset_x: 0.1, offset_y: 0 });
+
+    const state = useAppStore.getState();
+    expect(state.robotFootprint.type).toBe('rectangular');
+    expect((state.robotFootprint as any).length).toBe(0.8);
+    expect(state.isDirty).toBe(true);
+  });
+
+  it('should restore and reset robot footprint in setProjectData and resetProject', () => {
+    const { setProjectData, resetProject } = useAppStore.getState();
+
+    setProjectData({
+      root_node_ids: [],
+      nodes: {},
+      robot_footprint: {
+        type: 'polygon',
+        points: [[0.5, 0.5], [-0.5, 0.5], [-0.5, -0.5], [0.5, -0.5]],
+      },
+    });
+
+    let state = useAppStore.getState();
+    expect(state.robotFootprint.type).toBe('polygon');
+    expect((state.robotFootprint as any).points.length).toBe(4);
+
+    resetProject();
+    state = useAppStore.getState();
+    expect(state.robotFootprint).toEqual({ type: 'circular', radius: 0.3 });
+  });
 });

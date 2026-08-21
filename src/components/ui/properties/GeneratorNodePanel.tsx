@@ -66,11 +66,15 @@ export function GeneratorNodePanel({
         }
       });
 
-      const contextData = {
+      const contextData: Record<string, any> = {
         ...node.generator_params,
         properties: genParams,
         interaction_data: filteredInteractionData,
       };
+
+      if (plugin.manifest.needs?.includes('robot_footprint')) {
+        contextData.robot_footprint = useAppStore.getState().robotFootprint;
+      }
 
       let pythonPathToUse = globalPythonPath?.trim() || "python3";
       if (plugin.manifest.type === "python") {

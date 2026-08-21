@@ -355,6 +355,7 @@ mod tests {
             options_schema: None,
             export_templates: None,
             export_regions: None,
+            robot_footprint: None,
         };
 
         // Save

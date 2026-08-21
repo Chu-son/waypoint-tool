@@ -11,6 +11,7 @@ export type MapSlice = {
   mapScale: number;
   showPaths: boolean;
   showGrid: boolean;
+  showFootprints: boolean;
   shouldFitToMaps: number;
   isExportPreview: boolean;
 
@@ -36,6 +37,7 @@ export type MapSlice = {
   setMapScale: (scale: number) => void;
   setShowPaths: (show: boolean) => void;
   setShowGrid: (show: boolean) => void;
+  setShowFootprints: (show: boolean) => void;
   triggerFitToMaps: () => void;
   setIsExportPreview: (enabled: boolean) => void;
 
@@ -53,6 +55,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   mapScale: 1,
   showPaths: true,
   showGrid: true,
+  showFootprints: false,
   shouldFitToMaps: 0,
   isExportPreview: false,
   exportRegions: [],
@@ -60,6 +63,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
   setShowPaths: (show: boolean) => set({ showPaths: show }),
   setShowGrid: (show: boolean) => set({ showGrid: show }),
+  setShowFootprints: (show: boolean) => set({ showFootprints: show }),
   triggerFitToMaps: () => set({ shouldFitToMaps: Date.now() }),
   setIsExportPreview: (enabled: boolean) => set({ isExportPreview: enabled }),
 

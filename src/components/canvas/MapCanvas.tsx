@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ProjectMapLayer, EditObject } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
+import { FootprintLayer } from './layers/FootprintLayer';
 import { WaypointLayer } from './layers/WaypointLayer';
 import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
@@ -1297,6 +1298,9 @@ export function MapCanvas() {
 
           {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}
           {showPaths && <PathLayer scale={scale} />}
+
+          {/* Render Robot Footprints (Selected waypoints always, all waypoints if toggled) */}
+          <FootprintLayer scale={scale} />
 
           {/* Render Waypoints (manual root nodes and children of generator nodes) */}
           <WaypointLayer 

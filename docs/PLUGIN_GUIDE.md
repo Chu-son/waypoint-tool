@@ -30,6 +30,7 @@ my_plugin/
   - `"selected_points"`: ユーザーが選択している Waypoint のインデックスリスト (`context["selected_points"]`) を注入します。
   - `"occupancy_grid"`: 現在表示されているマップ画像から占有格子データを生成し (`context["occupancy_grid"]`) 注入します。
   - `"occupancy_grid_in_region"`: `inputs` で指定した `rectangle` の範囲内のみの占有格子データを生成し注入します（全体を生成するより高速です）。
+  - `"robot_footprint"`: プロジェクト設定で定義されたロボットの形状・寸法データ (`context["robot_footprint"]`) を注入します。
 
 ## 4. インタラクションヒント (Interaction Hints)
 
@@ -43,7 +44,7 @@ my_plugin/
 
 ### 基本的な構造
 ```python
-from wpt_plugin import WaypointGenerator, Point
+from wpt_plugin import WaypointGenerator, Point, RobotFootprint
 
 class MyGenerator(WaypointGenerator):
     def generate(self, context):
@@ -52,11 +53,14 @@ class MyGenerator(WaypointGenerator):
         if not start:
             return []
 
+        # ロボットフットプリントの取得 (needs: ["robot_footprint"] 指定時)
+        footprint = self.get_robot_footprint(context)
+
         # 2. パラメータの取得
         count = self.get_property(context, "count", 5)
         spacing = self.get_property(context, "spacing", 1.0)
 
-        # 3. 幾何計算 (Point, Line, Rectangle, Ray クラスが利用可能)
+        # 3. 幾何計算 (Point, Line, Rectangle, Ray, RobotFootprint クラスが利用可能)
         points = []
         for i in range(count):
             # ローカル座標で点を定義し、ワールド座標へ変換
@@ -74,9 +78,15 @@ if __name__ == "__main__":
 - `Line(p1, p2)`: 線分。長さの取得や交点判定が可能。
 - `Rectangle(center, width, height, yaw)`: 矩形。頂点の取得や点の内包判定が可能。
 - `Ray(origin, yaw, bidirectional)`: 仮想無限線。線分や矩形との交点取得に便利。
+- `RobotFootprint(type, radius, length, width, offset_x, offset_y, points)`: ロボットの形状・寸法。
+  - `self.get_robot_footprint(context)` で取得可能（`needs` で要求した場合）。
+  - `to_polygon(num_circle_segments)`: ロボットローカル座標系の頂点リスト `List[Point]` を返す。
+  - `to_world(x, y, yaw)`: 指定位置・姿勢におけるワールド座標系の頂点リスト `List[Point]` を返す。
+  - `is_point_inside(px, py, robot_x, robot_y, robot_yaw)`: 点の内包判定。
 - `OccupancyGrid(data)`: 占有格子マップクラス（ROS Nav2互換）。
   - `self.get_occupancy_grid(context)` で取得可能（`needs` で要求した場合）。
   - `is_obstacle(x, y)`: ワールド座標が障害物かどうかを判定。
+  - `is_footprint_colliding(footprint, x, y, yaw, padding)`: 指定姿勢でのロボットフットプリントと障害物の衝突を判定。
   - `find_first_obstacle_on_segment(p1, p2, inflation_radius)`: 線分上で最初に出現する障害物座標を返す（回避計算に有用）。
 
 詳細は `wpt_plugin` ディレクトリ内のソースコードおよび既存のプラグイン実装（`rect_search_generator` や `zigzag_path_generator` 等）を参照してください。

@@ -291,4 +291,33 @@ describe('SettingsModal UI', () => {
     promptSpy.mockRestore();
     confirmSpy.mockRestore();
   });
+
+  it('allows configuring robot footprint in the Robot Footprint tab', async () => {
+    vi.stubGlobal('alert', vi.fn());
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const robotTab = screen.getByText('Robot Footprint');
+    act(() => {
+      robotTab.click();
+    });
+
+    expect(screen.getByText('Robot Footprint Settings')).toBeInTheDocument();
+
+    // Select Rectangular
+    const rectBtn = screen.getByText('Rectangular (Box)');
+    act(() => {
+      rectBtn.click();
+    });
+
+    // Apply
+    const applyBtn = screen.getByRole('button', { name: /Apply/i });
+    act(() => {
+      applyBtn.click();
+    });
+
+    await waitFor(() => {
+      const state = useAppStore.getState();
+      expect(state.robotFootprint.type).toBe('rectangular');
+    });
+  });
 });

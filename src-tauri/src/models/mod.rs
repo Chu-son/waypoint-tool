@@ -116,6 +116,7 @@ pub struct ProjectData {
     pub options_schema: Option<serde_json::Value>,
     pub export_templates: Option<serde_json::Value>,
     pub export_regions: Option<Vec<ExportRegion>>,
+    pub robot_footprint: Option<serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -169,5 +170,22 @@ mod tests {
         assert!(restored.transform.is_some());
         assert_eq!(restored.transform.as_ref().unwrap().x, 10.0);
         assert_eq!(restored.children_ids.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_project_data_with_robot_footprint() {
+        let json = r#"{
+            "root_node_ids": [],
+            "nodes": {},
+            "robot_footprint": {
+                "type": "circular",
+                "radius": 0.35
+            }
+        }"#;
+        let project: ProjectData = serde_json::from_str(json).unwrap();
+        assert!(project.robot_footprint.is_some());
+        let fp = project.robot_footprint.unwrap();
+        assert_eq!(fp["type"], "circular");
+        assert_eq!(fp["radius"], 0.35);
     }
 }

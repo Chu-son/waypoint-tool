@@ -31,6 +31,7 @@ export const useAppStore = create<AppState>()(
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,
         showGrid: state.showGrid,
+        showFootprints: state.showFootprints,
         pluginSettings: state.pluginSettings,
         globalPythonPath: state.globalPythonPath,
         decimalPrecision: state.decimalPrecision,

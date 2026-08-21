@@ -132,6 +132,10 @@ export function PluginParamsPanel() {
           .filter(Boolean);
       }
 
+      if (plugin.manifest.needs?.includes('robot_footprint')) {
+        contextData.robot_footprint = useAppStore.getState().robotFootprint;
+      }
+
       // Collect waypoint range if waypoint inputs are used
       let idsToConsume: string[] = [];
       let insertIndex = -1;

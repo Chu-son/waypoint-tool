@@ -4,6 +4,7 @@ import { useAppStore } from "../../stores/appStore";
 
 import { GeneralTab } from "./settings/GeneralTab";
 import { OptionSchemaTab } from "./settings/OptionSchemaTab";
+import { RobotFootprintTab } from "./settings/RobotFootprintTab";
 import { ExportTemplatesTab } from "./settings/ExportTemplatesTab";
 import { PluginsTab } from "./settings/PluginsTab";
 import { Modal, ModalHeader, ModalContent } from "./common/Modal";
@@ -16,7 +17,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  type TabType = "general" | "options" | "export" | "plugins";
+  type TabType = "general" | "options" | "robot" | "export" | "plugins";
   const [activeTab, setActiveTab] = useState<TabType>("general");
   const modalTabFromStore = useAppStore((state) => state.settingsModalTab);
   const globalPythonPath = useAppStore((state) => state.globalPythonPath);
@@ -60,6 +61,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {([
             { id: "general", label: "General" },
             { id: "options", label: "Option Schema" },
+            { id: "robot", label: "Robot Footprint" },
             { id: "export", label: "Export Templates" },
             { id: "plugins", label: "Plugins" },
           ] as const).map((tab) => (
@@ -84,6 +86,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <div className="flex-1 overflow-y-auto p-8">
             {activeTab === "general" && <GeneralTab />}
             {activeTab === "options" && <OptionSchemaTab />}
+            {activeTab === "robot" && <RobotFootprintTab />}
             {activeTab === "export" && <ExportTemplatesTab />}
             {activeTab === "plugins" && (
               <PluginsTab

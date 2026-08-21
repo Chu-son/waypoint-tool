@@ -140,10 +140,12 @@ export function TopMenu() {
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
+  const showFootprints = useAppStore((state) => state.showFootprints);
   const enableSnapping = useAppStore((state) => state.enableSnapping);
   
   const setShowPaths = (v: boolean) => useAppStore.setState({ showPaths: v });
   const setShowGrid = (v: boolean) => useAppStore.setState({ showGrid: v });
+  const setShowFootprints = (v: boolean) => useAppStore.setState({ showFootprints: v });
   const setEnableSnapping = (v: boolean) => useAppStore.setState({ enableSnapping: v });
 
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
@@ -236,6 +238,7 @@ export function TopMenu() {
         { divider: true, label: "" },
         { label: `${showPaths ? "✓ " : "  "}Show Paths`, action: () => setShowPaths(!showPaths) },
         { label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`, action: () => setShowGrid(!showGrid) },
+        { label: `${showFootprints ? "✓ " : "  "}Show Robot Footprints`, action: () => setShowFootprints(!showFootprints) },
         { label: `${enableSnapping ? "✓ " : "  "}Snap to Previous Waypoint`, action: () => setEnableSnapping(!enableSnapping) },
         { label: "Fit to Map", action: triggerFitToMaps, shortcut: "Mid D-Click" },
         { divider: true, label: "" },

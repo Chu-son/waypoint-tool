@@ -7,7 +7,7 @@ from typing import Dict, Any, List, Optional, TypedDict
 from .geometry import Point, Rectangle, Line
 from .utils import normalize_yaw, quaternion_to_yaw, yaw_to_quaternion
 from .occupancy_grid import OccupancyGrid
-from .geometry import Point, Rectangle
+from .footprint import RobotFootprint
 
 class Transform(TypedDict, total=False):
     x: float
@@ -87,6 +87,14 @@ class WaypointGenerator:
         if data is None:
             return None
         return OccupancyGrid(data)
+
+    def get_robot_footprint(self, context: Dict[str, Any]) -> Optional[RobotFootprint]:
+        """context["robot_footprint"] を RobotFootprint インスタンスとして返す。
+        needs に "robot_footprint" を指定していない場合は None。"""
+        data = context.get("robot_footprint")
+        if data is None:
+            return None
+        return RobotFootprint.from_dict(data)
 
     @staticmethod
     def make_waypoint(x: float, y: float, yaw: float,

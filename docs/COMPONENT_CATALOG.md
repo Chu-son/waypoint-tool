@@ -120,8 +120,11 @@
   - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/SettingsModal.tsx))
-  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `OptionSchemaTab`, `ExportTemplatesTab`, `PluginsTab` を保持。
+  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `OptionSchemaTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` を保持。
   - **主要Props**: `isOpen`, `onClose`
+- **`RobotFootprintTab`** ([`src/components/ui/settings/RobotFootprintTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/RobotFootprintTab.tsx))
+  - **概要**: ロボットのフットプリント（円形・矩形・多角形）の定義・寸法設定・ROS Nav2 形式テキスト入出力、およびリアルタイム SVG プレビュー。
+  - **主要Props**: なし
 - **`TabSectionHeader`** ([`src/components/ui/settings/TabSectionHeader.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/TabSectionHeader.tsx))
   - **概要**: 設定モーダル内の各設定タブ専用ヘッダー部品。
   - **主要Props**: `title`, `subtitle`, `actions`
@@ -144,6 +147,8 @@
   - **主要Props**: `onOpenMap`
 
 ### Canvas レイヤー群 (`src/components/canvas/layers/`)
+- **`FootprintLayer`** ([`src/components/canvas/layers/FootprintLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/FootprintLayer.tsx))
+  - **概要**: 選択中の Waypoint および（表示トグル有効時の）全 Waypoint に対して、ロボットの向き (yaw) に合わせたフットプリント外枠・塗りつぶし・進行方向インジケーターを高速 WebGL 描画。
 - **`WaypointLayer`** ([`src/components/canvas/layers/WaypointLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/WaypointLayer.tsx))
   - **概要**: Waypoint 矢印マーカー、インデックスラベル、回転ハンドルの高速 WebGL 描画およびドラッグ操作判定。
 - **`PathLayer`** ([`src/components/canvas/layers/PathLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/PathLayer.tsx))

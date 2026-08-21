@@ -38,7 +38,7 @@ export type UISlice = {
   isImportModalOpen: boolean;
   isExportMapsModalOpen: boolean;
   isShortcutsModalOpen: boolean;
-  settingsModalTab: 'general' | 'options' | 'export' | 'plugins';
+  settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins';
 
   // Map Edit UI State
   isMapEditMode: boolean;
@@ -73,7 +73,7 @@ export type UISlice = {
   setShowProperties: (show: boolean) => void;
   resetWindowLayout: () => void;
   
-  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'export' | 'plugins') => void;
+  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'robot' | 'export' | 'plugins') => void;
   setExportModalOpen: (open: boolean) => void;
   setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;

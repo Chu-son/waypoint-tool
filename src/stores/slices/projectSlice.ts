@@ -1,8 +1,13 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, EditLayer } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, EditLayer, RobotFootprint } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
+
+export const DEFAULT_ROBOT_FOOTPRINT: RobotFootprint = {
+  type: 'circular',
+  radius: 0.3,
+};
 
 export type ProjectSlice = {
   lastDirectory: string | null;
@@ -10,15 +15,17 @@ export type ProjectSlice = {
   exportTemplates: ExportTemplate[];
   defaultExportFormats: DefaultExportFormat[];
   globalPythonPath: string;
+  robotFootprint: RobotFootprint;
 
   setLastDirectory: (dir: string | null) => void;
   setGlobalPythonPath: (path: string) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
+  setRobotFootprint: (footprint: RobotFootprint) => void;
   addExportTemplate: (template: ExportTemplate) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
   updateDefaultExportFormat: (id: string, updates: Partial<DefaultExportFormat>) => void;
-  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], editLayers?: EditLayer[], edit_layers?: EditLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number, options_schema?: OptionsSchema | null, export_regions?: any[] }) => void;
+  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], editLayers?: EditLayer[], edit_layers?: EditLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number, options_schema?: OptionsSchema | null, export_regions?: any[], robot_footprint?: RobotFootprint, robotFootprint?: RobotFootprint }) => void;
   
   loadProject: () => Promise<void>;
   saveProject: () => Promise<void>;
@@ -34,10 +41,12 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     { id: '__default_json__', name: 'JSON Document', extension: 'json', suffix: '_json', enabled: true },
   ],
   globalPythonPath: 'python',
+  robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
 
   setLastDirectory: (dir: string | null) => set({ lastDirectory: dir }),
   setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
   setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
+  setRobotFootprint: (footprint: RobotFootprint) => set({ robotFootprint: footprint, isDirty: true }),
   
   addExportTemplate: (template: ExportTemplate) => set((state) => ({
     exportTemplates: [...state.exportTemplates, template],
@@ -87,6 +96,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         exportTemplates: [...globalTemplates, ...localTemplates],
         exportRegions: data.export_regions || [],
         optionsSchema: data.options_schema || null,
+        robotFootprint: data.robot_footprint || data.robotFootprint || DEFAULT_ROBOT_FOOTPRINT,
         defaultExportFormats: data.default_export_formats || state.defaultExportFormats,
         indexStartIndex: data.index_start_index ?? state.indexStartIndex,
         decimalPrecision: data.decimal_precision ?? state.decimalPrecision,
@@ -106,6 +116,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       editLayers: [],
       exportRegions: [],
       optionsSchema: null,
+      robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
       exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
       isDirty: false
     };
@@ -150,7 +161,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           edit_layers: projectData.edit_layers,
           export_regions: projectData.export_regions,
           options_schema: projectData.options_schema,
-          export_templates: projectData.export_templates
+          export_templates: projectData.export_templates,
+          robot_footprint: projectData.robot_footprint,
         });
         setIsDirty(false);
       }
@@ -161,7 +173,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   },
 
   saveProject: async () => {
-    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, editLayers, setIsDirty } = get();
+    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, editLayers, robotFootprint, setIsDirty } = get();
     try {
       const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
@@ -202,6 +214,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           export_regions: get().exportRegions,
           options_schema: get().optionsSchema,
           export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
+          robot_footprint: robotFootprint,
         };
         await BackendAPI.saveProject(finalPath, projectData);
         setIsDirty(false);
