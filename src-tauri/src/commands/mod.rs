@@ -84,6 +84,9 @@ pub fn write_text_file(path: String, content: String) -> Result<(), String> {
 pub mod plugins;
 pub use plugins::*;
 
+pub mod custom_ui;
+pub use custom_ui::*;
+
 #[command]
 pub fn force_exit(app: AppHandle) {
     app.exit(0);
@@ -117,7 +120,8 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         plugins::check_sdk_version,
         plugins::update_plugin_sdk,
         read_image_base64,
-        open_devtools
+        open_devtools,
+        load_custom_ui_config
     ]
 }
 

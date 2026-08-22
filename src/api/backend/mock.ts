@@ -136,4 +136,15 @@ export class MockBackendAPI implements IBackendAPI {
       resolution: 0.05,
     };
   }
+
+  private mockCustomUiConfig: any = null;
+
+  setMockCustomUiConfig(config: any) {
+    this.mockCustomUiConfig = config;
+  }
+
+  async loadCustomUiConfig(): Promise<any> {
+    console.log('[Mock Backend] loadCustomUiConfig called');
+    return this.mockCustomUiConfig;
+  }
 }

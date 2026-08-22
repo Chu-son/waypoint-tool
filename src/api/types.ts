@@ -76,6 +76,7 @@ export interface IBackendAPI {
   writeTextFile(path: string, content: string): Promise<void>;
   exportMaps(options: ExportMapsOptions): Promise<void>;
   blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult>;
+  loadCustomUiConfig(): Promise<any>;
 }
 
 export interface OpenDialogOptions {

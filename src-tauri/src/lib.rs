@@ -45,6 +45,7 @@ pub fn run() {
             commands::read_image_base64,
             commands::force_exit,
             commands::open_devtools,
+            commands::load_custom_ui_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

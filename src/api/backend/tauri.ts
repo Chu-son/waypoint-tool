@@ -88,4 +88,8 @@ export class TauriBackendAPI implements IBackendAPI {
   async blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
     return invoke('blend_map_preview', { layers });
   }
+
+  async loadCustomUiConfig(): Promise<any> {
+    return invoke('load_custom_ui_config');
+  }
 }
