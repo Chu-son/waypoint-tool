@@ -248,6 +248,14 @@ export interface ProjectMapLayer {
   blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
 }
 
+// --- Occupancy Settings Types ---
+export interface OccupancySettings {
+  defaultOccupiedThresh: number; // 0.0 ~ 1.0 (default 0.65)
+  defaultFreeThresh: number;     // 0.0 ~ 1.0 (default 0.25)
+  defaultNegate: 0 | 1;          // 0: normal, 1: inverted
+}
+// --------------------------------
+
 export interface ProjectData {
   root_node_ids: string[];
   nodes: Record<string, ObjectNode>;
@@ -256,6 +264,7 @@ export interface ProjectData {
   edit_layers?: any[]; // Legacy
   generated_layers?: any[]; // Legacy
   robot_footprint?: RobotFootprint;
+  occupancy_settings?: OccupancySettings;
   active_path_calculator_plugin_id?: string | null;
   path_calculator_params?: Record<string, any>;
   auto_recalculate_path?: boolean;

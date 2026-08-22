@@ -358,6 +358,11 @@ mod tests {
             export_templates: None,
             export_regions: None,
             robot_footprint: None,
+            occupancy_settings: Some(serde_json::json!({
+                "defaultOccupiedThresh": 0.7,
+                "defaultFreeThresh": 0.2,
+                "defaultNegate": 0
+            })),
             path_color: Some("#10b981".to_string()),
             path_width: Some(0.2),
             path_opacity: Some(0.8),
@@ -375,6 +380,10 @@ mod tests {
         let loaded_data = load_res.unwrap();
         assert_eq!(loaded_data.root_node_ids, vec!["node1".to_string()]);
         assert!(loaded_data.nodes.contains_key("node1"));
+        assert!(loaded_data.occupancy_settings.is_some());
+        let occ = loaded_data.occupancy_settings.unwrap();
+        assert_eq!(occ["defaultOccupiedThresh"], 0.7);
+        assert_eq!(occ["defaultFreeThresh"], 0.2);
         let node = loaded_data.nodes.get("node1").unwrap();
         assert_eq!(node.id, "node1");
         assert_eq!(node.node_type, "manual");

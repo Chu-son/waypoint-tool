@@ -54,18 +54,18 @@ pub fn evaluate_pixel(
     if pixel[3] < 128 {
         return CellValue::Unknown;
     }
-    let gray = (pixel[0] as f32 * 0.299 + pixel[1] as f32 * 0.587 + pixel[2] as f32 * 0.114) as u8;
+    let gray_raw = pixel[0] as f64 * 0.299 + pixel[1] as f64 * 0.587 + pixel[2] as f64 * 0.114;
 
-    // In ROS standard PGM maps, gray value 205 (0xCD) is the exact canonical value for Unknown space.
-    // In trinary map representation, intermediate gray levels (128..=230) represent Unknown / Unexplored space.
-    if !negate && (gray >= 128 && gray <= 230) {
+    // Canonical ROS Unknown space (gray value 205 / 0xCD, typical range 198 ~ 212)
+    if !negate && (gray_raw >= 198.0 && gray_raw <= 212.0) {
         return CellValue::Unknown;
     }
 
+    let gray = gray_raw / 255.0;
     let normalized = if negate {
-        gray as f64 / 255.0
+        gray
     } else {
-        1.0 - gray as f64 / 255.0
+        1.0 - gray
     };
     if normalized >= occ_thresh {
         CellValue::Obstacle
@@ -165,9 +165,9 @@ mod tests {
 
     #[test]
     fn test_evaluate_pixel_with_ros_nav2_thresh() {
-        // Nav2 default YAML with free_thresh: 0.25, occupied_thresh: 0.65
+        // Nav2 standard YAML with free_thresh: 0.196, occupied_thresh: 0.65
         let occ_thresh = 0.65;
-        let free_thresh = 0.25;
+        let free_thresh = 0.196;
 
         // Obstacle (black, gray=0) -> Obstacle
         assert_eq!(

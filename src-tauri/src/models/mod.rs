@@ -119,6 +119,7 @@ pub struct ProjectData {
     pub export_templates: Option<serde_json::Value>,
     pub export_regions: Option<Vec<ExportRegion>>,
     pub robot_footprint: Option<serde_json::Value>,
+    pub occupancy_settings: Option<serde_json::Value>,
     pub path_color: Option<String>,
     pub path_width: Option<f64>,
     pub path_opacity: Option<f64>,

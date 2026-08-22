@@ -1,12 +1,18 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, RobotFootprint } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, RobotFootprint, OccupancySettings } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 
 export const DEFAULT_ROBOT_FOOTPRINT: RobotFootprint = {
   type: 'circular',
   radius: 0.3,
+};
+
+export const DEFAULT_OCCUPANCY_SETTINGS: OccupancySettings = {
+  defaultOccupiedThresh: 0.65,
+  defaultFreeThresh: 0.196,
+  defaultNegate: 0,
 };
 
 /**
@@ -76,6 +82,7 @@ export type ProjectSlice = {
   defaultExportFormats: DefaultExportFormat[];
   globalPythonPath: string;
   robotFootprint: RobotFootprint;
+  occupancySettings: OccupancySettings;
   pathColor: string;
   pathWidth: number;
   pathOpacity: number;
@@ -85,6 +92,8 @@ export type ProjectSlice = {
   setGlobalPythonPath: (path: string) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
   setRobotFootprint: (footprint: RobotFootprint) => void;
+  setOccupancySettings: (settings: OccupancySettings) => void;
+  updateOccupancySettings: (updates: Partial<OccupancySettings>) => void;
   setPathColor: (color: string) => void;
   setPathWidth: (width: number) => void;
   setPathOpacity: (opacity: number) => void;
@@ -111,6 +120,8 @@ export type ProjectSlice = {
     export_regions?: any[];
     robot_footprint?: RobotFootprint;
     robotFootprint?: RobotFootprint;
+    occupancy_settings?: OccupancySettings;
+    occupancySettings?: OccupancySettings;
     active_path_calculator_plugin_id?: string | null;
     activePathCalculatorPluginId?: string | null;
     path_calculator_params?: Record<string, any>;
@@ -142,6 +153,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   ],
   globalPythonPath: 'python',
   robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
+  occupancySettings: DEFAULT_OCCUPANCY_SETTINGS,
   pathColor: '#10b981',
   pathWidth: 0.1,
   pathOpacity: 0.7,
@@ -151,6 +163,11 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
   setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
   setRobotFootprint: (footprint: RobotFootprint) => set({ robotFootprint: footprint, isDirty: true }),
+  setOccupancySettings: (settings: OccupancySettings) => set({ occupancySettings: settings, isDirty: true }),
+  updateOccupancySettings: (updates: Partial<OccupancySettings>) => set((state) => ({
+    occupancySettings: { ...state.occupancySettings, ...updates },
+    isDirty: true
+  })),
   setPathColor: (color: string) => set({ pathColor: color, isDirty: true }),
   setPathWidth: (width: number) => set({ pathWidth: width, isDirty: true }),
   setPathOpacity: (opacity: number) => set({ pathOpacity: opacity, isDirty: true }),
@@ -198,6 +215,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         exportRegions: data.export_regions || [],
         optionsSchema: data.options_schema || null,
         robotFootprint: data.robot_footprint || data.robotFootprint || DEFAULT_ROBOT_FOOTPRINT,
+        occupancySettings: data.occupancy_settings || data.occupancySettings || DEFAULT_OCCUPANCY_SETTINGS,
         activePathCalculatorPluginId: data.active_path_calculator_plugin_id || data.activePathCalculatorPluginId || null,
         pathCalculatorParams: data.path_calculator_params || data.pathCalculatorParams || {},
         autoRecalculatePath: data.auto_recalculate_path ?? data.autoRecalculatePath ?? true,
@@ -233,6 +251,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       exportRegions: [],
       optionsSchema: null,
       robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
+      occupancySettings: DEFAULT_OCCUPANCY_SETTINGS,
       exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
       isDirty: false
     };
@@ -281,6 +300,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           options_schema: projectData.options_schema,
           export_templates: projectData.export_templates,
           robot_footprint: projectData.robot_footprint,
+          occupancy_settings: projectData.occupancy_settings,
           active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
           path_calculator_params: projectData.path_calculator_params,
           auto_recalculate_path: projectData.auto_recalculate_path,
@@ -303,7 +323,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   },
 
   saveProject: async () => {
-    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, customLayers, robotFootprint, activePathCalculatorPluginId, pathCalculatorParams, autoRecalculatePath, pathColor, pathWidth, pathOpacity, syncPathWidthWithFootprint, setIsDirty } = get();
+    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, customLayers, robotFootprint, occupancySettings, activePathCalculatorPluginId, pathCalculatorParams, autoRecalculatePath, pathColor, pathWidth, pathOpacity, syncPathWidthWithFootprint, setIsDirty } = get();
     try {
       const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
@@ -345,6 +365,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           options_schema: get().optionsSchema,
           export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
           robot_footprint: robotFootprint,
+          occupancy_settings: occupancySettings,
           active_path_calculator_plugin_id: activePathCalculatorPluginId,
           path_calculator_params: pathCalculatorParams,
           auto_recalculate_path: autoRecalculatePath,

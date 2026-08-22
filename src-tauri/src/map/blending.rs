@@ -30,12 +30,13 @@ pub fn classify_pixel(rgba: [u8; 4]) -> CellValue {
     if rgba[3] < 128 {
         return CellValue::Unknown;
     }
-    let gray = (rgba[0] as f64 * 0.299 + rgba[1] as f64 * 0.587 + rgba[2] as f64 * 0.114) as u8;
-    if gray < 128 {
+    let gray = (rgba[0] as f64 * 0.299 + rgba[1] as f64 * 0.587 + rgba[2] as f64 * 0.114).round() as u8;
+    if gray <= 89 {
         CellValue::Obstacle
-    } else if gray > 230 {
+    } else if gray >= 230 {
         CellValue::Free
     } else {
+        // Includes 205 (0xCD) and all intermediate values
         CellValue::Unknown
     }
 }
