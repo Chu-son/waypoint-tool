@@ -1,11 +1,9 @@
 import "./App.css";
-import React, { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { ToolPanel } from "./components/ui/ToolPanel";
 import { TopMenu } from "./components/ui/TopMenu";
 import { WaypointTree } from "./components/ui/WaypointTree";
-import { PropertiesPanel } from "./components/ui/PropertiesPanel";
 import { LayerPanel } from "./components/ui/LayerPanel";
-import { PluginParamsPanel } from "./components/ui/PluginParamsPanel";
 import { PluginListPanel } from "./components/ui/PluginListPanel";
 import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
@@ -17,6 +15,8 @@ import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
 import { MapEditOverlay } from "./components/ui/MapEditOverlay";
 import { ShortcutManager } from "./components/common/ShortcutManager";
+import { ThemeInjector } from "./components/ui/ThemeInjector";
+import { resolvePanelTabs, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
 import { useAppStore } from "./stores/appStore";
 import { 
   ChevronLeft, 
@@ -33,12 +33,9 @@ import { Button } from "./components/ui/common/Button";
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
-import { CustomLayerInspector } from "./components/ui/properties/CustomLayerInspector";
 import { PluginInstance } from "./types/store";
 
 function App() {
-  const activeTool = useAppStore((state) => state.activeTool);
-
   // Sidebar States from Store
   const leftPanelActiveTab = useAppStore((state) => state.leftPanelActiveTab);
   const rightPanelActiveTab = useAppStore((state) => state.rightPanelActiveTab);
@@ -68,8 +65,14 @@ function App() {
   const setLeftWidth = useAppStore((state) => state.setLeftPanelWidth);
   const setRightWidth = useAppStore((state) => state.setRightPanelWidth);
 
+  const customUiConfig = useAppStore((state) => state.customUiConfig);
+  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+
   useEffect(() => {
     const initApp = async () => {
+      // 1. Load Custom UI configuration first
+      await useAppStore.getState().loadCustomUiConfig();
+
       try {
         const installedPlugins = await BackendAPI.fetchInstalledPlugins();
         const pluginMap: Record<string, PluginInstance> = {};
@@ -150,6 +153,16 @@ function App() {
     };
     initApp();
   }, []);
+
+  // Update window title if Custom UI title is configured
+  useEffect(() => {
+    if (!isTauri()) return;
+    if (isCustomUiMode && customUiConfig?.brand?.windowTitle) {
+      getCurrentWindow().setTitle(customUiConfig.brand.windowTitle).catch(() => {});
+    } else {
+      getCurrentWindow().setTitle("Waypoint Tool").catch(() => {});
+    }
+  }, [isCustomUiMode, customUiConfig]);
 
   // Initialization moved to ShortcutManager for shortcuts, 
   // though basic initialization remains in App for now.
@@ -239,7 +252,9 @@ function App() {
     [rightWidth],
   );
 
-  const leftPanels: PanelTab[] = useMemo(() => [
+  const inspectorComponent = useInspectorPanelComponent();
+
+  const defaultLeftPanels: PanelTab[] = useMemo(() => [
     {
       id: "project",
       title: "Waypoints",
@@ -254,12 +269,7 @@ function App() {
     }
   ], []);
 
-  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
-  const activePluginId = useAppStore((state) => state.activePluginId);
-  const plugins = useAppStore((state) => state.plugins) || {};
-  const activePlugin = activePluginId ? plugins[activePluginId] : null;
-
-  const rightPanels: PanelTab[] = useMemo(() => [
+  const defaultRightPanels: PanelTab[] = useMemo(() => [
     {
       id: "layers",
       title: "Layers",
@@ -270,21 +280,27 @@ function App() {
       id: "inspector",
       title: "Inspector",
       icon: <Settings2 size={14} />,
-      component:
-        activeCustomLayerId ||
-        (activeTool === "add_generator" &&
-          activePlugin?.manifest?.category === "map_layer_generator") ? (
-          <CustomLayerInspector />
-        ) : activeTool === "add_generator" ? (
-          <PluginParamsPanel />
-        ) : (
-          <PropertiesPanel />
-        ),
+      component: inspectorComponent,
     },
-  ], [activeTool, activeCustomLayerId, activePlugin]);
+  ], [inspectorComponent]);
+
+  const leftPanels = useMemo(() => {
+    if (isCustomUiMode && customUiConfig?.layout?.leftPanel?.tabs) {
+      return resolvePanelTabs(customUiConfig.layout.leftPanel.tabs, defaultLeftPanels, inspectorComponent);
+    }
+    return defaultLeftPanels;
+  }, [isCustomUiMode, customUiConfig, defaultLeftPanels, inspectorComponent]);
+
+  const rightPanels = useMemo(() => {
+    if (isCustomUiMode && customUiConfig?.layout?.rightPanel?.tabs) {
+      return resolvePanelTabs(customUiConfig.layout.rightPanel.tabs, defaultRightPanels, inspectorComponent);
+    }
+    return defaultRightPanels;
+  }, [isCustomUiMode, customUiConfig, defaultRightPanels, inspectorComponent]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-surface-base text-text-base overflow-hidden font-sans">
+      <ThemeInjector />
       <ShortcutManager />
       <TopMenu />
 

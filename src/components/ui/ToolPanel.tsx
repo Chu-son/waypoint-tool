@@ -53,6 +53,9 @@ export function ToolPanel() {
   const activePluginId = useAppStore((state) => state.activePluginId);
   const setActivePlugin = useAppStore((state) => state.setActivePlugin);
 
+  const customUiConfig = useAppStore((state) => state.customUiConfig);
+  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+
   const handleExportWaypointsClick = () => {
     setExportModalOpen(true);
   };
@@ -61,11 +64,21 @@ export function ToolPanel() {
     setImportModalOpen(true);
   };
 
-  const tools = [
+  const allTools = [
     { id: "select", icon: Hand, label: "Select (V)" },
     { id: "add_point", icon: MousePointer2, label: "Add Waypoint (P)" },
     { id: "add_export_region", icon: Crop, label: "Add Export Region" },
   ] as const;
+
+  const toolPanelConfig = isCustomUiMode ? customUiConfig?.layout?.toolPanel : undefined;
+  const visibleTools = toolPanelConfig?.visibleTools
+    ? allTools.filter((t) => toolPanelConfig.visibleTools!.includes(t.id as any))
+    : allTools;
+
+  const allowImport = toolPanelConfig?.allowImport !== false;
+  const allowExport = toolPanelConfig?.allowExport !== false;
+  const allowSettings = toolPanelConfig?.allowSettings !== false;
+  const hasBottomActions = allowImport || allowExport || allowSettings;
 
   return (
     <Panel
@@ -74,7 +87,7 @@ export function ToolPanel() {
     >
       <FieldLabel className="mb-1">Tools</FieldLabel>
 
-      {tools.map((tool) => {
+      {visibleTools.map((tool) => {
         const Icon = tool.icon;
         const isActive = activeTool === tool.id && !activePluginId;
 
@@ -84,7 +97,7 @@ export function ToolPanel() {
             title={tool.label}
             isActive={isActive}
             onClick={() => {
-              setActiveTool(tool.id);
+              setActiveTool(tool.id as any);
               setActivePlugin(null);
             }}
           >
@@ -96,46 +109,54 @@ export function ToolPanel() {
         );
       })}
 
-      <div className="mt-auto mb-4 border-t border-border-base pt-4 flex flex-col items-center w-full gap-3">
-        <Button
-          onClick={handleImportWaypointsClick}
-          title="Import Waypoints"
-          variant="icon"
-          size="icon"
-          className="rounded-xl group"
-        >
-          <Upload
-            size={20}
-            className="group-hover:scale-110 transition-transform text-primary-base"
-          />
-        </Button>
+      {hasBottomActions && (
+        <div className="mt-auto mb-4 border-t border-border-base pt-4 flex flex-col items-center w-full gap-3">
+          {allowImport && (
+            <Button
+              onClick={handleImportWaypointsClick}
+              title="Import Waypoints"
+              variant="icon"
+              size="icon"
+              className="rounded-xl group"
+            >
+              <Upload
+                size={20}
+                className="group-hover:scale-110 transition-transform text-primary-base"
+              />
+            </Button>
+          )}
 
-        <Button
-          onClick={handleExportWaypointsClick}
-          title="Export Waypoints"
-          variant="icon"
-          size="icon"
-          className="rounded-xl group"
-        >
-          <Download
-            size={20}
-            className="group-hover:scale-110 transition-transform text-primary-base"
-          />
-        </Button>
+          {allowExport && (
+            <Button
+              onClick={handleExportWaypointsClick}
+              title="Export Waypoints"
+              variant="icon"
+              size="icon"
+              className="rounded-xl group"
+            >
+              <Download
+                size={20}
+                className="group-hover:scale-110 transition-transform text-primary-base"
+              />
+            </Button>
+          )}
 
-        <Button
-          onClick={() => setSettingsModalOpen(true, 'general')}
-          title="Settings & Plugins"
-          variant="icon"
-          size="icon"
-          className="rounded-xl mt-2"
-        >
-          <Settings
-            size={20}
-            className="text-text-muted hover:text-text-base transition-colors"
-          />
-        </Button>
-      </div>
+          {allowSettings && (
+            <Button
+              onClick={() => setSettingsModalOpen(true, 'general')}
+              title="Settings & Plugins"
+              variant="icon"
+              size="icon"
+              className="rounded-xl mt-2"
+            >
+              <Settings
+                size={20}
+                className="text-text-muted hover:text-text-base transition-colors"
+              />
+            </Button>
+          )}
+        </div>
+      )}
 
       <ExportModal
         isOpen={isExportModalOpen}

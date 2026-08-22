@@ -32,6 +32,7 @@ vi.mock('./api', () => ({
     loadProject: vi.fn(),
     loadOptionsSchema: vi.fn(),
     exportWaypoints: vi.fn(),
+    loadCustomUiConfig: vi.fn().mockResolvedValue(null),
   },
 }));
 
