@@ -90,6 +90,9 @@ pub fn build_occupancy_grid_from_layers(
         }
         let (resolution, origin, negate, occ_thresh, free_thresh) = parse_layer_info(layer.info.as_ref())?;
         let b64 = layer.image_base64.split(',').last().unwrap_or(&layer.image_base64);
+        if b64.trim().is_empty() {
+            continue;
+        }
         let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| format!("Base64 decode error: {}", e))?;
         let img = image::load_from_memory(&bytes).map_err(|e| format!("Image load error: {}", e))?.to_rgba8();
 
@@ -111,22 +114,56 @@ pub fn build_occupancy_grid_from_layers(
         return Err("No visible map layers provided".to_string());
     }
 
-    // z_index でソート
+    // z_index 昇順にソート (下層から上層へ)
     decoded_layers.sort_by_key(|l| l.z_index);
 
-    // ベースレイヤー（最初のレイヤー）のパラメータを使用
-    let base_res = decoded_layers[0].resolution;
-    let base_origin = decoded_layers[0].origin;
-    let width = decoded_layers[0].image.width();
-    let height = decoded_layers[0].image.height();
+    // 全レイヤーを包含するバウンディングボックスと最小解像度を計算
+    let mut min_x = f64::MAX;
+    let mut min_y = f64::MAX;
+    let mut max_x = f64::MIN;
+    let mut max_y = f64::MIN;
+    let mut min_resolution = f64::MAX;
 
-    let mut data_raw = Vec::with_capacity((width * height) as usize);
+    for layer in &decoded_layers {
+        let l_res = layer.resolution;
+        let l_ox = layer.origin[0];
+        let l_oy = layer.origin[1];
+        let w_meters = layer.image.width() as f64 * l_res;
+        let h_meters = layer.image.height() as f64 * l_res;
 
-    for r in 0..height {
-        for c in 0..width {
+        if l_res < min_resolution {
+            min_resolution = l_res;
+        }
+        if l_ox < min_x {
+            min_x = l_ox;
+        }
+        if l_oy < min_y {
+            min_y = l_oy;
+        }
+        if l_ox + w_meters > max_x {
+            max_x = l_ox + w_meters;
+        }
+        if l_oy + h_meters > max_y {
+            max_y = l_oy + h_meters;
+        }
+    }
+
+    if min_resolution == f64::MAX {
+        min_resolution = 0.05;
+    }
+    let resolution = min_resolution;
+    let out_w = (((max_x - min_x) / resolution).ceil() as u32).max(1);
+    let out_h = (((max_y - min_y) / resolution).ceil() as u32).max(1);
+
+    let oyaw = decoded_layers[0].origin[2];
+
+    let mut data_raw = Vec::with_capacity((out_w * out_h) as usize);
+
+    for r in 0..out_h {
+        for c in 0..out_w {
             // ワールド座標
-            let world_x = base_origin[0] + (c as f64) * base_res;
-            let world_y = base_origin[1] + ((height - 1 - r) as f64) * base_res;
+            let world_x = min_x + (c as f64) * resolution;
+            let world_y = min_y + ((out_h - 1 - r) as f64) * resolution;
 
             let mut combined_cell = CellValue::Unknown;
 
@@ -149,10 +186,10 @@ pub fn build_occupancy_grid_from_layers(
     let b64 = general_purpose::STANDARD.encode(&compressed);
 
     Ok(OccupancyGridData {
-        width,
-        height,
-        resolution: base_res,
-        origin: base_origin,
+        width: out_w,
+        height: out_h,
+        resolution,
+        origin: [min_x, min_y, oyaw],
         data: b64,
         encoding: "int8_zlib_base64".to_string(),
         cell_values: crate::plugins::models::CellValueConstants::default(),
@@ -196,5 +233,66 @@ mod tests {
             evaluate_pixel([255, 255, 255, 0], false, occ_thresh, free_thresh),
             CellValue::Unknown
         );
+    }
+
+    #[test]
+    fn test_build_occupancy_grid_from_layers_multiple() {
+        use image::{Rgba, RgbaImage};
+
+        // Create a base map (10x10, all white/Free: [254, 254, 254, 255])
+        let mut base_img = RgbaImage::new(10, 10);
+        for pixel in base_img.pixels_mut() {
+            *pixel = Rgba([254, 254, 254, 255]);
+        }
+        let mut base_png = Vec::new();
+        image::DynamicImage::ImageRgba8(base_img)
+            .write_to(&mut std::io::Cursor::new(&mut base_png), image::ImageFormat::Png)
+            .unwrap();
+        let base_b64 = general_purpose::STANDARD.encode(&base_png);
+
+        // Create a custom layer on top (10x10, with an obstacle [0, 0, 0, 255] at 0,0)
+        let mut top_img = RgbaImage::new(10, 10);
+        for pixel in top_img.pixels_mut() {
+            *pixel = Rgba([0, 0, 0, 0]); // transparent
+        }
+        top_img.put_pixel(5, 5, Rgba([0, 0, 0, 255])); // obstacle in center
+        let mut top_png = Vec::new();
+        image::DynamicImage::ImageRgba8(top_img)
+            .write_to(&mut std::io::Cursor::new(&mut top_png), image::ImageFormat::Png)
+            .unwrap();
+        let top_b64 = general_purpose::STANDARD.encode(&top_png);
+
+        let layer1 = PluginMapLayer {
+            image_base64: base_b64,
+            info: Some(serde_json::json!({
+                "resolution": 0.1,
+                "origin": [0.0, 0.0, 0.0],
+                "negate": 0,
+                "occupied_thresh": 0.65,
+                "free_thresh": 0.196
+            })),
+            visible: true,
+            blend_mode: "overwrite".to_string(),
+            z_index: 0,
+        };
+
+        let layer2 = PluginMapLayer {
+            image_base64: top_b64,
+            info: Some(serde_json::json!({
+                "resolution": 0.1,
+                "origin": [0.0, 0.0, 0.0],
+                "negate": 0,
+                "occupied_thresh": 0.65,
+                "free_thresh": 0.196
+            })),
+            visible: true,
+            blend_mode: "overwrite".to_string(),
+            z_index: 1000,
+        };
+
+        let grid = build_occupancy_grid_from_layers(&[&layer1, &layer2]).unwrap();
+        assert_eq!(grid.width, 10);
+        assert_eq!(grid.height, 10);
+        assert_eq!(grid.resolution, 0.1);
     }
 }

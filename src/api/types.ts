@@ -65,7 +65,7 @@ export interface IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
-    mapLayers?: ProjectMapLayer[],
+    mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
   ): Promise<any>;
   getPythonEnvironments(): Promise<string[]>;
   scaffoldPlugin(pluginName: string, targetDir: string): Promise<PluginInstance>;

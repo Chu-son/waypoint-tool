@@ -9,6 +9,7 @@ import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
 import { Label } from "./common/Label";
 import { AlertBox } from "./common/AlertBox";
+import { prepareLayersForExport } from "../../utils/mapRasterize";
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
@@ -23,6 +24,7 @@ export function PluginParamsPanel() {
   const setActiveInputIndex = useAppStore((state) => state.setActiveInputIndex);
   const nodes = useAppStore((state) => state.nodes);
   const mapLayers = useAppStore((state) => state.mapLayers);
+  const customLayers = useAppStore((state) => state.customLayers) || [];
 
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
@@ -178,16 +180,20 @@ export function PluginParamsPanel() {
       }
 
       // Execute plugin through backend API (passing contextual Python path)
-      // occupancy_grid 系 needs があるときはマップレイヤーを渡す
+      // occupancy_grid 系 needs があるときは合成マップレイヤー（CustomLayers含む）を渡す
       const needsOccupancyGrid = plugin.manifest.needs?.some(
         (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
       );
+
+      const layersToPass = needsOccupancyGrid
+        ? await prepareLayersForExport(mapLayers, customLayers)
+        : undefined;
 
       const resultingWaypoints = await BackendAPI.runPlugin(
         plugin,
         contextData,
         pythonPathToUse,
-        needsOccupancyGrid ? mapLayers : undefined,
+        layersToPass,
       );
 
       if (Array.isArray(resultingWaypoints) && resultingWaypoints.length > 0) {

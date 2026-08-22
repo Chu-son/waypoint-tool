@@ -43,7 +43,7 @@ export class TauriBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
-    mapLayers?: ProjectMapLayer[],
+    mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
   ): Promise<any> {
     return invoke('run_plugin', {
       pluginInstance,

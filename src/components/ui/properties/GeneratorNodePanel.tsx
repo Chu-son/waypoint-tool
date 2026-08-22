@@ -8,6 +8,7 @@ import { PluginInputEditor } from "../PluginInputEditor";
 import { Play, Settings2, RefreshCcw, BoxSelect } from "lucide-react";
 import { WaypointNode } from "../../../types/store";
 import { v4 as uuidv4 } from "uuid";
+import { prepareLayersForExport } from "../../../utils/mapRasterize";
 
 interface GeneratorNodePanelProps {
   node: WaypointNode;
@@ -31,6 +32,7 @@ export function GeneratorNodePanel({
   );
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const mapLayers = useAppStore((state) => state.mapLayers);
+  const customLayers = useAppStore((state) => state.customLayers) || [];
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
@@ -92,11 +94,15 @@ export function GeneratorNodePanel({
         (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
       );
 
+      const layersToPass = needsOccupancyGrid
+        ? await prepareLayersForExport(mapLayers, customLayers)
+        : undefined;
+
       const resultingWaypoints = await BackendAPI.runPlugin(
         plugin,
         contextData,
         pythonPathToUse,
-        needsOccupancyGrid ? mapLayers : undefined,
+        layersToPass,
       );
 
       if (

@@ -15,6 +15,7 @@ import { PluginInputEditor } from "../PluginInputEditor";
 import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Bookmark } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { v4 as uuidv4 } from "uuid";
+import { prepareLayersForExport } from "../../../utils/mapRasterize";
 
 export function CustomLayerInspector() {
   const customLayers = useAppStore((state) => state.customLayers) || [];
@@ -186,11 +187,18 @@ export function CustomLayerInspector() {
         contextData.robot_footprint = robotFootprint;
       }
 
+      // 自分自身の再生成の場合は、古い結果が混ざらないように customLayers から自分自身を除外してマージ
+      const otherCustomLayers = existingLayer
+        ? customLayers.filter((l) => l.id !== existingLayer.id)
+        : customLayers;
+
+      const layersToPass = await prepareLayersForExport(mapLayers, otherCustomLayers);
+
       const result = await BackendAPI.runPlugin(
         activePlugin,
         contextData,
         pythonPathToUse,
-        mapLayers
+        layersToPass
       );
 
       if (!result || !result.image_base64 || !result.info) {

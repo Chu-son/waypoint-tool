@@ -160,4 +160,65 @@ describe('PluginParamsPanel', () => {
 
     expect(mockReloadPlugins).toHaveBeenCalled();
   });
+
+  it('passes prepared merged layers to runPlugin when plugin needs occupancy_grid', async () => {
+    const occPlugin = {
+      id: 'occ-plugin',
+      manifest: {
+        name: 'Occ Generator',
+        description: 'Needs grid',
+        type: 'python',
+        needs: ['occupancy_grid'],
+        inputs: [],
+        properties: []
+      }
+    };
+
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      activeTool: 'add_generator',
+      activePluginId: 'occ-plugin',
+      plugins: { 'occ-plugin': occPlugin },
+      pluginSettings: [],
+      globalPythonPath: '',
+      pluginInteractionData: {},
+      activeInputIndex: 0,
+      nodes: {},
+      mapLayers: [
+        { id: 'm1', name: 'Map', visible: true, opacity: 1, z_index: 0, image_base64: 'b64', info: { resolution: 0.05, origin: [0, 0, 0] } }
+      ],
+      customLayers: [],
+      selectedNodeIds: [],
+      decimalPrecision: 4,
+    }));
+
+    (useAppStore.getState as any).mockReturnValue({
+      addNode: vi.fn(),
+      removeNodes: vi.fn(),
+      reorderNodes: vi.fn(),
+      rootNodeIds: [],
+      selectNodes: vi.fn(),
+      setActiveTool: vi.fn(),
+      setPluginActiveProperties: vi.fn(),
+      runInHistoryTransaction: (fn: () => void) => fn(),
+    });
+
+    (BackendAPI.runPlugin as any).mockResolvedValue([
+      { x: 1, y: 2, yaw: 0 }
+    ]);
+
+    render(<PluginParamsPanel />);
+    const executeBtn = screen.getByText('Generate Path');
+    fireEvent.click(executeBtn);
+
+    await waitFor(() => {
+      expect(BackendAPI.runPlugin).toHaveBeenCalledWith(
+        occPlugin,
+        expect.anything(),
+        'python3',
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'm1', visible: true })
+        ])
+      );
+    });
+  });
 });

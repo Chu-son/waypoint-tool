@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { PluginInstance, PluginSetting } from '../../types/store';
 import { BackendAPI } from '../../api';
+import { prepareLayersForExport } from '../../utils/mapRasterize';
 
 export type PluginSlice = {
   plugins: Record<string, PluginInstance>;
@@ -138,6 +139,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       rootNodeIds,
       nodes,
       mapLayers,
+      customLayers,
       robotFootprint,
     } = get();
 
@@ -190,11 +192,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         contextData.robot_footprint = robotFootprint;
       }
 
+      const layersToPass = await prepareLayersForExport(mapLayers || [], customLayers || []);
+
       const result = await BackendAPI.runPlugin(
         plugin,
         contextData,
         pythonPathToUse,
-        mapLayers
+        layersToPass
       );
 
       // Check if this request is still the latest one

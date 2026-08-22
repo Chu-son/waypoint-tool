@@ -71,7 +71,7 @@ export class MockBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     _contextData: any,
     _pythonPath?: string,
-    _mapLayers?: ProjectMapLayer[]
+    _mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[]
   ): Promise<any> {
     console.log('[Mock Backend] runPlugin called for:', pluginInstance.manifest.name);
     return [];
