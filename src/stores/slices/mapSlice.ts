@@ -1,10 +1,12 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { ProjectMapLayer, EditLayer, EditObject } from '../../types/store';
+import { ProjectMapLayer, CustomLayer, ManualCustomLayer, PluginCustomLayer, EditObject, ExportRegion } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 
 export type MapSlice = {
   mapLayers: ProjectMapLayer[];
+  customLayers: CustomLayer[];
+  activeCustomLayerId: string | null;
   defaultMapOpacity: number;
   enableSnapping: boolean;
   cursorPosition: { x: number; y: number } | null;
@@ -15,19 +17,20 @@ export type MapSlice = {
   shouldFitToMaps: number;
   isExportPreview: boolean;
 
-  editLayers: EditLayer[];
-
   setMapLayers: (layers: ProjectMapLayer[]) => void;
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => void;
   updateMapLayer: (id: string, updates: Partial<ProjectMapLayer>) => void;
   removeMapLayer: (id: string) => void;
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
 
-  setEditLayers: (layers: EditLayer[]) => void;
-  addEditLayer: (name: string) => EditLayer;
-  removeEditLayer: (id: string) => void;
-  updateEditLayer: (id: string, updates: Partial<Omit<EditLayer, 'editObjects'>>) => void;
-  reorderEditLayers: (fromIndex: number, toIndex: number) => void;
+  setCustomLayers: (layers: CustomLayer[]) => void;
+  addManualCustomLayer: (name?: string) => ManualCustomLayer;
+  addPluginCustomLayer: (layer: PluginCustomLayer) => void;
+  updateCustomLayer: (id: string, updates: Partial<CustomLayer>) => void;
+  removeCustomLayer: (id: string) => void;
+  reorderCustomLayers: (fromIndex: number, toIndex: number) => void;
+  setActiveCustomLayerId: (id: string | null) => void;
+
   addEditObject: (layerId: string, obj: EditObject) => void;
   removeEditObject: (layerId: string, objId: string) => void;
   updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => void;
@@ -41,14 +44,16 @@ export type MapSlice = {
   triggerFitToMaps: () => void;
   setIsExportPreview: (enabled: boolean) => void;
 
-  exportRegions: import('../../types/store').ExportRegion[];
-  addExportRegion: (region: import('../../types/store').ExportRegion) => void;
-  updateExportRegion: (id: string, updates: Partial<import('../../types/store').ExportRegion>) => void;
+  exportRegions: ExportRegion[];
+  addExportRegion: (region: ExportRegion) => void;
+  updateExportRegion: (id: string, updates: Partial<ExportRegion>) => void;
   removeExportRegion: (id: string) => void;
 };
 
 export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, get) => ({
   mapLayers: [],
+  customLayers: [],
+  activeCustomLayerId: null,
   defaultMapOpacity: 0.5,
   enableSnapping: true,
   cursorPosition: null,
@@ -59,7 +64,6 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   shouldFitToMaps: 0,
   isExportPreview: false,
   exportRegions: [],
-  editLayers: [],
 
   setShowPaths: (show: boolean) => set({ showPaths: show }),
   setShowGrid: (show: boolean) => set({ showGrid: show }),
@@ -67,17 +71,104 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   triggerFitToMaps: () => set({ shouldFitToMaps: Date.now() }),
   setIsExportPreview: (enabled: boolean) => set({ isExportPreview: enabled }),
 
+  setCustomLayers: (layers: CustomLayer[]) => set({ customLayers: layers, isDirty: true }),
+
+  addManualCustomLayer: (name?: string) => {
+    const customLayers = get().customLayers;
+    const manualCount = customLayers.filter(l => l.type === 'manual').length + 1;
+    const newLayer: ManualCustomLayer = {
+      id: uuidv4(),
+      name: name || `Custom Layer ${manualCount}`,
+      type: 'manual',
+      visible: true,
+      opacity: 1.0,
+      z_index: customLayers.length,
+      blend_mode: 'overwrite',
+      editObjects: [],
+    };
+    set((state) => ({
+      customLayers: [newLayer, ...state.customLayers].map((l, i) => ({ ...l, z_index: i })),
+      activeCustomLayerId: newLayer.id,
+      isDirty: true,
+    }));
+    return newLayer;
+  },
+
+  addPluginCustomLayer: (layer: PluginCustomLayer) => set((state) => {
+    const newLayers = [layer, ...state.customLayers];
+    const updated = newLayers.map((l, i) => ({ ...l, z_index: i }));
+    return {
+      customLayers: updated,
+      activeCustomLayerId: layer.id,
+      isDirty: true,
+    };
+  }),
+
+  updateCustomLayer: (id: string, updates: Partial<CustomLayer>) => set((state) => ({
+    customLayers: state.customLayers.map(l => l.id === id ? ({ ...l, ...updates } as CustomLayer) : l),
+    isDirty: true,
+  })),
+
+  removeCustomLayer: (id: string) => set((state) => ({
+    customLayers: state.customLayers.filter(l => l.id !== id),
+    activeCustomLayerId: state.activeCustomLayerId === id ? null : state.activeCustomLayerId,
+    isDirty: true,
+  })),
+
+  reorderCustomLayers: (fromIndex: number, toIndex: number) => set((state) => {
+    const layers = [...state.customLayers];
+    const [moved] = layers.splice(fromIndex, 1);
+    layers.splice(toIndex, 0, moved);
+    const updated = layers.map((l, i) => ({ ...l, z_index: i }));
+    return { customLayers: updated, isDirty: true };
+  }),
+
+  setActiveCustomLayerId: (id: string | null) => set({ activeCustomLayerId: id }),
+
+  addEditObject: (layerId: string, obj: EditObject) => set((state) => ({
+    customLayers: state.customLayers.map(l => {
+      if (l.id === layerId && l.type === 'manual') {
+        return { ...l, editObjects: [...l.editObjects, obj] };
+      }
+      return l;
+    }),
+    isDirty: true,
+  })),
+
+  removeEditObject: (layerId: string, objId: string) => set((state) => ({
+    customLayers: state.customLayers.map(l => {
+      if (l.id === layerId && l.type === 'manual') {
+        return { ...l, editObjects: l.editObjects.filter(o => o.id !== objId) };
+      }
+      return l;
+    }),
+    isDirty: true,
+  })),
+
+  updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => set((state) => ({
+    customLayers: state.customLayers.map(l => {
+      if (l.id === layerId && l.type === 'manual') {
+        return {
+          ...l,
+          editObjects: l.editObjects.map(o => (o.id === objId ? ({ ...o, ...updates } as EditObject) : o)),
+        };
+      }
+      return l;
+    }),
+    isDirty: true,
+  })),
+
   addExportRegion: (region) => set((state) => ({
     exportRegions: [...state.exportRegions, region],
-    isDirty: true
+    isDirty: true,
   })),
   updateExportRegion: (id, updates) => set((state) => ({
     exportRegions: state.exportRegions.map(r => r.id === id ? { ...r, ...updates } : r),
-    isDirty: true
+    isDirty: true,
   })),
   removeExportRegion: (id) => set((state) => ({
     exportRegions: state.exportRegions.filter(r => r.id !== id),
-    isDirty: true
+    isDirty: true,
   })),
 
   setMapLayers: (layers: ProjectMapLayer[]) => set({ mapLayers: layers, isDirty: true }),
@@ -102,12 +193,12 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
   updateMapLayer: (id: string, updates: Partial<ProjectMapLayer>) => set((state) => ({
     mapLayers: state.mapLayers.map(l => l.id === id ? { ...l, ...updates } : l),
-    isDirty: true
+    isDirty: true,
   })),
 
   removeMapLayer: (id: string) => set((state) => ({
     mapLayers: state.mapLayers.filter(l => l.id !== id),
-    isDirty: true
+    isDirty: true,
   })),
 
   reorderMapLayers: (fromIndex: number, toIndex: number) => set((state) => {
@@ -118,67 +209,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     return { mapLayers: updatedLayers, isDirty: true };
   }),
 
-  setEditLayers: (layers: EditLayer[]) => set({ editLayers: layers, isDirty: true }),
-
-  addEditLayer: (name: string) => {
-    const newLayer: EditLayer = {
-      id: uuidv4(),
-      name,
-      visible: true,
-      opacity: 1.0,
-      z_index: get().editLayers.length,
-      editObjects: [],
-    };
-    set((state) => ({ editLayers: [...state.editLayers, newLayer], isDirty: true }));
-    return newLayer;
-  },
-
-  removeEditLayer: (id: string) => set((state) => ({
-    editLayers: state.editLayers.filter(l => l.id !== id),
-    isDirty: true
-  })),
-
-  updateEditLayer: (id: string, updates: Partial<Omit<EditLayer, 'editObjects'>>) => set((state) => ({
-    editLayers: state.editLayers.map(l => l.id === id ? { ...l, ...updates } : l),
-    isDirty: true
-  })),
-
-  reorderEditLayers: (fromIndex: number, toIndex: number) => set((state) => {
-    const layers = [...state.editLayers];
-    const [moved] = layers.splice(fromIndex, 1);
-    layers.splice(toIndex, 0, moved);
-    const updatedLayers = layers.map((l, i) => ({ ...l, z_index: i }));
-    return { editLayers: updatedLayers, isDirty: true };
-  }),
-
-  addEditObject: (layerId: string, obj: EditObject) => set((state) => ({
-    editLayers: state.editLayers.map(l =>
-      l.id === layerId ? { ...l, editObjects: [...l.editObjects, obj] } : l
-    ),
-    isDirty: true
-  })),
-
-  removeEditObject: (layerId: string, objId: string) => set((state) => ({
-    editLayers: state.editLayers.map(l =>
-      l.id === layerId ? { ...l, editObjects: l.editObjects.filter(o => o.id !== objId) } : l
-    ),
-    isDirty: true
-  })),
-
-  updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => set((state) => ({
-    editLayers: state.editLayers.map(l =>
-      l.id === layerId
-        ? {
-            ...l,
-            editObjects: l.editObjects.map(o => (o.id === objId ? ({ ...o, ...updates } as EditObject) : o)),
-          }
-        : l
-    ),
-    isDirty: true
-  })),
-
   setEnableSnapping: (enable: boolean) => set({ enableSnapping: enable }),
-
   setCursorPosition: (pos) => set({ cursorPosition: pos }),
   setMapScale: (scale) => set({ mapScale: scale }),
 });

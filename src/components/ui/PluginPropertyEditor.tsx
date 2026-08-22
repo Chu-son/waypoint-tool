@@ -41,6 +41,22 @@ export const PluginPropertyEditor: React.FC<PluginPropertyEditorProps> = ({
           />
           <span className="text-xs text-text-muted font-medium">Enabled</span>
         </Label>
+      ) : property.type === "color" ? (
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={value || property.default || "#22c55e"}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-8 h-8 rounded-lg border border-border-base/50 cursor-pointer bg-surface-base p-0.5 shrink-0"
+          />
+          <Input
+            type="text"
+            value={value || property.default || "#22c55e"}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-8 text-xs font-mono flex-1 uppercase"
+            placeholder="#22c55e"
+          />
+        </div>
       ) : property.type === "integer" || property.type === "float" ? (
         <Input
           type="number"

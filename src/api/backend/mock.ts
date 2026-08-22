@@ -72,7 +72,7 @@ export class MockBackendAPI implements IBackendAPI {
     _contextData: any,
     _pythonPath?: string,
     _mapLayers?: ProjectMapLayer[]
-  ): Promise<Record<string, any>[]> {
+  ): Promise<any> {
     console.log('[Mock Backend] runPlugin called for:', pluginInstance.manifest.name);
     return [];
   }

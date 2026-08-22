@@ -4,7 +4,7 @@ import { RectEditObject } from '../../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 
 export function useMapEditRect() {
-  const activeEditLayerId = useAppStore((state) => state.activeEditLayerId);
+  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
   const addEditObject = useAppStore((state) => state.addEditObject);
   const updateEditObject = useAppStore((state) => state.updateEditObject);
@@ -26,9 +26,12 @@ export function useMapEditRect() {
   const handleRectDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      const targetLayerId = activeEditLayerId || state.editLayers[0]?.id || state.addEditLayer('Edit Layer 1').id;
-      if (!state.activeEditLayerId) {
-        state.setActiveEditLayerId(targetLayerId);
+      let targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual');
+      if (!targetLayer) {
+        targetLayer = state.customLayers.find(l => l.type === 'manual') || state.addManualCustomLayer();
+      }
+      if (state.activeCustomLayerId !== targetLayer.id) {
+        state.setActiveCustomLayerId(targetLayer.id);
       }
       setRectDrawStart(worldPos);
       setRectPreview({
@@ -42,7 +45,7 @@ export function useMapEditRect() {
         angle: 0,
       });
     },
-    [activeEditLayerId, mapEditFillValue]
+    [activeCustomLayerId, mapEditFillValue]
   );
 
   const handleRectDrawMove = useCallback(
@@ -69,7 +72,8 @@ export function useMapEditRect() {
 
   const handleRectDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
-    const targetLayerId = activeEditLayerId || state.editLayers[0]?.id;
+    const targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual') || state.customLayers.find(l => l.type === 'manual');
+    const targetLayerId = targetLayer?.id;
     if (!rectDrawStart || !rectPreview || !targetLayerId) {
       setRectDrawStart(null);
       setRectPreview(null);
@@ -93,7 +97,7 @@ export function useMapEditRect() {
   }, [
     rectDrawStart,
     rectPreview,
-    activeEditLayerId,
+    activeCustomLayerId,
     addEditObject,
     setSelectedEditObjectId,
     beginHistoryTransaction,

@@ -83,4 +83,27 @@ describe('PluginPropertyEditor', () => {
 
     expect(screen.getByText('Help text')).toBeInTheDocument();
   });
+
+  it('renders color property correctly', () => {
+    const prop = {
+      name: 'layer_color',
+      label: 'Layer Color',
+      type: 'color',
+      default: '#22c55e',
+    };
+    render(
+      <PluginPropertyEditor
+        property={prop}
+        value='#3b82f6'
+        onChange={mockOnChange}
+      />
+    );
+
+    expect(screen.getByText('Layer Color')).toBeInTheDocument();
+    const textInput = screen.getByPlaceholderText('#22c55e');
+    expect(textInput).toHaveValue('#3b82f6');
+
+    fireEvent.change(textInput, { target: { value: '#ef4444' } });
+    expect(mockOnChange).toHaveBeenCalledWith('#ef4444');
+  });
 });

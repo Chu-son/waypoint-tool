@@ -32,6 +32,7 @@ import { Button } from "./components/ui/common/Button";
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
+import { CustomLayerInspector } from "./components/ui/properties/CustomLayerInspector";
 import { PluginInstance } from "./types/store";
 
 function App() {
@@ -249,6 +250,11 @@ function App() {
     }
   ], []);
 
+  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
+  const activePluginId = useAppStore((state) => state.activePluginId);
+  const plugins = useAppStore((state) => state.plugins) || {};
+  const activePlugin = activePluginId ? plugins[activePluginId] : null;
+
   const rightPanels: PanelTab[] = useMemo(() => [
     {
       id: "layers",
@@ -260,9 +266,18 @@ function App() {
       id: "inspector",
       title: "Inspector",
       icon: <Settings2 size={14} />,
-      component: activeTool === "add_generator" ? <PluginParamsPanel /> : <PropertiesPanel />
-    }
-  ], [activeTool]);
+      component:
+        activeCustomLayerId ||
+        (activeTool === "add_generator" &&
+          activePlugin?.manifest?.category === "map_layer_generator") ? (
+          <CustomLayerInspector />
+        ) : activeTool === "add_generator" ? (
+          <PluginParamsPanel />
+        ) : (
+          <PropertiesPanel />
+        ),
+    },
+  ], [activeTool, activeCustomLayerId, activePlugin]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-surface-base text-text-base overflow-hidden font-sans">

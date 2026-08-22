@@ -39,10 +39,9 @@ function simplifyPoints(points: Array<{ x: number; y: number }>, epsilon: number
 }
 
 export function useMapEditFreehand() {
-  const activeEditLayerId = useAppStore((state) => state.activeEditLayerId);
+  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const activeMapLayerId = useAppStore((state) => state.activeMapLayerId);
   const mapLayers = useAppStore((state) => state.mapLayers);
-  const editLayers = useAppStore((state) => state.editLayers);
   const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
   const mapEditBrushSize = useAppStore((state) => state.mapEditBrushSize); // in pixels
   const addEditObject = useAppStore((state) => state.addEditObject);
@@ -55,14 +54,9 @@ export function useMapEditFreehand() {
 
   // Get active map layer resolution
   const getResolution = useCallback(() => {
-    let targetMapId = activeMapLayerId;
-    if (!targetMapId && activeEditLayerId) {
-      const el = editLayers.find((l) => l.id === activeEditLayerId);
-      if (el?.targetMapLayerId) targetMapId = el.targetMapLayerId;
-    }
-    const visibleMap = mapLayers.find((m) => (targetMapId ? m.id === targetMapId : m.visible));
+    const visibleMap = mapLayers.find((m) => (activeMapLayerId ? m.id === activeMapLayerId : m.visible));
     return visibleMap?.info?.resolution || 0.05;
-  }, [activeMapLayerId, activeEditLayerId, editLayers, mapLayers]);
+  }, [activeMapLayerId, mapLayers]);
 
   const resolution = getResolution();
   const brushRadiusWorld = mapEditBrushSize * resolution;
@@ -70,15 +64,18 @@ export function useMapEditFreehand() {
   const handleFreehandDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      const targetLayerId = activeEditLayerId || state.editLayers[0]?.id || state.addEditLayer('Edit Layer 1').id;
-      if (!state.activeEditLayerId) {
-        state.setActiveEditLayerId(targetLayerId);
+      let targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual');
+      if (!targetLayer) {
+        targetLayer = state.customLayers.find(l => l.type === 'manual') || state.addManualCustomLayer();
+      }
+      if (state.activeCustomLayerId !== targetLayer.id) {
+        state.setActiveCustomLayerId(targetLayer.id);
       }
       setIsFreehandDrawing(true);
       setFreehandPoints([worldPos]);
       setBrushPreviewPos(worldPos);
     },
-    [activeEditLayerId]
+    [activeCustomLayerId]
   );
 
   const handleFreehandDrawMove = useCallback(
@@ -102,7 +99,8 @@ export function useMapEditFreehand() {
 
   const handleFreehandDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
-    const targetLayerId = activeEditLayerId || state.editLayers[0]?.id;
+    const targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual') || state.customLayers.find(l => l.type === 'manual');
+    const targetLayerId = targetLayer?.id;
     if (!isFreehandDrawing || !targetLayerId || freehandPoints.length === 0) {
       setIsFreehandDrawing(false);
       setFreehandPoints([]);
@@ -129,7 +127,7 @@ export function useMapEditFreehand() {
     setFreehandPoints([]);
   }, [
     isFreehandDrawing,
-    activeEditLayerId,
+    activeCustomLayerId,
     freehandPoints,
     brushRadiusWorld,
     mapEditFillValue,

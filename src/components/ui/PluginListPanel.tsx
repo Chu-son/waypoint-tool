@@ -91,11 +91,11 @@ export function PluginListPanel() {
 
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
 
-  const enabledPluginsList = pluginSettings
+  const enabledPluginsList = (pluginSettings || [])
     .filter((s) => s.enabled)
-    .sort((a, b) => a.order - b.order)
-    .map((s) => plugins[s.id])
-    .filter(Boolean);
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    .map((s) => (plugins || {})[s.id])
+    .filter((p) => p && p.manifest && p.manifest.category !== "map_layer_generator" && p.manifest.category !== "path_calculator");
 
   const getPluginIconStr = (pluginId: string) => {
     const setting = pluginSettings.find(s => s.id === pluginId);

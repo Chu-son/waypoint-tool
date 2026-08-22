@@ -17,7 +17,7 @@ export function ExportMapsModal() {
 
   const exportRegions = useAppStore((state) => state.exportRegions);
   const mapLayers = useAppStore((state) => state.mapLayers);
-  const editLayers = useAppStore((state) => state.editLayers);
+  const customLayers = useAppStore((state) => state.customLayers) || [];
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
 
@@ -58,7 +58,7 @@ export function ExportMapsModal() {
             layerVisibility: {},
           }));
 
-        const layersToExport = await prepareLayersForExport(mapLayers, editLayers);
+        const layersToExport = await prepareLayersForExport(mapLayers, customLayers);
 
         await BackendAPI.exportMaps({
           saveDir: dirPath,

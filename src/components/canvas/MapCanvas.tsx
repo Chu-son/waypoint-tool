@@ -4,7 +4,7 @@ import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
-import { ProjectMapLayer, EditObject } from '../../types/store';
+import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer, EditObject } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
 import { FootprintLayer } from './layers/FootprintLayer';
@@ -27,7 +27,7 @@ extend({
   Text,
 });
 
-function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: ProjectMapLayer, scale: number, textStyle: TextStyle, overrideTexture?: Texture | null }) {
+export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: ProjectMapLayer | PluginCustomLayer | any, scale: number, textStyle: TextStyle, overrideTexture?: Texture | null }) {
   const [texture, setTexture] = useState<Texture | null>(overrideTexture || null);
   const [imgSize, setImgSize] = useState({ w: overrideTexture ? overrideTexture.width : 0, h: overrideTexture ? overrideTexture.height : 0 });
 
@@ -37,24 +37,32 @@ function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: P
       setImgSize({ w: overrideTexture.width, h: overrideTexture.height });
       return;
     }
-    let newTexture: Texture | null = null;
+    let cancelled = false;
     if (layer.image_base64) {
       const img = new Image();
       img.onload = () => {
-        newTexture = Texture.from(img);
+        if (cancelled) return;
+        const newTexture = Texture.from(img);
         setTexture(newTexture);
         setImgSize({ w: img.width, h: img.height });
       };
       img.src = layer.image_base64;
     }
     return () => {
-      if (newTexture) {
-        newTexture.destroy(true);
-      }
+      cancelled = true;
     };
   }, [layer.image_base64, overrideTexture]);
 
-  if (!texture || !layer.visible) return null;
+  // Clean up the previous texture ONLY after React has committed the new texture to the Sprite!
+  useEffect(() => {
+    return () => {
+      if (texture && !texture.destroyed && !overrideTexture) {
+        texture.destroy(true);
+      }
+    };
+  }, [texture, overrideTexture]);
+
+  if (!texture || texture.destroyed || !texture.source || !layer.visible) return null;
   
   // Extract metadata (with safe fallbacks)
   const { resolution = 0.05, origin = [0, 0, 0] } = layer.info || {};
@@ -66,8 +74,7 @@ function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: P
   // Y scale is inverted so that the image draws right-side up inside the Y-inverted Pixi Container.
   // Top-left Y calculation: Origin is bottom-left, so we add height * resolution
   // We must also account for the map's yaw rotation (yaw).
-  // Prioritize actual loaded image size (imgSize.h) over layer.height to avoid fallback values (e.g. 1000)
-  const h = imgSize.h || (texture ? texture.height : 0) || layer.height || 0;
+  const h = imgSize.h || (texture ? texture.height : 0) || ('height' in layer ? layer.height : layer.info?.height) || 0;
   const H = h * resolution;
   const topLeftX = ox - H * Math.sin(yaw);
   const topLeftY = oy + H * Math.cos(yaw);
@@ -75,6 +82,7 @@ function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: P
   return (
     <pixiContainer zIndex={layer.z_index}>
       <pixiSprite 
+        key={texture.uid || layer.id}
         texture={texture} 
         anchor={{ x: 0, y: 1 }} 
         x={ox} 
@@ -124,16 +132,15 @@ export function MapCanvas() {
   const setMapScale = useAppStore(state => state.setMapScale);
   
   const mapLayers = useAppStore(state => state.mapLayers);
-  const editLayers = useAppStore(state => state.editLayers);
+  const customLayers = useAppStore(state => state.customLayers) || [];
   const enableSnapping = useAppStore(state => state.enableSnapping);
   const isExportPreview = useAppStore(state => state.isExportPreview);
 
   const isMapEditMode = useAppStore(state => state.isMapEditMode);
   const mapEditSubTool = useAppStore(state => state.mapEditSubTool);
-  const activeEditLayerId = useAppStore(state => state.activeEditLayerId);
   const selectedEditObjectId = useAppStore(state => state.selectedEditObjectId);
   const setSelectedEditObjectId = useAppStore(state => state.setSelectedEditObjectId);
-  const setActiveEditLayerId = useAppStore(state => state.setActiveEditLayerId);
+  const setActiveCustomLayerId = useAppStore(state => state.setActiveCustomLayerId);
   const updateEditObject = useAppStore(state => state.updateEditObject);
 
   const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
@@ -150,7 +157,7 @@ export function MapCanvas() {
     return { x: worldX, y: worldY };
   }, [position, scale]);
 
-  // B案: blend_mode, z_index, visible, image_base64, editLayers のみの変更キーを生成
+  // blend_mode, z_index, visible, image_base64, customLayers のみの変更キーを生成
   const previewSyncKey = useMemo(() => {
     const mapKey = JSON.stringify(
       mapLayers.map(l => ({
@@ -161,21 +168,22 @@ export function MapCanvas() {
         hasImage: !!l.image_base64,
       }))
     );
-    const editKey = JSON.stringify(
-      editLayers.map(l => ({
+    const customKey = JSON.stringify(
+      customLayers.map(l => ({
         id: l.id,
+        type: l.type,
         visible: l.visible,
         z_index: l.z_index,
-        objCount: l.editObjects.length,
-        objIds: l.editObjects.map(o => o.id).join(','),
+        objCount: l.type === 'manual' ? l.editObjects.length : 0,
+        hasImage: l.type === 'plugin' ? !!l.image_base64 : false,
       }))
     );
-    return `${mapKey}::${editKey}`;
-  }, [mapLayers, editLayers]);
+    return `${mapKey}::${customKey}`;
+  }, [mapLayers, customLayers]);
 
   useEffect(() => {
     if (!isExportPreview) {
-      setPreviewTexture(prev => { if (prev) prev.destroy(true); return null; });
+      setPreviewTexture(null);
       setIsPreviewLoading(false);
       setPreviewError(null);
       return;
@@ -186,7 +194,7 @@ export function MapCanvas() {
     setPreviewError(null);
     console.log('[Export Preview] Generating preview... SyncKey:', previewSyncKey);
 
-    prepareLayersForExport(mapLayers, editLayers).then(layerInputs => {
+    prepareLayersForExport(mapLayers, customLayers).then(layerInputs => {
       if (cancelled) return null;
       return BackendAPI.blendMapPreview(layerInputs);
     }).then(result => {
@@ -195,8 +203,8 @@ export function MapCanvas() {
       const img = new Image();
       img.onload = () => {
         if (cancelled) return;
-        const tex = Texture.from(img);
-        setPreviewTexture(prev => { if (prev) prev.destroy(true); return tex; });
+        const texture = Texture.from(img);
+        setPreviewTexture(texture);
         setPreviewInfo({ resolution: result.resolution, origin: result.origin });
         setIsPreviewLoading(false);
         console.log('[Export Preview] Texture loaded successfully.');
@@ -216,7 +224,15 @@ export function MapCanvas() {
     });
 
     return () => { cancelled = true; };
-  }, [isExportPreview, previewSyncKey, mapLayers, editLayers]);
+  }, [isExportPreview, previewSyncKey, mapLayers, customLayers]);
+
+  useEffect(() => {
+    return () => {
+      if (previewTexture && !previewTexture.destroyed) {
+        previewTexture.destroy(true);
+      }
+    };
+  }, [previewTexture]);
 
   const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region'>('none');
   const lastMiddleClickTime = useRef<number>(0);
@@ -279,9 +295,9 @@ export function MapCanvas() {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
       setSelectedEditObjectId(objId);
-      setActiveEditLayerId(layerId);
+      setActiveCustomLayerId(layerId);
 
-      const targetLayer = useAppStore.getState().editLayers.find((l) => l.id === layerId);
+      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as ManualCustomLayer | undefined;
       const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
       if (!targetObj) return;
 
@@ -306,14 +322,14 @@ export function MapCanvas() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [setSelectedEditObjectId, setActiveEditLayerId, screenToWorld]
+    [setSelectedEditObjectId, setActiveCustomLayerId, screenToWorld]
   );
 
   const handleEditObjectHandlePointerDown = useCallback(
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
-      const targetLayer = useAppStore.getState().editLayers.find((l) => l.id === layerId);
+      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as ManualCustomLayer | undefined;
       const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
       if (!targetObj || targetObj.type !== 'rect') return;
 
@@ -330,7 +346,7 @@ export function MapCanvas() {
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string, handle: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
-      const targetLayer = useAppStore.getState().editLayers.find((l) => l.id === layerId);
+      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as ManualCustomLayer | undefined;
       const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
       if (!targetObj) return;
 
@@ -589,12 +605,13 @@ export function MapCanvas() {
       const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
 
       const id = uuidv4();
+      useAppStore.getState().beginHistoryTransaction();
       addNode({
         id,
         type: 'manual',
         transform: { x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1 },
         options: {}
-      });
+      }, undefined, { skipRecalculate: true });
       selectNodes([id]);
       
       interactionMode.current = 'set_yaw';
@@ -896,7 +913,7 @@ export function MapCanvas() {
              qz: node.transform?.qz || 0, 
              qw: node.transform?.qw ?? 1 
           }
-        });
+        }, { skipRecalculate: true });
       }
     }
     else if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
@@ -921,7 +938,7 @@ export function MapCanvas() {
               qz: Math.sin(halfYaw), 
               qw: Math.cos(halfYaw) 
             }
-          });
+          }, { skipRecalculate: true });
         }
       }
     }
@@ -1156,6 +1173,9 @@ export function MapCanvas() {
     if (interactionMode.current !== 'none') {
       if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
         useAppStore.getState().endHistoryTransaction();
+        if (useAppStore.getState().autoRecalculatePath && useAppStore.getState().activePathCalculatorPluginId) {
+          useAppStore.getState().recalculatePath({ immediate: true });
+        }
       }
       if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
         const node = useAppStore.getState().nodes[activeNodeId.current];
@@ -1241,6 +1261,9 @@ export function MapCanvas() {
       onPointerLeave={() => { 
         if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
           useAppStore.getState().endHistoryTransaction();
+          if (useAppStore.getState().autoRecalculatePath && useAppStore.getState().activePathCalculatorPluginId) {
+            useAppStore.getState().recalculatePath({ immediate: true });
+          }
         }
         interactionMode.current = 'none';
         activeNodeId.current = null;
@@ -1276,15 +1299,17 @@ export function MapCanvas() {
                 textStyle={textStyle}
               />
             ) : null
-          ) : mapLayers.length > 0 ? (
-            mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)
+          ) : mapLayers.length > 0 || customLayers.length > 0 ? (
+            <>
+              {mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)}
+              {customLayers.filter((l): l is PluginCustomLayer => l.type === 'plugin').map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)}
+            </>
           ) : (
             <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
           )}
           <MapEditLayer
             scale={scale}
-            editLayers={editLayers}
-            activeEditLayerId={activeEditLayerId}
+            editLayers={customLayers.filter((l): l is ManualCustomLayer => l.type === 'manual')}
             selectedEditObjectId={selectedEditObjectId}
             previewObject={rectPreview || circlePreview || freehandPreview}
             brushPreviewPos={isMapEditMode && mapEditSubTool === 'freehand' ? brushPreviewPos : null}

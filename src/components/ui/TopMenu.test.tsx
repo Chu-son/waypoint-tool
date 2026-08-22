@@ -10,6 +10,10 @@ vi.mock('lucide-react', () => ({
   Minus: () => <div data-testid="minus-icon" />,
   Square: () => <div data-testid="square-icon" />,
   X: () => <div data-testid="x-icon" />,
+  Route: () => <div data-testid="route-icon" />,
+  RefreshCcw: () => <div data-testid="refresh-icon" />,
+  ChevronDown: () => <div data-testid="chevrondown-icon" />,
+  Check: () => <div data-testid="check-icon" />,
 }));
 
 // Mock Store

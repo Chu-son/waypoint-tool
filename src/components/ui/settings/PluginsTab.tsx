@@ -229,13 +229,18 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                           }}
                         />
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-text-base text-[15px]">
                               {plugin ? plugin.manifest.name : "Unknown Plugin"}
                             </span>
                             <span className="text-[9px] px-2 py-0.5 rounded-full bg-surface-base/60 text-text-muted border border-border-base/50 uppercase font-bold tracking-widest shadow-sm">
                               {plugin ? plugin.manifest.type : "MISSING"} {setting.isBuiltin ? "" : "(Custom)"}
                             </span>
+                            {plugin?.manifest.category && (
+                              <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary-base/10 text-primary-base border border-primary-base/30 uppercase font-bold tracking-wider shadow-sm">
+                                {plugin.manifest.category.replace(/_/g, ' ')}
+                              </span>
+                            )}
                           </div>
                           <p className="text-[11px] text-text-muted font-mono mt-1 opacity-80 break-all line-clamp-1">
                             {plugin?.folder_path || setting.path}

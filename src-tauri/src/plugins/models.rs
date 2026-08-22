@@ -8,6 +8,27 @@ pub enum PluginInputType {
     Waypoint,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct CellValueConstants {
+    pub free: i8,
+    pub obstacle: i8,
+    pub unknown: i8,
+}
+
+impl Default for CellValueConstants {
+    fn default() -> Self {
+        Self {
+            free: 0,
+            obstacle: 100,
+            unknown: -1,
+        }
+    }
+}
+
+fn default_encoding() -> String {
+    "int8_zlib_base64".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OccupancyGridData {
     pub width: u32,
@@ -15,6 +36,10 @@ pub struct OccupancyGridData {
     pub resolution: f64,
     pub origin: [f64; 3],  // [x, y, yaw]
     pub data: String,      // zlib + base64 encoded string
+    #[serde(default = "default_encoding")]
+    pub encoding: String,
+    #[serde(default)]
+    pub cell_values: CellValueConstants,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -40,6 +65,8 @@ pub struct PluginInputDef {
 pub struct PluginManifest {
     pub name: String,
     pub version: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>, // "waypoint_generator" | "map_layer_generator" | "path_calculator"
     #[serde(default)]
     pub description: Option<String>,
     #[serde(rename = "type")]

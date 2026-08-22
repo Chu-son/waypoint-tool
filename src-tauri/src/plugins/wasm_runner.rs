@@ -4,7 +4,7 @@ use std::io::Write;
 pub fn run_wasm_plugin(
     wasm_path: &str,
     context_json: &str,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<serde_json::Value, String> {
     
     // 【WebAssembly 実行アーキテクチャの背景】
     // WebAssembly(Wasm) プラグインの実行には、WASI (WebAssembly System Interface) に準拠した
@@ -35,10 +35,10 @@ pub fn run_wasm_plugin(
 
     let stdout_str = String::from_utf8_lossy(&output.stdout);
     
-    let waypoints: Vec<serde_json::Value> = serde_json::from_str(&stdout_str)
-        .map_err(|e| format!("Failed to parse wasm plugin output as JSON arrays: {}\nOutput was:\n{}", e, stdout_str))?;
+    let result: serde_json::Value = serde_json::from_str(&stdout_str)
+        .map_err(|e| format!("Failed to parse wasm plugin output as JSON: {}\nOutput was:\n{}", e, stdout_str))?;
 
-    Ok(waypoints)
+    Ok(result)
 }
 
 #[cfg(test)]

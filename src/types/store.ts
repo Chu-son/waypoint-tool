@@ -94,6 +94,7 @@ export type RobotFootprint = CircularFootprint | RectangularFootprint | PolygonF
 // -----------------------------
 
 // --- Plugin Architecture Types ---
+export type PluginCategory = 'waypoint_generator' | 'map_layer_generator' | 'path_calculator';
 export type PluginInputType = 'point' | 'rectangle' | 'waypoint';
 
 export type PluginInputDef = {
@@ -108,6 +109,7 @@ export type PluginInputDef = {
 
 export type PluginManifest = {
   name: string;
+  category?: PluginCategory;
   version?: string;
   description?: string;
   type: 'python' | 'wasm';
@@ -133,6 +135,80 @@ export type PluginInstance = {
   is_builtin: boolean;
   sdk_version?: string;
 };
+
+// --- Custom Layers (Manual & Plugin) ---
+export type CustomLayerType = 'manual' | 'plugin';
+
+export interface CustomLayerBase {
+  id: string;
+  name: string;
+  visible: boolean;
+  opacity: number;
+  z_index: number;
+  blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
+}
+
+export type EditObjectType = 'rect' | 'circle' | 'freehand';
+
+interface EditObjectBase {
+  id: string;
+  type: EditObjectType;
+  fillValue: number; // 0~255 (0=black=obstacle, 255=white=free space)
+}
+
+export interface RectEditObject extends EditObjectBase {
+  type: 'rect';
+  cx: number;     // Center world coordinate X (meters)
+  cy: number;     // Center world coordinate Y (meters)
+  width: number;  // Width in world units (meters)
+  height: number; // Height in world units (meters)
+  angle: number;  // Radians (relative to center point)
+}
+
+export interface CircleEditObject extends EditObjectBase {
+  type: 'circle';
+  cx: number;     // Center world coordinate X (meters)
+  cy: number;     // Center world coordinate Y (meters)
+  radius: number; // Radius in world units (meters)
+}
+
+export interface FreehandEditObject extends EditObjectBase {
+  type: 'freehand';
+  points: Array<{ x: number; y: number }>; // World coordinate point sequence
+  brushRadius: number; // Brush radius in world units (meters)
+}
+
+export type EditObject = RectEditObject | CircleEditObject | FreehandEditObject;
+
+/** Manual Vector Edit Layer */
+export interface ManualCustomLayer extends CustomLayerBase {
+  type: 'manual';
+  editObjects: EditObject[];
+}
+
+/** Plugin Generated Overlay Layer */
+export interface PluginCustomLayer extends CustomLayerBase {
+  type: 'plugin';
+  plugin_id: string;
+  params: Record<string, any>;
+  interaction_data?: Record<string, any>;
+  image_base64: string;
+  info: {
+    resolution: number;
+    origin: [number, number, number];
+    width: number;
+    height: number;
+    negate?: number;
+    occupied_thresh?: number;
+    free_thresh?: number;
+  };
+}
+
+export type CustomLayer = ManualCustomLayer | PluginCustomLayer;
+
+// Aliases for type compatibility if needed
+export type EditLayer = ManualCustomLayer;
+export type GeneratedMapLayer = PluginCustomLayer;
 // ---------------------------------
 
 export type ObjectNode = WaypointNode;
@@ -172,53 +248,17 @@ export interface ProjectMapLayer {
   blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
 }
 
-export type EditObjectType = 'rect' | 'circle' | 'freehand';
-
-interface EditObjectBase {
-  id: string;
-  type: EditObjectType;
-  fillValue: number; // 0~255 (0=black=obstacle, 255=white=free space)
-}
-
-export interface RectEditObject extends EditObjectBase {
-  type: 'rect';
-  cx: number;     // Center world coordinate X (meters)
-  cy: number;     // Center world coordinate Y (meters)
-  width: number;  // Width in world units (meters)
-  height: number; // Height in world units (meters)
-  angle: number;  // Radians (relative to center point)
-}
-
-export interface CircleEditObject extends EditObjectBase {
-  type: 'circle';
-  cx: number;     // Center world coordinate X (meters)
-  cy: number;     // Center world coordinate Y (meters)
-  radius: number; // Radius in world units (meters)
-}
-
-export interface FreehandEditObject extends EditObjectBase {
-  type: 'freehand';
-  points: Array<{ x: number; y: number }>; // World coordinate point sequence
-  brushRadius: number; // Brush radius in world units (meters)
-}
-
-export type EditObject = RectEditObject | CircleEditObject | FreehandEditObject;
-
-export interface EditLayer {
-  id: string;
-  name: string;
-  visible: boolean;
-  opacity: number;
-  z_index: number; // Index within EditLayers
-  targetMapLayerId?: string | null; // Optional / Deprecated
-  editObjects: EditObject[];
-}
-
 export interface ProjectData {
   root_node_ids: string[];
   nodes: Record<string, ObjectNode>;
   map_layers?: ProjectMapLayer[];
+  custom_layers?: CustomLayer[];
+  edit_layers?: any[]; // Legacy
+  generated_layers?: any[]; // Legacy
   robot_footprint?: RobotFootprint;
+  active_path_calculator_plugin_id?: string | null;
+  path_calculator_params?: Record<string, any>;
+  auto_recalculate_path?: boolean;
 }
 export interface AppState {
   nodes: Record<string, ObjectNode>;

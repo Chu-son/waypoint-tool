@@ -8,8 +8,8 @@ import { EditObjectType } from '../../types/store';
 export function MapEditOverlay() {
   const isMapEditMode = useAppStore((state) => state.isMapEditMode);
   const setMapEditMode = useAppStore((state) => state.setMapEditMode);
-  const activeEditLayerId = useAppStore((state) => state.activeEditLayerId);
-  const editLayers = useAppStore((state) => state.editLayers);
+  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
+  const customLayers = useAppStore((state) => state.customLayers);
   const selectedEditObjectId = useAppStore((state) => state.selectedEditObjectId);
   const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
   const updateEditObject = useAppStore((state) => state.updateEditObject);
@@ -23,24 +23,24 @@ export function MapEditOverlay() {
   const mapEditBrushSize = useAppStore((state) => state.mapEditBrushSize);
   const setMapEditBrushSize = useAppStore((state) => state.setMapEditBrushSize);
 
-  if (!isMapEditMode || !activeEditLayerId) return null;
+  if (!isMapEditMode || !activeCustomLayerId) return null;
 
-  const activeLayer = editLayers.find((l) => l.id === activeEditLayerId);
+  const activeLayer = customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') as import('../../types/store').ManualCustomLayer | undefined;
   const selectedObject = activeLayer?.editObjects.find((o) => o.id === selectedEditObjectId);
 
   const currentFillValue = selectedObject !== undefined ? selectedObject.fillValue : mapEditFillValue;
 
   const handleFillValueChange = (val: number) => {
     setMapEditFillValue(val);
-    if (activeEditLayerId && selectedEditObjectId) {
-      updateEditObject(activeEditLayerId, selectedEditObjectId, { fillValue: val });
+    if (activeCustomLayerId && selectedEditObjectId) {
+      updateEditObject(activeCustomLayerId, selectedEditObjectId, { fillValue: val });
       pushHistorySnapshot();
     }
   };
 
   const handleDeleteSelectedObject = () => {
-    if (activeEditLayerId && selectedEditObjectId) {
-      removeEditObject(activeEditLayerId, selectedEditObjectId);
+    if (activeCustomLayerId && selectedEditObjectId) {
+      removeEditObject(activeCustomLayerId, selectedEditObjectId);
       setSelectedEditObjectId(null);
       pushHistorySnapshot();
     }

@@ -181,7 +181,7 @@ pub fn run_plugin(
     context_json: String,
     python_path: Option<String>,
     map_layers: Option<Vec<crate::plugins::models::PluginMapLayer>>,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<serde_json::Value, String> {
     // 【プラグイン・アーキテクチャの背景】
     // このツールでは、外部の経路生成アルゴリズム（PythonやWebAssembly）と連携するために、
     // セキュリティと拡張性、言語非依存性を重視し、「標準入出力ストリームを介したJSON通信」を採用しています。
@@ -277,13 +277,13 @@ pub fn run_plugin(
         println!("[DEBUG/RUST] Execution Success stdout:\n{}", stdout_str);
         println!("[DEBUG/RUST] Execution Success stderr:\n{}", stderr_str);
         
-        let waypoints: Vec<serde_json::Value> = serde_json::from_str(&stdout_str)
+        let result: serde_json::Value = serde_json::from_str(&stdout_str)
             .map_err(|e| {
                 println!("[DEBUG/RUST] JSON Parse Error: {}", e);
-                format!("Failed to parse plugin output as JSON arrays: {}\nOutput was:\n{}", e, stdout_str)
+                format!("Failed to parse plugin output as JSON: {}\nOutput was:\n{}", e, stdout_str)
             })?;
 
-        Ok(waypoints)
+        Ok(result)
     } else if plugin_instance.manifest.plugin_type == "wasm" {
         let wasm_file = std::path::Path::new(&plugin_instance.folder_path)
             .join(&plugin_instance.manifest.executable);

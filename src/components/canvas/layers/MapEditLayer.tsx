@@ -1,12 +1,11 @@
 import { FederatedPointerEvent } from 'pixi.js';
-import { EditLayer, EditObject } from '../../../types/store';
+import { ManualCustomLayer, EditObject } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
 import { computePointsBoundingBox } from '../../../utils/geometry';
 
 interface MapEditLayerProps {
   scale: number;
-  editLayers: EditLayer[];
-  activeEditLayerId: string | null;
+  editLayers: ManualCustomLayer[];
   selectedEditObjectId: string | null;
   previewObject: EditObject | null;
   brushPreviewPos: { x: number; y: number } | null;

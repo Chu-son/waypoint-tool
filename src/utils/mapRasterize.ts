@@ -1,4 +1,4 @@
-import { EditLayer, EditObject, ProjectMapLayer } from '../types/store';
+import { CustomLayer, ManualCustomLayer, EditObject, ProjectMapLayer } from '../types/store';
 
 /**
  * Converts world coordinates (meters) to pixel coordinates on the map.
@@ -87,14 +87,14 @@ function drawEditObjectToCanvas(
 }
 
 /**
- * Renders an EditLayer onto a target ProjectMapLayer using Canvas 2D API,
+ * Renders a ManualCustomLayer onto a target ProjectMapLayer using Canvas 2D API,
  * returning a new Base64-encoded PNG data URL.
  */
-export async function compositeEditLayerOntoMap(
-  editLayer: EditLayer,
+export async function compositeManualCustomLayerOntoMap(
+  customLayer: ManualCustomLayer,
   targetMapLayer: ProjectMapLayer
 ): Promise<string> {
-  if (!editLayer.editObjects.length) {
+  if (!customLayer.editObjects.length) {
     return targetMapLayer.image_base64;
   }
 
@@ -113,11 +113,11 @@ export async function compositeEditLayerOntoMap(
       // Draw base map image
       ctx.drawImage(img, 0, 0);
 
-      // For map export & compositing, opacity is fixed at 1.0 (full opacity for ROS map values)
+      // Full opacity for ROS map values
       ctx.globalAlpha = 1.0;
 
       // Draw each edit object
-      for (const obj of editLayer.editObjects) {
+      for (const obj of customLayer.editObjects) {
         drawEditObjectToCanvas(ctx, obj, targetMapLayer.info);
       }
 
@@ -125,7 +125,7 @@ export async function compositeEditLayerOntoMap(
       resolve(dataUrl);
     };
     img.onerror = (err) => {
-      console.error('Failed to load map image for edit layer compositing:', err);
+      console.error('Failed to load map image for custom layer compositing:', err);
       resolve(targetMapLayer.image_base64);
     };
     img.src = targetMapLayer.image_base64;
@@ -133,10 +133,10 @@ export async function compositeEditLayerOntoMap(
 }
 
 /**
- * Calculates the bounding box in world coordinates for all objects in an EditLayer.
+ * Calculates the bounding box in world coordinates for all objects in a ManualCustomLayer.
  */
 export function getEditLayerBoundingBox(
-  editLayer: EditLayer,
+  editLayer: ManualCustomLayer,
   resolution = 0.05
 ): {
   minX: number;
@@ -186,10 +186,10 @@ export function getEditLayerBoundingBox(
 }
 
 /**
- * Rasterizes an EditLayer into an independent ExportLayer with a transparent background.
+ * Rasterizes a manual CustomLayer into an independent ExportLayer with a transparent background.
  */
-export async function rasterizeEditLayerToExportLayer(
-  editLayer: EditLayer
+export async function rasterizeManualCustomLayerToExportLayer(
+  customLayer: ManualCustomLayer
 ): Promise<{
   id: string;
   name: string;
@@ -199,12 +199,12 @@ export async function rasterizeEditLayerToExportLayer(
   blend_mode: string;
   z_index: number;
 } | null> {
-  if (!editLayer.visible || editLayer.editObjects.length === 0) {
+  if (!customLayer.visible || customLayer.editObjects.length === 0) {
     return null;
   }
 
   const resolution = 0.05;
-  const bbox = getEditLayerBoundingBox(editLayer, resolution);
+  const bbox = getEditLayerBoundingBox(customLayer, resolution);
 
   const canvas = document.createElement('canvas');
   canvas.width = bbox.widthPx;
@@ -223,18 +223,18 @@ export async function rasterizeEditLayerToExportLayer(
     height: bbox.heightPx,
   };
 
-  for (const obj of editLayer.editObjects) {
+  for (const obj of customLayer.editObjects) {
     drawEditObjectToCanvas(ctx, obj, info);
   }
 
   const dataUrl = canvas.toDataURL('image/png');
 
   return {
-    id: editLayer.id,
-    name: editLayer.name,
+    id: customLayer.id,
+    name: customLayer.name,
     image_base64: dataUrl,
     info: {
-      image: `${editLayer.name.replace(/\s+/g, '_').toLowerCase()}.png`,
+      image: `${customLayer.name.replace(/\s+/g, '_').toLowerCase()}.png`,
       resolution,
       origin: [bbox.minX, bbox.minY, 0],
       negate: 0,
@@ -242,17 +242,17 @@ export async function rasterizeEditLayerToExportLayer(
       free_thresh: 0.196,
     },
     opacity: 1.0,
-    blend_mode: 'overwrite',
-    z_index: 1000 + editLayer.z_index,
+    blend_mode: customLayer.blend_mode || 'overwrite',
+    z_index: 1000 + customLayer.z_index,
   };
 }
 
 /**
- * Prepares visible MapLayers and standalone rasterized EditLayers for export or preview.
+ * Prepares visible MapLayers and CustomLayers (both manual & plugin) for export or preview.
  */
 export async function prepareLayersForExport(
   mapLayers: ProjectMapLayer[],
-  editLayers: EditLayer[]
+  customLayers: CustomLayer[]
 ) {
   const visibleMapLayers = mapLayers
     .filter((l) => l.visible)
@@ -267,29 +267,49 @@ export async function prepareLayersForExport(
       visible: true,
     }));
 
-  const editLayerExports = await Promise.all(
-    editLayers.map((el) => rasterizeEditLayerToExportLayer(el))
+  const customLayerExports = await Promise.all(
+    customLayers
+      .filter((l) => l.visible)
+      .map(async (cl) => {
+        if (cl.type === 'manual') {
+          return rasterizeManualCustomLayerToExportLayer(cl);
+        } else {
+          // Plugin generated raster layer
+          if (!cl.image_base64) return null;
+          return {
+            id: cl.id,
+            name: cl.name,
+            image_base64: cl.image_base64,
+            info: cl.info,
+            opacity: cl.opacity ?? 1.0,
+            blend_mode: cl.blend_mode || 'overwrite',
+            z_index: 1000 + cl.z_index,
+            visible: true,
+          };
+        }
+      })
   );
-  const validEditLayers = editLayerExports
+
+  const validCustomLayers = customLayerExports
     .filter((l): l is NonNullable<typeof l> => l !== null)
     .map((l) => ({ ...l, visible: true }));
 
-  return [...visibleMapLayers, ...validEditLayers];
+  return [...visibleMapLayers, ...validCustomLayers];
 }
 
 /**
- * Pre-composites visible EditLayers onto their target MapLayers (Legacy compatibility).
+ * Pre-composites visible ManualCustomLayers onto their target MapLayers (Legacy compatibility).
  */
 export async function preCompositeEditLayers(
   mapLayers: ProjectMapLayer[],
-  editLayers: EditLayer[]
+  customLayers: ManualCustomLayer[]
 ): Promise<ProjectMapLayer[]> {
-  if (!editLayers.length || !mapLayers.length) {
+  if (!customLayers.length || !mapLayers.length) {
     return mapLayers;
   }
 
   const result = mapLayers.map((l) => ({ ...l }));
-  const visibleEditLayers = editLayers
+  const visibleEditLayers = customLayers
     .filter((el) => el.visible && el.editObjects.length > 0)
     .sort((a, b) => a.z_index - b.z_index);
 
@@ -299,13 +319,13 @@ export async function preCompositeEditLayers(
 
   for (const editLayer of visibleEditLayers) {
     const visibleMapLayers = result.filter((l) => l.visible).sort((a, b) => b.z_index - a.z_index);
-    const targetMapId = editLayer.targetMapLayerId || visibleMapLayers[0]?.id;
+    const targetMapId = (editLayer as any).targetMapLayerId || visibleMapLayers[0]?.id;
     if (!targetMapId) continue;
 
     const targetIdx = result.findIndex((l) => l.id === targetMapId);
     if (targetIdx < 0) continue;
 
-    const compositedBase64 = await compositeEditLayerOntoMap(editLayer, result[targetIdx]);
+    const compositedBase64 = await compositeManualCustomLayerOntoMap(editLayer, result[targetIdx]);
     result[targetIdx] = {
       ...result[targetIdx],
       image_base64: compositedBase64,

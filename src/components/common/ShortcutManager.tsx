@@ -15,7 +15,7 @@ export function ShortcutManager() {
     undo,
     redo,
     selectedEditObjectId,
-    activeEditLayerId,
+    activeCustomLayerId,
     removeEditObject,
     setSelectedEditObjectId,
     pushHistorySnapshot,
@@ -33,8 +33,8 @@ export function ShortcutManager() {
 
       // Basic Actions
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedEditObjectId && activeEditLayerId) {
-          removeEditObject(activeEditLayerId, selectedEditObjectId);
+        if (selectedEditObjectId && activeCustomLayerId) {
+          removeEditObject(activeCustomLayerId, selectedEditObjectId);
           if (setSelectedEditObjectId) setSelectedEditObjectId(null);
           if (pushHistorySnapshot) pushHistorySnapshot();
         } else if (selectedNodeIds.length > 0) {

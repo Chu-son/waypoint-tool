@@ -66,7 +66,7 @@ export interface IBackendAPI {
     contextData: any,
     pythonPath?: string,
     mapLayers?: ProjectMapLayer[],
-  ): Promise<Record<string, any>[]>;
+  ): Promise<any>;
   getPythonEnvironments(): Promise<string[]>;
   scaffoldPlugin(pluginName: string, targetDir: string): Promise<PluginInstance>;
   checkSdkVersion(): Promise<string>;

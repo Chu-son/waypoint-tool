@@ -44,7 +44,7 @@ export class TauriBackendAPI implements IBackendAPI {
     contextData: any,
     pythonPath?: string,
     mapLayers?: ProjectMapLayer[],
-  ): Promise<Record<string, any>[]> {
+  ): Promise<any> {
     return invoke('run_plugin', {
       pluginInstance,
       contextJson: JSON.stringify(contextData),

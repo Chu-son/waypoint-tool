@@ -4,7 +4,7 @@ import { CircleEditObject } from '../../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 
 export function useMapEditCircle() {
-  const activeEditLayerId = useAppStore((state) => state.activeEditLayerId);
+  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
   const addEditObject = useAppStore((state) => state.addEditObject);
   const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
@@ -16,9 +16,12 @@ export function useMapEditCircle() {
   const handleCircleDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      const targetLayerId = activeEditLayerId || state.editLayers[0]?.id || state.addEditLayer('Edit Layer 1').id;
-      if (!state.activeEditLayerId) {
-        state.setActiveEditLayerId(targetLayerId);
+      let targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual');
+      if (!targetLayer) {
+        targetLayer = state.customLayers.find(l => l.type === 'manual') || state.addManualCustomLayer();
+      }
+      if (state.activeCustomLayerId !== targetLayer.id) {
+        state.setActiveCustomLayerId(targetLayer.id);
       }
       setCircleCenter(worldPos);
       setCirclePreview({
@@ -30,7 +33,7 @@ export function useMapEditCircle() {
         radius: 0.01,
       });
     },
-    [activeEditLayerId, mapEditFillValue]
+    [activeCustomLayerId, mapEditFillValue]
   );
 
   const handleCircleDrawMove = useCallback(
@@ -54,7 +57,8 @@ export function useMapEditCircle() {
 
   const handleCircleDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
-    const targetLayerId = activeEditLayerId || state.editLayers[0]?.id;
+    const targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual') || state.customLayers.find(l => l.type === 'manual');
+    const targetLayerId = targetLayer?.id;
     if (!circleCenter || !circlePreview || !targetLayerId) {
       setCircleCenter(null);
       setCirclePreview(null);
@@ -76,7 +80,7 @@ export function useMapEditCircle() {
   }, [
     circleCenter,
     circlePreview,
-    activeEditLayerId,
+    activeCustomLayerId,
     addEditObject,
     setSelectedEditObjectId,
     pushHistorySnapshot,

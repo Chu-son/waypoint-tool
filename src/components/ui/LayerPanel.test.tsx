@@ -17,6 +17,9 @@ vi.mock('lucide-react', () => ({
   Sparkles: () => <div data-testid="sparkles-icon" />,
   Pencil: () => <div data-testid="pencil-icon" />,
   Crop: () => <div data-testid="crop-icon" />,
+  Plus: () => <div data-testid="plus-icon" />,
+  Settings2: () => <div data-testid="settings2-icon" />,
+  X: () => <div data-testid="x-icon" />,
 }));
 
 // Mock API
@@ -51,29 +54,33 @@ describe('LayerPanel', () => {
     vi.clearAllMocks();
     (useAppStore as any).mockImplementation((selector: any) => selector({
       mapLayers: [],
-      editLayers: [],
+      customLayers: [],
       lastDirectory: '/test/dir',
       updateMapLayer: mockUpdateMapLayer,
       removeMapLayer: mockRemoveMapLayer,
       reorderMapLayers: mockReorderMapLayers,
       addMapLayer: mockAddMapLayer,
-      addEditLayer: vi.fn(),
-      removeEditLayer: vi.fn(),
-      updateEditLayer: vi.fn(),
-      reorderEditLayers: vi.fn(),
+      updateCustomLayer: vi.fn(),
+      removeCustomLayer: vi.fn(),
+      reorderCustomLayers: vi.fn(),
       setLastDirectory: mockSetLastDirectory,
+      plugins: {},
+      selectNodes: vi.fn(),
     }));
   });
 
   it('renders empty state', () => {
     render(<LayerPanel />);
-    expect(screen.getByText(/no maps loaded/i)).toBeInTheDocument();
+    expect(screen.getByText(/no maps or custom layers/i)).toBeInTheDocument();
   });
 
   it('shows layers and handles visibility toggle', () => {
     (useAppStore as any).mockImplementation((selector: any) => selector({
       mapLayers: mockLayers,
+      customLayers: [],
       updateMapLayer: mockUpdateMapLayer,
+      plugins: {},
+      selectNodes: vi.fn(),
     }));
 
     render(<LayerPanel />);
@@ -87,54 +94,61 @@ describe('LayerPanel', () => {
   it('handles reordering with up/down buttons', () => {
     (useAppStore as any).mockImplementation((selector: any) => selector({
       mapLayers: mockLayers,
+      customLayers: [],
       reorderMapLayers: mockReorderMapLayers,
+      plugins: {},
+      selectNodes: vi.fn(),
     }));
 
     render(<LayerPanel />);
+    
+    // First item's Down button (second button in up/down group for first item)
     const downBtns = screen.getAllByTitle('Move Down');
     fireEvent.click(downBtns[0]);
     expect(mockReorderMapLayers).toHaveBeenCalledWith(0, 1);
   });
 
   it('handles map loading flow', async () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [],
-      lastDirectory: '/test/dir',
-      addMapLayer: mockAddMapLayer,
-      setLastDirectory: mockSetLastDirectory,
-    }));
-
-    (DialogAPI.open as any).mockResolvedValue('/new/map.yaml');
+    (DialogAPI.open as any).mockResolvedValue('/path/to/test_map.yaml');
     (BackendAPI.loadROSMap as any).mockResolvedValue({
-        info: { res: 0.1 },
-        image_data_b64: 'b64',
-        width: 100,
-        height: 100
+      info: { resolution: 0.05 },
+      image_data_b64: 'fake-base64',
+      width: 100,
+      height: 100,
     });
 
     render(<LayerPanel />);
-    const loadBtn = screen.getByRole('button', { name: /load map/i });
+    
+    const loadBtn = screen.getByText('Load Map');
     fireEvent.click(loadBtn);
 
     await waitFor(() => {
       expect(DialogAPI.open).toHaveBeenCalled();
-      expect(BackendAPI.loadROSMap).toHaveBeenCalledWith('/new/map.yaml');
-      expect(mockAddMapLayer).toHaveBeenCalledWith('map.yaml', { res: 0.1 }, 'b64', 100, 100);
-      expect(mockSetLastDirectory).toHaveBeenCalledWith('/new');
+      expect(BackendAPI.loadROSMap).toHaveBeenCalledWith('/path/to/test_map.yaml');
+      expect(mockAddMapLayer).toHaveBeenCalledWith(
+        'test_map.yaml',
+        { resolution: 0.05 },
+        'fake-base64',
+        100,
+        100
+      );
+      expect(mockSetLastDirectory).toHaveBeenCalledWith('/path/to');
     });
   });
 
   it('removes layer after confirmation', async () => {
     (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [mockLayers[0]],
+      mapLayers: mockLayers,
+      customLayers: [],
       removeMapLayer: mockRemoveMapLayer,
+      plugins: {},
+      selectNodes: vi.fn(),
     }));
 
-    (DialogAPI.ask as any).mockResolvedValue(true);
-    
     render(<LayerPanel />);
-    const deleteBtn = screen.getByTitle('Remove Map');
-    fireEvent.click(deleteBtn);
+    
+    const removeBtns = screen.getAllByTitle('Remove Map');
+    fireEvent.click(removeBtns[0]);
 
     await waitFor(() => {
       expect(DialogAPI.ask).toHaveBeenCalled();

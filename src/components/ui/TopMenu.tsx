@@ -134,6 +134,8 @@ function WindowControls({ onExit }: { onExit: () => void }) {
   );
 }
 
+import { PathRouterMenu } from "./PathRouterMenu";
+
 export function TopMenu() {
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const removeNodes = useAppStore((state) => state.removeNodes);
@@ -286,6 +288,10 @@ export function TopMenu() {
             />
           ))}
         </div>
+
+        <div className="h-4 w-px bg-border-base/50" />
+
+        <PathRouterMenu />
       </div>
 
       <WindowControls onExit={handleExit} />
