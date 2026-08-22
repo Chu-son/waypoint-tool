@@ -34,27 +34,27 @@ function TabButton({
     <button
       onClick={onClick}
       className={cn(
-        "text-[11px] font-bold uppercase tracking-wider pb-1 flex items-center gap-1.5 shrink-0 transition-all border-b-2",
+        "text-[11px] font-semibold tracking-wide px-2.5 py-1 rounded-md flex items-center gap-1.5 shrink-0 transition-all cursor-pointer select-none",
         isActive
-          ? "text-primary-base border-primary-base"
-          : "text-text-muted border-transparent hover:text-text-base"
+          ? "text-primary-base bg-primary-base/15 font-bold shadow-sm"
+          : "text-text-muted hover:text-text-base hover:bg-surface-hover/60"
       )}
     >
-      <span className={cn("transition-transform", isActive ? "scale-110" : "")}>
+      <span className={cn("transition-transform shrink-0", isActive ? "scale-105" : "")}>
         {panel.icon}
       </span>
-      {panel.title}
+      <span className="truncate">{panel.title}</span>
     </button>
   );
 }
 
-function ViewModeMenuItem({
+function MenuItem({
   icon,
   label,
   isActive,
   onClick,
 }: {
-  icon: ReactNode;
+  icon?: ReactNode;
   label: string;
   isActive: boolean;
   onClick: () => void;
@@ -63,14 +63,15 @@ function ViewModeMenuItem({
     <button
       onClick={onClick}
       className={cn(
-        "w-full px-4 py-2 text-left text-xs flex items-center gap-2 transition-colors",
+        "w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 transition-colors cursor-pointer rounded-md",
         isActive
           ? "text-primary-base font-bold bg-primary-base/10"
           : "text-text-muted hover:bg-surface-hover hover:text-text-base"
       )}
     >
-      {icon}
-      {label}
+      {icon && <span className="shrink-0">{icon}</span>}
+      <span className="truncate flex-1">{label}</span>
+      {isActive && <span className="w-1.5 h-1.5 rounded-full bg-primary-base shrink-0" />}
     </button>
   );
 }
@@ -89,23 +90,23 @@ export function PanelContainer({
   const activePanel = panels.find((p) => p.id === activeTabId) || panels[0];
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden">
+    <div className="flex flex-col h-full w-full relative">
       {/* Header */}
-      <div className="relative z-10 px-3 py-2 border-b border-border-base bg-surface-panel/80 flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-2 overflow-hidden">
+      <div className="relative z-10 px-2 py-1.5 border-b border-border-base bg-surface-panel/90 flex justify-between items-center shrink-0 min-h-[38px] gap-1">
+        <div className="flex items-center gap-1.5 overflow-hidden min-w-0 flex-1">
           {onClose && (
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="h-7 w-7 shrink-0"
+              className="h-7 w-7 shrink-0 text-text-muted hover:text-text-base"
             >
               {closeIcon}
             </Button>
           )}
           
           {viewMode === "tabs" ? (
-            <div className="flex space-x-4 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0 flex-1">
               {panels.map((panel) => (
                 <TabButton
                   key={panel.id}
@@ -116,11 +117,11 @@ export function PanelContainer({
               ))}
             </div>
           ) : (
-            <FieldLabel className="ml-1">Split View</FieldLabel>
+            <FieldLabel className="ml-1 truncate">Split View</FieldLabel>
           )}
         </div>
 
-        <div className="relative shrink-0">
+        <div className="relative shrink-0 flex items-center">
           <Button
             variant="ghost"
             size="icon"
@@ -136,28 +137,53 @@ export function PanelContainer({
           {isMenuOpen && (
             <>
               <div 
-                className="fixed inset-0 z-10" 
+                className="fixed inset-0 z-40" 
                 onClick={() => setIsMenuOpen(false)} 
               />
-              <div className="absolute right-0 mt-2 w-48 bg-surface-panel/95 backdrop-blur-md border border-border-base rounded-lg shadow-2xl py-1 z-20 animate-in fade-in zoom-in duration-100 origin-top-right">
-                <ViewModeMenuItem
-                  icon={<Layout size={14} />}
-                  label="Tab View"
-                  isActive={viewMode === "tabs"}
-                  onClick={() => {
-                    onViewModeChange("tabs");
-                    setIsMenuOpen(false);
-                  }}
-                />
-                <ViewModeMenuItem
-                  icon={<Columns size={14} className="rotate-90" />}
-                  label="Split View (Vertical)"
-                  isActive={viewMode === "split"}
-                  onClick={() => {
-                    onViewModeChange("split");
-                    setIsMenuOpen(false);
-                  }}
-                />
+              <div className="absolute right-0 top-full mt-1.5 w-44 bg-surface-panel/98 backdrop-blur-md border border-border-base rounded-lg shadow-2xl p-1 z-50 animate-in fade-in zoom-in duration-100 origin-top-right">
+                {/* Tabs List */}
+                <div className="space-y-0.5">
+                  {panels.map((panel) => (
+                    <MenuItem
+                      key={panel.id}
+                      icon={panel.icon}
+                      label={panel.title}
+                      isActive={viewMode === "tabs" && activeTabId === panel.id}
+                      onClick={() => {
+                        onTabChange(panel.id);
+                        if (viewMode !== "tabs") {
+                          onViewModeChange("tabs");
+                        }
+                        setIsMenuOpen(false);
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Divider */}
+                <div className="my-1 border-t border-border-base/50" />
+
+                {/* View Mode */}
+                <div className="space-y-0.5">
+                  <MenuItem
+                    icon={<Layout size={14} />}
+                    label="Tab View"
+                    isActive={viewMode === "tabs"}
+                    onClick={() => {
+                      onViewModeChange("tabs");
+                      setIsMenuOpen(false);
+                    }}
+                  />
+                  <MenuItem
+                    icon={<Columns size={14} className="rotate-90" />}
+                    label="Split View (Vertical)"
+                    isActive={viewMode === "split"}
+                    onClick={() => {
+                      onViewModeChange("split");
+                      setIsMenuOpen(false);
+                    }}
+                  />
+                </div>
               </div>
             </>
           )}

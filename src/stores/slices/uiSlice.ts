@@ -102,7 +102,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   rightPanelViewMode: 'tabs',
   isLeftPanelOpen: true,
   isRightPanelOpen: true,
-  leftPanelWidth: 256,
+  leftPanelWidth: 280,
   rightPanelWidth: 320,
   showProperties: true,
 
@@ -166,7 +166,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
     rightPanelViewMode: 'tabs',
     leftPanelActiveTab: 'project',
     rightPanelActiveTab: 'layers',
-    leftPanelWidth: 256,
+    leftPanelWidth: 280,
     rightPanelWidth: 320,
     isDirty: true
   }),

@@ -199,7 +199,7 @@ function App() {
 
       const onMouseMove = (moveEvent: MouseEvent) => {
         const newWidth = startWidth + (moveEvent.clientX - startX);
-        setLeftWidth(Math.max(150, Math.min(newWidth, 600)));
+        setLeftWidth(Math.max(180, Math.min(newWidth, 600)));
       };
       const onMouseUp = () => {
         document.removeEventListener("mousemove", onMouseMove);
@@ -292,7 +292,7 @@ function App() {
           <>
             <div
               style={{ width: leftWidth }}
-              className="bg-surface-panel border-r border-border-base flex flex-col z-0 shadow-lg relative flex-shrink-0"
+              className="bg-surface-panel border-r border-border-base flex flex-col z-20 shadow-lg relative flex-shrink-0"
             >
               <PanelContainer
                 panels={leftPanels}
@@ -360,7 +360,7 @@ function App() {
             />
             <div
               style={{ width: rightWidth }}
-              className="bg-surface-panel border-l border-border-base flex flex-col z-0 shadow-lg relative flex-shrink-0"
+              className="bg-surface-panel border-l border-border-base flex flex-col z-20 shadow-lg relative flex-shrink-0"
             >
               <PanelContainer
                 panels={rightPanels}
