@@ -16,6 +16,8 @@ export type MapSlice = {
   showFootprints: boolean;
   shouldFitToMaps: number;
   isExportPreview: boolean;
+  showOccupancyHighlight: boolean;
+  occupancyHighlightAlpha: number;
 
   setMapLayers: (layers: ProjectMapLayer[]) => void;
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => void;
@@ -43,6 +45,8 @@ export type MapSlice = {
   setShowFootprints: (show: boolean) => void;
   triggerFitToMaps: () => void;
   setIsExportPreview: (enabled: boolean) => void;
+  setShowOccupancyHighlight: (show: boolean) => void;
+  setOccupancyHighlightAlpha: (alpha: number) => void;
 
   exportRegions: ExportRegion[];
   addExportRegion: (region: ExportRegion) => void;
@@ -63,6 +67,8 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   showFootprints: false,
   shouldFitToMaps: 0,
   isExportPreview: false,
+  showOccupancyHighlight: false,
+  occupancyHighlightAlpha: 0.6,
   exportRegions: [],
 
   setShowPaths: (show: boolean) => set({ showPaths: show }),
@@ -70,6 +76,8 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   setShowFootprints: (show: boolean) => set({ showFootprints: show }),
   triggerFitToMaps: () => set({ shouldFitToMaps: Date.now() }),
   setIsExportPreview: (enabled: boolean) => set({ isExportPreview: enabled }),
+  setShowOccupancyHighlight: (show: boolean) => set({ showOccupancyHighlight: show }),
+  setOccupancyHighlightAlpha: (alpha: number) => set({ occupancyHighlightAlpha: alpha }),
 
   setCustomLayers: (layers: CustomLayer[]) => set({ customLayers: layers, isDirty: true }),
 
@@ -174,13 +182,20 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   setMapLayers: (layers: ProjectMapLayer[]) => set({ mapLayers: layers, isDirty: true }),
 
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => set((state) => {
+    const occSettings = state.occupancySettings || { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 };
+    const mergedInfo = {
+      ...info,
+      occupied_thresh: typeof info?.occupied_thresh === 'number' ? info.occupied_thresh : occSettings.defaultOccupiedThresh,
+      free_thresh: typeof info?.free_thresh === 'number' ? info.free_thresh : occSettings.defaultFreeThresh,
+      negate: typeof info?.negate === 'number' ? info.negate : occSettings.defaultNegate,
+    };
     const newLayer: ProjectMapLayer = {
       id: uuidv4(),
       name,
       visible: true,
       opacity: state.defaultMapOpacity,
       image_base64: base64,
-      info: info,
+      info: mergedInfo,
       width,
       height,
       z_index: state.mapLayers.length,

@@ -11,12 +11,29 @@ vi.mock('@pixi/react', () => ({
 
 // Mock pixi.js
 vi.mock('pixi.js', () => {
+  class MockFilter {
+    destroy = vi.fn();
+    resources: any;
+    constructor(options?: any) {
+      this.resources = options?.resources || {};
+    }
+  }
   return {
     Container: () => ({ destroy: vi.fn() }),
     Sprite: () => ({ destroy: vi.fn() }),
     Graphics: () => ({ destroy: vi.fn() }),
     Text: () => ({ destroy: vi.fn() }),
     TextStyle: vi.fn(),
+    Filter: MockFilter,
+    GlProgram: {
+      from: vi.fn().mockReturnValue({}),
+    },
+    UniformGroup: class MockUniformGroup {
+      uniforms: any;
+      constructor(uniforms?: any) {
+        this.uniforms = uniforms || {};
+      }
+    },
     Texture: {
       from: vi.fn((img: any) => ({
         width: img?.width || 100,
