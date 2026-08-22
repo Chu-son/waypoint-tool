@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Custom UI Configuration Schema",
+  "type": "object",
+  "properties": {
+    "brand": {
+      "type": "object",
+      "properties": {
+        "appName": { "type": "string" },
+        "windowTitle": { "type": "string" },
+        "icon": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "about": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "version": { "type": "string" },
+            "company": { "type": "string" }
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "cssVariables": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "customCssPath": { "type": "string" }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "showWelcomeModal": { "type": "boolean" },
+        "topMenu": {
+          "type": "object",
+          "properties": {
+            "hiddenMenuLabels": { "type": "array", "items": { "type": "string" } },
+            "hiddenItemIds": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "toolPanel": {
+          "type": "object",
+          "properties": {
+            "visibleTools": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["select", "add_point", "add_generator", "add_rect_sweep", "add_export_region"] }
+            },
+            "allowImport": { "type": "boolean" },
+            "allowExport": { "type": "boolean" },
+            "allowSettings": { "type": "boolean" }
+          }
+        },
+        "leftPanel": {
+          "type": "object",
+          "properties": {
+            "defaultOpen": { "type": "boolean" },
+            "defaultWidth": { "type": "number" },
+            "viewMode": { "type": "string", "enum": ["tabs", "split"] },
+            "tabs": { "type": "array" }
+          }
+        },
+        "rightPanel": {
+          "type": "object",
+          "properties": {
+            "defaultOpen": { "type": "boolean" },
+            "defaultWidth": { "type": "number" },
+            "viewMode": { "type": "string", "enum": ["tabs", "split"] },
+            "tabs": { "type": "array" }
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "title"],
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "actionButton": {
+                "type": "object",
+                "required": ["label", "action"],
+                "properties": {
+                  "label": { "type": "string" },
+                  "action": { "type": "string" },
+                  "args": { "type": "object" }
+                }
+              },
+              "controls": { "type": "array" },
+              "pluginTarget": { "type": "string" },
+              "simplifiedParams": { "type": "array" },
+              "onEnter": { "type": "object" },
+              "onLeave": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

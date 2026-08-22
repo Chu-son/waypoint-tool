@@ -1,0 +1,133 @@
+{
+  "$schema": "../../schema/custom-ui-config.schema.json",
+  "brand": {
+    "appName": "Roomba Route Creator",
+    "windowTitle": "Roomba Route Creator - お掃除経路エディタ",
+    "icon": "Bot",
+    "about": {
+      "title": "Roomba Route Creator v1.0",
+      "description": "初心者向けお掃除ロボット経路設定ツール",
+      "company": "Robotics Clean Solutions"
+    }
+  },
+  "theme": {
+    "cssVariables": {
+      "--color-primary-base": "#10b981",
+      "--color-primary-hover": "#059669"
+    }
+  },
+  "layout": {
+    "showWelcomeModal": false,
+    "topMenu": {
+      "hiddenItemIds": ["help_devtools", "file_export_maps"]
+    },
+    "toolPanel": {
+      "visibleTools": ["select", "add_point", "add_rect_sweep"],
+      "allowImport": false,
+      "allowExport": true,
+      "allowSettings": false
+    },
+    "leftPanel": {
+      "defaultOpen": true,
+      "defaultWidth": 340,
+      "viewMode": "tabs",
+      "tabs": [
+        { "type": "workflow", "id": "workflow", "title": "お掃除手順ガイド" },
+        { "type": "builtin", "id": "project", "title": "詳細地点一覧" }
+      ]
+    },
+    "rightPanel": {
+      "defaultOpen": true,
+      "defaultWidth": 320,
+      "viewMode": "tabs",
+      "tabs": [
+        { "type": "builtin", "id": "inspector", "title": "属性設定" },
+        { "type": "builtin", "id": "layers", "title": "マップレイヤー" }
+      ]
+    }
+  },
+  "workflow": {
+    "id": "roomba_cleaning_flow",
+    "title": "お掃除ルート作成ワークフロー",
+    "steps": [
+      {
+        "id": "step_new_project",
+        "title": "1. 新規プロジェクト",
+        "description": "新しいお掃除計画を開始します。",
+        "actionButton": { "label": "初期化して開始", "action": "reset_project" }
+      },
+      {
+        "id": "step_load_map",
+        "title": "2. 間取りマップの読み込み",
+        "description": "部屋のマップ画像（PGM/PNG/YAML）を選択してください。",
+        "actionButton": { "label": "マップファイルを開く", "action": "open_map_dialog" },
+        "onEnter": { "actions": ["triggerFitToMaps"] }
+      },
+      {
+        "id": "step_footprint",
+        "title": "3. ロボットサイズの確認",
+        "description": "お掃除ロボットの直径を設定します。",
+        "controls": [
+          {
+            "type": "slider",
+            "target": { "action": "setRobotFootprintRadius" },
+            "label": "本体の半径 (m)",
+            "min": 0.1,
+            "max": 0.5,
+            "step": 0.01,
+            "default": 0.18
+          }
+        ],
+        "onEnter": { "state": { "showFootprints": true } }
+      },
+      {
+        "id": "step_noise_cleanup",
+        "title": "4. マップのノイズ消去",
+        "description": "キャンバス上で不要なゴミや障害物のノイズを消しゴムで消去します。",
+        "onEnter": { "state": { "isMapEditMode": true, "mapEditSubTool": "circle", "mapEditFillValue": 0 } },
+        "onLeave": { "state": { "isMapEditMode": false } }
+      },
+      {
+        "id": "step_cleaning_area",
+        "title": "5. 清掃エリアの囲み指定",
+        "description": "マップ上で掃除を行いたい領域を四角形で囲んでください。",
+        "onEnter": {
+          "state": { "activeTool": "add_rect_sweep" },
+          "actions": [{ "name": "ensureCustomLayer", "args": { "layerName": "清掃対象エリア" } }]
+        }
+      },
+      {
+        "id": "step_generate_path",
+        "title": "6. 経路の自動生成",
+        "description": "囲んだエリアを隙間なく掃除するジグザグ経路を自動計算します。",
+        "pluginTarget": "grid_sweep_generator",
+        "simplifiedParams": [
+          {
+            "paramKey": "step_size",
+            "label": "お掃除の細かさ",
+            "type": "select",
+            "options": [
+              { "label": "標準 (30cm間隔)", "value": 0.3 },
+              { "label": "念入り (15cm間隔)", "value": 0.15 },
+              { "label": "高速 (45cm間隔)", "value": 0.45 }
+            ]
+          }
+        ],
+        "actionButton": { "label": "ルートを自動生成する", "action": "run_active_plugin" }
+      },
+      {
+        "id": "step_verify_coverage",
+        "title": "7. 塗り残しの目視確認",
+        "description": "走行幅表示を確認し、塗り残しがないかチェックします。",
+        "onEnter": { "state": { "showFootprints": true, "showPaths": true } }
+      },
+      {
+        "id": "step_manual_tweak_export",
+        "title": "8. 微調整と保存",
+        "description": "必要に応じて地点をドラッグして位置を調整し、ロボット用データとして書き出します。",
+        "onEnter": { "state": { "activeTool": "select", "showProperties": true } },
+        "actionButton": { "label": "経路ファイルを書き出す (Export)", "action": "open_export_modal" }
+      }
+    ]
+  }
+}
