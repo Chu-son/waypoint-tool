@@ -143,6 +143,9 @@
 - **`KeyboardShortcutsModal`** ([`src/components/ui/KeyboardShortcutsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/KeyboardShortcutsModal.tsx))
   - **概要**: 定義されているショートカットキー一覧を表示するヘルプダイアログ。
   - **主要Props**: `isOpen`, `onClose`
+- **`WelcomeModal`** ([`src/components/ui/WelcomeModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WelcomeModal.tsx))
+  - **概要**: ツール起動時およびファイルメニューから呼び出せるプロジェクト選択・ウェルカム画面。新規作成、既存プロジェクトを開く、直近開いたプロジェクト一覧のロードを提供。
+  - **主要Props**: `isOpen`, `onClose`
 - **`StatusBar`** ([`src/components/ui/StatusBar.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/StatusBar.tsx))
   - **概要**: 画面最下部にマウスのワールド座標 (X, Y)、現在のズーム倍率、アクティブツール状態を表示するバー。
   - **主要Props**: なし

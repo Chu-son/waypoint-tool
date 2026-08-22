@@ -71,6 +71,8 @@ describe('TopMenu', () => {
       setExportModalOpen: mockSetExportModalOpen,
       setSettingsModalOpen: mockSetSettingsModalOpen,
       setShortcutsModalOpen: vi.fn(),
+      setWelcomeModalOpen: vi.fn(),
+      setIsInitialLaunch: vi.fn(),
       setShowPaths: mockSetShowPaths,
       setShowGrid: mockSetShowGrid,
       selectAllNodes: mockSelectAllNodes,
@@ -86,6 +88,7 @@ describe('TopMenu', () => {
     (useAppStore.getState as any) = vi.fn().mockReturnValue({
         isDirty: false,
         setIsDirty: vi.fn(),
+        resetProject: vi.fn(),
     });
     
     (useAppStore.setState as any) = vi.fn().mockImplementation((updates) => {
@@ -103,7 +106,7 @@ describe('TopMenu', () => {
     expect(screen.getByText('Help')).toBeInTheDocument();
   });
 
-  it('opens "File" menu and handles "Open Project"', () => {
+  it('opens "File" menu and handles "Open Project"', async () => {
     render(<TopMenu />);
     const fileBtn = screen.getByText('File');
     fireEvent.click(fileBtn);
@@ -112,7 +115,9 @@ describe('TopMenu', () => {
     expect(openBtn).toBeInTheDocument();
     fireEvent.click(openBtn);
 
-    expect(mockLoadProject).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockLoadProject).toHaveBeenCalled();
+    });
   });
 
   it('handles dirty state exit confirmation', async () => {

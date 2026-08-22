@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, RobotFootprint, OccupancySettings } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, RobotFootprint, OccupancySettings, RecentProjectItem } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -77,6 +77,7 @@ export function normalizeProjectData(data: any): {
 
 export type ProjectSlice = {
   lastDirectory: string | null;
+  recentProjects: RecentProjectItem[];
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
   defaultExportFormats: DefaultExportFormat[];
@@ -89,6 +90,7 @@ export type ProjectSlice = {
   syncPathWidthWithFootprint: boolean;
 
   setLastDirectory: (dir: string | null) => void;
+  addRecentProject: (pathStr: string) => void;
   setGlobalPythonPath: (path: string) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
   setRobotFootprint: (footprint: RobotFootprint) => void;
@@ -144,13 +146,15 @@ export type ProjectSlice = {
     syncPathWidthWithFootprint?: boolean;
   }) => void;
   
-  loadProject: () => Promise<void>;
+  loadProject: () => Promise<boolean>;
+  loadProjectFromPath: (pathStr: string) => Promise<boolean>;
   saveProject: () => Promise<void>;
   resetProject: () => void;
 };
 
 export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => ({
   lastDirectory: null,
+  recentProjects: [],
   optionsSchema: null,
   exportTemplates: [],
   defaultExportFormats: [
@@ -166,6 +170,21 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   syncPathWidthWithFootprint: false,
 
   setLastDirectory: (dir: string | null) => set({ lastDirectory: dir }),
+  addRecentProject: (pathStr: string) => set((state) => {
+    const normalizedPath = pathStr.trim();
+    if (!normalizedPath) return state;
+    const fileName = normalizedPath.split(/[/\\]/).pop() || normalizedPath;
+    const name = fileName.replace(/\.wptroj$/i, '');
+    const filtered = state.recentProjects.filter((p) => p.path !== normalizedPath);
+    const updated: RecentProjectItem = {
+      path: normalizedPath,
+      name,
+      lastOpened: Date.now(),
+    };
+    return {
+      recentProjects: [updated, ...filtered].slice(0, 10),
+    };
+  }),
   setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
   setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
   setRobotFootprint: (footprint: RobotFootprint) => set({ robotFootprint: footprint, isDirty: true }),
@@ -268,8 +287,68 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     };
   }),
 
-  loadProject: async () => {
-    const { lastDirectory, setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity, recalculatePath } = get();
+  loadProjectFromPath: async (pathStr: string): Promise<boolean> => {
+    const { setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity, recalculatePath, addRecentProject } = get();
+    try {
+      const getDirName = (path: string) => {
+        const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+        return lastSlash > -1 ? path.substring(0, lastSlash) : path;
+      };
+
+      setLastDirectory(getDirName(pathStr));
+      const projectData: any = await BackendAPI.loadProject(pathStr);
+
+      setProjectData({
+        nodes: projectData.nodes,
+        rootNodeIds: projectData.root_node_ids,
+        mapLayers: projectData.map_layers?.map((layer: any) => ({
+          id: uuidv4(),
+          name: layer.name || "Restored Map",
+          info: layer.info || {},
+          image_base64: layer.image_base64 || "",
+          width: layer.width || 1000,
+          height: layer.height || 1000,
+          visible: typeof layer.visible === 'boolean' ? layer.visible : true,
+          opacity: typeof layer.opacity === 'number' ? layer.opacity : (projectData.default_map_opacity ?? defaultMapOpacity),
+          z_index: typeof layer.z_index === 'number' ? layer.z_index : 0,
+          blend_mode: layer.blend_mode || 'overwrite'
+        })),
+        custom_layers: projectData.custom_layers,
+        generated_layers: projectData.generated_layers,
+        edit_layers: projectData.edit_layers,
+        export_regions: projectData.export_regions,
+        options_schema: projectData.options_schema,
+        export_templates: projectData.export_templates,
+        robot_footprint: projectData.robot_footprint,
+        occupancy_settings: projectData.occupancy_settings,
+        default_map_opacity: projectData.default_map_opacity,
+        left_panel_view_mode: projectData.left_panel_view_mode,
+        right_panel_view_mode: projectData.right_panel_view_mode,
+        active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
+        path_calculator_params: projectData.path_calculator_params,
+        auto_recalculate_path: projectData.auto_recalculate_path,
+        path_color: projectData.path_color,
+        path_width: projectData.path_width,
+        path_opacity: projectData.path_opacity,
+        sync_path_width_with_footprint: projectData.sync_path_width_with_footprint,
+      });
+      setIsDirty(false);
+      addRecentProject(pathStr);
+
+      // Recalculate path if active plugin was loaded
+      if (projectData.active_path_calculator_plugin_id) {
+        recalculatePath();
+      }
+      return true;
+    } catch (err) {
+      console.error("Failed to load project:", err);
+      alert(`プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+      return false;
+    }
+  },
+
+  loadProject: async (): Promise<boolean> => {
+    const { lastDirectory, loadProjectFromPath } = get();
     try {
       const selectedPath = await DialogAPI.open({
         multiple: false,
@@ -279,60 +358,14 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
       if (selectedPath) {
         const pathStr = typeof selectedPath === "string" ? selectedPath : (selectedPath as any).path;
-        if (!pathStr) return;
-
-        const getDirName = (path: string) => {
-          const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-          return lastSlash > -1 ? path.substring(0, lastSlash) : path;
-        };
-
-        setLastDirectory(getDirName(pathStr));
-        const projectData: any = await BackendAPI.loadProject(pathStr);
-
-        setProjectData({
-          nodes: projectData.nodes,
-          rootNodeIds: projectData.root_node_ids,
-          mapLayers: projectData.map_layers?.map((layer: any) => ({
-            id: uuidv4(),
-            name: layer.name || "Restored Map",
-            info: layer.info || {},
-            image_base64: layer.image_base64 || "",
-            width: layer.width || 1000,
-            height: layer.height || 1000,
-            visible: typeof layer.visible === 'boolean' ? layer.visible : true,
-            opacity: typeof layer.opacity === 'number' ? layer.opacity : (projectData.default_map_opacity ?? defaultMapOpacity),
-            z_index: typeof layer.z_index === 'number' ? layer.z_index : 0,
-            blend_mode: layer.blend_mode || 'overwrite'
-          })),
-          custom_layers: projectData.custom_layers,
-          generated_layers: projectData.generated_layers,
-          edit_layers: projectData.edit_layers,
-          export_regions: projectData.export_regions,
-          options_schema: projectData.options_schema,
-          export_templates: projectData.export_templates,
-          robot_footprint: projectData.robot_footprint,
-          occupancy_settings: projectData.occupancy_settings,
-          default_map_opacity: projectData.default_map_opacity,
-          left_panel_view_mode: projectData.left_panel_view_mode,
-          right_panel_view_mode: projectData.right_panel_view_mode,
-          active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
-          path_calculator_params: projectData.path_calculator_params,
-          auto_recalculate_path: projectData.auto_recalculate_path,
-          path_color: projectData.path_color,
-          path_width: projectData.path_width,
-          path_opacity: projectData.path_opacity,
-          sync_path_width_with_footprint: projectData.sync_path_width_with_footprint,
-        });
-        setIsDirty(false);
-
-        // Recalculate path if active plugin was loaded
-        if (projectData.active_path_calculator_plugin_id) {
-          recalculatePath();
-        }
+        if (!pathStr) return false;
+        return await loadProjectFromPath(pathStr);
       }
+      return false;
     } catch (err) {
-      console.error("Failed to load project:", err);
-      alert(`プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+      console.error("Failed to open project dialog:", err);
+      alert(`プロジェクト選択ダイアログの起動に失敗しました。\nエラー詳細: ${String(err)}`);
+      return false;
     }
   },
 
@@ -357,6 +390,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       pathOpacity,
       syncPathWidthWithFootprint,
       setIsDirty,
+      addRecentProject,
     } = get();
     try {
       const savePath = await DialogAPI.save({
@@ -413,6 +447,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         };
         await BackendAPI.saveProject(finalPath, projectData);
         setIsDirty(false);
+        addRecentProject(finalPath);
         alert("プロジェクトを保存しました。");
       }
     } catch (err) {

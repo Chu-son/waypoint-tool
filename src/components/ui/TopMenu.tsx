@@ -155,6 +155,8 @@ export function TopMenu() {
   const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
   const setExportMapsModalOpen = useAppStore((state) => state.setExportMapsModalOpen);
   const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
+  const setWelcomeModalOpen = useAppStore((state) => state.setWelcomeModalOpen);
+  const setIsInitialLaunch = useAppStore((state) => state.setIsInitialLaunch);
   const selectAllNodes = useAppStore((state) => state.selectAllNodes);
   const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
@@ -184,6 +186,29 @@ export function TopMenu() {
     }
   };
 
+  const confirmDiscardChanges = async (): Promise<boolean> => {
+    if (!useAppStore.getState().isDirty) return true;
+    return await DialogAPI.ask(
+      "未保存の変更があります。破棄して続行しますか？",
+      {
+        title: "未保存の変更の確認",
+        kind: "warning",
+      }
+    );
+  };
+
+  const handleNewProject = async () => {
+    const ok = await confirmDiscardChanges();
+    if (!ok) return;
+    useAppStore.getState().resetProject();
+  };
+
+  const handleOpenProject = async () => {
+    const ok = await confirmDiscardChanges();
+    if (!ok) return;
+    await loadProject();
+  };
+
   const handleExit = async () => {
     if (useAppStore.getState().isDirty) {
       const confirmed = await DialogAPI.ask(
@@ -203,8 +228,16 @@ export function TopMenu() {
     {
       label: "File",
       options: [
-        { label: "New Project...", action: () => useAppStore.getState().resetProject(), shortcut: "Ctrl+N" },
-        { label: "Open Project...", action: loadProject, shortcut: "Ctrl+O" },
+        {
+          label: "Welcome Screen...",
+          action: () => {
+            setIsInitialLaunch(false);
+            setWelcomeModalOpen(true);
+          },
+        },
+        { divider: true, label: "" },
+        { label: "New Project...", action: handleNewProject, shortcut: "Ctrl+N" },
+        { label: "Open Project...", action: handleOpenProject, shortcut: "Ctrl+O" },
         { label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
         { divider: true, label: "" },
         { label: "Export Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },

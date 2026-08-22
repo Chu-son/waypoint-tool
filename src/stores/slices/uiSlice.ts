@@ -38,6 +38,8 @@ export type UISlice = {
   isImportModalOpen: boolean;
   isExportMapsModalOpen: boolean;
   isShortcutsModalOpen: boolean;
+  isWelcomeModalOpen: boolean;
+  isInitialLaunch: boolean;
   settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins';
 
   // Map Edit UI State
@@ -78,6 +80,8 @@ export type UISlice = {
   setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;
   setShortcutsModalOpen: (open: boolean) => void;
+  setWelcomeModalOpen: (open: boolean) => void;
+  setIsInitialLaunch: (initial: boolean) => void;
   
   // Note: setDirty is mapped to setIsDirty in original store
   setDirty: (dirty: boolean) => void;
@@ -112,6 +116,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   isImportModalOpen: false,
   isExportMapsModalOpen: false,
   isShortcutsModalOpen: false,
+  isWelcomeModalOpen: true,
+  isInitialLaunch: true,
 
   isMapEditMode: false,
   mapEditSubTool: 'rect',
@@ -179,4 +185,6 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => (
   setImportModalOpen: (open) => set({ isImportModalOpen: open }),
   setExportMapsModalOpen: (open) => set({ isExportMapsModalOpen: open }),
   setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
+  setWelcomeModalOpen: (open) => set({ isWelcomeModalOpen: open }),
+  setIsInitialLaunch: (initial) => set({ isInitialLaunch: initial }),
 });

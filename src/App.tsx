@@ -12,6 +12,7 @@ import { MapCanvas } from "./components/canvas/MapCanvas";
 import { SettingsModal } from "./components/ui/SettingsModal";
 import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
 import { ExportMapsModal } from "./components/ui/ExportMapsModal";
+import { WelcomeModal } from "./components/ui/WelcomeModal";
 import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
 import { MapEditOverlay } from "./components/ui/MapEditOverlay";
@@ -58,6 +59,9 @@ function App() {
   
   const isShortcutsModalOpen = useAppStore((state) => state.isShortcutsModalOpen);
   const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
+
+  const isWelcomeModalOpen = useAppStore((state) => state.isWelcomeModalOpen);
+  const setWelcomeModalOpen = useAppStore((state) => state.setWelcomeModalOpen);
 
   const leftWidth = useAppStore((state) => state.leftPanelWidth);
   const rightWidth = useAppStore((state) => state.rightPanelWidth);
@@ -384,6 +388,10 @@ function App() {
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setShortcutsModalOpen(false)}
+      />
+      <WelcomeModal
+        isOpen={isWelcomeModalOpen}
+        onClose={() => setWelcomeModalOpen(false)}
       />
     </div>
   );

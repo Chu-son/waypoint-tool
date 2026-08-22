@@ -49,6 +49,12 @@ export type ExportTemplate = {
   importMapping?: ImportFieldMapping;
 };
 
+export interface RecentProjectItem {
+  path: string;
+  name: string;
+  lastOpened: number;
+}
+
 export interface PluginSetting {
   id: string;
   path?: string;
