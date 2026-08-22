@@ -158,7 +158,9 @@
   - **概要**: マップ未読み込み時にキャンバス上に表示されるウェルカム・ドロップエリアガイド UI。
   - **主要Props**: `onOpenMap`
 
-### Canvas レイヤー群 (`src/components/canvas/layers/`)
+### Canvas レイヤー & フィルター群 (`src/components/canvas/`)
+- **`OccupancyHighlightFilter`** ([`src/components/canvas/filters/OccupancyHighlightFilter.ts`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/filters/OccupancyHighlightFilter.ts))
+  - **概要**: マップ画像を 2D Occupancy Grid の 3 領域（Obstacle: 赤, Free: 緑, Unknown: 紫）にリアルタイム色分けする PixiJS GPU GLSL シェーダーフィルター。
 - **`FootprintLayer`** ([`src/components/canvas/layers/FootprintLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/FootprintLayer.tsx))
   - **概要**: 選択中の Waypoint および（表示トグル有効時の）全 Waypoint に対して、ロボットの向き (yaw) に合わせたフットプリント外枠・塗りつぶし・進行方向インジケーターを高速 WebGL 描画。
 - **`WaypointLayer`** ([`src/components/canvas/layers/WaypointLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/WaypointLayer.tsx))

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI, BackendAPI } from "../../api";
 import { Button } from "./common/Button";
@@ -72,6 +72,9 @@ export function LayerPanel() {
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
   const selectNodes = useAppStore((state) => state.selectNodes);
+
+  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
+  const setShowOccupancyHighlight = useAppStore((state) => state.setShowOccupancyHighlight);
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
 
@@ -151,6 +154,48 @@ export function LayerPanel() {
 
       {/* Layer List Scroll Area */}
       <div className="flex-1 overflow-y-auto w-full p-4 space-y-4">
+        {/* Global Composite Preview & Highlight Controls (Above Custom Layers) */}
+        {(mapLayers.length > 0 || customLayers.length > 0) && (
+          <div className="flex items-center justify-between px-2.5 py-1.5 bg-surface-panel/40 border border-border-base/40 rounded-xl shadow-sm">
+            <span className="text-[11px] font-bold text-text-muted flex items-center gap-1.5">
+              <span>Preview</span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all",
+                  showOccupancyHighlight
+                    ? 'text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 shadow-sm'
+                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
+                )}
+                onClick={() => setShowOccupancyHighlight(!showOccupancyHighlight)}
+                title={showOccupancyHighlight ? "Occupancy Highlight: ON (3値色分けプレビュー解除)" : "Occupancy Highlight: OFF (3値色分けプレビュー表示)"}
+              >
+                <Palette size={13} />
+                <span>Occupancy</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all",
+                  isExportPreview
+                    ? 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 shadow-sm'
+                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
+                )}
+                onClick={() => setIsExportPreview(!isExportPreview)}
+                title={isExportPreview ? "Merged Map Preview: ON (クリックで解除)" : "Merged Map Preview: OFF (クリックで有効化)"}
+              >
+                <ScanEye size={13} />
+                <span>Merged</span>
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Custom Layers Section */}
         {customLayers.length > 0 && (
           <div className="space-y-4">
@@ -230,19 +275,6 @@ export function LayerPanel() {
                 Map Layers
                 <div className="h-px flex-1 bg-border-base/20" />
               </FieldLabel>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-6 w-6 transition-all ${
-                  isExportPreview
-                    ? 'text-emerald-400 bg-emerald-400/10 hover:bg-emerald-400/20'
-                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
-                }`}
-                onClick={() => setIsExportPreview(!isExportPreview)}
-                title={isExportPreview ? "Export Preview: ON (クリックで解除)" : "Export Preview: OFF (クリックで有効化)"}
-              >
-                <ScanEye size={14} />
-              </Button>
             </div>
             {mapLayers.map((layer, index) => {
               const isActiveTargetMap = activeMapLayerId === layer.id;
@@ -530,6 +562,33 @@ function LayerCard({
   onRemove,
   onUpdateLayer,
 }: LayerCardProps) {
+  const [showThresholds, setShowThresholds] = useState(false);
+  const occupancySettings = useAppStore((state) => state.occupancySettings);
+
+  const occThresh = layer.info?.occupied_thresh ?? occupancySettings?.defaultOccupiedThresh ?? 0.65;
+  const freeThresh = layer.info?.free_thresh ?? occupancySettings?.defaultFreeThresh ?? 0.25;
+  const negate = layer.info?.negate ?? occupancySettings?.defaultNegate ?? 0;
+
+  const handleUpdateInfo = (updates: Partial<{ occupied_thresh: number; free_thresh: number; negate: number }>) => {
+    onUpdateLayer({
+      info: {
+        ...layer.info,
+        ...updates,
+      },
+    });
+  };
+
+  const handleResetThresholds = () => {
+    onUpdateLayer({
+      info: {
+        ...layer.info,
+        occupied_thresh: occupancySettings?.defaultOccupiedThresh ?? 0.65,
+        free_thresh: occupancySettings?.defaultFreeThresh ?? 0.25,
+        negate: occupancySettings?.defaultNegate ?? 0,
+      },
+    });
+  };
+
   return (
     <CardFrame visible={layer.visible} isActive={isActiveTargetMap} onClick={onSelect}>
       <div className="flex items-center justify-between mb-4 relative z-10">
@@ -578,22 +637,37 @@ function LayerCard({
         
         <div className="flex items-center gap-1.5">
           <Button
-            variant="ghost"
+            variant={showThresholds ? "secondary" : "ghost"}
             size="icon"
-            className="h-9 w-9 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
-            onClick={(e) => { e.stopPropagation(); onToggleVisible(); }}
-            title="Toggle Visibility"
+            className={cn(
+              "h-8 w-8 text-text-muted hover:text-text-base transition-all",
+              showThresholds && "text-purple-400 bg-purple-500/10 border border-purple-500/20"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowThresholds(!showThresholds);
+            }}
+            title="Threshold Settings (Occupied, Free, Negate)"
           >
-            {layer.visible ? <Eye size={18} /> : <EyeOff size={18} />}
+            <SlidersHorizontal size={15} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
+            className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+            onClick={(e) => { e.stopPropagation(); onToggleVisible(); }}
+            title="Toggle Visibility"
+          >
+            {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
             onClick={(e) => { e.stopPropagation(); onRemove(); }}
             title="Remove Map"
           >
-            <Trash2 size={18} />
+            <Trash2 size={16} />
           </Button>
         </div>
       </div>
@@ -621,6 +695,92 @@ function LayerCard({
             <option value="merge_free">Merge Free Space</option>
           </Select>
         </div>
+
+        {/* Collapsible Occupancy Thresholds Section */}
+        {showThresholds && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mt-2 pt-3 border-t border-border-base/40 space-y-3 bg-surface-base/40 p-2.5 rounded-xl animate-in fade-in slide-in-from-top-1 duration-150"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-text-base flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
+                Occupancy Thresholds
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-1.5 text-[10px] text-text-muted hover:text-text-base gap-1"
+                onClick={handleResetThresholds}
+                title="Reset thresholds to project defaults"
+              >
+                <RotateCcw size={11} />
+                <span>Reset</span>
+              </Button>
+            </div>
+
+            {/* Mini Visual Threshold Bar */}
+            <div className="h-2 w-full rounded overflow-hidden flex border border-border-base/40">
+              <div
+                style={{ width: `${Math.min(100, Math.max(0, freeThresh * 100))}%` }}
+                className="bg-emerald-500/80"
+                title={`Free: 0.00 ~ ${freeThresh.toFixed(2)}`}
+              />
+              <div
+                style={{
+                  width: `${Math.max(0, (occThresh - freeThresh) * 100)}%`,
+                }}
+                className="bg-purple-500/80"
+                title={`Unknown: ${freeThresh.toFixed(2)} ~ ${occThresh.toFixed(2)}`}
+              />
+              <div
+                style={{
+                  width: `${Math.max(0, (1.0 - occThresh) * 100)}%`,
+                }}
+                className="bg-rose-500/80"
+                title={`Obstacle: ${occThresh.toFixed(2)} ~ 1.00`}
+              />
+            </div>
+
+            <Slider
+              label="Occupied Thresh"
+              valueDisplay={occThresh.toFixed(2)}
+              min="0"
+              max="1"
+              step="0.01"
+              value={occThresh}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                handleUpdateInfo({ occupied_thresh: Math.max(val, freeThresh) });
+              }}
+            />
+
+            <Slider
+              label="Free Thresh"
+              valueDisplay={freeThresh.toFixed(2)}
+              min="0"
+              max="1"
+              step="0.01"
+              value={freeThresh}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                handleUpdateInfo({ free_thresh: Math.min(val, occThresh) });
+              }}
+            />
+
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-text-muted font-medium">Negate</span>
+              <Select
+                value={negate}
+                onChange={(e) => handleUpdateInfo({ negate: parseInt(e.target.value) as 0 | 1 })}
+                className="h-6 text-[11px] bg-surface-base border-border-base/50 w-32 py-0"
+              >
+                <option value={0}>0 (Standard)</option>
+                <option value={1}>1 (Inverted)</option>
+              </Select>
+            </div>
+          </div>
+        )}
       </div>
     </CardFrame>
   );

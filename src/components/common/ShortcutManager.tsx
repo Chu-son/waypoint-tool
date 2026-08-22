@@ -97,6 +97,10 @@ export function ShortcutManager() {
             e.preventDefault();
             redo();
             break;
+          case "h":
+            e.preventDefault();
+            useAppStore.setState((s) => ({ showOccupancyHighlight: !s.showOccupancyHighlight }));
+            break;
         }
       }
     };

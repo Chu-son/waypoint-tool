@@ -20,6 +20,9 @@ vi.mock('lucide-react', () => ({
   Plus: () => <div data-testid="plus-icon" />,
   Settings2: () => <div data-testid="settings2-icon" />,
   X: () => <div data-testid="x-icon" />,
+  Palette: () => <div data-testid="palette-icon" />,
+  RotateCcw: () => <div data-testid="rotate-ccw-icon" />,
+  SlidersHorizontal: () => <div data-testid="sliders-horizontal-icon" />,
 }));
 
 // Mock API
@@ -56,6 +59,9 @@ describe('LayerPanel', () => {
       mapLayers: [],
       customLayers: [],
       lastDirectory: '/test/dir',
+      occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
+      showOccupancyHighlight: false,
+      setShowOccupancyHighlight: vi.fn(),
       updateMapLayer: mockUpdateMapLayer,
       removeMapLayer: mockRemoveMapLayer,
       reorderMapLayers: mockReorderMapLayers,

@@ -241,6 +241,11 @@ export function TopMenu() {
         { label: `${showPaths ? "✓ " : "  "}Show Paths`, action: () => setShowPaths(!showPaths) },
         { label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`, action: () => setShowGrid(!showGrid) },
         { label: `${showFootprints ? "✓ " : "  "}Show Robot Footprints`, action: () => setShowFootprints(!showFootprints) },
+        {
+          label: `${useAppStore.getState().showOccupancyHighlight ? "✓ " : "  "}Show Occupancy Highlight`,
+          action: () => useAppStore.getState().setShowOccupancyHighlight(!useAppStore.getState().showOccupancyHighlight),
+          shortcut: "Ctrl+H",
+        },
         { label: `${enableSnapping ? "✓ " : "  "}Snap to Previous Waypoint`, action: () => setEnableSnapping(!enableSnapping) },
         { label: "Fit to Map", action: triggerFitToMaps, shortcut: "Mid D-Click" },
         { divider: true, label: "" },
