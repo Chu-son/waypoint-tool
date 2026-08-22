@@ -20,6 +20,8 @@ import { useMapEditFreehand } from './hooks/useMapEditFreehand';
 import { prepareLayersForExport } from '../../utils/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
 
+import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
+
 extend({
   Container,
   Sprite,
@@ -30,6 +32,45 @@ extend({
 export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: ProjectMapLayer | PluginCustomLayer | any, scale: number, textStyle: TextStyle, overrideTexture?: Texture | null }) {
   const [texture, setTexture] = useState<Texture | null>(overrideTexture || null);
   const [imgSize, setImgSize] = useState({ w: overrideTexture ? overrideTexture.width : 0, h: overrideTexture ? overrideTexture.height : 0 });
+  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
+  const occupancyHighlightAlpha = useAppStore((state) => state.occupancyHighlightAlpha);
+
+  const occThresh = layer.info?.occupied_thresh ?? 0.65;
+  const freeThresh = layer.info?.free_thresh ?? 0.25;
+  const negate = layer.info?.negate ?? 0;
+
+  const highlightFilter = useMemo(() => {
+    if (!showOccupancyHighlight) return null;
+    try {
+      return new OccupancyHighlightFilter({
+        occupiedThresh: occThresh,
+        freeThresh: freeThresh,
+        negate: negate,
+        alpha: occupancyHighlightAlpha,
+      });
+    } catch {
+      return null;
+    }
+  }, [showOccupancyHighlight]);
+
+  useEffect(() => {
+    if (highlightFilter) {
+      highlightFilter.updateUniforms({
+        occupiedThresh: occThresh,
+        freeThresh: freeThresh,
+        negate: negate,
+        alpha: occupancyHighlightAlpha,
+      });
+    }
+  }, [highlightFilter, occThresh, freeThresh, negate, occupancyHighlightAlpha]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightFilter && !highlightFilter.destroyed) {
+        highlightFilter.destroy();
+      }
+    };
+  }, [highlightFilter]);
 
   useEffect(() => {
     if (overrideTexture) {
@@ -90,6 +131,7 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
         rotation={yaw}
         scale={{ x: resolution, y: -resolution }}
         alpha={layer.opacity} 
+        filters={highlightFilter ? [highlightFilter] : undefined}
       />
       {/* Top-Left Map Layer Name */}
       <pixiContainer
@@ -157,7 +199,11 @@ export function MapCanvas() {
     return { x: worldX, y: worldY };
   }, [position, scale]);
 
-  // blend_mode, z_index, visible, image_base64, customLayers のみの変更キーを生成
+  const occupancySettings = useAppStore((state) => state.occupancySettings);
+  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
+  const shouldShowBlendedPreview = isExportPreview || showOccupancyHighlight;
+
+  // blend_mode, z_index, visible, image_base64, customLayers, occupancySettings の変更キーを生成
   const previewSyncKey = useMemo(() => {
     const mapKey = JSON.stringify(
       mapLayers.map(l => ({
@@ -166,6 +212,7 @@ export function MapCanvas() {
         z_index: l.z_index,
         visible: l.visible,
         hasImage: !!l.image_base64,
+        info: l.info,
       }))
     );
     const customKey = JSON.stringify(
@@ -174,15 +221,18 @@ export function MapCanvas() {
         type: l.type,
         visible: l.visible,
         z_index: l.z_index,
+        blend_mode: l.blend_mode || 'overwrite',
         objCount: l.type === 'manual' ? l.editObjects.length : 0,
+        editObjects: l.type === 'manual' ? l.editObjects : undefined,
         hasImage: l.type === 'plugin' ? !!l.image_base64 : false,
       }))
     );
-    return `${mapKey}::${customKey}`;
-  }, [mapLayers, customLayers]);
+    const occKey = JSON.stringify(occupancySettings);
+    return `${shouldShowBlendedPreview}::${mapKey}::${customKey}::${occKey}`;
+  }, [shouldShowBlendedPreview, mapLayers, customLayers, occupancySettings]);
 
   useEffect(() => {
-    if (!isExportPreview) {
+    if (!shouldShowBlendedPreview) {
       setPreviewTexture(null);
       setIsPreviewLoading(false);
       setPreviewError(null);
@@ -192,39 +242,42 @@ export function MapCanvas() {
     let cancelled = false;
     setIsPreviewLoading(true);
     setPreviewError(null);
-    console.log('[Export Preview] Generating preview... SyncKey:', previewSyncKey);
 
     prepareLayersForExport(mapLayers, customLayers).then(layerInputs => {
       if (cancelled) return null;
+      if (!layerInputs || layerInputs.length === 0) return null;
       return BackendAPI.blendMapPreview(layerInputs);
     }).then(result => {
       if (cancelled || !result) return;
-      console.log('[Export Preview] Backend returned preview data. Origin:', result.origin, 'Size:', result.width, 'x', result.height);
       const img = new Image();
       img.onload = () => {
         if (cancelled) return;
         const texture = Texture.from(img);
         setPreviewTexture(texture);
-        setPreviewInfo({ resolution: result.resolution, origin: result.origin });
+        setPreviewInfo({
+          resolution: result.resolution,
+          origin: result.origin,
+          occupied_thresh: occupancySettings.defaultOccupiedThresh,
+          free_thresh: occupancySettings.defaultFreeThresh,
+          negate: occupancySettings.defaultNegate,
+        });
         setIsPreviewLoading(false);
-        console.log('[Export Preview] Texture loaded successfully.');
       };
       img.onerror = () => {
         if (cancelled) return;
         setPreviewError('Failed to load image texture from base64.');
         setIsPreviewLoading(false);
-        console.error('[Export Preview] Image onload error.');
       };
       img.src = result.image_data_b64;
     }).catch(err => {
       if (cancelled) return;
-      console.error('[Export Preview] Export Preview failed:', err);
+      console.error('[Blend Preview] Blend Preview failed:', err);
       setPreviewError(String(err));
       setIsPreviewLoading(false);
     });
 
     return () => { cancelled = true; };
-  }, [isExportPreview, previewSyncKey, mapLayers, customLayers]);
+  }, [shouldShowBlendedPreview, previewSyncKey, mapLayers, customLayers, occupancySettings]);
 
   useEffect(() => {
     return () => {
@@ -1275,20 +1328,25 @@ export function MapCanvas() {
       <Application preserveDrawingBuffer={true} background="#0f172a" resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
-          {isExportPreview ? (
-            isPreviewLoading ? (
+          {shouldShowBlendedPreview ? (
+            isPreviewLoading && !previewTexture ? (
               <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-            ) : previewError ? (
+            ) : previewError && !previewTexture ? (
               <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
             ) : previewTexture ? (
               <MapLayerSprite
                 layer={{
-                  id: '__export_preview__',
-                  name: 'Export Preview',
+                  id: '__blended_preview__',
+                  name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
                   visible: true,
                   opacity: 1,
                   image_base64: '',
-                  info: previewInfo,
+                  info: {
+                    ...previewInfo,
+                    occupied_thresh: occupancySettings.defaultOccupiedThresh,
+                    free_thresh: occupancySettings.defaultFreeThresh,
+                    negate: occupancySettings.defaultNegate,
+                  },
                   width: previewTexture.width,
                   height: previewTexture.height,
                   z_index: 0,
@@ -1314,7 +1372,7 @@ export function MapCanvas() {
             previewObject={rectPreview || circlePreview || freehandPreview}
             brushPreviewPos={isMapEditMode && mapEditSubTool === 'freehand' ? brushPreviewPos : null}
             brushPreviewRadius={brushRadiusWorld}
-            isExportPreview={isExportPreview}
+            isExportPreview={shouldShowBlendedPreview}
             onObjectPointerDown={handleEditObjectPointerDown}
             onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
             onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}

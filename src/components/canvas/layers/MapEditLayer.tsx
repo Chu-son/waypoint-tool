@@ -55,15 +55,24 @@ export function MapEditLayer({
             onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
             draw={(g) => {
               g.clear();
-              g.fillStyle = { color: colorHex, alpha: opacity };
-              g.strokeStyle = {
-                width: isSelected ? 2 / safeScale : 1 / safeScale,
-                color: strokeColor,
-                alpha: isSelected ? 1.0 : opacity,
-              };
+              // When in export/blended preview, body is already rendered on the blended previewTexture
+              if (!isExportPreview || isPreview) {
+                g.fillStyle = { color: colorHex, alpha: opacity };
+              }
+              if (!isExportPreview || isSelected || isPreview) {
+                g.strokeStyle = {
+                  width: isSelected ? 2 / safeScale : 1 / safeScale,
+                  color: strokeColor,
+                  alpha: isSelected ? 1.0 : opacity,
+                };
+              }
               g.rect(-obj.width / 2, -obj.height / 2, obj.width, obj.height);
-              g.fill();
-              g.stroke();
+              if (!isExportPreview || isPreview) {
+                g.fill();
+              }
+              if (!isExportPreview || isSelected || isPreview) {
+                g.stroke();
+              }
             }}
           />
 
@@ -114,15 +123,23 @@ export function MapEditLayer({
             onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
             draw={(g) => {
               g.clear();
-              g.fillStyle = { color: colorHex, alpha: opacity };
-              g.strokeStyle = {
-                width: isSelected ? 2 / safeScale : 1 / safeScale,
-                color: strokeColor,
-                alpha: isSelected ? 1.0 : opacity,
-              };
+              if (!isExportPreview || isPreview) {
+                g.fillStyle = { color: colorHex, alpha: opacity };
+              }
+              if (!isExportPreview || isSelected || isPreview) {
+                g.strokeStyle = {
+                  width: isSelected ? 2 / safeScale : 1 / safeScale,
+                  color: strokeColor,
+                  alpha: isSelected ? 1.0 : opacity,
+                };
+              }
               g.circle(0, 0, obj.radius);
-              g.fill();
-              g.stroke();
+              if (!isExportPreview || isPreview) {
+                g.fill();
+              }
+              if (!isExportPreview || isSelected || isPreview) {
+                g.stroke();
+              }
             }}
           />
           {isSelected &&
@@ -161,25 +178,27 @@ export function MapEditLayer({
             onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
             draw={(g) => {
               g.clear();
-              g.strokeStyle = {
-                width: obj.brushRadius * 2,
-                color: strokeColor,
-                alpha: opacity,
-                cap: 'round',
-                join: 'round',
-              };
-              g.fillStyle = { color: colorHex, alpha: opacity };
+              if (!isExportPreview || isPreview) {
+                g.strokeStyle = {
+                  width: obj.brushRadius * 2,
+                  color: strokeColor,
+                  alpha: opacity,
+                  cap: 'round',
+                  join: 'round',
+                };
+                g.fillStyle = { color: colorHex, alpha: opacity };
 
-              const pts = obj.points;
-              g.moveTo(pts[0].x, pts[0].y);
-              for (let i = 1; i < pts.length; i++) {
-                g.lineTo(pts[i].x, pts[i].y);
-              }
-              if (pts.length === 1) {
-                g.circle(pts[0].x, pts[0].y, obj.brushRadius);
-                g.fill();
-              } else {
-                g.stroke();
+                const pts = obj.points;
+                g.moveTo(pts[0].x, pts[0].y);
+                for (let i = 1; i < pts.length; i++) {
+                  g.lineTo(pts[i].x, pts[i].y);
+                }
+                if (pts.length === 1) {
+                  g.circle(pts[0].x, pts[0].y, obj.brushRadius);
+                  g.fill();
+                } else {
+                  g.stroke();
+                }
               }
 
               if (isSelected) {

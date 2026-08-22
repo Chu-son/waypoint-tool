@@ -9,16 +9,35 @@ vi.mock('@pixi/react', () => ({
   extend: vi.fn(),
 }));
 
-vi.mock('pixi.js', () => ({
-  Container: () => ({ destroy: vi.fn() }),
-  Sprite: () => ({ destroy: vi.fn() }),
-  Graphics: () => ({ clear: vi.fn(), drawCircle: vi.fn(), destroy: vi.fn() }),
-  Texture: {
-    from: vi.fn().mockReturnValue({}),
-  },
-  Text: () => ({ destroy: vi.fn() }),
-  TextStyle: vi.fn(),
-}));
+vi.mock('pixi.js', () => {
+  class MockFilter {
+    destroy = vi.fn();
+    resources: any;
+    constructor(options?: any) {
+      this.resources = options?.resources || {};
+    }
+  }
+  return {
+    Container: () => ({ destroy: vi.fn() }),
+    Sprite: () => ({ destroy: vi.fn() }),
+    Graphics: () => ({ clear: vi.fn(), drawCircle: vi.fn(), destroy: vi.fn() }),
+    Texture: {
+      from: vi.fn().mockReturnValue({}),
+    },
+    Text: () => ({ destroy: vi.fn() }),
+    TextStyle: vi.fn(),
+    Filter: MockFilter,
+    GlProgram: {
+      from: vi.fn().mockReturnValue({}),
+    },
+    UniformGroup: class MockUniformGroup {
+      uniforms: any;
+      constructor(uniforms?: any) {
+        this.uniforms = uniforms || {};
+      }
+    },
+  };
+});
 
 // Mock uuid
 vi.mock('uuid', () => ({

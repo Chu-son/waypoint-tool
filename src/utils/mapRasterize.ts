@@ -189,7 +189,8 @@ export function getEditLayerBoundingBox(
  * Rasterizes a manual CustomLayer into an independent ExportLayer with a transparent background.
  */
 export async function rasterizeManualCustomLayerToExportLayer(
-  customLayer: ManualCustomLayer
+  customLayer: ManualCustomLayer,
+  targetResolution?: number
 ): Promise<{
   id: string;
   name: string;
@@ -203,7 +204,7 @@ export async function rasterizeManualCustomLayerToExportLayer(
     return null;
   }
 
-  const resolution = 0.05;
+  const resolution = targetResolution || 0.05;
   const bbox = getEditLayerBoundingBox(customLayer, resolution);
 
   const canvas = document.createElement('canvas');
@@ -267,12 +268,14 @@ export async function prepareLayersForExport(
       visible: true,
     }));
 
+  const baseResolution = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+
   const customLayerExports = await Promise.all(
     customLayers
       .filter((l) => l.visible)
       .map(async (cl) => {
         if (cl.type === 'manual') {
-          return rasterizeManualCustomLayerToExportLayer(cl);
+          return rasterizeManualCustomLayerToExportLayer(cl, baseResolution);
         } else {
           // Plugin generated raster layer
           if (!cl.image_base64) return null;
