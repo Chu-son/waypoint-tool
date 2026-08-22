@@ -7,11 +7,12 @@ import { Label } from "../common/Label";
 import { Select } from "../common/Select";
 import { Input } from "../common/Input";
 import { Slider } from "../common/Slider";
+import { Checkbox } from "../common/Checkbox";
 import { AlertBox } from "../common/AlertBox";
 import { FieldLabel } from "../common/FieldLabel";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
-import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle } from "lucide-react";
+import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Bookmark } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { v4 as uuidv4 } from "uuid";
 
@@ -68,6 +69,7 @@ export function CustomLayerInspector() {
   const [layerName, setLayerName] = useState<string>("");
   const [layerOpacity, setLayerOpacity] = useState<number>(1.0);
   const [blendMode, setBlendMode] = useState<"overwrite" | "merge_obstacles" | "merge_free">("overwrite");
+  const [isReference, setIsReference] = useState<boolean>(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
@@ -79,6 +81,7 @@ export function CustomLayerInspector() {
       setLayerName(existingLayer.name);
       setLayerOpacity(existingLayer.opacity ?? 1.0);
       setBlendMode(existingLayer.blend_mode || "overwrite");
+      setIsReference(!!existingLayer.is_reference);
 
       if (existingLayer.type === "plugin") {
         setSelectedPluginId(existingLayer.plugin_id);
@@ -108,6 +111,7 @@ export function CustomLayerInspector() {
       setLayerName(plugins[pluginIdToUse]?.manifest.name || "Generated Layer");
       setLayerOpacity(0.7);
       setBlendMode("overwrite");
+      setIsReference(false);
 
       if (pluginIdToUse && plugins[pluginIdToUse]) {
         const initialParams: Record<string, any> = {};
@@ -204,6 +208,7 @@ export function CustomLayerInspector() {
           info: result.info,
           opacity: layerOpacity,
           blend_mode: blendMode || result.blend_mode || "overwrite",
+          is_reference: isReference,
         });
       } else {
         const newId = uuidv4();
@@ -220,6 +225,7 @@ export function CustomLayerInspector() {
           opacity: layerOpacity,
           z_index: customLayers.length,
           blend_mode: blendMode || result.blend_mode || "overwrite",
+          is_reference: isReference,
         };
         addPluginCustomLayer(newLayer);
         setActiveCustomLayerId(newId);
@@ -545,47 +551,83 @@ export function CustomLayerInspector() {
           </div>
         )}
 
-        {/* --- SECTION C: Common Appearance (Opacity & Blend Mode) --- */}
-        {!isNewPluginLayer && existingLayer && (
-          <div className="space-y-3 pt-2 border-t border-border-base/30">
-            <FieldLabel className="text-[10px]">Layer Appearance</FieldLabel>
+        {/* --- SECTION C: Common Settings (Reference Layer, Opacity & Blend Mode) --- */}
+        <div className="space-y-3 pt-2 border-t border-border-base/30">
+          <FieldLabel className="text-[10px]">Layer Properties</FieldLabel>
 
-            <div className="space-y-1">
-              <div className="flex justify-between items-center text-[10px] text-text-muted font-medium">
-                <span>Opacity</span>
-                <span>{Math.round(layerOpacity * 100)}%</span>
+          {/* Reference Layer Setting */}
+          <div className="p-3 rounded-xl bg-surface-base/50 border border-border-base/40 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bookmark size={15} className={isReference ? "text-purple-400 fill-purple-400" : "text-text-muted"} />
+                <span className="text-xs font-bold text-text-base">Reference Layer</span>
               </div>
-              <Slider
-                min={0}
-                max={1}
-                step={0.01}
-                value={layerOpacity}
+              <Checkbox
+                checked={isReference}
                 onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setLayerOpacity(val);
-                  updateCustomLayer(existingLayer.id, { opacity: val });
+                  const checked = e.target.checked;
+                  setIsReference(checked);
+                  if (existingLayer) {
+                    updateCustomLayer(existingLayer.id, { is_reference: checked });
+                  }
                 }}
               />
             </div>
+            <p className="text-[10px] text-text-muted">
+              マップ合成（Merge）やエクスポートから除外され、下絵・参考情報としてオーバーレイ表示されます。
+            </p>
+          </div>
 
+          <div className="space-y-1">
+            <div className="flex justify-between items-center text-[10px] text-text-muted font-medium">
+              <span>Opacity</span>
+              <span>{Math.round(layerOpacity * 100)}%</span>
+            </div>
+            <Slider
+              min={0}
+              max={1}
+              step={0.01}
+              value={layerOpacity}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setLayerOpacity(val);
+                if (existingLayer) {
+                  updateCustomLayer(existingLayer.id, { opacity: val });
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] text-text-muted font-medium">Blend Mode</span>
               <Select
                 value={blendMode}
+                disabled={isReference}
                 onChange={(e) => {
                   const val = e.target.value as any;
                   setBlendMode(val);
-                  updateCustomLayer(existingLayer.id, { blend_mode: val });
+                  if (existingLayer) {
+                    updateCustomLayer(existingLayer.id, { blend_mode: val });
+                  }
                 }}
-                className="h-7 text-xs bg-surface-base border-border-base/50 w-36"
+                className={cn(
+                  "h-7 text-xs bg-surface-base border-border-base/50 w-36",
+                  isReference && "opacity-50 cursor-not-allowed bg-surface-base/30"
+                )}
               >
                 <option value="overwrite">Overwrite</option>
                 <option value="merge_obstacles">Merge Obstacles</option>
                 <option value="merge_free">Merge Free Space</option>
               </Select>
             </div>
+            {isReference && (
+              <p className="text-[9px] text-purple-300/80 text-right">
+                ※ 参照レイヤーのため合成されません
+              </p>
+            )}
           </div>
-        )}
+        </div>
 
         {errorInfo && (
           <AlertBox variant="danger" title="Generation Error">

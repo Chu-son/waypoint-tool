@@ -27,7 +27,7 @@ export type MapSlice = {
   reorderMapLayers: (fromIndex: number, toIndex: number) => void;
 
   setCustomLayers: (layers: CustomLayer[]) => void;
-  addManualCustomLayer: (name?: string) => ManualCustomLayer;
+  addManualCustomLayer: (name?: string, is_reference?: boolean) => ManualCustomLayer;
   addPluginCustomLayer: (layer: PluginCustomLayer) => void;
   updateCustomLayer: (id: string, updates: Partial<CustomLayer>) => void;
   removeCustomLayer: (id: string) => void;
@@ -83,7 +83,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
   setCustomLayers: (layers: CustomLayer[]) => set({ customLayers: layers, isDirty: true }),
 
-  addManualCustomLayer: (name?: string) => {
+  addManualCustomLayer: (name?: string, is_reference?: boolean) => {
     const customLayers = get().customLayers;
     const manualCount = customLayers.filter(l => l.type === 'manual').length + 1;
     const newLayer: ManualCustomLayer = {
@@ -94,6 +94,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       opacity: 1.0,
       z_index: customLayers.length,
       blend_mode: 'overwrite',
+      is_reference: is_reference ?? false,
       editObjects: [],
     };
     set((state) => ({

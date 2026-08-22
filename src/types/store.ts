@@ -166,6 +166,7 @@ export interface CustomLayerBase {
   opacity: number;
   z_index: number;
   blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
+  is_reference?: boolean;
 }
 
 export type EditObjectType = 'rect' | 'circle' | 'freehand';

@@ -220,6 +220,7 @@ export function MapCanvas() {
         id: l.id,
         type: l.type,
         visible: l.visible,
+        is_reference: l.is_reference || false,
         z_index: l.z_index,
         blend_mode: l.blend_mode || 'overwrite',
         objCount: l.type === 'manual' ? l.editObjects.length : 0,
@@ -1438,34 +1439,42 @@ export function MapCanvas() {
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
           {shouldShowBlendedPreview ? (
-            isPreviewLoading && !previewTexture ? (
-              <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-            ) : previewError && !previewTexture ? (
-              <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-            ) : previewTexture ? (
-              <MapLayerSprite
-                layer={{
-                  id: '__blended_preview__',
-                  name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
-                  visible: true,
-                  opacity: 1,
-                  image_base64: '',
-                  info: {
-                    ...previewInfo,
-                    occupied_thresh: occupancySettings.defaultOccupiedThresh,
-                    free_thresh: occupancySettings.defaultFreeThresh,
-                    negate: occupancySettings.defaultNegate,
-                  },
-                  width: previewTexture.width,
-                  height: previewTexture.height,
-                  z_index: 0,
-                  blend_mode: 'overwrite',
-                }}
-                overrideTexture={previewTexture}
-                scale={scale}
-                textStyle={textStyle}
-              />
-            ) : null
+            <>
+              {isPreviewLoading && !previewTexture ? (
+                <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
+              ) : previewError && !previewTexture ? (
+                <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
+              ) : previewTexture ? (
+                <MapLayerSprite
+                  layer={{
+                    id: '__blended_preview__',
+                    name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
+                    visible: true,
+                    opacity: 1,
+                    image_base64: '',
+                    info: {
+                      ...previewInfo,
+                      occupied_thresh: occupancySettings.defaultOccupiedThresh,
+                      free_thresh: occupancySettings.defaultFreeThresh,
+                      negate: occupancySettings.defaultNegate,
+                    },
+                    width: previewTexture.width,
+                    height: previewTexture.height,
+                    z_index: 0,
+                    blend_mode: 'overwrite',
+                  }}
+                  overrideTexture={previewTexture}
+                  scale={scale}
+                  textStyle={textStyle}
+                />
+              ) : null}
+              {/* Overlay reference plugin layers during blended preview */}
+              {customLayers
+                .filter((l): l is PluginCustomLayer => l.type === 'plugin' && l.visible && !!l.is_reference)
+                .map(layer => (
+                  <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />
+                ))}
+            </>
           ) : mapLayers.length > 0 || customLayers.length > 0 ? (
             <>
               {mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)}

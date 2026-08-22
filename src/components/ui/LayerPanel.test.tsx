@@ -23,6 +23,7 @@ vi.mock('lucide-react', () => ({
   Palette: () => <div data-testid="palette-icon" />,
   RotateCcw: () => <div data-testid="rotate-ccw-icon" />,
   SlidersHorizontal: () => <div data-testid="sliders-horizontal-icon" />,
+  Bookmark: () => <div data-testid="bookmark-icon" />,
 }));
 
 // Mock API
@@ -160,5 +161,57 @@ describe('LayerPanel', () => {
       expect(DialogAPI.ask).toHaveBeenCalled();
       expect(mockRemoveMapLayer).toHaveBeenCalledWith('l1');
     });
+  });
+
+  it('handles custom layer reference toggle and displays REF badge', () => {
+    const mockUpdateCustomLayer = vi.fn();
+    const mockCustomLayers = [
+      {
+        id: 'cl1',
+        name: 'Ref Layer',
+        type: 'manual',
+        visible: true,
+        opacity: 1.0,
+        z_index: 0,
+        blend_mode: 'overwrite',
+        is_reference: true,
+        editObjects: [],
+      },
+      {
+        id: 'cl2',
+        name: 'Normal Layer',
+        type: 'manual',
+        visible: true,
+        opacity: 1.0,
+        z_index: 1,
+        blend_mode: 'overwrite',
+        is_reference: false,
+        editObjects: [],
+      },
+    ];
+
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      mapLayers: [],
+      customLayers: mockCustomLayers,
+      updateCustomLayer: mockUpdateCustomLayer,
+      plugins: {},
+      selectNodes: vi.fn(),
+    }));
+
+    render(<LayerPanel />);
+    expect(screen.getByDisplayValue('Ref Layer')).toBeInTheDocument();
+    expect(screen.getByText('REF')).toBeInTheDocument();
+    expect(screen.getByText(/※ 参照レイヤーのため合成されません/i)).toBeInTheDocument();
+
+    const refToggleBtns = screen.getAllByTitle(/Reference Layer:/i);
+    expect(refToggleBtns).toHaveLength(2);
+
+    // Toggle reference on normal layer
+    fireEvent.click(refToggleBtns[1]);
+    expect(mockUpdateCustomLayer).toHaveBeenCalledWith('cl2', { is_reference: true });
+
+    // Toggle reference on reference layer
+    fireEvent.click(refToggleBtns[0]);
+    expect(mockUpdateCustomLayer).toHaveBeenCalledWith('cl1', { is_reference: false });
   });
 });

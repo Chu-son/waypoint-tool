@@ -272,7 +272,7 @@ export async function prepareLayersForExport(
 
   const customLayerExports = await Promise.all(
     customLayers
-      .filter((l) => l.visible)
+      .filter((l) => l.visible && !l.is_reference)
       .map(async (cl) => {
         if (cl.type === 'manual') {
           return rasterizeManualCustomLayerToExportLayer(cl, baseResolution);
@@ -313,7 +313,7 @@ export async function preCompositeEditLayers(
 
   const result = mapLayers.map((l) => ({ ...l }));
   const visibleEditLayers = customLayers
-    .filter((el) => el.visible && el.editObjects.length > 0)
+    .filter((el) => el.visible && !el.is_reference && el.editObjects.length > 0)
     .sort((a, b) => a.z_index - b.z_index);
 
   if (!visibleEditLayers.length) {

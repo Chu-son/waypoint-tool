@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette, Bookmark } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI, BackendAPI } from "../../api";
 import { Button } from "./common/Button";
@@ -440,6 +440,11 @@ function CustomLayerCard({
               )}>
                 {isManual ? "Manual" : "Plugin"}
               </span>
+              {layer.is_reference && (
+                <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Reference Layer (Excluded from Merge/Export)">
+                  REF
+                </span>
+              )}
               <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
                 Layer {index + 1} {isManual ? `• ${layer.editObjects.length} obj` : ""}
               </span>
@@ -448,6 +453,24 @@ function CustomLayerCard({
         </div>
 
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-7 w-7 transition-all",
+              layer.is_reference
+                ? "text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40"
+                : "text-text-muted hover:text-purple-400 hover:bg-purple-500/10"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateLayer({ is_reference: !layer.is_reference });
+            }}
+            title={layer.is_reference ? "Reference Layer: ON (マージ除外・オーバーレイ参照用)" : "Reference Layer: OFF (通常レイヤー)"}
+          >
+            <Bookmark size={14} className={layer.is_reference ? "fill-purple-300" : ""} />
+          </Button>
+
           {isManual ? (
             <Button
               variant={isEditing ? "primary" : "ghost"}
@@ -515,18 +538,29 @@ function CustomLayerCard({
           onChange={(e) => onUpdateLayer({ opacity: parseFloat(e.target.value) })}
         />
 
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[10px] text-text-muted font-medium">Blend Mode</span>
-          <Select
-            value={layer.blend_mode || "overwrite"}
-            onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
-            onClick={(e) => e.stopPropagation()}
-            className="h-7 text-xs bg-surface-base border-border-base/50 w-36"
-          >
-            <option value="overwrite">Overwrite</option>
-            <option value="merge_obstacles">Merge Obstacles</option>
-            <option value="merge_free">Merge Free Space</option>
-          </Select>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] text-text-muted font-medium">Blend Mode</span>
+            <Select
+              value={layer.blend_mode || "overwrite"}
+              disabled={!!layer.is_reference}
+              onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
+              onClick={(e) => e.stopPropagation()}
+              className={cn(
+                "h-7 text-xs bg-surface-base border-border-base/50 w-36",
+                layer.is_reference && "opacity-50 cursor-not-allowed bg-surface-base/30"
+              )}
+            >
+              <option value="overwrite">Overwrite</option>
+              <option value="merge_obstacles">Merge Obstacles</option>
+              <option value="merge_free">Merge Free Space</option>
+            </Select>
+          </div>
+          {layer.is_reference && (
+            <p className="text-[9px] text-purple-300/80 text-right">
+              ※ 参照レイヤーのため合成されません
+            </p>
+          )}
         </div>
       </div>
     </CardFrame>

@@ -27,6 +27,7 @@ export function normalizeProjectData(data: any): {
     const layers: CustomLayer[] = raw.map((l: any, i: number) => ({
       ...l,
       id: l.id || uuidv4(),
+      is_reference: l.is_reference ?? false,
       z_index: typeof l.z_index === 'number' ? l.z_index : i,
       editObjects: l.type === 'manual' ? (l.editObjects || l.edit_objects || []).map((o: any) => ({ ...o, id: o.id || uuidv4() })) : undefined,
     }));
@@ -46,6 +47,7 @@ export function normalizeProjectData(data: any): {
       opacity: el.opacity ?? 1.0,
       z_index: el.z_index ?? migrated.length,
       blend_mode: el.blend_mode || 'overwrite',
+      is_reference: el.is_reference ?? false,
       editObjects: (el.editObjects || el.edit_objects || []).map((obj: any) => ({
         ...obj,
         id: obj.id || uuidv4(),
@@ -68,6 +70,7 @@ export function normalizeProjectData(data: any): {
       opacity: gl.opacity ?? 0.7,
       z_index: gl.z_index ?? migrated.length,
       blend_mode: gl.blend_mode || 'overwrite',
+      is_reference: gl.is_reference ?? false,
     });
   });
 

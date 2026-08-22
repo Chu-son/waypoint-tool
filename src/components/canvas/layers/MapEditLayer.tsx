@@ -31,8 +31,9 @@ export function MapEditLayer({
   const safeScale = Math.max(scale, 0.001);
 
   // Render a single EditObject
-  const renderObject = (layerId: string, obj: EditObject, opacity: number, isPreview = false) => {
-    const isSelected = !isExportPreview && !isPreview && selectedEditObjectId === obj.id;
+  const renderObject = (layerId: string, obj: EditObject, opacity: number, isPreview = false, isReference = false) => {
+    const isEffectiveExportPreview = isExportPreview && !isReference;
+    const isSelected = !isEffectiveExportPreview && !isPreview && selectedEditObjectId === obj.id;
     const fillVal = Math.min(255, Math.max(0, Math.round(obj.fillValue)));
     const colorHex = (fillVal << 16) | (fillVal << 8) | fillVal;
     const strokeColor = isSelected ? 0x3b82f6 : isPreview ? 0x94a3b8 : colorHex;
@@ -50,16 +51,16 @@ export function MapEditLayer({
         <pixiContainer key={obj.id} x={obj.cx} y={obj.cy} rotation={obj.angle}>
           {/* Main rectangle graphics */}
           <pixiGraphics
-            eventMode={isExportPreview || isPreview ? 'none' : 'dynamic'}
+            eventMode={isEffectiveExportPreview || isPreview ? 'none' : 'dynamic'}
             cursor="pointer"
             onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
             draw={(g) => {
               g.clear();
-              // When in export/blended preview, body is already rendered on the blended previewTexture
-              if (!isExportPreview || isPreview) {
+              // When in export/blended preview, body is already rendered on the blended previewTexture unless it's a reference layer
+              if (!isEffectiveExportPreview || isPreview) {
                 g.fillStyle = { color: colorHex, alpha: opacity };
               }
-              if (!isExportPreview || isSelected || isPreview) {
+              if (!isEffectiveExportPreview || isSelected || isPreview) {
                 g.strokeStyle = {
                   width: isSelected ? 2 / safeScale : 1 / safeScale,
                   color: strokeColor,
@@ -67,10 +68,10 @@ export function MapEditLayer({
                 };
               }
               g.rect(-obj.width / 2, -obj.height / 2, obj.width, obj.height);
-              if (!isExportPreview || isPreview) {
+              if (!isEffectiveExportPreview || isPreview) {
                 g.fill();
               }
-              if (!isExportPreview || isSelected || isPreview) {
+              if (!isEffectiveExportPreview || isSelected || isPreview) {
                 g.stroke();
               }
             }}
@@ -118,15 +119,15 @@ export function MapEditLayer({
       return (
         <pixiContainer key={obj.id} x={obj.cx} y={obj.cy}>
           <pixiGraphics
-            eventMode={isExportPreview || isPreview ? 'none' : 'dynamic'}
+            eventMode={isEffectiveExportPreview || isPreview ? 'none' : 'dynamic'}
             cursor="pointer"
             onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
             draw={(g) => {
               g.clear();
-              if (!isExportPreview || isPreview) {
+              if (!isEffectiveExportPreview || isPreview) {
                 g.fillStyle = { color: colorHex, alpha: opacity };
               }
-              if (!isExportPreview || isSelected || isPreview) {
+              if (!isEffectiveExportPreview || isSelected || isPreview) {
                 g.strokeStyle = {
                   width: isSelected ? 2 / safeScale : 1 / safeScale,
                   color: strokeColor,
@@ -134,10 +135,10 @@ export function MapEditLayer({
                 };
               }
               g.circle(0, 0, obj.radius);
-              if (!isExportPreview || isPreview) {
+              if (!isEffectiveExportPreview || isPreview) {
                 g.fill();
               }
-              if (!isExportPreview || isSelected || isPreview) {
+              if (!isEffectiveExportPreview || isSelected || isPreview) {
                 g.stroke();
               }
             }}
@@ -173,12 +174,12 @@ export function MapEditLayer({
       return (
         <pixiContainer key={obj.id}>
           <pixiGraphics
-            eventMode={isExportPreview || isPreview ? 'none' : 'dynamic'}
+            eventMode={isEffectiveExportPreview || isPreview ? 'none' : 'dynamic'}
             cursor="pointer"
             onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
             draw={(g) => {
               g.clear();
-              if (!isExportPreview || isPreview) {
+              if (!isEffectiveExportPreview || isPreview) {
                 g.strokeStyle = {
                   width: obj.brushRadius * 2,
                   color: strokeColor,
@@ -238,7 +239,7 @@ export function MapEditLayer({
       {/* Existing EditLayers */}
       {visibleLayers.map((layer) => (
         <pixiContainer key={layer.id}>
-          {layer.editObjects.map((obj) => renderObject(layer.id, obj, layer.opacity))}
+          {layer.editObjects.map((obj) => renderObject(layer.id, obj, layer.opacity, false, !!layer.is_reference))}
         </pixiContainer>
       ))}
 

@@ -3,8 +3,9 @@ import { useAppStore } from "../../stores/appStore";
 import { Modal, ModalHeader, ModalContent } from "./common/Modal";
 import { Button } from "./common/Button";
 import { Input } from "./common/Input";
+import { Checkbox } from "./common/Checkbox";
 import { FieldLabel } from "./common/FieldLabel";
-import { Pencil, Sparkles, Plus } from "lucide-react";
+import { Pencil, Sparkles, Plus, Bookmark } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 interface NewCustomLayerModalProps {
@@ -25,6 +26,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
   const selectNodes = useAppStore((state) => state.selectNodes);
 
   const [manualLayerName, setManualLayerName] = useState("");
+  const [isReferenceManual, setIsReferenceManual] = useState(false);
 
   const layerPlugins = Object.values(plugins).filter(
     (p) => p && p.manifest && p.manifest.category === "map_layer_generator"
@@ -35,12 +37,13 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
   const handleCreateManual = () => {
     selectNodes([]);
     const name = manualLayerName.trim() || defaultManualName;
-    const newLayer = addManualCustomLayer(name);
+    const newLayer = addManualCustomLayer(name, isReferenceManual);
     setActiveCustomLayerId(newLayer.id);
     setMapEditMode(true);
     setRightPanelActiveTab("inspector");
     setRightPanelOpen(true);
     setManualLayerName("");
+    setIsReferenceManual(false);
     onClose();
   };
 
@@ -97,6 +100,17 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                 <span>Create Manual Layer</span>
               </Button>
             </div>
+
+            <label className="flex items-center gap-2 cursor-pointer text-xs text-text-muted hover:text-text-base select-none pt-1">
+              <Checkbox
+                checked={isReferenceManual}
+                onChange={(e) => setIsReferenceManual(e.target.checked)}
+              />
+              <span className="flex items-center gap-1.5">
+                <Bookmark size={13} className={isReferenceManual ? "text-purple-400 fill-purple-400" : ""} />
+                参照用レイヤーとして作成（マップ合成・エクスポートから除外）
+              </span>
+            </label>
           </div>
         </div>
 
