@@ -11,6 +11,12 @@ export type PluginSlice = {
   pluginActiveProperties: Record<string, any>;
   activeInputIndex: number;
 
+  activePathCalculatorPluginId: string | null;
+  pathCalculatorParams: Record<string, any>;
+  autoRecalculatePath: boolean;
+  calculatedPathSegments: Array<Array<{ x: number; y: number }>> | null;
+  isCalculatingPath: boolean;
+
   setPlugins: (plugins: Record<string, PluginInstance>) => void;
   setPluginSettings: (settings: PluginSetting[]) => void;
   updatePluginSetting: (id: string, updates: Partial<PluginSetting>) => void;
@@ -20,7 +26,17 @@ export type PluginSlice = {
   setPluginActiveProperties: (props: Record<string, any>) => void;
   setActiveInputIndex: (index: number) => void;
   reloadPlugins: () => Promise<void>;
+
+  setActivePathCalculatorPluginId: (pluginId: string | null) => void;
+  setPathCalculatorParams: (params: Record<string, any>) => void;
+  setAutoRecalculatePath: (enabled: boolean) => void;
+  setCalculatedPathSegments: (segments: Array<Array<{ x: number; y: number }>> | null) => void;
+  debouncedRecalculatePath: (delayMs?: number) => void;
+  recalculatePath: (options?: { immediate?: boolean }) => Promise<void>;
 };
+
+let recalculateTimer: any = null;
+let currentCalculationRequestId = 0;
 
 export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (set, get) => ({
   plugins: {},
@@ -29,6 +45,12 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   pluginInteractionData: {},
   pluginActiveProperties: {},
   activeInputIndex: 0,
+
+  activePathCalculatorPluginId: null,
+  pathCalculatorParams: {},
+  autoRecalculatePath: true,
+  calculatedPathSegments: null,
+  isCalculatingPath: false,
 
   setPlugins: (plugins) => set({ plugins }),
   
@@ -62,6 +84,140 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   setPluginActiveProperties: (props) => set({ pluginActiveProperties: props }),
   
   setActiveInputIndex: (index) => set({ activeInputIndex: index }),
+
+  setActivePathCalculatorPluginId: (pluginId) => {
+    set({ activePathCalculatorPluginId: pluginId, isDirty: true });
+    if (!pluginId) {
+      set({ calculatedPathSegments: null, isCalculatingPath: false });
+    } else if (get().autoRecalculatePath) {
+      get().recalculatePath({ immediate: true });
+    }
+  },
+
+  setPathCalculatorParams: (params) => {
+    set({ pathCalculatorParams: params, isDirty: true });
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(200);
+    }
+  },
+
+  setAutoRecalculatePath: (enabled) => set({ autoRecalculatePath: enabled, isDirty: true }),
+
+  setCalculatedPathSegments: (segments) => set({ calculatedPathSegments: segments }),
+
+  debouncedRecalculatePath: (delayMs = 200) => {
+    if (recalculateTimer) {
+      clearTimeout(recalculateTimer);
+      recalculateTimer = null;
+    }
+    recalculateTimer = setTimeout(() => {
+      recalculateTimer = null;
+      get().recalculatePath({ immediate: true });
+    }, delayMs);
+  },
+
+  recalculatePath: async (options) => {
+    if (!options?.immediate) {
+      get().debouncedRecalculatePath(200);
+      return;
+    }
+
+    if (recalculateTimer) {
+      clearTimeout(recalculateTimer);
+      recalculateTimer = null;
+    }
+
+    const requestId = ++currentCalculationRequestId;
+
+    const {
+      activePathCalculatorPluginId,
+      pathCalculatorParams,
+      plugins,
+      pluginSettings,
+      globalPythonPath,
+      rootNodeIds,
+      nodes,
+      mapLayers,
+      robotFootprint,
+    } = get();
+
+    if (!activePathCalculatorPluginId || !plugins[activePathCalculatorPluginId]) {
+      set({ calculatedPathSegments: null, isCalculatingPath: false });
+      return;
+    }
+
+    const plugin = plugins[activePathCalculatorPluginId];
+
+    // Collect ordered waypoints
+    const waypoints: Array<{ x: number; y: number; qx: number; qy: number; qz: number; qw: number }> = [];
+    rootNodeIds.forEach((id) => {
+      const node = nodes[id];
+      if (!node) return;
+      if (node.type === 'manual' && node.transform) {
+        waypoints.push(node.transform);
+      } else if (node.type === 'generator' && node.children_ids) {
+        node.children_ids.forEach((cid) => {
+          const child = nodes[cid];
+          if (child && child.transform) {
+            waypoints.push(child.transform);
+          }
+        });
+      }
+    });
+
+    if (waypoints.length < 2) {
+      set({ calculatedPathSegments: null, isCalculatingPath: false });
+      return;
+    }
+
+    set({ isCalculatingPath: true });
+
+    try {
+      let pythonPathToUse = globalPythonPath?.trim() || "python3";
+      if (plugin.manifest.type === "python") {
+        const setting = pluginSettings.find((s) => s.id === plugin.id);
+        if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== "") {
+          pythonPathToUse = setting.pythonOverridePath.trim();
+        }
+      }
+
+      const contextData: any = {
+        waypoints,
+        properties: pathCalculatorParams,
+      };
+
+      if (plugin.manifest.needs?.includes('robot_footprint')) {
+        contextData.robot_footprint = robotFootprint;
+      }
+
+      const result = await BackendAPI.runPlugin(
+        plugin,
+        contextData,
+        pythonPathToUse,
+        mapLayers
+      );
+
+      // Check if this request is still the latest one
+      if (requestId !== currentCalculationRequestId) {
+        return;
+      }
+
+      if (result && Array.isArray(result.segments)) {
+        set({ calculatedPathSegments: result.segments, isCalculatingPath: false });
+      } else if (Array.isArray(result)) {
+        // Flat list of segments or points
+        set({ calculatedPathSegments: [result], isCalculatingPath: false });
+      } else {
+        console.warn("[recalculatePath] Unexpected result format from path calculator:", result);
+        set({ calculatedPathSegments: null, isCalculatingPath: false });
+      }
+    } catch (err) {
+      if (requestId === currentCalculationRequestId) {
+        console.error("[recalculatePath] Failed to calculate path:", err);
+        set({ calculatedPathSegments: null, isCalculatingPath: false });
+      }
+    }
+  },
 
   reloadPlugins: async () => {
     try {

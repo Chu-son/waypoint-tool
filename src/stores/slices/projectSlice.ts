@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, EditLayer, RobotFootprint } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, RobotFootprint } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -9,6 +9,66 @@ export const DEFAULT_ROBOT_FOOTPRINT: RobotFootprint = {
   radius: 0.3,
 };
 
+/**
+ * Normalizes raw project data from file/JSON into the latest schema.
+ * Handles isolated ingress migration from legacy edit_layers / generated_layers to custom_layers.
+ */
+export function normalizeProjectData(data: any): {
+  customLayers: CustomLayer[];
+} {
+  if (data.custom_layers || data.customLayers) {
+    const raw = data.custom_layers || data.customLayers;
+    const layers: CustomLayer[] = raw.map((l: any, i: number) => ({
+      ...l,
+      id: l.id || uuidv4(),
+      z_index: typeof l.z_index === 'number' ? l.z_index : i,
+      editObjects: l.type === 'manual' ? (l.editObjects || l.edit_objects || []).map((o: any) => ({ ...o, id: o.id || uuidv4() })) : undefined,
+    }));
+    return { customLayers: layers };
+  }
+
+  // Legacy ingress migration
+  const migrated: CustomLayer[] = [];
+
+  const rawEdit = data.edit_layers || data.editLayers || [];
+  rawEdit.forEach((el: any) => {
+    migrated.push({
+      id: el.id || uuidv4(),
+      name: el.name || 'Manual Layer',
+      type: 'manual',
+      visible: el.visible ?? true,
+      opacity: el.opacity ?? 1.0,
+      z_index: el.z_index ?? migrated.length,
+      blend_mode: el.blend_mode || 'overwrite',
+      editObjects: (el.editObjects || el.edit_objects || []).map((obj: any) => ({
+        ...obj,
+        id: obj.id || uuidv4(),
+      })),
+    });
+  });
+
+  const rawGen = data.generated_layers || data.generatedLayers || [];
+  rawGen.forEach((gl: any) => {
+    migrated.push({
+      id: gl.id || uuidv4(),
+      name: gl.name || 'Generated Layer',
+      type: 'plugin',
+      plugin_id: gl.plugin_id || '',
+      params: gl.params || {},
+      interaction_data: gl.interaction_data || {},
+      image_base64: gl.image_base64 || '',
+      info: gl.info || {},
+      visible: gl.visible ?? true,
+      opacity: gl.opacity ?? 0.7,
+      z_index: gl.z_index ?? migrated.length,
+      blend_mode: gl.blend_mode || 'overwrite',
+    });
+  });
+
+  migrated.sort((a, b) => a.z_index - b.z_index);
+  return { customLayers: migrated.map((l, i) => ({ ...l, z_index: i })) };
+}
+
 export type ProjectSlice = {
   lastDirectory: string | null;
   optionsSchema: OptionsSchema | null;
@@ -16,16 +76,56 @@ export type ProjectSlice = {
   defaultExportFormats: DefaultExportFormat[];
   globalPythonPath: string;
   robotFootprint: RobotFootprint;
+  pathColor: string;
+  pathWidth: number;
+  pathOpacity: number;
+  syncPathWidthWithFootprint: boolean;
 
   setLastDirectory: (dir: string | null) => void;
   setGlobalPythonPath: (path: string) => void;
   setOptionsSchema: (schema: OptionsSchema) => void;
   setRobotFootprint: (footprint: RobotFootprint) => void;
+  setPathColor: (color: string) => void;
+  setPathWidth: (width: number) => void;
+  setPathOpacity: (opacity: number) => void;
+  setSyncPathWidthWithFootprint: (sync: boolean) => void;
   addExportTemplate: (template: ExportTemplate) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
   updateDefaultExportFormat: (id: string, updates: Partial<DefaultExportFormat>) => void;
-  setProjectData: (data: { rootNodeIds?: string[], root_node_ids?: string[], nodes?: Record<string, WaypointNode>, mapLayers?: ProjectMapLayer[], map_layers?: ProjectMapLayer[], editLayers?: EditLayer[], edit_layers?: EditLayer[], export_templates?: ExportTemplate[], default_export_formats?: DefaultExportFormat[], index_start_index?: 0 | 1, decimal_precision?: number, options_schema?: OptionsSchema | null, export_regions?: any[], robot_footprint?: RobotFootprint, robotFootprint?: RobotFootprint }) => void;
+  setProjectData: (data: {
+    rootNodeIds?: string[];
+    root_node_ids?: string[];
+    nodes?: Record<string, WaypointNode>;
+    mapLayers?: ProjectMapLayer[];
+    map_layers?: ProjectMapLayer[];
+    customLayers?: CustomLayer[];
+    custom_layers?: CustomLayer[];
+    edit_layers?: any[];
+    generated_layers?: any[];
+    export_templates?: ExportTemplate[];
+    default_export_formats?: DefaultExportFormat[];
+    index_start_index?: 0 | 1;
+    decimal_precision?: number;
+    options_schema?: OptionsSchema | null;
+    export_regions?: any[];
+    robot_footprint?: RobotFootprint;
+    robotFootprint?: RobotFootprint;
+    active_path_calculator_plugin_id?: string | null;
+    activePathCalculatorPluginId?: string | null;
+    path_calculator_params?: Record<string, any>;
+    pathCalculatorParams?: Record<string, any>;
+    auto_recalculate_path?: boolean;
+    autoRecalculatePath?: boolean;
+    path_color?: string;
+    pathColor?: string;
+    path_width?: number;
+    pathWidth?: number;
+    path_opacity?: number;
+    pathOpacity?: number;
+    sync_path_width_with_footprint?: boolean;
+    syncPathWidthWithFootprint?: boolean;
+  }) => void;
   
   loadProject: () => Promise<void>;
   saveProject: () => Promise<void>;
@@ -42,11 +142,19 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   ],
   globalPythonPath: 'python',
   robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
+  pathColor: '#10b981',
+  pathWidth: 0.1,
+  pathOpacity: 0.7,
+  syncPathWidthWithFootprint: false,
 
   setLastDirectory: (dir: string | null) => set({ lastDirectory: dir }),
   setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
   setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
   setRobotFootprint: (footprint: RobotFootprint) => set({ robotFootprint: footprint, isDirty: true }),
+  setPathColor: (color: string) => set({ pathColor: color, isDirty: true }),
+  setPathWidth: (width: number) => set({ pathWidth: width, isDirty: true }),
+  setPathOpacity: (opacity: number) => set({ pathOpacity: opacity, isDirty: true }),
+  setSyncPathWidthWithFootprint: (sync: boolean) => set({ syncPathWidthWithFootprint: sync, isDirty: true }),
   
   addExportTemplate: (template: ExportTemplate) => set((state) => ({
     exportTemplates: [...state.exportTemplates, template],
@@ -77,26 +185,26 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
       state.clearHistory();
 
-      const rawEditLayers = data.edit_layers || data.editLayers || [];
-      const restoredEditLayers: EditLayer[] = rawEditLayers.map((el: any) => ({
-        ...el,
-        id: el.id || uuidv4(),
-        editObjects: (el.editObjects || el.edit_objects || []).map((obj: any) => ({
-          ...obj,
-          id: obj.id || uuidv4(),
-        })),
-      }));
+      const { customLayers } = normalizeProjectData(data);
 
       return {
         rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
         nodes: data.nodes || {},
         selectedNodeIds: [],
         mapLayers: data.map_layers || data.mapLayers || state.mapLayers,
-        editLayers: restoredEditLayers,
+        customLayers,
+        activeCustomLayerId: null,
         exportTemplates: [...globalTemplates, ...localTemplates],
         exportRegions: data.export_regions || [],
         optionsSchema: data.options_schema || null,
         robotFootprint: data.robot_footprint || data.robotFootprint || DEFAULT_ROBOT_FOOTPRINT,
+        activePathCalculatorPluginId: data.active_path_calculator_plugin_id || data.activePathCalculatorPluginId || null,
+        pathCalculatorParams: data.path_calculator_params || data.pathCalculatorParams || {},
+        autoRecalculatePath: data.auto_recalculate_path ?? data.autoRecalculatePath ?? true,
+        pathColor: data.path_color || data.pathColor || '#10b981',
+        pathWidth: data.path_width ?? data.pathWidth ?? 0.1,
+        pathOpacity: data.path_opacity ?? data.pathOpacity ?? 0.7,
+        syncPathWidthWithFootprint: data.sync_path_width_with_footprint ?? data.syncPathWidthWithFootprint ?? false,
         defaultExportFormats: data.default_export_formats || state.defaultExportFormats,
         indexStartIndex: data.index_start_index ?? state.indexStartIndex,
         decimalPrecision: data.decimal_precision ?? state.decimalPrecision,
@@ -113,7 +221,15 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       nodes: {},
       selectedNodeIds: [],
       mapLayers: [],
-      editLayers: [],
+      customLayers: [],
+      activeCustomLayerId: null,
+      activePathCalculatorPluginId: null,
+      pathCalculatorParams: {},
+      calculatedPathSegments: null,
+      pathColor: '#10b981',
+      pathWidth: 0.1,
+      pathOpacity: 0.7,
+      syncPathWidthWithFootprint: false,
       exportRegions: [],
       optionsSchema: null,
       robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
@@ -123,7 +239,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   }),
 
   loadProject: async () => {
-    const { lastDirectory, setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity } = get();
+    const { lastDirectory, setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity, recalculatePath } = get();
     try {
       const selectedPath = await DialogAPI.open({
         multiple: false,
@@ -158,13 +274,27 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             z_index: 0,
             blend_mode: layer.blend_mode || 'overwrite'
           })),
+          custom_layers: projectData.custom_layers,
+          generated_layers: projectData.generated_layers,
           edit_layers: projectData.edit_layers,
           export_regions: projectData.export_regions,
           options_schema: projectData.options_schema,
           export_templates: projectData.export_templates,
           robot_footprint: projectData.robot_footprint,
+          active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
+          path_calculator_params: projectData.path_calculator_params,
+          auto_recalculate_path: projectData.auto_recalculate_path,
+          path_color: projectData.path_color,
+          path_width: projectData.path_width,
+          path_opacity: projectData.path_opacity,
+          sync_path_width_with_footprint: projectData.sync_path_width_with_footprint,
         });
         setIsDirty(false);
+
+        // Recalculate path if active plugin was loaded
+        if (projectData.active_path_calculator_plugin_id) {
+          recalculatePath();
+        }
       }
     } catch (err) {
       console.error("Failed to load project:", err);
@@ -173,7 +303,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   },
 
   saveProject: async () => {
-    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, editLayers, robotFootprint, setIsDirty } = get();
+    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, customLayers, robotFootprint, activePathCalculatorPluginId, pathCalculatorParams, autoRecalculatePath, pathColor, pathWidth, pathOpacity, syncPathWidthWithFootprint, setIsDirty } = get();
     try {
       const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
@@ -210,11 +340,18 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           root_node_ids: rootNodeIds,
           nodes,
           map_layers: mapLayersToSave,
-          edit_layers: editLayers,
+          custom_layers: customLayers,
           export_regions: get().exportRegions,
           options_schema: get().optionsSchema,
           export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
           robot_footprint: robotFootprint,
+          active_path_calculator_plugin_id: activePathCalculatorPluginId,
+          path_calculator_params: pathCalculatorParams,
+          auto_recalculate_path: autoRecalculatePath,
+          path_color: pathColor,
+          path_width: pathWidth,
+          path_opacity: pathOpacity,
+          sync_path_width_with_footprint: syncPathWidthWithFootprint,
         };
         await BackendAPI.saveProject(finalPath, projectData);
         setIsDirty(false);

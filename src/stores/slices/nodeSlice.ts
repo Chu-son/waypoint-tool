@@ -10,8 +10,8 @@ export type NodeSlice = {
   
   anchorNodeId: string | null;
   setAnchorNode: (id: string | null) => void;
-  addNode: (node: WaypointNode, parentId?: string) => void;
-  updateNode: (id: string, updates: Partial<WaypointNode>) => void;
+  addNode: (node: WaypointNode, parentId?: string, options?: { skipRecalculate?: boolean }) => void;
+  updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => void;
   removeNodes: (ids: string[]) => void;
   reorderNodes: (fromIndex: number, toIndex: number) => void;
   selectNodes: (ids: string[], multi?: boolean) => void;
@@ -32,7 +32,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
   setInsertionIndex: (index: number) => set({ insertionIndex: index }),
 
-  addNode: (node: WaypointNode, parentId?: string) => {
+  addNode: (node: WaypointNode, parentId?: string, options?: { skipRecalculate?: boolean }) => {
     get().pushHistorySnapshot();
     set((state) => {
     const newNodes = { ...state.nodes, [node.id]: node };
@@ -56,10 +56,15 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       isDirty: true 
     };
     });
+    if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(150);
+    }
   },
 
-  updateNode: (id: string, updates: Partial<WaypointNode>) => {
-    get().pushHistorySnapshot();
+  updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => {
+    if (!options?.skipRecalculate) {
+      get().pushHistorySnapshot();
+    }
     set((state) => ({
       nodes: {
         ...state.nodes,
@@ -67,6 +72,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       },
       isDirty: true
     }));
+    if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(200);
+    }
   },
 
   reorderNodes: (fromIndex: number, toIndex: number) => {
@@ -77,6 +85,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       newRootIds.splice(toIndex, 0, moved);
       return { rootNodeIds: newRootIds, isDirty: true };
     });
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(100);
+    }
   },
 
   removeNodes: (ids: string[]) => {
@@ -110,12 +121,15 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     
     return { 
       nodes: newNodes, 
-      rootNodeIds: newRootIds,
+      rootNodeIds: newRootIds, 
       selectedNodeIds: state.selectedNodeIds.filter(id => !idsToRemove.has(id)),
       anchorNodeId: state.anchorNodeId && idsToRemove.has(state.anchorNodeId) ? null : state.anchorNodeId,
       isDirty: true
     };
     });
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().recalculatePath({ immediate: true });
+    }
   },
 
   selectNodes: (ids: string[], multi = false) => set((state) => {
@@ -131,6 +145,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     const updates: Partial<AppState> = { selectedNodeIds: nextIds };
     if (nextIds.length > 0) {
       updates.rightPanelActiveTab = 'inspector';
+      updates.activeCustomLayerId = null;
     }
     if (state.elementCopyState) {
       const targetId = nextIds.length === 1 ? nextIds[0] : null;

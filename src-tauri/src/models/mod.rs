@@ -112,11 +112,17 @@ pub struct ProjectData {
     pub root_node_ids: Vec<String>,
     pub nodes: HashMap<String, WaypointNode>,
     pub map_layers: Option<Vec<ProjectMapLayer>>,
+    pub custom_layers: Option<serde_json::Value>,
     pub edit_layers: Option<serde_json::Value>,
+    pub generated_layers: Option<serde_json::Value>,
     pub options_schema: Option<serde_json::Value>,
     pub export_templates: Option<serde_json::Value>,
     pub export_regions: Option<Vec<ExportRegion>>,
     pub robot_footprint: Option<serde_json::Value>,
+    pub path_color: Option<String>,
+    pub path_width: Option<f64>,
+    pub path_opacity: Option<f64>,
+    pub sync_path_width_with_footprint: Option<bool>,
 }
 
 #[cfg(test)]

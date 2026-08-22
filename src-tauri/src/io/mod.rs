@@ -351,11 +351,17 @@ mod tests {
             root_node_ids: vec!["node1".to_string()],
             nodes,
             map_layers: None,
+            custom_layers: None,
             edit_layers: None,
+            generated_layers: None,
             options_schema: None,
             export_templates: None,
             export_regions: None,
             robot_footprint: None,
+            path_color: Some("#10b981".to_string()),
+            path_width: Some(0.2),
+            path_opacity: Some(0.8),
+            sync_path_width_with_footprint: Some(true),
         };
 
         // Save
