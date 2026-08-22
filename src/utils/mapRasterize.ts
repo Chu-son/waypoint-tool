@@ -248,34 +248,60 @@ export async function rasterizeManualCustomLayerToExportLayer(
   };
 }
 
+export type PreparedExportLayer = {
+  id: string;
+  name: string;
+  image_base64?: string;
+  info?: any;
+  opacity: number;
+  blend_mode: string;
+  z_index: number;
+  visible: boolean;
+};
+
 /**
  * Prepares visible MapLayers and CustomLayers (both manual & plugin) for export or preview.
  */
 export async function prepareLayersForExport(
   mapLayers: ProjectMapLayer[],
   customLayers: CustomLayer[]
-) {
-  const visibleMapLayers = mapLayers
-    .filter((l) => l.visible)
-    .map((l) => ({
+): Promise<PreparedExportLayer[]> {
+  const visibleMapLayers = mapLayers.filter((l) => l.visible);
+  const totalMapCount = mapLayers.length;
+
+  const mappedMapLayers: PreparedExportLayer[] = visibleMapLayers.map((l) => {
+    const originalIndex = mapLayers.findIndex((ml) => ml.id === l.id);
+    const zIndex = originalIndex >= 0 ? totalMapCount - 1 - originalIndex : 0;
+    return {
       id: l.id,
       name: l.name,
       image_base64: l.image_base64,
       info: l.info,
       opacity: 1.0,
       blend_mode: l.blend_mode || 'overwrite',
-      z_index: l.z_index,
+      z_index: zIndex,
       visible: true,
-    }));
+    };
+  });
 
   const baseResolution = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+  const totalCustomCount = customLayers.length;
 
   const customLayerExports = await Promise.all(
     customLayers
       .filter((l) => l.visible && !l.is_reference)
-      .map(async (cl) => {
+      .map(async (cl): Promise<PreparedExportLayer | null> => {
+        const originalIndex = customLayers.findIndex((c) => c.id === cl.id);
+        const zIndex = 1000 + (originalIndex >= 0 ? totalCustomCount - 1 - originalIndex : 0);
+
         if (cl.type === 'manual') {
-          return rasterizeManualCustomLayerToExportLayer(cl, baseResolution);
+          const exportLayer = await rasterizeManualCustomLayerToExportLayer(cl, baseResolution);
+          if (!exportLayer) return null;
+          return {
+            ...exportLayer,
+            z_index: zIndex,
+            visible: true,
+          };
         } else {
           // Plugin generated raster layer
           if (!cl.image_base64) return null;
@@ -286,7 +312,7 @@ export async function prepareLayersForExport(
             info: cl.info,
             opacity: cl.opacity ?? 1.0,
             blend_mode: cl.blend_mode || 'overwrite',
-            z_index: 1000 + cl.z_index,
+            z_index: zIndex,
             visible: true,
           };
         }
@@ -294,10 +320,9 @@ export async function prepareLayersForExport(
   );
 
   const validCustomLayers = customLayerExports
-    .filter((l): l is NonNullable<typeof l> => l !== null)
-    .map((l) => ({ ...l, visible: true }));
+    .filter((l): l is PreparedExportLayer => l !== null);
 
-  return [...visibleMapLayers, ...validCustomLayers];
+  return [...mappedMapLayers, ...validCustomLayers];
 }
 
 /**

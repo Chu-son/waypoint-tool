@@ -12,7 +12,7 @@ import { WaypointLayer } from './layers/WaypointLayer';
 import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
-import { MapEditLayer } from './layers/MapEditLayer';
+import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
 import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
 import { useMapEditCircle } from './hooks/useMapEditCircle';
@@ -121,7 +121,7 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
   const topLeftY = oy + H * Math.cos(yaw);
 
   return (
-    <pixiContainer zIndex={layer.z_index}>
+    <pixiContainer>
       <pixiSprite 
         key={texture.uid || layer.id}
         texture={texture} 
@@ -1438,63 +1438,108 @@ export function MapCanvas() {
       <Application preserveDrawingBuffer={true} background="#0f172a" resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
-          {shouldShowBlendedPreview ? (
-            <>
-              {isPreviewLoading && !previewTexture ? (
-                <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-              ) : previewError && !previewTexture ? (
-                <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-              ) : previewTexture ? (
-                <MapLayerSprite
-                  layer={{
-                    id: '__blended_preview__',
-                    name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
-                    visible: true,
-                    opacity: 1,
-                    image_base64: '',
-                    info: {
-                      ...previewInfo,
-                      occupied_thresh: occupancySettings.defaultOccupiedThresh,
-                      free_thresh: occupancySettings.defaultFreeThresh,
-                      negate: occupancySettings.defaultNegate,
-                    },
-                    width: previewTexture.width,
-                    height: previewTexture.height,
-                    z_index: 0,
-                    blend_mode: 'overwrite',
-                  }}
-                  overrideTexture={previewTexture}
-                  scale={scale}
-                  textStyle={textStyle}
-                />
-              ) : null}
-              {/* Overlay reference plugin layers during blended preview */}
-              {customLayers
-                .filter((l): l is PluginCustomLayer => l.type === 'plugin' && l.visible && !!l.is_reference)
-                .map(layer => (
-                  <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />
-                ))}
-            </>
-          ) : mapLayers.length > 0 || customLayers.length > 0 ? (
-            <>
-              {mapLayers.map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)}
-              {customLayers.filter((l): l is PluginCustomLayer => l.type === 'plugin').map(layer => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)}
-            </>
-          ) : (
-            <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
-          )}
-          <MapEditLayer
-            scale={scale}
-            editLayers={customLayers.filter((l): l is ManualCustomLayer => l.type === 'manual')}
-            selectedEditObjectId={selectedEditObjectId}
-            previewObject={rectPreview || circlePreview || freehandPreview}
-            brushPreviewPos={isMapEditMode && mapEditSubTool === 'freehand' ? brushPreviewPos : null}
-            brushPreviewRadius={brushRadiusWorld}
-            isExportPreview={shouldShowBlendedPreview}
-            onObjectPointerDown={handleEditObjectPointerDown}
-            onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
-            onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
-          />
+          {/* 1. Base Map Layers Group */}
+          <pixiContainer label="map-layers-group">
+            {shouldShowBlendedPreview ? (
+              <>
+                {isPreviewLoading && !previewTexture ? (
+                  <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
+                ) : previewError && !previewTexture ? (
+                  <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
+                ) : previewTexture ? (
+                  <MapLayerSprite
+                    layer={{
+                      id: '__blended_preview__',
+                      name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
+                      visible: true,
+                      opacity: 1,
+                      image_base64: '',
+                      info: {
+                        ...previewInfo,
+                        occupied_thresh: occupancySettings.defaultOccupiedThresh,
+                        free_thresh: occupancySettings.defaultFreeThresh,
+                        negate: occupancySettings.defaultNegate,
+                      },
+                      width: previewTexture.width,
+                      height: previewTexture.height,
+                      z_index: 0,
+                      blend_mode: 'overwrite',
+                    }}
+                    overrideTexture={previewTexture}
+                    scale={scale}
+                    textStyle={textStyle}
+                  />
+                ) : null}
+              </>
+            ) : mapLayers.length > 0 ? (
+              [...mapLayers].reverse().map(layer => (
+                <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />
+              ))
+            ) : customLayers.length === 0 ? (
+              <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
+            ) : null}
+          </pixiContainer>
+
+          {/* 2. Custom Layers Group (Always rendered on top of Map Layers) */}
+          <pixiContainer label="custom-layers-group">
+            {shouldShowBlendedPreview ? (
+              /* Overlay reference custom layers during blended preview */
+              <>
+                {customLayers
+                  .filter((l) => l.visible && !!l.is_reference)
+                  .slice()
+                  .reverse()
+                  .map((layer) => {
+                    if (layer.type === 'plugin') {
+                      return <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />;
+                    } else {
+                      return (
+                        <MapEditSingleLayer
+                          key={layer.id}
+                          scale={scale}
+                          layer={layer}
+                          selectedEditObjectId={selectedEditObjectId}
+                          isExportPreview={true}
+                          onObjectPointerDown={handleEditObjectPointerDown}
+                          onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
+                          onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
+                        />
+                      );
+                    }
+                  })}
+              </>
+            ) : (
+              /* Normal rendering: all custom layers in order from bottom (back) to top (front) */
+              <>
+                {[...customLayers].reverse().map((layer) => {
+                  if (layer.type === 'plugin') {
+                    return <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />;
+                  } else {
+                    return (
+                      <MapEditSingleLayer
+                        key={layer.id}
+                        scale={scale}
+                        layer={layer}
+                        selectedEditObjectId={selectedEditObjectId}
+                        isExportPreview={false}
+                        onObjectPointerDown={handleEditObjectPointerDown}
+                        onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
+                        onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
+                      />
+                    );
+                  }
+                })}
+              </>
+            )}
+            {/* Transient editing tool previews and brush cursor overlay */}
+            <MapEditToolOverlay
+              scale={scale}
+              previewObject={rectPreview || circlePreview || freehandPreview}
+              brushPreviewPos={isMapEditMode && mapEditSubTool === 'freehand' ? brushPreviewPos : null}
+              brushPreviewRadius={brushRadiusWorld}
+              isExportPreview={shouldShowBlendedPreview}
+            />
+          </pixiContainer>
           {showGrid && <GridLayer scale={scale} />}
 
           {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}
