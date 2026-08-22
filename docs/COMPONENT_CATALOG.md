@@ -78,6 +78,12 @@
 - **`GeneratorNodePanel`** ([`src/components/ui/properties/GeneratorNodePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/GeneratorNodePanel.tsx))
   - **概要**: 生成されたジェネレーターノードの再編集・引数調整・Waypoint展開 (Explode) を行うUI。
   - **主要Props**: `nodeId`
+- **`CustomLayerInspector`** ([`src/components/ui/properties/CustomLayerInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/CustomLayerInspector.tsx))
+  - **概要**: 手動ベクター描画レイヤー（矩形・円形・ブラシ）のツール設定や、プラグイン生成マップレイヤーの新規作成・パラメータ編集・再生成・透過度・ブレンドモード調整を行う統合インスペクターUI。
+  - **主要Props**: なし（`appStore` の `activeCustomLayerId` と連動）
+- **`NewCustomLayerModal`** ([`src/components/ui/NewCustomLayerModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/NewCustomLayerModal.tsx))
+  - **概要**: 新規カスタムレイヤー作成モーダル。手動ベクターレイヤーの追加、または `map_layer_generator` プラグインの一覧から選択してレイヤーを作成する。
+  - **主要Props**: `isOpen`, `onClose`
 - **`IndexGroup`** / **`ElementCopyContextMenu`** ([`src/components/ui/properties/`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/))
   - **概要**: Waypoint インデックス変更および右クリックコンテキストメニューによる値の特定コピー機能。
 - **`TransformField`** ([`src/components/ui/properties/TransformField.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/TransformField.tsx))
@@ -94,6 +100,9 @@
 
 - **`TopMenu`** ([`src/components/ui/TopMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/TopMenu.tsx))
   - **概要**: アプリケーション最上部のメニューバー (File, Edit, View, Help) およびプロジェクトタイトル表示。
+  - **主要Props**: なし
+- **`PathRouterMenu`** ([`src/components/ui/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PathRouterMenu.tsx))
+  - **概要**: トップバーに配置されるパス計算アルゴリズム選択、パラメータ設定、自動再計算トグル用ドロップダウンメニュー。
   - **主要Props**: なし
 - **`ToolPanel`** ([`src/components/ui/ToolPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ToolPanel.tsx))
   - **概要**: 画面左端に配置されるメインツール切り替えバー (Select, Add Waypoint, Export Region, Import/Export/Settings等)。
@@ -128,6 +137,9 @@
 - **`TabSectionHeader`** ([`src/components/ui/settings/TabSectionHeader.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/TabSectionHeader.tsx))
   - **概要**: 設定モーダル内の各設定タブ専用ヘッダー部品。
   - **主要Props**: `title`, `subtitle`, `actions`
+- **`PathRouterMenu`** ([`src/components/ui/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PathRouterMenu.tsx))
+  - **概要**: トップバーに常駐するパス計算・ルーター設定ポップアップメニュー。経路補間アルゴリズム（直線 / Dijkstra等）の選択、パラメータ設定、自動再計算トグル、パス色・透過度・線幅・Footprint幅同期などの表示設定を提供。
+  - **主要Props**: なし
 - **`KeyboardShortcutsModal`** ([`src/components/ui/KeyboardShortcutsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/KeyboardShortcutsModal.tsx))
   - **概要**: 定義されているショートカットキー一覧を表示するヘルプダイアログ。
   - **主要Props**: `isOpen`, `onClose`
@@ -152,7 +164,7 @@
 - **`WaypointLayer`** ([`src/components/canvas/layers/WaypointLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/WaypointLayer.tsx))
   - **概要**: Waypoint 矢印マーカー、インデックスラベル、回転ハンドルの高速 WebGL 描画およびドラッグ操作判定。
 - **`PathLayer`** ([`src/components/canvas/layers/PathLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/PathLayer.tsx))
-  - **概要**: Waypoint 同士を接続するライン・順序矢印・軌跡の描画。
+  - **概要**: Waypoint 同士を接続する直線およびプラグイン計算経路（Dijkstra 回避パス等）の描画。カスタマイズ可能な色・透過度・実寸メートル幅の半透明コリドー（通過帯）およびソリッド中心線のレンダリングに対応。
 - **`GridLayer`** ([`src/components/canvas/layers/GridLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/GridLayer.tsx))
   - **概要**: 1m メッシュなどのワールドグリッド線の描画。
 - **`PluginLayer`** ([`src/components/canvas/layers/PluginLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/PluginLayer.tsx))
