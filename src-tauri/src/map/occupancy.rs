@@ -3,7 +3,7 @@ use base64::{engine::general_purpose, Engine as _};
 use flate2::{write::ZlibEncoder, Compression};
 use std::io::Write;
 use crate::plugins::models::{PluginMapLayer, OccupancyGridData};
-use super::blending::{classify_pixel, apply_blend_cell, CellValue};
+use super::blending::{apply_blend_cell, CellValue};
 
 #[derive(Debug, Clone)]
 pub struct LayerForBlend {
@@ -54,11 +54,14 @@ pub fn evaluate_pixel(
     if pixel[3] < 128 {
         return CellValue::Unknown;
     }
-    // If standard thresholds are used with default negate, use classify_pixel
-    if !negate && (occ_thresh - 0.65).abs() < 1e-4 && (free_thresh - 0.196).abs() < 1e-4 {
-        return classify_pixel(pixel);
-    }
     let gray = (pixel[0] as f32 * 0.299 + pixel[1] as f32 * 0.587 + pixel[2] as f32 * 0.114) as u8;
+
+    // In ROS standard PGM maps, gray value 205 (0xCD) is the exact canonical value for Unknown space.
+    // In trinary map representation, intermediate gray levels (128..=230) represent Unknown / Unexplored space.
+    if !negate && (gray >= 128 && gray <= 230) {
+        return CellValue::Unknown;
+    }
+
     let normalized = if negate {
         gray as f64 / 255.0
     } else {
@@ -151,5 +154,47 @@ pub fn build_occupancy_grid_from_layers(
         resolution: base_res,
         origin: base_origin,
         data: b64,
+        encoding: "int8_zlib_base64".to_string(),
+        cell_values: crate::plugins::models::CellValueConstants::default(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_evaluate_pixel_with_ros_nav2_thresh() {
+        // Nav2 default YAML with free_thresh: 0.25, occupied_thresh: 0.65
+        let occ_thresh = 0.65;
+        let free_thresh = 0.25;
+
+        // Obstacle (black, gray=0) -> Obstacle
+        assert_eq!(
+            evaluate_pixel([0, 0, 0, 255], false, occ_thresh, free_thresh),
+            CellValue::Obstacle
+        );
+
+        // Free space (white, gray=254 or 255) -> Free
+        assert_eq!(
+            evaluate_pixel([254, 254, 254, 255], false, occ_thresh, free_thresh),
+            CellValue::Free
+        );
+        assert_eq!(
+            evaluate_pixel([255, 255, 255, 255], false, occ_thresh, free_thresh),
+            CellValue::Free
+        );
+
+        // Canonical ROS Unknown space (gray=205 / 0xCD) -> Unknown!
+        assert_eq!(
+            evaluate_pixel([205, 205, 205, 255], false, occ_thresh, free_thresh),
+            CellValue::Unknown
+        );
+
+        // Alpha transparent -> Unknown
+        assert_eq!(
+            evaluate_pixel([255, 255, 255, 0], false, occ_thresh, free_thresh),
+            CellValue::Unknown
+        );
+    }
 }

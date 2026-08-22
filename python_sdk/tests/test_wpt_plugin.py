@@ -8,7 +8,8 @@ import unittest
 
 # Add parent directory to path so we can import wpt_plugin
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from wpt_plugin import WaypointGenerator
+from wpt_plugin import WaypointGenerator, MapLayerGenerator, PathCalculator, OccupancyGrid
+
 
 
 class StubGenerator(WaypointGenerator):
@@ -130,5 +131,128 @@ class TestWaypointGeneratorBase(unittest.TestCase):
         self.assertIsNone(WaypointGenerator.get_interaction_data(ctx, "nonexistent"))
 
 
+class StubLayerGenerator(MapLayerGenerator):
+    def generate_layer(self, context):
+        mask = [
+            [1, 0],
+            [0, 1]
+        ]
+        return self.create_layer_from_mask(
+            mask,
+            origin=[0.0, 0.0, 0.0],
+            resolution=0.1,
+            name="Test Layer",
+            blend_mode="overwrite"
+        )
+
+
+class TestMapLayerGenerator(unittest.TestCase):
+    def test_create_layer_from_mask(self):
+        mask = [
+            [1, 0, 1],
+            [0, 1, 0]
+        ]
+        layer = MapLayerGenerator.create_layer_from_mask(
+            mask, origin=[10.0, 20.0, 0.0], resolution=0.05, name="Custom Mask Layer"
+        )
+        self.assertEqual(layer["name"], "Custom Mask Layer")
+        self.assertEqual(layer["info"]["width"], 3)
+        self.assertEqual(layer["info"]["height"], 2)
+        self.assertEqual(layer["info"]["resolution"], 0.05)
+        self.assertEqual(layer["info"]["origin"], [10.0, 20.0, 0.0])
+        self.assertTrue(layer["image_base64"].startswith("data:image/png;base64,"))
+
+    def test_run_from_stdin_layer(self):
+        old_stdin, old_stdout = sys.stdin, sys.stdout
+        sys.stdin = io.StringIO(json.dumps({"properties": {}}))
+        sys.stdout = captured = io.StringIO()
+        try:
+            gen = StubLayerGenerator()
+            gen.run_from_stdin()
+        finally:
+            sys.stdin, sys.stdout = old_stdin, old_stdout
+
+        result = json.loads(captured.getvalue())
+        self.assertEqual(result["name"], "Test Layer")
+        self.assertEqual(result["info"]["width"], 2)
+        self.assertEqual(result["info"]["height"], 2)
+
+
+class StubPathCalculator(PathCalculator):
+    pass
+
+
+class TestPathCalculator(unittest.TestCase):
+    def _create_mock_grid(self, width=10, height=10, resolution=0.1, origin=(0.0, 0.0, 0.0), obstacles=None):
+        import zlib
+        import base64
+        data_bytes = bytearray(width * height)
+        # default FREE = 0
+        if obstacles:
+            for (r, c) in obstacles:
+                if 0 <= r < height and 0 <= c < width:
+                    data_bytes[r * width + c] = 100
+        compressed = zlib.compress(bytes(data_bytes))
+        b64 = base64.b64encode(compressed).decode('ascii')
+        return OccupancyGrid({
+            "width": width,
+            "height": height,
+            "resolution": resolution,
+            "origin": list(origin),
+            "data": b64
+        })
+
+    def test_find_dijkstra_path_straight(self):
+        from wpt_plugin.geometry import Point
+        from wpt_plugin.path import find_dijkstra_path
+        # 10x10 free grid
+        grid = self._create_mock_grid(10, 10, 0.1, origin=(0.0, 0.0, 0.0))
+        # Start at (0.15, 0.15), Goal at (0.85, 0.85)
+        start = Point(0.15, 0.15)
+        goal = Point(0.85, 0.85)
+        path = find_dijkstra_path(grid, start, goal, padding=0.0)
+        self.assertIsNotNone(path)
+        self.assertGreater(len(path), 1)
+        self.assertAlmostEqual(path[0].x, start.x)
+        self.assertAlmostEqual(path[0].y, start.y)
+        self.assertAlmostEqual(path[-1].x, goal.x)
+        self.assertAlmostEqual(path[-1].y, goal.y)
+
+    def test_find_dijkstra_path_blocked(self):
+        from wpt_plugin.geometry import Point
+        from wpt_plugin.path import find_dijkstra_path
+        # Wall across the middle
+        obstacles = [(5, c) for c in range(10)]
+        grid = self._create_mock_grid(10, 10, 0.1, origin=(0.0, 0.0, 0.0), obstacles=obstacles)
+        start = Point(0.15, 0.15) # row 8 in grid
+        goal = Point(0.15, 0.85)  # row 1 in grid
+        path = find_dijkstra_path(grid, start, goal)
+        self.assertIsNone(path)
+
+    def test_run_from_stdin_path(self):
+        old_stdin, old_stdout = sys.stdin, sys.stdout
+        context = {
+            "waypoints": [
+                {"transform": {"x": 0.0, "y": 0.0}},
+                {"transform": {"x": 1.0, "y": 0.0}}
+            ],
+            "properties": {}
+        }
+        sys.stdin = io.StringIO(json.dumps(context))
+        sys.stdout = captured = io.StringIO()
+        try:
+            calc = StubPathCalculator()
+            calc.run_from_stdin()
+        finally:
+            sys.stdin, sys.stdout = old_stdin, old_stdout
+
+        result = json.loads(captured.getvalue())
+        self.assertIn("segments", result)
+        self.assertEqual(len(result["segments"]), 1)
+        self.assertEqual(result["segments"][0][0]["x"], 0.0)
+        self.assertEqual(result["segments"][0][-1]["x"], 1.0)
+
+
 if __name__ == '__main__':
     unittest.main()
+

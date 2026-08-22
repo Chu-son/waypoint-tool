@@ -26,20 +26,52 @@ class OccupancyGrid:
         self.height: int = data["height"]
         self.resolution: float = data["resolution"]
         self.origin: list = data["origin"]   # [x, y, yaw]
+
+        # Load cell value definitions from protocol metadata if present
+        cell_vals = data.get("cell_values", {})
+        self.FREE: int = cell_vals.get("free", 0)
+        self.OBSTACLE: int = cell_vals.get("obstacle", 100)
+        self.UNKNOWN: int = cell_vals.get("unknown", -1)
+
         import base64
         import zlib
-        self._data: list = list(zlib.decompress(base64.b64decode(data["data"])))
+        import struct
+        raw_bytes = zlib.decompress(base64.b64decode(data["data"]))
+        # Decompress signed 8-bit integers (int8: -128..127) so 0xFF becomes -1 (UNKNOWN)
+        self._data: list = list(struct.unpack(f"{len(raw_bytes)}b", raw_bytes))
 
     def get_cell(self, row: int, col: int) -> int:
-        """セル値を返す。範囲外は UNKNOWN として扱う。"""
+        """セル値を返す。範囲外は UNKNOWN (-1) として扱う。"""
         if row < 0 or row >= self.height or col < 0 or col >= self.width:
             return self.UNKNOWN
         return self._data[row * self.width + col]
 
-    def is_obstacle(self, world_x: float, world_y: float) -> bool:
-        """ワールド座標が障害物かどうかを判定。"""
-        col, row = self.world_to_grid(world_x, world_y)
+    def is_free_cell(self, row: int, col: int) -> bool:
+        """指定のグリッドセルが自由空間（Free）かどうかを判定。"""
+        return self.get_cell(row, col) == self.FREE
+
+    def is_obstacle_cell(self, row: int, col: int) -> bool:
+        """指定のグリッドセルが障害物（Obstacle）かどうかを判定。"""
         return self.get_cell(row, col) == self.OBSTACLE
+
+    def is_unknown_cell(self, row: int, col: int) -> bool:
+        """指定のグリッドセルが不明領域（Unknown）かどうかを判定。"""
+        return self.get_cell(row, col) == self.UNKNOWN
+
+    def is_free(self, world_x: float, world_y: float) -> bool:
+        """ワールド座標が自由空間（Free）かどうかを判定。"""
+        col, row = self.world_to_grid(world_x, world_y)
+        return self.is_free_cell(row, col)
+
+    def is_obstacle(self, world_x: float, world_y: float) -> bool:
+        """ワールド座標が障害物（Obstacle）かどうかを判定。"""
+        col, row = self.world_to_grid(world_x, world_y)
+        return self.is_obstacle_cell(row, col)
+
+    def is_unknown(self, world_x: float, world_y: float) -> bool:
+        """ワールド座標が不明領域（Unknown）かどうかを判定。"""
+        col, row = self.world_to_grid(world_x, world_y)
+        return self.is_unknown_cell(row, col)
 
     def world_to_grid(self, world_x: float, world_y: float):
         """ワールド座標 → (col, row) のグリッドインデックスに変換。"""

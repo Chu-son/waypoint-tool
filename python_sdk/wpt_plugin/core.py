@@ -21,33 +21,8 @@ class Waypoint(TypedDict, total=False):
     transform: Transform
     options: Dict[str, Any]
 
-class WaypointGenerator:
-    """Base class for Waypoint Tool Python plugins."""
-
-    def generate(self, context: Dict[str, Any]) -> List[Waypoint]:
-        """Generate waypoints. MUST be overridden by subclasses."""
-        raise NotImplementedError("Plugins must implement the 'generate' method.")
-
-    def run_from_stdin(self):
-        """Standard communication loop via stdin/stdout."""
-        try:
-            input_data = sys.stdin.read()
-            if not input_data.strip():
-                print("[]")
-                return
-
-            context = json.loads(input_data)
-            result = self.generate(context)
-
-            if not isinstance(result, list):
-                result = [result]
-
-            self._validate_output(result)
-            print(json.dumps(result))
-
-        except Exception:
-            print(traceback.format_exc(), file=sys.stderr)
-            sys.exit(1)
+class PluginBase:
+    """Base class for all Waypoint Tool Python plugins."""
 
     @staticmethod
     def get_property(context: Dict[str, Any], name: str, default: Any = None) -> Any:
@@ -97,6 +72,47 @@ class WaypointGenerator:
         return RobotFootprint.from_dict(data)
 
     @staticmethod
+    def log(message: str):
+        print(f"[PLUGIN] {message}", file=sys.stderr)
+
+    @staticmethod
+    def quaternion_to_yaw(point_data: Dict[str, Any]) -> float:
+        return quaternion_to_yaw(point_data)
+
+    @staticmethod
+    def yaw_to_quaternion(yaw: float) -> tuple:
+        return yaw_to_quaternion(yaw)
+
+
+class WaypointGenerator(PluginBase):
+    """Base class for Waypoint Generator plugins."""
+
+    def generate(self, context: Dict[str, Any]) -> List[Waypoint]:
+        """Generate waypoints. MUST be overridden by subclasses."""
+        raise NotImplementedError("Plugins must implement the 'generate' method.")
+
+    def run_from_stdin(self):
+        """Standard communication loop via stdin/stdout."""
+        try:
+            input_data = sys.stdin.read()
+            if not input_data.strip():
+                print("[]")
+                return
+
+            context = json.loads(input_data)
+            result = self.generate(context)
+
+            if not isinstance(result, list):
+                result = [result]
+
+            self._validate_output(result)
+            print(json.dumps(result))
+
+        except Exception:
+            print(traceback.format_exc(), file=sys.stderr)
+            sys.exit(1)
+
+    @staticmethod
     def make_waypoint(x: float, y: float, yaw: float,
                        options: Optional[Dict[str, Any]] = None,
                        precision: int = 6) -> Waypoint:
@@ -115,10 +131,6 @@ class WaypointGenerator:
             wp["options"] = options
         return wp
 
-    @staticmethod
-    def log(message: str):
-        print(f"[PLUGIN] {message}", file=sys.stderr)
-
     def _validate_output(self, waypoints: List[Any]):
         for i, wp in enumerate(waypoints):
             if not isinstance(wp, dict):
@@ -127,12 +139,3 @@ class WaypointGenerator:
             if "transform" not in wp and ("x" not in wp or "y" not in wp):
                 self.log(f"WARNING: Waypoint [{i}] has no positional data")
 
-    # Re-export utils for convenience/compatibility if needed, 
-    # though we encourage using the new classes.
-    @staticmethod
-    def quaternion_to_yaw(point_data: Dict[str, Any]) -> float:
-        return quaternion_to_yaw(point_data)
-
-    @staticmethod
-    def yaw_to_quaternion(yaw: float) -> tuple:
-        return yaw_to_quaternion(yaw)
