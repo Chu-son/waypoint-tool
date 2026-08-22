@@ -120,6 +120,12 @@ pub struct ProjectData {
     pub export_regions: Option<Vec<ExportRegion>>,
     pub robot_footprint: Option<serde_json::Value>,
     pub occupancy_settings: Option<serde_json::Value>,
+    pub default_map_opacity: Option<f64>,
+    pub left_panel_view_mode: Option<String>,
+    pub right_panel_view_mode: Option<String>,
+    pub active_path_calculator_plugin_id: Option<String>,
+    pub path_calculator_params: Option<serde_json::Value>,
+    pub auto_recalculate_path: Option<bool>,
     pub path_color: Option<String>,
     pub path_width: Option<f64>,
     pub path_opacity: Option<f64>,
@@ -194,5 +200,20 @@ mod tests {
         let fp = project.robot_footprint.unwrap();
         assert_eq!(fp["type"], "circular");
         assert_eq!(fp["radius"], 0.35);
+    }
+
+    #[test]
+    fn test_project_data_with_panel_modes_and_opacity() {
+        let json = r#"{
+            "root_node_ids": [],
+            "nodes": {},
+            "default_map_opacity": 0.85,
+            "left_panel_view_mode": "split",
+            "right_panel_view_mode": "tabs"
+        }"#;
+        let project: ProjectData = serde_json::from_str(json).unwrap();
+        assert_eq!(project.default_map_opacity, Some(0.85));
+        assert_eq!(project.left_panel_view_mode, Some("split".to_string()));
+        assert_eq!(project.right_panel_view_mode, Some("tabs".to_string()));
     }
 }

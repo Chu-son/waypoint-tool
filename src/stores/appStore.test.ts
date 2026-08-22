@@ -331,4 +331,60 @@ describe('AppStore Zustand Store', () => {
     state = useAppStore.getState();
     expect(state.robotFootprint).toEqual({ type: 'circular', radius: 0.3 });
   });
+
+  // --- パネル表示モード (Tab / Split View) ---
+
+  it('should restore and reset panel view modes in setProjectData and resetProject', () => {
+    const { setProjectData, resetProject, setLeftPanelViewMode, setRightPanelViewMode } = useAppStore.getState();
+
+    setLeftPanelViewMode('split');
+    setRightPanelViewMode('tabs');
+    expect(useAppStore.getState().leftPanelViewMode).toBe('split');
+    expect(useAppStore.getState().rightPanelViewMode).toBe('tabs');
+
+    setProjectData({
+      root_node_ids: [],
+      nodes: {},
+      left_panel_view_mode: 'tabs',
+      right_panel_view_mode: 'split',
+    });
+
+    let state = useAppStore.getState();
+    expect(state.leftPanelViewMode).toBe('tabs');
+    expect(state.rightPanelViewMode).toBe('split');
+
+    resetProject();
+    state = useAppStore.getState();
+    expect(state.leftPanelViewMode).toBe('tabs');
+    expect(state.rightPanelViewMode).toBe('tabs');
+  });
+
+  // --- マップレイヤーの透過度 (OPACITY) および defaultMapOpacity ---
+
+  it('should manage defaultMapOpacity and preserve individual map opacities', () => {
+    const { setDefaultMapOpacity, setProjectData, resetProject } = useAppStore.getState();
+
+    setDefaultMapOpacity(0.85);
+    expect(useAppStore.getState().defaultMapOpacity).toBe(0.85);
+
+    setProjectData({
+      root_node_ids: [],
+      nodes: {},
+      default_map_opacity: 0.75,
+      map_layers: [
+        { id: 'm1', name: 'Map 1', info: null, image_base64: 'b1', visible: true, opacity: 0.3, z_index: 0, width: 100, height: 100 },
+        { id: 'm2', name: 'Map 2', info: null, image_base64: 'b2', visible: false, opacity: 0.9, z_index: 1, width: 100, height: 100 },
+      ],
+    });
+
+    let state = useAppStore.getState();
+    expect(state.defaultMapOpacity).toBe(0.75);
+    expect(state.mapLayers.length).toBe(2);
+    expect(state.mapLayers[0].opacity).toBe(0.3);
+    expect(state.mapLayers[1].opacity).toBe(0.9);
+
+    resetProject();
+    state = useAppStore.getState();
+    expect(state.mapLayers).toEqual([]);
+  });
 });

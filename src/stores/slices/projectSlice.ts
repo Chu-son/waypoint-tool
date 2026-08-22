@@ -128,6 +128,12 @@ export type ProjectSlice = {
     pathCalculatorParams?: Record<string, any>;
     auto_recalculate_path?: boolean;
     autoRecalculatePath?: boolean;
+    default_map_opacity?: number;
+    defaultMapOpacity?: number;
+    left_panel_view_mode?: 'tabs' | 'split';
+    leftPanelViewMode?: 'tabs' | 'split';
+    right_panel_view_mode?: 'tabs' | 'split';
+    rightPanelViewMode?: 'tabs' | 'split';
     path_color?: string;
     pathColor?: string;
     path_width?: number;
@@ -216,6 +222,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         optionsSchema: data.options_schema || null,
         robotFootprint: data.robot_footprint || data.robotFootprint || DEFAULT_ROBOT_FOOTPRINT,
         occupancySettings: data.occupancy_settings || data.occupancySettings || DEFAULT_OCCUPANCY_SETTINGS,
+        defaultMapOpacity: typeof data.default_map_opacity === 'number' ? data.default_map_opacity : (typeof data.defaultMapOpacity === 'number' ? data.defaultMapOpacity : state.defaultMapOpacity),
+        leftPanelViewMode: data.left_panel_view_mode || data.leftPanelViewMode || state.leftPanelViewMode,
+        rightPanelViewMode: data.right_panel_view_mode || data.rightPanelViewMode || state.rightPanelViewMode,
         activePathCalculatorPluginId: data.active_path_calculator_plugin_id || data.activePathCalculatorPluginId || null,
         pathCalculatorParams: data.path_calculator_params || data.pathCalculatorParams || {},
         autoRecalculatePath: data.auto_recalculate_path ?? data.autoRecalculatePath ?? true,
@@ -252,6 +261,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       optionsSchema: null,
       robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
       occupancySettings: DEFAULT_OCCUPANCY_SETTINGS,
+      leftPanelViewMode: 'tabs',
+      rightPanelViewMode: 'tabs',
       exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
       isDirty: false
     };
@@ -288,9 +299,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             image_base64: layer.image_base64 || "",
             width: layer.width || 1000,
             height: layer.height || 1000,
-            visible: true,
-            opacity: defaultMapOpacity,
-            z_index: 0,
+            visible: typeof layer.visible === 'boolean' ? layer.visible : true,
+            opacity: typeof layer.opacity === 'number' ? layer.opacity : (projectData.default_map_opacity ?? defaultMapOpacity),
+            z_index: typeof layer.z_index === 'number' ? layer.z_index : 0,
             blend_mode: layer.blend_mode || 'overwrite'
           })),
           custom_layers: projectData.custom_layers,
@@ -301,6 +312,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           export_templates: projectData.export_templates,
           robot_footprint: projectData.robot_footprint,
           occupancy_settings: projectData.occupancy_settings,
+          default_map_opacity: projectData.default_map_opacity,
+          left_panel_view_mode: projectData.left_panel_view_mode,
+          right_panel_view_mode: projectData.right_panel_view_mode,
           active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
           path_calculator_params: projectData.path_calculator_params,
           auto_recalculate_path: projectData.auto_recalculate_path,
@@ -323,7 +337,27 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   },
 
   saveProject: async () => {
-    const { lastDirectory, setLastDirectory, rootNodeIds, nodes, mapLayers, customLayers, robotFootprint, occupancySettings, activePathCalculatorPluginId, pathCalculatorParams, autoRecalculatePath, pathColor, pathWidth, pathOpacity, syncPathWidthWithFootprint, setIsDirty } = get();
+    const {
+      lastDirectory,
+      setLastDirectory,
+      rootNodeIds,
+      nodes,
+      mapLayers,
+      customLayers,
+      robotFootprint,
+      occupancySettings,
+      defaultMapOpacity,
+      leftPanelViewMode,
+      rightPanelViewMode,
+      activePathCalculatorPluginId,
+      pathCalculatorParams,
+      autoRecalculatePath,
+      pathColor,
+      pathWidth,
+      pathOpacity,
+      syncPathWidthWithFootprint,
+      setIsDirty,
+    } = get();
     try {
       const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
@@ -366,6 +400,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
           robot_footprint: robotFootprint,
           occupancy_settings: occupancySettings,
+          default_map_opacity: defaultMapOpacity,
+          left_panel_view_mode: leftPanelViewMode,
+          right_panel_view_mode: rightPanelViewMode,
           active_path_calculator_plugin_id: activePathCalculatorPluginId,
           path_calculator_params: pathCalculatorParams,
           auto_recalculate_path: autoRecalculatePath,

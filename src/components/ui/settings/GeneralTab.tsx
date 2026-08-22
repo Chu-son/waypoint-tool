@@ -6,8 +6,7 @@ import { BrowseInput } from "../common/BrowseInput";
 
 export function GeneralTab() {
   const defaultMapOpacity = useAppStore((state) => state.defaultMapOpacity);
-  const setDefaultMapOpacity = (opacity: number) =>
-    useAppStore.setState({ defaultMapOpacity: opacity, isDirty: true });
+  const setDefaultMapOpacity = useAppStore((state) => state.setDefaultMapOpacity);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);

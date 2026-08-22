@@ -363,6 +363,12 @@ mod tests {
                 "defaultFreeThresh": 0.2,
                 "defaultNegate": 0
             })),
+            default_map_opacity: Some(0.85),
+            left_panel_view_mode: Some("split".to_string()),
+            right_panel_view_mode: Some("tabs".to_string()),
+            active_path_calculator_plugin_id: None,
+            path_calculator_params: None,
+            auto_recalculate_path: Some(true),
             path_color: Some("#10b981".to_string()),
             path_width: Some(0.2),
             path_opacity: Some(0.8),
@@ -378,6 +384,9 @@ mod tests {
         assert!(load_res.is_ok(), "Load project failed");
 
         let loaded_data = load_res.unwrap();
+        assert_eq!(loaded_data.default_map_opacity, Some(0.85));
+        assert_eq!(loaded_data.left_panel_view_mode, Some("split".to_string()));
+        assert_eq!(loaded_data.right_panel_view_mode, Some("tabs".to_string()));
         assert_eq!(loaded_data.root_node_ids, vec!["node1".to_string()]);
         assert!(loaded_data.nodes.contains_key("node1"));
         assert!(loaded_data.occupancy_settings.is_some());

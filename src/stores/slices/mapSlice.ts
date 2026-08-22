@@ -8,6 +8,7 @@ export type MapSlice = {
   customLayers: CustomLayer[];
   activeCustomLayerId: string | null;
   defaultMapOpacity: number;
+  setDefaultMapOpacity: (opacity: number) => void;
   enableSnapping: boolean;
   cursorPosition: { x: number; y: number } | null;
   mapScale: number;
@@ -59,6 +60,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   customLayers: [],
   activeCustomLayerId: null,
   defaultMapOpacity: 0.5,
+  setDefaultMapOpacity: (opacity: number) => set({ defaultMapOpacity: opacity, isDirty: true }),
   enableSnapping: true,
   cursorPosition: null,
   mapScale: 1,
