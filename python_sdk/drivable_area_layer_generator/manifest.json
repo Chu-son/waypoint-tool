@@ -1,13 +1,21 @@
 {
   "name": "Drivable Area Layer Generator",
   "category": "map_layer_generator",
-  "version": "1.2.0",
-  "description": "Expands drivable area from an interactive seed point using flood-fill with robot footprint clearance, unknown space handling, and customizable overlay colors.",
+  "version": "1.3.0",
+  "description": "Expands drivable area from interactive seed points using multi-source flood-fill with robot footprint clearance, unknown space handling, and customizable overlay colors.",
   "type": "python",
   "executable": "main.py",
   "icon": "Sparkles",
   "inputs": [
-    { "id": "seed_point", "label": "Seed Point", "type": "point" }
+    {
+      "id": "seed_points",
+      "label": "Seed Points",
+      "type": "points",
+      "min_points": 1,
+      "max_points": 50,
+      "allow_yaw": false,
+      "description": "Click on map to add seed points. Drag to move, right-click or delete via list to remove."
+    }
   ],
   "needs": ["occupancy_grid", "robot_footprint"],
   "properties": [

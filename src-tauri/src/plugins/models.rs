@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PluginInputType {
     Point,
+    Points,
+    PointList,
     Rectangle,
     Waypoint,
 }
@@ -56,9 +58,18 @@ pub struct PluginMapLayer {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PluginInputDef {
     pub id: String,
-    pub label: String,
+    #[serde(default)]
+    pub label: Option<String>,
     #[serde(rename = "type")]
     pub input_type: PluginInputType,
+    #[serde(default)]
+    pub min_points: Option<usize>,
+    #[serde(default)]
+    pub max_points: Option<usize>,
+    #[serde(default)]
+    pub allow_yaw: Option<bool>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -143,6 +154,34 @@ mod tests {
         assert!(manifest.inputs.is_empty());
         assert!(manifest.properties.is_empty());
         assert!(manifest.needs.is_empty());
+    }
+
+    #[test]
+    fn test_points_input_manifest_deserialize() {
+        let json = r#"{
+            "name": "Drivable Area Layer Generator",
+            "category": "map_layer_generator",
+            "type": "python",
+            "executable": "main.py",
+            "inputs": [
+                {
+                    "id": "seed_points",
+                    "label": "Seed Points",
+                    "type": "points",
+                    "min_points": 1,
+                    "max_points": 50,
+                    "allow_yaw": false
+                }
+            ],
+            "properties": []
+        }"#;
+        let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.name, "Drivable Area Layer Generator");
+        assert_eq!(manifest.inputs.len(), 1);
+        assert_eq!(manifest.inputs[0].input_type, PluginInputType::Points);
+        assert_eq!(manifest.inputs[0].min_points, Some(1));
+        assert_eq!(manifest.inputs[0].max_points, Some(50));
+        assert_eq!(manifest.inputs[0].allow_yaw, Some(false));
     }
 }
 

@@ -101,7 +101,18 @@ export type RobotFootprint = CircularFootprint | RectangularFootprint | PolygonF
 
 // --- Plugin Architecture Types ---
 export type PluginCategory = 'waypoint_generator' | 'map_layer_generator' | 'path_calculator';
-export type PluginInputType = 'point' | 'rectangle' | 'waypoint';
+export type PluginInputType = 'point' | 'points' | 'point_list' | 'rectangle' | 'waypoint';
+
+export interface PluginInteractionPointItem {
+  id: string;
+  x: number;
+  y: number;
+  yaw?: number;
+  qx?: number;
+  qy?: number;
+  qz?: number;
+  qw?: number;
+}
 
 export type PluginInputDef = {
   id: string;
@@ -109,6 +120,9 @@ export type PluginInputDef = {
   label: string; // The display label
   description?: string;
   type: PluginInputType | 'boolean' | 'integer' | 'float' | 'string';
+  min_points?: number;
+  max_points?: number;
+  allow_yaw?: boolean;
   default?: any;
   required?: boolean;
 };

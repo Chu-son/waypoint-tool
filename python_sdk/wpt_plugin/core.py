@@ -33,14 +33,30 @@ class PluginBase:
         return context.get("interaction_data", {}).get(input_id)
 
     def get_interaction_point(self, context: Dict[str, Any], input_id: str) -> Optional[Point]:
+        points = self.get_interaction_points(context, input_id)
+        return points[0] if points else None
+
+    def get_interaction_points(self, context: Dict[str, Any], input_id: str) -> List[Point]:
         data = self.get_interaction_data(context, input_id)
         if not data:
-            return None
-        return Point(
-            x=data.get("x", 0.0),
-            y=data.get("y", 0.0),
-            yaw=quaternion_to_yaw(data)
-        )
+            return []
+        if isinstance(data, list):
+            points = []
+            for item in data:
+                if isinstance(item, dict) and "x" in item and "y" in item:
+                    points.append(Point(
+                        x=float(item.get("x", 0.0)),
+                        y=float(item.get("y", 0.0)),
+                        yaw=quaternion_to_yaw(item)
+                    ))
+            return points
+        elif isinstance(data, dict) and "x" in data and "y" in data:
+            return [Point(
+                x=float(data.get("x", 0.0)),
+                y=float(data.get("y", 0.0)),
+                yaw=quaternion_to_yaw(data)
+            )]
+        return []
 
     def get_interaction_rect(self, context: Dict[str, Any], input_id: str) -> Optional[Rectangle]:
         data = self.get_interaction_data(context, input_id)

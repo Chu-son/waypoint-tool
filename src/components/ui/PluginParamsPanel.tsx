@@ -75,6 +75,11 @@ export function PluginParamsPanel() {
     const currentKey = currentInput?.name || currentInput?.id;
     if (!currentKey || !pluginInteractionData[currentKey]) return;
 
+    // Do NOT auto-advance if current input is a points list (user adds multiple points interactively)
+    if (currentInput.type === "points" || currentInput.type === "point_list") {
+      return;
+    }
+
     // Current input has data - find next unset input
     for (let i = activeInputIndex + 1; i < inputs.length; i++) {
       const inp = inputs[i];
@@ -320,7 +325,8 @@ export function PluginParamsPanel() {
             <div className="flex gap-1">
               {inputs.map((inp, idx) => {
                 const key = inp.name || inp.id || "";
-                const hasData = !!pluginInteractionData[key];
+                const rawVal = pluginInteractionData[key];
+                const hasData = Array.isArray(rawVal) ? rawVal.length > 0 : !!rawVal;
                 const isActive = idx === activeInputIndex;
                 return (
                   <Button
@@ -347,9 +353,11 @@ export function PluginParamsPanel() {
                       <span className="truncate">
                         {inp.type === "rectangle"
                           ? "▭"
-                          : inp.type === "point"
-                            ? "◉"
-                            : "●"}
+                          : inp.type === "points" || inp.type === "point_list"
+                            ? "⁝"
+                            : inp.type === "point"
+                              ? "◉"
+                              : "●"}
                       </span>
                     </div>
                   </Button>
@@ -365,7 +373,8 @@ export function PluginParamsPanel() {
             const key = inp.name || inp.id;
             if (!key) return null;
             const isActiveStep = idx === activeInputIndex;
-            const hasData = !!pluginInteractionData[key];
+            const rawVal = pluginInteractionData[key];
+            const hasData = Array.isArray(rawVal) ? rawVal.length > 0 : !!rawVal;
             return (
               <PluginInputEditor
                 key={`input-${idx}`}

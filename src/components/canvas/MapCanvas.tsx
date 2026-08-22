@@ -287,7 +287,7 @@ export function MapCanvas() {
     };
   }, [previewTexture]);
 
-  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region'>('none');
+  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region' | 'drag_points_item' | 'set_yaw_points_item'>('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
@@ -295,6 +295,8 @@ export function MapCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const rectInputKey = useRef<string>('');  // The input ID being drawn (e.g. 'sweep_rect')
   const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft' | 'nw'|'ne'|'sw'|'se'|'n'|'s'|'e'|'w'>('max');
+  const pointsInputKey = useRef<string>('');
+  const pointsItemIndex = useRef<number>(-1);
   const regionDragOffset = useRef({ x: 0, y: 0 });
 
   const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
@@ -702,8 +704,8 @@ export function MapCanvas() {
       useAppStore.getState().updatePluginInteractionData('__export_region_origin', { x: worldX, y: worldY });
       e.currentTarget.setPointerCapture(e.pointerId);
     }
-    // Left click + Add Generator Tool -> Define interaction input based on active plugin type
-    else if (e.button === 0 && activeTool === 'add_generator') {
+    // Click (Left or Right) + Add Generator Tool -> Define interaction input based on active plugin type
+    else if ((e.button === 0 || e.button === 2) && activeTool === 'add_generator') {
       const rect = containerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -713,60 +715,98 @@ export function MapCanvas() {
       const allInputs = activePlugin?.manifest?.inputs || [];
       const hitRadius = 12 / scale;
 
-      // FIRST: Check ALL existing rectangles in pluginInteractionData for handle hits
-      //        This works regardless of which activeInputIndex is currently set.
-      for (const inp of allInputs) {
-        if (inp.type !== 'rectangle') continue;
-        const rKey = inp.name || inp.id;
-        if (!rKey) continue;
-        const existing = useAppStore.getState().pluginInteractionData[rKey];
-        if (!existing?.center) continue;
+      // FIRST: Check ALL existing rectangles in pluginInteractionData for handle hits (Left-click only)
+      if (e.button === 0) {
+        for (const inp of allInputs) {
+          if (inp.type !== 'rectangle') continue;
+          const rKey = inp.name || inp.id;
+          if (!rKey) continue;
+          const existing = useAppStore.getState().pluginInteractionData[rKey];
+          if (!existing?.center) continue;
 
-        const { center, width, height, yaw = 0 } = existing;
-        const halfW = width / 2;
-        const halfH = height / 2;
+          const { center, width, height, yaw = 0 } = existing;
+          const halfW = width / 2;
+          const halfH = height / 2;
 
-        // Convert mouse world coordinates to rectangle local space
-        const dx = worldX - center.x;
-        const dy = worldY - center.y;
-        
-        // Inverse rotation (by -yaw)
-        const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-        const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
+          // Convert mouse world coordinates to rectangle local space
+          const dx = worldX - center.x;
+          const dy = worldY - center.y;
+          
+          // Inverse rotation (by -yaw)
+          const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
+          const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
 
-        // Check rotation handle (above top of rect on screen = +halfH in Y-up world)
-        const rotHandleLocalY = halfH + 20 / scale;
-        const rotDx = localX - 0;
-        const rotDy = localY - rotHandleLocalY;
-        if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
-          rectInputKey.current = rKey;
-          interactionMode.current = 'set_rect_rotation';
-          e.currentTarget.setPointerCapture(e.pointerId);
-          return;
-        }
-
-        // Check corners in local space (Y-up: +Y = screen top)
-        const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
-          { cx: -halfW, cy: halfH, corner: 'min' },         // top-left on screen
-          { cx: halfW, cy: -halfH, corner: 'max' },         // bottom-right on screen
-          { cx: halfW, cy: halfH, corner: 'topRight' },     // top-right on screen
-          { cx: -halfW, cy: -halfH, corner: 'bottomLeft' }, // bottom-left on screen
-        ];
-        
-        for (const c of cornersMap) {
-          const cdx = localX - c.cx;
-          const cdy = localY - c.cy;
-          if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
+          // Check rotation handle (above top of rect on screen = +halfH in Y-up world)
+          const rotHandleLocalY = halfH + 20 / scale;
+          const rotDx = localX - 0;
+          const rotDy = localY - rotHandleLocalY;
+          if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
             rectInputKey.current = rKey;
-            rectDragCorner.current = c.corner;
-            interactionMode.current = 'drag_rect_corner';
+            interactionMode.current = 'set_rect_rotation';
             e.currentTarget.setPointerCapture(e.pointerId);
             return;
+          }
+
+          // Check corners in local space (Y-up: +Y = screen top)
+          const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
+            { cx: -halfW, cy: halfH, corner: 'min' },         // top-left on screen
+            { cx: halfW, cy: -halfH, corner: 'max' },         // bottom-right on screen
+            { cx: halfW, cy: halfH, corner: 'topRight' },     // top-right on screen
+            { cx: -halfW, cy: -halfH, corner: 'bottomLeft' }, // bottom-left on screen
+          ];
+          
+          for (const c of cornersMap) {
+            const cdx = localX - c.cx;
+            const cdy = localY - c.cy;
+            if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
+              rectInputKey.current = rKey;
+              rectDragCorner.current = c.corner;
+              interactionMode.current = 'drag_rect_corner';
+              e.currentTarget.setPointerCapture(e.pointerId);
+              return;
+            }
           }
         }
       }
 
-      // THEN: Process the current activeInputIndex input for new interactions
+      // SECOND: Check ALL existing points in pluginInteractionData for point hits (Move on Left, Remove on Right)
+      for (const inp of allInputs) {
+        if (inp.type !== 'points' && inp.type !== 'point_list') continue;
+        const pKey = inp.name || inp.id;
+        if (!pKey) continue;
+        const rawList = useAppStore.getState().pluginInteractionData[pKey];
+        if (!Array.isArray(rawList)) continue;
+
+        for (let i = 0; i < rawList.length; i++) {
+          const pt = rawList[i];
+          if (!pt || typeof pt.x !== 'number' || typeof pt.y !== 'number') continue;
+          const dx = worldX - pt.x;
+          const dy = worldY - pt.y;
+          if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
+            if (e.button === 2) {
+              // Right click -> Remove this point
+              e.preventDefault();
+              const next = rawList.filter((_, idx) => idx !== i);
+              useAppStore.getState().updatePluginInteractionData(pKey, next);
+              return;
+            } else if (e.button === 0) {
+              // Left click -> Drag this point
+              pointsInputKey.current = pKey;
+              pointsItemIndex.current = i;
+              interactionMode.current = 'drag_points_item';
+              e.currentTarget.setPointerCapture(e.pointerId);
+              return;
+            }
+          }
+        }
+      }
+
+      if (e.button === 2) {
+        // Right click not on any point: do nothing
+        return;
+      }
+
+      // THEN: Process the current activeInputIndex input for new interactions (Left click only)
       const currentInput = allInputs[activeInputIndex];
       const inputKey = currentInput?.name || currentInput?.id || 'start_point';
       const inputType = currentInput?.type || 'point';
@@ -783,10 +823,34 @@ export function MapCanvas() {
         });
         interactionMode.current = 'draw_rect';
         e.currentTarget.setPointerCapture(e.pointerId);
+      } else if (inputType === 'points' || inputType === 'point_list') {
+        // Add a new point to the points list
+        const rawList = useAppStore.getState().pluginInteractionData[inputKey];
+        const currentList = Array.isArray(rawList) ? [...rawList] : [];
+        const maxPoints = currentInput.max_points ?? 50;
+
+        if (currentList.length < maxPoints) {
+          const newPoint = {
+            id: uuidv4(),
+            x: worldX,
+            y: worldY,
+            qx: 0,
+            qy: 0,
+            qz: 0,
+            qw: 1,
+          };
+          currentList.push(newPoint);
+          useAppStore.getState().updatePluginInteractionData(inputKey, currentList);
+
+          pointsInputKey.current = inputKey;
+          pointsItemIndex.current = currentList.length - 1;
+          interactionMode.current = currentInput.allow_yaw ? 'set_yaw_points_item' : 'drag_points_item';
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }
       } else {
-        // Point input (existing behavior)
+        // Single Point input (existing behavior)
         useAppStore.getState().updatePluginInteractionData(inputKey, {
-           x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1
+          x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1
         });
         interactionMode.current = 'set_yaw_plugin';
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -992,6 +1056,49 @@ export function MapCanvas() {
               qw: Math.cos(halfYaw) 
             }
           }, { skipRecalculate: true });
+        }
+      }
+    }
+    else if (interactionMode.current === 'drag_points_item') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+
+      const key = pointsInputKey.current;
+      const idx = pointsItemIndex.current;
+      const rawList = useAppStore.getState().pluginInteractionData[key];
+      if (Array.isArray(rawList) && idx >= 0 && idx < rawList.length) {
+        const next = [...rawList];
+        next[idx] = { ...next[idx], x: worldX, y: worldY };
+        useAppStore.getState().updatePluginInteractionData(key, next);
+      }
+    }
+    else if (interactionMode.current === 'set_yaw_points_item') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+
+      const key = pointsInputKey.current;
+      const idx = pointsItemIndex.current;
+      const rawList = useAppStore.getState().pluginInteractionData[key];
+      if (Array.isArray(rawList) && idx >= 0 && idx < rawList.length) {
+        const pt = rawList[idx];
+        const dx = worldX - pt.x;
+        const dy = worldY - pt.y;
+        if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
+          const yaw = Math.atan2(dy, dx);
+          const halfYaw = yaw / 2.0;
+          const next = [...rawList];
+          next[idx] = {
+            ...pt,
+            qx: 0,
+            qy: 0,
+            qz: Math.sin(halfYaw),
+            qw: Math.cos(halfYaw),
+          };
+          useAppStore.getState().updatePluginInteractionData(key, next);
         }
       }
     }
@@ -1251,6 +1358,8 @@ export function MapCanvas() {
       e.currentTarget.releasePointerCapture(e.pointerId);
       interactionMode.current = 'none';
       activeNodeId.current = null;
+      pointsInputKey.current = '';
+      pointsItemIndex.current = -1;
     } else {
       // If we weren't doing anything else, clicking empty space clears selection
       if (activeTool === 'select') {

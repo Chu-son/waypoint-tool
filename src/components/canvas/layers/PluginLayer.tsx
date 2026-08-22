@@ -204,7 +204,90 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
           );
         }
 
-        // Point data
+        // Points list data (Array of points)
+        if (Array.isArray(data)) {
+          return (
+            <pixiContainer key={`points-${key}`}>
+              {data.map((pt, idx) => {
+                if (!pt || typeof pt.x !== 'number' || !isFinite(pt.x) || !isFinite(pt.y)) return null;
+                const ptKey = pt.id || `pt-${key}-${idx}`;
+                const pqw = pt.qw ?? 1, pqz = pt.qz ?? 0, pqx = pt.qx ?? 0, pqy = pt.qy ?? 0;
+                let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
+                if (!isFinite(yaw)) yaw = 0;
+
+                const hasYaw = Math.abs(pqz) > 0.0001 || Math.abs(pqw - 1) > 0.0001;
+
+                return (
+                  <pixiContainer key={ptKey} x={pt.x} y={pt.y}>
+                    {/* Orientation arrow if yaw is set */}
+                    {hasYaw && (
+                      <pixiGraphics
+                        rotation={yaw}
+                        draw={(g) => {
+                          g.clear();
+                          g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
+                          g.fillStyle = { color: 0xf472b6, alpha: 0.8 };
+                          g.moveTo(12 / safeScale, 0);
+                          g.lineTo(-4 / safeScale, 4 / safeScale);
+                          g.lineTo(-4 / safeScale, -4 / safeScale);
+                          g.lineTo(12 / safeScale, 0);
+                          g.fill();
+                          g.stroke();
+                        }}
+                      />
+                    )}
+
+                    {/* Point Circle */}
+                    <pixiGraphics
+                      draw={(g) => {
+                        g.clear();
+                        // Outer halo
+                        g.fillStyle = { color: 0xec4899, alpha: 0.25 };
+                        g.circle(0, 0, 8 / safeScale);
+                        g.fill();
+
+                        // Inner solid circle
+                        g.fillStyle = { color: 0xec4899, alpha: 0.9 };
+                        g.strokeStyle = { width: 1.5 / safeScale, color: 0xffffff };
+                        g.circle(0, 0, 4.5 / safeScale);
+                        g.fill();
+                        g.stroke();
+                      }}
+                    />
+
+                    {/* Index Badge */}
+                    <pixiContainer x={6 / safeScale} y={-6 / safeScale} scale={{ x: 1 / safeScale, y: -1 / safeScale }}>
+                      <pixiGraphics
+                        draw={(g) => {
+                          g.clear();
+                          g.fillStyle = { color: 0x1e293b, alpha: 0.85 };
+                          g.strokeStyle = { width: 1, color: 0xec4899 };
+                          g.roundRect(-4, -4, 16, 12, 3);
+                          g.fill();
+                          g.stroke();
+                        }}
+                      />
+                      <pixiText
+                        text={`#${idx + 1}`}
+                        x={4}
+                        y={2}
+                        anchor={0.5}
+                        style={{
+                          fontFamily: 'system-ui, sans-serif',
+                          fontSize: 9,
+                          fontWeight: 'bold',
+                          fill: '#f472b6',
+                        } as any}
+                      />
+                    </pixiContainer>
+                  </pixiContainer>
+                );
+              })}
+            </pixiContainer>
+          );
+        }
+
+        // Single Point data
         if (typeof data.x !== 'number' || !isFinite(data.x) || !isFinite(data.y)) return null;
         const pqw = data.qw ?? 1, pqz = data.qz ?? 0, pqx = data.qx ?? 0, pqy = data.qy ?? 0;
         let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
@@ -218,7 +301,6 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
             rotation={yaw}
             draw={(g) => {
               g.clear();
-              // simplified point drawing - it doesn't know if it's locked here, we assume it's just a plugin point preview
               g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
               g.fillStyle = { color: 0xf472b6, alpha: 0.8 };
               g.moveTo(10 / safeScale, 0);

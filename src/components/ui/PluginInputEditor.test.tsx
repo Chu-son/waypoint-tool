@@ -142,4 +142,116 @@ describe('PluginInputEditor', () => {
       expect(screen.getByDisplayValue('4')).toBeInTheDocument();
     });
   });
+
+  describe('Points List Type (type: "points")', () => {
+    const pointsInput = {
+      id: 'pts-1',
+      name: 'seed_points',
+      label: 'Seed Points',
+      type: 'points',
+      min_points: 1,
+      max_points: 10,
+    };
+
+    it('renders points input empty state in creation mode', () => {
+      render(
+        <PluginInputEditor
+          {...baseProps}
+          input={pointsInput}
+          interactionData={[]}
+          mode="creation"
+          isActive={true}
+          hasData={false}
+        />
+      );
+
+      expect(screen.getByText('Seed Points')).toBeInTheDocument();
+      expect(screen.getAllByText(/Click on map to add points/i).length).toBeGreaterThan(0);
+      expect(screen.getByText('0 points')).toBeInTheDocument();
+      expect(screen.getByText('/ 10 max')).toBeInTheDocument();
+      expect(screen.getByText('Add')).toBeInTheDocument();
+    });
+
+    it('renders points list and allows editing coordinates', () => {
+      const initialPoints = [
+        { id: 'pt-1', x: 1.0, y: 2.0 },
+        { id: 'pt-2', x: 3.5, y: 4.5 },
+      ];
+
+      render(
+        <PluginInputEditor
+          {...baseProps}
+          input={pointsInput}
+          interactionData={initialPoints}
+          mode="creation"
+          isActive={true}
+          hasData={true}
+        />
+      );
+
+      expect(screen.getByText('2 points')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('1')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('2')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('3.5')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('4.5')).toBeInTheDocument();
+
+      const firstX = screen.getByDisplayValue('1');
+      fireEvent.change(firstX, { target: { value: '1.5' } });
+
+      expect(mockOnUpdate).toHaveBeenCalledWith([
+        { id: 'pt-1', x: 1.5, y: 2.0 },
+        { id: 'pt-2', x: 3.5, y: 4.5 },
+      ]);
+    });
+
+    it('allows removing a specific point and clearing all', () => {
+      const initialPoints = [
+        { id: 'pt-1', x: 1.0, y: 2.0 },
+        { id: 'pt-2', x: 3.5, y: 4.5 },
+      ];
+
+      render(
+        <PluginInputEditor
+          {...baseProps}
+          input={pointsInput}
+          interactionData={initialPoints}
+          mode="edit"
+        />
+      );
+
+      expect(screen.getByText('(Points List)')).toBeInTheDocument();
+
+      // Clear all
+      const clearBtn = screen.getByText('Clear All');
+      fireEvent.click(clearBtn);
+      expect(mockOnUpdate).toHaveBeenCalledWith([]);
+
+      // Remove single
+      const removeButtons = screen.getAllByTitle('Remove this point');
+      fireEvent.click(removeButtons[0]);
+      expect(mockOnUpdate).toHaveBeenCalledWith([
+        { id: 'pt-2', x: 3.5, y: 4.5 },
+      ]);
+    });
+
+    it('allows adding point manually via Add button', () => {
+      render(
+        <PluginInputEditor
+          {...baseProps}
+          input={pointsInput}
+          interactionData={[]}
+          mode="creation"
+          isActive={true}
+        />
+      );
+
+      const addBtn = screen.getByText('Add');
+      fireEvent.click(addBtn);
+
+      expect(mockOnUpdate).toHaveBeenCalled();
+      const updatedArg = mockOnUpdate.mock.calls[0][0];
+      expect(updatedArg).toHaveLength(1);
+      expect(updatedArg[0]).toMatchObject({ x: 0, y: 0 });
+    });
+  });
 });

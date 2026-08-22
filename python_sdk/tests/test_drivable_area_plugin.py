@@ -191,6 +191,29 @@ class TestLayerColorAndDrivableArea(unittest.TestCase):
         res2 = gen.generate_layer(context_optimistic)
         self.assertIn("image_base64", res2)
 
+    def test_drivable_area_generator_multiple_seed_points(self):
+        gen = DrivableAreaLayerGenerator()
+        # 30x30 free grid
+        grid_data = self._create_mock_grid(30, 30, resolution=0.1, origin=(0.0, 0.0, 0.0))
+        context = {
+            "occupancy_grid": grid_data,
+            "properties": {
+                "max_radius": 0.5,
+                "use_robot_footprint": False,
+            },
+            "interaction_data": {
+                "seed_points": [
+                    {"x": 0.5, "y": 0.5},
+                    {"x": 2.0, "y": 2.0},
+                ]
+            }
+        }
+        res = gen.generate_layer(context)
+        self.assertIn("image_base64", res)
+        self.assertEqual(res["name"], "Drivable Area Layer")
+        self.assertEqual(res["info"]["width"], 30)
+        self.assertEqual(res["info"]["height"], 30)
+
 
 if __name__ == '__main__':
     unittest.main()

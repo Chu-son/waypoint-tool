@@ -26,8 +26,13 @@ my_plugin/
   - `"map_layer_generator"`: オーバーレイ用のマップレイヤー画像を生成するプラグイン。
   - `"path_calculator"`: ウェイポイント間を障害物回避等で補間するパス計算プラグイン。
 - `inputs`: キャンバス上での操作入力を定義。
-  - `type: "point"`: 座標と向きをクリックで指定。
+  - `type: "point"`: 座標と向き（Yaw）をクリックで指定。
+  - `type: "points"`: 複数座標のリスト（点群）。キャンバスクリックで追加、ドラッグで移動、右クリック/リスト操作で削除。
+    - `min_points`: 最小点数（省略可）。
+    - `max_points`: 最大点数（省略可、デフォルト 50）。
+    - `allow_yaw`: 各点に向き（Yaw）を持たせるか（デフォルト `false`）。
   - `type: "rectangle"`: 範囲をドラッグで指定。
+  - `type: "waypoint"`: 既存のウェイポイントを選択。
 - `properties`: UI に表示されるパラメータ（数値、文字列、真偽値等）。
   - `interaction_hints`: キャンバス上にプレビュー図形を描画するためのヒント情報。
 - `needs`: アプリ本体から追加情報（マップや選択中のポイントなど）を要求する場合に指定。現在サポートされている値は以下の通りです：
@@ -77,7 +82,7 @@ from wpt_plugin import MapLayerGenerator, OccupancyGrid, Point
 
 class DrivableAreaGenerator(MapLayerGenerator):
     def generate_layer(self, context):
-        seed = self.get_interaction_point(context, "seed_point") or Point(0, 0)
+        seeds = self.get_interaction_points(context, "seed_points") or [Point(0, 0)]
         grid = self.get_occupancy_grid(context)
         
         # 2値マスク (1: 描画, 0: 透過) からレイヤーを生成

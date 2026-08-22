@@ -17,9 +17,10 @@ from wpt_plugin import MapLayerGenerator, OccupancyGrid, Point
 
 class DrivableAreaLayerGenerator(MapLayerGenerator):
     def generate_layer(self, context):
-        seed = self.get_interaction_point(context, "seed_point")
-        if not seed:
-            seed = Point(0.0, 0.0)
+        seeds = self.get_interaction_points(context, "seed_points")
+        if not seeds:
+            single = self.get_interaction_point(context, "seed_point")
+            seeds = [single] if single else [Point(0.0, 0.0)]
 
         grid = self.get_occupancy_grid(context)
         footprint = self.get_robot_footprint(context)
@@ -51,19 +52,27 @@ class DrivableAreaLayerGenerator(MapLayerGenerator):
         clearance = robot_radius + max(0.0, extra_margin)
 
         if grid is None:
-            # マップがない場合は仮想グリッドを作成（max_radiusに合わせて動的サイズ設定）
+            # マップがない場合は全シードを内包する仮想グリッドを作成
             res = 0.05
-            span_cells = int(math.ceil((max_radius * 2) / res)) + 20
-            width = height = max(200, span_cells)
-            origin = [seed.x - (width / 2) * res, seed.y - (height / 2) * res, 0.0]
+            min_x = min(s.x for s in seeds) - max_radius - 1.0
+            max_x = max(s.x for s in seeds) + max_radius + 1.0
+            min_y = min(s.y for s in seeds) - max_radius - 1.0
+            max_y = max(s.y for s in seeds) + max_radius + 1.0
+
+            width = max(100, int(math.ceil((max_x - min_x) / res)))
+            height = max(100, int(math.ceil((max_y - min_y) / res)))
+            origin = [min_x, min_y, 0.0]
             mask = [[0 for _ in range(width)] for _ in range(height)]
-            center_r, center_c = height // 2, width // 2
-            r_cells = int(max_radius / res)
-            r_cells_sq = r_cells * r_cells
+            max_radius_sq = max_radius * max_radius
+
             for row_idx in range(height):
+                world_y = min_y + (row_idx + 0.5) * res
                 for col_idx in range(width):
-                    if (row_idx - center_r) ** 2 + (col_idx - center_c) ** 2 <= r_cells_sq:
-                        mask[row_idx][col_idx] = 1
+                    world_x = min_x + (col_idx + 0.5) * res
+                    for s in seeds:
+                        if (world_x - s.x) ** 2 + (world_y - s.y) ** 2 <= max_radius_sq:
+                            mask[row_idx][col_idx] = 1
+                            break
 
             return self.create_layer_from_mask(
                 mask,
@@ -126,55 +135,56 @@ class DrivableAreaLayerGenerator(MapLayerGenerator):
                     if is_inflation_source(row_idx, col_idx):
                         blocked[row_idx][col_idx] = True
 
-        # 2. シード位置の特定とクリッピング
-        seed_c, seed_r = grid.world_to_grid(seed.x, seed.y)
-        seed_c = max(0, min(width - 1, seed_c))
-        seed_r = max(0, min(height - 1, seed_r))
-
+        # 2. 全シード位置の特定と初期キュー投入
         mask = [[0 for _ in range(width)] for _ in range(height)]
         visited = set()
         queue = deque()
 
-        # シードが障害物クリアランス内の場合、近傍の非ブロック・通行可能セルを探索
-        start_r, start_c = seed_r, seed_c
-        if blocked[seed_r][seed_c] or not is_cell_traversable(seed_r, seed_c):
-            found_free = False
-            for radius in range(1, max(clearance_cells + 2, 5)):
-                for dr in range(-radius, radius + 1):
-                    for dc in range(-radius, radius + 1):
-                        nr, nc = seed_r + dr, seed_c + dc
-                        if 0 <= nr < height and 0 <= nc < width:
-                            if not blocked[nr][nc] and is_cell_traversable(nr, nc):
-                                start_r, start_c = nr, nc
-                                found_free = True
-                                break
+        for seed in seeds:
+            seed_c, seed_r = grid.world_to_grid(seed.x, seed.y)
+            seed_c = max(0, min(width - 1, seed_c))
+            seed_r = max(0, min(height - 1, seed_r))
+
+            # シードが障害物クリアランス内の場合、近傍の非ブロック・通行可能セルを探索
+            start_r, start_c = seed_r, seed_c
+            if blocked[seed_r][seed_c] or not is_cell_traversable(seed_r, seed_c):
+                found_free = False
+                for radius in range(1, max(clearance_cells + 2, 5)):
+                    for dr in range(-radius, radius + 1):
+                        for dc in range(-radius, radius + 1):
+                            nr, nc = seed_r + dr, seed_c + dc
+                            if 0 <= nr < height and 0 <= nc < width:
+                                if not blocked[nr][nc] and is_cell_traversable(nr, nc):
+                                    start_r, start_c = nr, nc
+                                    found_free = True
+                                    break
+                        if found_free:
+                            break
                     if found_free:
                         break
-                if found_free:
-                    break
 
-        if not blocked[start_r][start_c] and is_cell_traversable(start_r, start_c):
-            queue.append((start_r, start_c))
-            visited.add((start_r, start_c))
+            if not blocked[start_r][start_c] and is_cell_traversable(start_r, start_c):
+                if (start_r, start_c) not in visited:
+                    queue.append((start_r, start_c, seed_r, seed_c))
+                    visited.add((start_r, start_c))
 
         max_radius_cells_sq = (max_radius / res) ** 2
 
-        # 3. BFS Flood-fill 走行可能領域拡張
+        # 3. BFS Flood-fill 走行可能領域拡張 (Multi-source BFS)
         while queue:
-            curr_r, curr_c = queue.popleft()
-
+            curr_r, curr_c, org_r, org_c = queue.popleft()
             mask[curr_r][curr_c] = 1
 
             for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 nr, nc = curr_r + dr, curr_c + dc
                 if 0 <= nr < height and 0 <= nc < width:
                     if (nr, nc) not in visited and not blocked[nr][nc]:
-                        visited.add((nr, nc))
-                        # 距離制限チェック
-                        dist_sq = (nr - seed_r) ** 2 + (nc - seed_c) ** 2
+                        # 起点シードからの距離制限チェック
+                        dist_sq = (nr - org_r) ** 2 + (nc - org_c) ** 2
                         if dist_sq <= max_radius_cells_sq:
                             if is_cell_traversable(nr, nc):
-                                queue.append((nr, nc))
+                                visited.add((nr, nc))
+                                queue.append((nr, nc, org_r, org_c))
 
         # 4. オプション：Dilation（領域膨張）
         if dilation_cells > 0:
@@ -191,8 +201,9 @@ class DrivableAreaLayerGenerator(MapLayerGenerator):
                                             dilated_mask[nr][nc] = 1
             mask = dilated_mask
 
+        seed_desc = f"{len(seeds)} seed(s)" if len(seeds) > 1 else f"seed ({seeds[0].x:.2f}, {seeds[0].y:.2f})"
         self.log(
-            f"Generated drivable area layer from seed ({seed.x:.2f}, {seed.y:.2f}) "
+            f"Generated drivable area layer from {seed_desc} "
             f"[clearance={clearance:.2f}m, allow_unknown={allow_unknown}, color={layer_color}, opacity={fill_opacity:.2f}]"
         )
 
