@@ -4,12 +4,18 @@ import { Checkbox } from "./common/Checkbox";
 import { Input } from "./common/Input";
 import { Select } from "./common/Select";
 
+export interface PluginPropertyOption {
+  value: string;
+  label?: string;
+}
+
 export interface PluginProperty {
   name: string;
   label?: string;
   type: string;
   default?: any;
-  options?: string[];
+  options?: Array<string | PluginPropertyOption>;
+  enum_values?: Array<string | PluginPropertyOption>;
   description?: string;
 }
 
@@ -28,6 +34,7 @@ export const PluginPropertyEditor: React.FC<PluginPropertyEditorProps> = ({
 }) => {
   const key = property.name;
   const label = property.label || key;
+  const selectOptions = property.options || property.enum_values;
 
   return (
     <div className={`space-y-1.5 ${className}`}>
@@ -72,17 +79,21 @@ export const PluginPropertyEditor: React.FC<PluginPropertyEditorProps> = ({
           className="h-8 text-xs"
           placeholder={String(property.default ?? "")}
         />
-      ) : Array.isArray(property.options) && property.options.length > 0 ? (
+      ) : Array.isArray(selectOptions) && selectOptions.length > 0 ? (
         <Select
           value={value ?? property.default ?? ""}
           onChange={(e) => onChange(e.target.value)}
           className="h-8 text-xs"
         >
-          {property.options.map((opt: string) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
+          {selectOptions.map((opt) => {
+            const optVal = typeof opt === "string" ? opt : opt.value;
+            const optLabel = typeof opt === "string" ? opt : (opt.label || opt.value);
+            return (
+              <option key={optVal} value={optVal}>
+                {optLabel}
+              </option>
+            );
+          })}
         </Select>
       ) : (
         <Input

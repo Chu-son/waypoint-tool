@@ -106,4 +106,61 @@ describe('PluginPropertyEditor', () => {
     fireEvent.change(textInput, { target: { value: '#ef4444' } });
     expect(mockOnChange).toHaveBeenCalledWith('#ef4444');
   });
+
+  it('renders select property with enum_values correctly', () => {
+    const prop = {
+      name: 'filter_mode',
+      label: 'Filter Mode',
+      type: 'enum',
+      enum_values: ['remove_obstacles', 'fill_holes', 'both'],
+      default: 'remove_obstacles',
+    };
+    render(
+      <PluginPropertyEditor
+        property={prop}
+        value='fill_holes'
+        onChange={mockOnChange}
+      />
+    );
+
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveValue('fill_holes');
+    expect(screen.getByRole('option', { name: 'remove_obstacles' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'fill_holes' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'both' })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: 'both' } });
+    expect(mockOnChange).toHaveBeenCalledWith('both');
+  });
+
+  it('renders select property with object options with custom labels', () => {
+    const prop = {
+      name: 'shape',
+      label: 'Kernel Shape',
+      type: 'string',
+      options: [
+        { value: 'disk', label: 'Disk (Circular)' },
+        { value: 'cross', label: 'Cross (4-Neighbor)' },
+        { value: 'square', label: 'Square (8-Neighbor)' },
+      ],
+      default: 'disk',
+    };
+    render(
+      <PluginPropertyEditor
+        property={prop}
+        value='disk'
+        onChange={mockOnChange}
+      />
+    );
+
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveValue('disk');
+    expect(screen.getByRole('option', { name: 'Disk (Circular)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Cross (4-Neighbor)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Square (8-Neighbor)' })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: 'square' } });
+    expect(mockOnChange).toHaveBeenCalledWith('square');
+  });
 });
+
