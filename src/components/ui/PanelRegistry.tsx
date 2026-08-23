@@ -29,17 +29,20 @@ export function useInspectorPanelComponent() {
   const plugins = useAppStore((state) => state.plugins) || {};
   const activePlugin = activePluginId ? plugins[activePluginId] : null;
 
-  if (
-    activeCustomLayerId ||
-    (activeTool === 'add_generator' && activePlugin?.manifest?.category === 'map_layer_generator')
-  ) {
-    return <CustomLayerInspector />;
-  }
-
+  // 1. If actively in generator mode, render the inspector matching the selected plugin
   if (activeTool === 'add_generator') {
+    if (activePlugin?.manifest?.category === 'map_layer_generator') {
+      return <CustomLayerInspector />;
+    }
     return <PluginParamsPanel />;
   }
 
+  // 2. If a custom layer is selected (manual vector edit, layer opacity, settings)
+  if (activeCustomLayerId) {
+    return <CustomLayerInspector />;
+  }
+
+  // 3. Default to properties panel (selected waypoint nodes or project settings)
   return <PropertiesPanel />;
 }
 

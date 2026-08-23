@@ -31,6 +31,7 @@ export function PluginParamsPanel() {
   const updatePluginInteractionData = useAppStore(
     (state) => state.updatePluginInteractionData,
   );
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [params, setParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
@@ -120,152 +121,161 @@ export function PluginParamsPanel() {
     setIsExecuting(true);
     setErrorInfo(null);
     try {
-      const contextData: any = {
-        properties: params,
-        interaction_data: {},
-      };
+      await runWithLoading(
+        {
+          message: "プラグインを実行中...",
+          detail: plugin.manifest.name || plugin.id,
+          blocking: true,
+        },
+        async () => {
+          const contextData: any = {
+            properties: params,
+            interaction_data: {},
+          };
 
-      // Add interaction inputs (points & rectangles) to the parameter payload for python scripts
-      inputs.forEach((inp) => {
-        const key = inp.name || inp.id;
-        if (key && pluginInteractionData[key]) {
-          contextData.interaction_data[key] = pluginInteractionData[key];
-        }
-      });
-
-      if (needsSelection) {
-        contextData.selected_points = selectedNodeIds
-          .map((id) => nodes[id]?.transform)
-          .filter(Boolean);
-      }
-
-      if (plugin.manifest.needs?.includes('robot_footprint')) {
-        contextData.robot_footprint = useAppStore.getState().robotFootprint;
-      }
-
-      // Collect waypoint range if waypoint inputs are used
-      let idsToConsume: string[] = [];
-      let insertIndex = -1;
-      const waypointInputs = inputs.filter(inp => inp.type === 'waypoint');
-      if (waypointInputs.length > 0) {
-        const waypointIndices = waypointInputs
-          .map(inp => pluginInteractionData[inp.name || inp.id])
-          .filter(idx => idx !== undefined && idx !== null);
-        
-        if (waypointIndices.length > 0) {
-          const rootNodeIds = useAppStore.getState().rootNodeIds;
-          const minIdx = Math.min(...waypointIndices);
-          const maxIdx = Math.max(...waypointIndices);
-          insertIndex = minIdx;
-          idsToConsume = rootNodeIds.slice(minIdx, maxIdx + 1);
-          
-          // Pass the full data of waypoints in range to the plugin
-          contextData.waypoint_range = idsToConsume.map(id => nodes[id]).filter(Boolean);
-        }
-      }
-
-      // ----------------------------------------------------------------------
-      // Python Configuration Injection
-      // ----------------------------------------------------------------------
-      let pythonPathToUse = globalPythonPath?.trim() || "python3";
-      if (plugin.manifest.type === "python") {
-        const setting = pluginSettings.find((s) => s.id === plugin.id);
-        if (
-          setting &&
-          setting.pythonOverridePath &&
-          setting.pythonOverridePath.trim() !== ""
-        ) {
-          pythonPathToUse = setting.pythonOverridePath.trim();
-        }
-      }
-
-      // Execute plugin through backend API (passing contextual Python path)
-      // occupancy_grid 系 needs があるときは合成マップレイヤー（CustomLayers含む）を渡す
-      const needsOccupancyGrid = plugin.manifest.needs?.some(
-        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
-      );
-
-      const layersToPass = needsOccupancyGrid
-        ? await prepareLayersForExport(mapLayers, customLayers)
-        : undefined;
-
-      const resultingWaypoints = await BackendAPI.runPlugin(
-        plugin,
-        contextData,
-        pythonPathToUse,
-        layersToPass,
-      );
-
-      if (Array.isArray(resultingWaypoints) && resultingWaypoints.length > 0) {
-        // Create Parent Generator Node
-        const parentId = uuidv4();
-        const store = useAppStore.getState();
-
-        store.runInHistoryTransaction(() => {
-          // Remove consumed nodes first
-          if (idsToConsume.length > 0) {
-            store.removeNodes(idsToConsume);
-          }
-
-          store.addNode({
-            id: parentId,
-            type: "generator",
-            plugin_id: plugin.id,
-            generator_params: contextData,
-            children_ids: [],
+          // Add interaction inputs (points & rectangles) to the parameter payload for python scripts
+          inputs.forEach((inp) => {
+            const key = inp.name || inp.id;
+            if (key && pluginInteractionData[key]) {
+              contextData.interaction_data[key] = pluginInteractionData[key];
+            }
           });
 
-          // If we have an insert index, we need to move the newly added node to that index
-          if (insertIndex !== -1) {
-            const currentRootIds = useAppStore.getState().rootNodeIds;
-            const newIdx = currentRootIds.indexOf(parentId);
-            if (newIdx !== -1 && newIdx !== insertIndex) {
-              store.reorderNodes(newIdx, insertIndex);
+          if (needsSelection) {
+            contextData.selected_points = selectedNodeIds
+              .map((id) => nodes[id]?.transform)
+              .filter(Boolean);
+          }
+
+          if (plugin.manifest.needs?.includes('robot_footprint')) {
+            contextData.robot_footprint = useAppStore.getState().robotFootprint;
+          }
+
+          // Collect waypoint range if waypoint inputs are used
+          let idsToConsume: string[] = [];
+          let insertIndex = -1;
+          const waypointInputs = inputs.filter(inp => inp.type === 'waypoint');
+          if (waypointInputs.length > 0) {
+            const waypointIndices = waypointInputs
+              .map(inp => pluginInteractionData[inp.name || inp.id])
+              .filter(idx => idx !== undefined && idx !== null);
+            
+            if (waypointIndices.length > 0) {
+              const rootNodeIds = useAppStore.getState().rootNodeIds;
+              const minIdx = Math.min(...waypointIndices);
+              const maxIdx = Math.max(...waypointIndices);
+              insertIndex = minIdx;
+              idsToConsume = rootNodeIds.slice(minIdx, maxIdx + 1);
+              
+              // Pass the full data of waypoints in range to the plugin
+              contextData.waypoint_range = idsToConsume.map(id => nodes[id]).filter(Boolean);
             }
           }
 
-          // Build new child nodes
-          resultingWaypoints.forEach((wp) => {
-            let qx = wp.qx ?? 0,
-              qy = wp.qy ?? 0,
-              qz = wp.qz ?? 0,
-              qw = wp.qw ?? 1;
-            // If python returned Euler yaw and skipped quaternions, convert it
-            if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-              const halfYaw = wp.yaw / 2.0;
-              qz = Math.sin(halfYaw);
-              qw = Math.cos(halfYaw);
+          // ----------------------------------------------------------------------
+          // Python Configuration Injection
+          // ----------------------------------------------------------------------
+          let pythonPathToUse = globalPythonPath?.trim() || "python3";
+          if (plugin.manifest.type === "python") {
+            const setting = pluginSettings.find((s) => s.id === plugin.id);
+            if (
+              setting &&
+              setting.pythonOverridePath &&
+              setting.pythonOverridePath.trim() !== ""
+            ) {
+              pythonPathToUse = setting.pythonOverridePath.trim();
             }
+          }
 
-            const id = uuidv4();
-            useAppStore.getState().addNode(
-              {
-                id,
-                type: "manual",
-                transform: wp.transform || {
-                  x: wp.x ?? 0,
-                  y: wp.y ?? 0,
-                  qx,
-                  qy,
-                  qz,
-                  qw,
-                },
-                options: wp.options || {},
-              },
-              parentId,
-            ); // append to parent
-          });
-        });
+          // Execute plugin through backend API (passing contextual Python path)
+          // occupancy_grid 系 needs があるときは合成マップレイヤー（CustomLayers含む）を渡す
+          const needsOccupancyGrid = plugin.manifest.needs?.some(
+            (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+          );
 
-        // Auto select the newly generated parent node
-        useAppStore.getState().selectNodes([parentId]);
-        // Switch tool back to select, which triggers inspector to switch to Regenerate
-        useAppStore.getState().setActiveTool("select");
-      } else {
-        setErrorInfo(
-          "Plugin executed successfully but returned 0 waypoints. Check your settings.",
-        );
-      }
+          const layersToPass = needsOccupancyGrid
+            ? await prepareLayersForExport(mapLayers, customLayers)
+            : undefined;
+
+          const resultingWaypoints = await BackendAPI.runPlugin(
+            plugin,
+            contextData,
+            pythonPathToUse,
+            layersToPass,
+          );
+
+          if (Array.isArray(resultingWaypoints) && resultingWaypoints.length > 0) {
+            // Create Parent Generator Node
+            const parentId = uuidv4();
+            const store = useAppStore.getState();
+
+            store.runInHistoryTransaction(() => {
+              // Remove consumed nodes first
+              if (idsToConsume.length > 0) {
+                store.removeNodes(idsToConsume);
+              }
+
+              store.addNode({
+                id: parentId,
+                type: "generator",
+                plugin_id: plugin.id,
+                generator_params: contextData,
+                children_ids: [],
+              });
+
+              // If we have an insert index, we need to move the newly added node to that index
+              if (insertIndex !== -1) {
+                const currentRootIds = useAppStore.getState().rootNodeIds;
+                const newIdx = currentRootIds.indexOf(parentId);
+                if (newIdx !== -1 && newIdx !== insertIndex) {
+                  store.reorderNodes(newIdx, insertIndex);
+                }
+              }
+
+              // Build new child nodes
+              resultingWaypoints.forEach((wp) => {
+                let qx = wp.qx ?? 0,
+                  qy = wp.qy ?? 0,
+                  qz = wp.qz ?? 0,
+                  qw = wp.qw ?? 1;
+                // If python returned Euler yaw and skipped quaternions, convert it
+                if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
+                  const halfYaw = wp.yaw / 2.0;
+                  qz = Math.sin(halfYaw);
+                  qw = Math.cos(halfYaw);
+                }
+
+                const id = uuidv4();
+                useAppStore.getState().addNode(
+                  {
+                    id,
+                    type: "manual",
+                    transform: wp.transform || {
+                      x: wp.x ?? 0,
+                      y: wp.y ?? 0,
+                      qx,
+                      qy,
+                      qz,
+                      qw,
+                    },
+                    options: wp.options || {},
+                  },
+                  parentId,
+                ); // append to parent
+              });
+            });
+
+            // Auto select the newly generated parent node
+            useAppStore.getState().selectNodes([parentId]);
+            // Switch tool back to select, which triggers inspector to switch to Regenerate
+            useAppStore.getState().setActiveTool("select");
+          } else {
+            setErrorInfo(
+              "Plugin executed successfully but returned 0 waypoints. Check your settings.",
+            );
+          }
+        }
+      );
     } catch (err: any) {
       console.error("Plugin execution failed:", err);
       setErrorInfo(err.toString());
@@ -308,7 +318,12 @@ export function PluginParamsPanel() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => useAppStore.getState().setActiveTool("select")}
+              onClick={() => {
+                const store = useAppStore.getState();
+                store.setActiveTool("select");
+                store.setActivePlugin(null);
+                store.clearPluginInteractionData();
+              }}
               className="h-7 w-7"
             >
               <X size={14} />

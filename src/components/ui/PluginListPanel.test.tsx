@@ -41,6 +41,9 @@ describe('PluginListPanel', () => {
   const mockSetActiveTool = vi.fn();
   const mockSetActivePlugin = vi.fn();
   const mockSetSettingsModalOpen = vi.fn();
+  const mockSelectNodes = vi.fn();
+  const mockSetRightPanelActiveTab = vi.fn();
+  const mockSetRightPanelOpen = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,12 +55,18 @@ describe('PluginListPanel', () => {
       setActiveTool: mockSetActiveTool,
       setActivePlugin: mockSetActivePlugin,
       setSettingsModalOpen: mockSetSettingsModalOpen,
+      selectNodes: mockSelectNodes,
+      setRightPanelActiveTab: mockSetRightPanelActiveTab,
+      setRightPanelOpen: mockSetRightPanelOpen,
     }));
 
     (useAppStore.getState as any).mockReturnValue({
       setActiveTool: mockSetActiveTool,
       setActivePlugin: mockSetActivePlugin,
       setSettingsModalOpen: mockSetSettingsModalOpen,
+      selectNodes: mockSelectNodes,
+      setRightPanelActiveTab: mockSetRightPanelActiveTab,
+      setRightPanelOpen: mockSetRightPanelOpen,
     });
   });
 

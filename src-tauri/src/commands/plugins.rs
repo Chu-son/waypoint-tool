@@ -175,8 +175,7 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
     Ok(())
 }
 
-#[tauri::command]
-pub fn run_plugin(
+pub fn run_plugin_sync(
     plugin_instance: PluginInstance,
     context_json: String,
     python_path: Option<String>,
@@ -295,6 +294,20 @@ pub fn run_plugin(
     } else {
         Err("Unsupported plugin type. Only 'python' and 'wasm' are currently supported.".to_string())
     }
+}
+
+#[tauri::command]
+pub async fn run_plugin(
+    plugin_instance: PluginInstance,
+    context_json: String,
+    python_path: Option<String>,
+    map_layers: Option<Vec<crate::plugins::models::PluginMapLayer>>,
+) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_plugin_sync(plugin_instance, context_json, python_path, map_layers)
+    })
+    .await
+    .map_err(|e| format!("Plugin task execution failed to join: {}", e))?
 }
 
 #[tauri::command]

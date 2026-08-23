@@ -88,8 +88,10 @@ export function PluginListPanel() {
   const setActivePlugin = useAppStore((state) => state.setActivePlugin);
   const activePluginId = useAppStore((state) => state.activePluginId);
   const activeTool = useAppStore((state) => state.activeTool);
-
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
+  const selectNodes = useAppStore((state) => state.selectNodes);
+  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
+  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
 
   const enabledPluginsList = (pluginSettings || [])
     .filter((s) => s.enabled)
@@ -129,8 +131,11 @@ export function PluginListPanel() {
                 iconStr={getPluginIconStr(plugin.id)}
                 isActive={isActive}
                 onSelect={() => {
-                  setActiveTool("add_generator");
+                  selectNodes([]);
                   setActivePlugin(plugin.id);
+                  setActiveTool("add_generator");
+                  setRightPanelActiveTab("inspector");
+                  setRightPanelOpen(true);
                 }}
                 onOpenDetails={() => setSettingsModalOpen(true, 'plugins')}
               />

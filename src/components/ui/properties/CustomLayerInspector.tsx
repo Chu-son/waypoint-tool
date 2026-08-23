@@ -38,6 +38,7 @@ export function CustomLayerInspector() {
   const setActivePlugin = useAppStore((state) => state.setActivePlugin);
   const activePluginId = useAppStore((state) => state.activePluginId);
   const setPluginActiveProperties = useAppStore((state) => state.setPluginActiveProperties);
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   // Map Edit States
   const isMapEditMode = useAppStore((state) => state.isMapEditMode);
@@ -160,84 +161,97 @@ export function CustomLayerInspector() {
     setErrorInfo(null);
 
     try {
-      let pythonPathToUse = globalPythonPath?.trim() || "python3";
-      if (activePlugin.manifest.type === "python") {
-        const setting = pluginSettings.find((s) => s.id === activePlugin.id);
-        if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== "") {
-          pythonPathToUse = setting.pythonOverridePath.trim();
+      await runWithLoading(
+        {
+          message: "カスタムレイヤーを生成中...",
+          detail: activePlugin.manifest.name || activePlugin.id,
+          blocking: true,
+        },
+        async () => {
+          let pythonPathToUse = globalPythonPath?.trim() || "python3";
+          if (activePlugin.manifest.type === "python") {
+            const setting = pluginSettings.find((s) => s.id === activePlugin.id);
+            if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== "") {
+              pythonPathToUse = setting.pythonOverridePath.trim();
+            }
+          }
+
+          const filteredInteractionData: Record<string, any> = {};
+          activePlugin.manifest.inputs?.forEach((inp) => {
+            const key = inp.name || inp.id;
+            if (key && pluginInteractionData[key]) {
+              filteredInteractionData[key] = pluginInteractionData[key];
+            }
+          });
+
+          const robotFootprint = useAppStore.getState().robotFootprint;
+
+          const contextData: any = {
+            properties: params,
+            interaction_data: filteredInteractionData,
+          };
+
+          if (activePlugin.manifest.needs?.includes("robot_footprint") || robotFootprint) {
+            contextData.robot_footprint = robotFootprint;
+          }
+
+          // 自分自身の再生成の場合は、古い結果が混ざらないように customLayers から自分自身を除外してマージ
+          const otherCustomLayers = existingLayer
+            ? customLayers.filter((l) => l.id !== existingLayer.id)
+            : customLayers;
+
+          const layersToPass = await prepareLayersForExport(mapLayers, otherCustomLayers);
+
+          const result = await BackendAPI.runPlugin(
+            activePlugin,
+            contextData,
+            pythonPathToUse,
+            layersToPass
+          );
+
+          if (!result || !result.image_base64 || !result.info) {
+            throw new Error(
+              "Plugin returned invalid layer output. Expected { image_base64, info }."
+            );
+          }
+
+          const normalizedImageBase64 = String(result.image_base64).startsWith("data:")
+            ? String(result.image_base64)
+            : `data:image/png;base64,${result.image_base64}`;
+
+          if (existingLayer && existingLayer.type === "plugin") {
+            updateCustomLayer(existingLayer.id, {
+              name: layerName || result.name || existingLayer.name,
+              params,
+              interaction_data: filteredInteractionData,
+              image_base64: normalizedImageBase64,
+              info: result.info,
+              opacity: layerOpacity,
+              blend_mode: blendMode || result.blend_mode || "overwrite",
+              is_reference: isReference,
+            });
+          } else {
+            const newId = uuidv4();
+            const newLayer: PluginCustomLayer = {
+              id: newId,
+              name: layerName || result.name || activePlugin.manifest.name || "Generated Layer",
+              type: "plugin",
+              plugin_id: activePlugin.id,
+              params,
+              interaction_data: filteredInteractionData,
+              image_base64: normalizedImageBase64,
+              info: result.info,
+              visible: true,
+              opacity: layerOpacity,
+              z_index: customLayers.length,
+              blend_mode: blendMode || result.blend_mode || "overwrite",
+              is_reference: isReference,
+            };
+            addPluginCustomLayer(newLayer);
+            setActiveCustomLayerId(newId);
+          }
         }
-      }
-
-      const filteredInteractionData: Record<string, any> = {};
-      activePlugin.manifest.inputs?.forEach((inp) => {
-        const key = inp.name || inp.id;
-        if (key && pluginInteractionData[key]) {
-          filteredInteractionData[key] = pluginInteractionData[key];
-        }
-      });
-
-      const robotFootprint = useAppStore.getState().robotFootprint;
-
-      const contextData: any = {
-        properties: params,
-        interaction_data: filteredInteractionData,
-      };
-
-      if (activePlugin.manifest.needs?.includes("robot_footprint") || robotFootprint) {
-        contextData.robot_footprint = robotFootprint;
-      }
-
-      // 自分自身の再生成の場合は、古い結果が混ざらないように customLayers から自分自身を除外してマージ
-      const otherCustomLayers = existingLayer
-        ? customLayers.filter((l) => l.id !== existingLayer.id)
-        : customLayers;
-
-      const layersToPass = await prepareLayersForExport(mapLayers, otherCustomLayers);
-
-      const result = await BackendAPI.runPlugin(
-        activePlugin,
-        contextData,
-        pythonPathToUse,
-        layersToPass
       );
-
-      if (!result || !result.image_base64 || !result.info) {
-        throw new Error(
-          "Plugin returned invalid layer output. Expected { image_base64, info }."
-        );
-      }
-
-      if (existingLayer && existingLayer.type === "plugin") {
-        updateCustomLayer(existingLayer.id, {
-          name: layerName || result.name || existingLayer.name,
-          params,
-          interaction_data: filteredInteractionData,
-          image_base64: result.image_base64,
-          info: result.info,
-          opacity: layerOpacity,
-          blend_mode: blendMode || result.blend_mode || "overwrite",
-          is_reference: isReference,
-        });
-      } else {
-        const newId = uuidv4();
-        const newLayer: PluginCustomLayer = {
-          id: newId,
-          name: layerName || result.name || activePlugin.manifest.name || "Generated Layer",
-          type: "plugin",
-          plugin_id: activePlugin.id,
-          params,
-          interaction_data: filteredInteractionData,
-          image_base64: result.image_base64,
-          info: result.info,
-          visible: true,
-          opacity: layerOpacity,
-          z_index: customLayers.length,
-          blend_mode: blendMode || result.blend_mode || "overwrite",
-          is_reference: isReference,
-        };
-        addPluginCustomLayer(newLayer);
-        setActiveCustomLayerId(newId);
-      }
     } catch (err: any) {
       console.error("Layer generation failed:", err);
       setErrorInfo(String(err));
@@ -250,6 +264,7 @@ export function CustomLayerInspector() {
     setActiveCustomLayerId(null);
     setMapEditMode(false);
     setActiveTool("select");
+    setActivePlugin(null);
     clearPluginInteractionData();
   };
 

@@ -66,6 +66,7 @@ describe('PluginParamsPanel', () => {
       nodes: {},
       selectedNodeIds: [],
       decimalPrecision: 2,
+      runWithLoading: async (_: any, fn: any) => await fn(),
     }));
 
     (useAppStore.getState as any).mockReturnValue({
@@ -189,6 +190,7 @@ describe('PluginParamsPanel', () => {
       customLayers: [],
       selectedNodeIds: [],
       decimalPrecision: 4,
+      runWithLoading: async (_: any, fn: any) => await fn(),
     }));
 
     (useAppStore.getState as any).mockReturnValue({

@@ -49,10 +49,15 @@ export function ShortcutManager() {
         if (selectedNodeIds.length > 0) {
           useAppStore.setState?.({ selectedNodeIds: [] });
         }
-        if (activeTool !== "select") {
-          useAppStore.setState?.({ activeTool: "select" });
+        if (activeCustomLayerId) {
+          useAppStore.setState?.({ activeCustomLayerId: null });
         }
-        useAppStore.setState?.({ pluginInteractionData: {} });
+        useAppStore.setState?.({
+          isMapEditMode: false,
+          activeTool: "select",
+          activePluginId: null,
+          pluginInteractionData: {},
+        });
         
         // Return to Layers panel on Escape
         setRightPanelActiveTab("layers");

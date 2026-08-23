@@ -62,11 +62,16 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     isDirty: true
   })),
   
-  setActivePlugin: (pluginId) => set({ 
-    activePluginId: pluginId, 
-    pluginInteractionData: {}, 
-    pluginActiveProperties: {},
-    activeInputIndex: 0 
+  setActivePlugin: (pluginId) => set((state) => {
+    const plugin = pluginId && state.plugins ? state.plugins[pluginId] : null;
+    const isMapLayerGen = plugin?.manifest?.category === 'map_layer_generator';
+    return {
+      activePluginId: pluginId,
+      pluginInteractionData: {},
+      pluginActiveProperties: {},
+      activeInputIndex: 0,
+      ...(!isMapLayerGen ? { activeCustomLayerId: null, isMapEditMode: false } : {}),
+    };
   }),
   
   updatePluginInteractionData: (inputId, data) => set((state) => ({
@@ -145,6 +150,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
     if (!activePathCalculatorPluginId || !plugins[activePathCalculatorPluginId]) {
       set({ calculatedPathSegments: null, isCalculatingPath: false });
+      get().stopLoading('path-calc');
       return;
     }
 
@@ -169,10 +175,17 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
     if (waypoints.length < 2) {
       set({ calculatedPathSegments: null, isCalculatingPath: false });
+      get().stopLoading('path-calc');
       return;
     }
 
     set({ isCalculatingPath: true });
+    get().startLoading({
+      id: 'path-calc',
+      message: '経路を計算中...',
+      detail: plugin.manifest.name || plugin.id,
+      blocking: false,
+    });
 
     try {
       let pythonPathToUse = globalPythonPath?.trim() || "python3";
@@ -219,6 +232,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       if (requestId === currentCalculationRequestId) {
         console.error("[recalculatePath] Failed to calculate path:", err);
         set({ calculatedPathSegments: null, isCalculatingPath: false });
+      }
+    } finally {
+      if (requestId === currentCalculationRequestId) {
+        get().stopLoading('path-calc');
       }
     }
   },
