@@ -73,6 +73,7 @@ describe('LayerPanel', () => {
       setLastDirectory: mockSetLastDirectory,
       plugins: {},
       selectNodes: vi.fn(),
+      runWithLoading: async (_: any, fn: any) => await fn(),
     }));
   });
 

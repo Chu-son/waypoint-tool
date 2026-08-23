@@ -20,6 +20,7 @@ export function ExportMapsModal() {
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [selectedRegions, setSelectedRegions] = useState<Record<string, boolean>>(
     exportRegions.reduce((acc, r) => ({ ...acc, [r.id]: true }), {})
@@ -58,15 +59,24 @@ export function ExportMapsModal() {
             layerVisibility: {},
           }));
 
-        const layersToExport = await prepareLayersForExport(mapLayers, customLayers);
+        await runWithLoading(
+          {
+            message: "マップをエクスポート中...",
+            detail: `${regionsToExport.length} 件のマップ領域を出力中`,
+            blocking: true,
+          },
+          async () => {
+            const layersToExport = await prepareLayersForExport(mapLayers, customLayers);
 
-        await BackendAPI.exportMaps({
-          saveDir: dirPath,
-          format: exportFormat,
-          mapListFilename: outputMapList ? mapListFilename : null,
-          regions: regionsToExport,
-          layers: layersToExport,
-        });
+            await BackendAPI.exportMaps({
+              saveDir: dirPath,
+              format: exportFormat,
+              mapListFilename: outputMapList ? mapListFilename : null,
+              regions: regionsToExport,
+              layers: layersToExport,
+            });
+          }
+        );
 
         alert("マップのエクスポートが完了しました。");
         onClose();

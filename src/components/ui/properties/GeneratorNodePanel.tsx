@@ -33,6 +33,7 @@ export function GeneratorNodePanel({
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const mapLayers = useAppStore((state) => state.mapLayers);
   const customLayers = useAppStore((state) => state.customLayers) || [];
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
@@ -60,96 +61,105 @@ export function GeneratorNodePanel({
     if (!plugin) return;
     setIsExecuting(true);
     try {
-      const filteredInteractionData: Record<string, any> = {};
-      plugin.manifest.inputs?.forEach((inp) => {
-        const key = inp.name || inp.id;
-        if (key && pluginInteractionData[key]) {
-          filteredInteractionData[key] = pluginInteractionData[key];
-        }
-      });
-
-      const contextData: Record<string, any> = {
-        ...node.generator_params,
-        properties: genParams,
-        interaction_data: filteredInteractionData,
-      };
-
-      if (plugin.manifest.needs?.includes('robot_footprint')) {
-        contextData.robot_footprint = useAppStore.getState().robotFootprint;
-      }
-
-      let pythonPathToUse = globalPythonPath?.trim() || "python3";
-      if (plugin.manifest.type === "python") {
-        const setting = pluginSettings.find((s) => s.id === plugin.id);
-        if (
-          setting &&
-          setting.pythonOverridePath &&
-          setting.pythonOverridePath.trim() !== ""
-        ) {
-          pythonPathToUse = setting.pythonOverridePath.trim();
-        }
-      }
-
-      const needsOccupancyGrid = plugin.manifest.needs?.some(
-        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
-      );
-
-      const layersToPass = needsOccupancyGrid
-        ? await prepareLayersForExport(mapLayers, customLayers)
-        : undefined;
-
-      const resultingWaypoints = await BackendAPI.runPlugin(
-        plugin,
-        contextData,
-        pythonPathToUse,
-        layersToPass,
-      );
-
-      if (
-        Array.isArray(resultingWaypoints) &&
-        resultingWaypoints.length > 0
-      ) {
-        useAppStore.getState().runInHistoryTransaction(() => {
-          if (node.children_ids && node.children_ids.length > 0) {
-            removeNodes(node.children_ids);
-          }
-
-          const newChildIds: string[] = [];
-          resultingWaypoints.forEach((wp) => {
-            let qx = wp.qx ?? 0,
-              qy = wp.qy ?? 0,
-              qz = wp.qz ?? 0,
-              qw = wp.qw ?? 1;
-            if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-              const halfYaw = wp.yaw / 2.0;
-              qz = Math.sin(halfYaw);
-              qw = Math.cos(halfYaw);
+      await runWithLoading(
+        {
+          message: "ウェイポイントを再生成中...",
+          detail: plugin.manifest.name || plugin.id,
+          blocking: true,
+        },
+        async () => {
+          const filteredInteractionData: Record<string, any> = {};
+          plugin.manifest.inputs?.forEach((inp) => {
+            const key = inp.name || inp.id;
+            if (key && pluginInteractionData[key]) {
+              filteredInteractionData[key] = pluginInteractionData[key];
             }
-            const id = uuidv4();
-            newChildIds.push(id);
-            useAppStore.getState().addNode(
-              {
-                id,
-                type: "manual",
-                transform: wp.transform || {
-                  x: wp.x ?? 0,
-                  y: wp.y ?? 0,
-                  qx,
-                  qy,
-                  qz,
-                  qw,
-                },
-                options: wp.options || {},
-              },
-              node.id,
-            );
           });
 
-          handleUpdate(node.id, { generator_params: contextData });
-        });
-      } else {
-        alert("Plugin executed but returned 0 waypoints.");
-      }
+          const contextData: Record<string, any> = {
+            ...node.generator_params,
+            properties: genParams,
+            interaction_data: filteredInteractionData,
+          };
+
+          if (plugin.manifest.needs?.includes('robot_footprint')) {
+            contextData.robot_footprint = useAppStore.getState().robotFootprint;
+          }
+
+          let pythonPathToUse = globalPythonPath?.trim() || "python3";
+          if (plugin.manifest.type === "python") {
+            const setting = pluginSettings.find((s) => s.id === plugin.id);
+            if (
+              setting &&
+              setting.pythonOverridePath &&
+              setting.pythonOverridePath.trim() !== ""
+            ) {
+              pythonPathToUse = setting.pythonOverridePath.trim();
+            }
+          }
+
+          const needsOccupancyGrid = plugin.manifest.needs?.some(
+            (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+          );
+
+          const layersToPass = needsOccupancyGrid
+            ? await prepareLayersForExport(mapLayers, customLayers)
+            : undefined;
+
+          const resultingWaypoints = await BackendAPI.runPlugin(
+            plugin,
+            contextData,
+            pythonPathToUse,
+            layersToPass,
+          );
+
+          if (
+            Array.isArray(resultingWaypoints) &&
+            resultingWaypoints.length > 0
+          ) {
+            useAppStore.getState().runInHistoryTransaction(() => {
+              if (node.children_ids && node.children_ids.length > 0) {
+                removeNodes(node.children_ids);
+              }
+
+              const newChildIds: string[] = [];
+              resultingWaypoints.forEach((wp) => {
+                let qx = wp.qx ?? 0,
+                  qy = wp.qy ?? 0,
+                  qz = wp.qz ?? 0,
+                  qw = wp.qw ?? 1;
+                if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
+                  const halfYaw = wp.yaw / 2.0;
+                  qz = Math.sin(halfYaw);
+                  qw = Math.cos(halfYaw);
+                }
+                const id = uuidv4();
+                newChildIds.push(id);
+                useAppStore.getState().addNode(
+                  {
+                    id,
+                    type: "manual",
+                    transform: wp.transform || {
+                      x: wp.x ?? 0,
+                      y: wp.y ?? 0,
+                      qx,
+                      qy,
+                      qz,
+                      qw,
+                    },
+                    options: wp.options || {},
+                  },
+                  node.id,
+                );
+              });
+
+              handleUpdate(node.id, { generator_params: contextData });
+            });
+          } else {
+            alert("Plugin executed but returned 0 waypoints.");
+          }
+        }
+      );
     } catch (err: any) {
       console.error("Re-generation failed:", err);
       alert(`Failed to re-generate:\n${err.toString()}`);

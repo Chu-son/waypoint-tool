@@ -291,7 +291,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   }),
 
   loadProjectFromPath: async (pathStr: string): Promise<boolean> => {
-    const { setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity, recalculatePath, addRecentProject } = get();
+    const { setLastDirectory, setProjectData, setIsDirty, defaultMapOpacity, recalculatePath, addRecentProject, runWithLoading } = get();
     try {
       const getDirName = (path: string) => {
         const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
@@ -299,50 +299,61 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       };
 
       setLastDirectory(getDirName(pathStr));
-      const projectData: any = await BackendAPI.loadProject(pathStr);
+      const fileName = pathStr.split('/').pop() || pathStr;
 
-      setProjectData({
-        nodes: projectData.nodes,
-        rootNodeIds: projectData.root_node_ids,
-        mapLayers: projectData.map_layers?.map((layer: any) => ({
-          id: uuidv4(),
-          name: layer.name || "Restored Map",
-          info: layer.info || {},
-          image_base64: layer.image_base64 || "",
-          width: layer.width || 1000,
-          height: layer.height || 1000,
-          visible: typeof layer.visible === 'boolean' ? layer.visible : true,
-          opacity: typeof layer.opacity === 'number' ? layer.opacity : (projectData.default_map_opacity ?? defaultMapOpacity),
-          z_index: typeof layer.z_index === 'number' ? layer.z_index : 0,
-          blend_mode: layer.blend_mode || 'overwrite'
-        })),
-        custom_layers: projectData.custom_layers,
-        generated_layers: projectData.generated_layers,
-        edit_layers: projectData.edit_layers,
-        export_regions: projectData.export_regions,
-        options_schema: projectData.options_schema,
-        export_templates: projectData.export_templates,
-        robot_footprint: projectData.robot_footprint,
-        occupancy_settings: projectData.occupancy_settings,
-        default_map_opacity: projectData.default_map_opacity,
-        left_panel_view_mode: projectData.left_panel_view_mode,
-        right_panel_view_mode: projectData.right_panel_view_mode,
-        active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
-        path_calculator_params: projectData.path_calculator_params,
-        auto_recalculate_path: projectData.auto_recalculate_path,
-        path_color: projectData.path_color,
-        path_width: projectData.path_width,
-        path_opacity: projectData.path_opacity,
-        sync_path_width_with_footprint: projectData.sync_path_width_with_footprint,
-      });
-      setIsDirty(false);
-      addRecentProject(pathStr);
+      return await runWithLoading(
+        {
+          message: "プロジェクトを読み込み中...",
+          detail: fileName,
+          blocking: true,
+        },
+        async () => {
+          const projectData: any = await BackendAPI.loadProject(pathStr);
 
-      // Recalculate path if active plugin was loaded
-      if (projectData.active_path_calculator_plugin_id) {
-        recalculatePath();
-      }
-      return true;
+          setProjectData({
+            nodes: projectData.nodes,
+            rootNodeIds: projectData.root_node_ids,
+            mapLayers: projectData.map_layers?.map((layer: any) => ({
+              id: uuidv4(),
+              name: layer.name || "Restored Map",
+              info: layer.info || {},
+              image_base64: layer.image_base64 || "",
+              width: layer.width || 1000,
+              height: layer.height || 1000,
+              visible: typeof layer.visible === 'boolean' ? layer.visible : true,
+              opacity: typeof layer.opacity === 'number' ? layer.opacity : (projectData.default_map_opacity ?? defaultMapOpacity),
+              z_index: typeof layer.z_index === 'number' ? layer.z_index : 0,
+              blend_mode: layer.blend_mode || 'overwrite'
+            })),
+            custom_layers: projectData.custom_layers,
+            generated_layers: projectData.generated_layers,
+            edit_layers: projectData.edit_layers,
+            export_regions: projectData.export_regions,
+            options_schema: projectData.options_schema,
+            export_templates: projectData.export_templates,
+            robot_footprint: projectData.robot_footprint,
+            occupancy_settings: projectData.occupancy_settings,
+            default_map_opacity: projectData.default_map_opacity,
+            left_panel_view_mode: projectData.left_panel_view_mode,
+            right_panel_view_mode: projectData.right_panel_view_mode,
+            active_path_calculator_plugin_id: projectData.active_path_calculator_plugin_id,
+            path_calculator_params: projectData.path_calculator_params,
+            auto_recalculate_path: projectData.auto_recalculate_path,
+            path_color: projectData.path_color,
+            path_width: projectData.path_width,
+            path_opacity: projectData.path_opacity,
+            sync_path_width_with_footprint: projectData.sync_path_width_with_footprint,
+          });
+          setIsDirty(false);
+          addRecentProject(pathStr);
+
+          // Recalculate path if active plugin was loaded
+          if (projectData.active_path_calculator_plugin_id) {
+            recalculatePath();
+          }
+          return true;
+        }
+      );
     } catch (err) {
       console.error("Failed to load project:", err);
       alert(`プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);

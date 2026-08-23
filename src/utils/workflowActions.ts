@@ -39,10 +39,19 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
         ],
       });
       if (selected && typeof selected === 'string') {
-        const mapData = await BackendAPI.loadROSMap(selected);
         const fileName = selected.split(/[/\\]/).pop() || 'Map';
-        store.addMapLayer(fileName, mapData.info, mapData.image_data_b64, mapData.width, mapData.height);
-        store.triggerFitToMaps();
+        await store.runWithLoading(
+          {
+            message: "マップを読み込み中...",
+            detail: fileName,
+            blocking: true,
+          },
+          async () => {
+            const mapData = await BackendAPI.loadROSMap(selected);
+            store.addMapLayer(fileName, mapData.info, mapData.image_data_b64, mapData.width, mapData.height);
+            store.triggerFitToMaps();
+          }
+        );
       }
     } catch (err) {
       console.error('Failed to open map in workflow action:', err);
@@ -71,52 +80,61 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     }
 
     try {
-      const layersToPass = await prepareLayersForExport(store.mapLayers, store.customLayers);
-      const pythonPath = store.globalPythonPath;
-      const contextData = {
-        interactionData: store.pluginInteractionData,
-        properties: store.pluginActiveProperties,
-      };
+      await store.runWithLoading(
+        {
+          message: "プラグインを実行中...",
+          detail: plugin.manifest.name || plugin.id,
+          blocking: true,
+        },
+        async () => {
+          const layersToPass = await prepareLayersForExport(store.mapLayers, store.customLayers);
+          const pythonPath = store.globalPythonPath;
+          const contextData = {
+            interactionData: store.pluginInteractionData,
+            properties: store.pluginActiveProperties,
+          };
 
-      const result = await BackendAPI.runPlugin(plugin, contextData, pythonPath, layersToPass);
-      if (result && Array.isArray(result)) {
-        const parentId = uuidv4();
-        store.runInHistoryTransaction(() => {
-          store.addNode({
-            id: parentId,
-            type: "generator",
-            plugin_id: plugin.id,
-            generator_params: contextData,
-            children_ids: [],
-          });
+          const result = await BackendAPI.runPlugin(plugin, contextData, pythonPath, layersToPass);
+          if (result && Array.isArray(result)) {
+            const parentId = uuidv4();
+            store.runInHistoryTransaction(() => {
+              store.addNode({
+                id: parentId,
+                type: "generator",
+                plugin_id: plugin.id,
+                generator_params: contextData,
+                children_ids: [],
+              });
 
-          result.forEach((wp: any) => {
-            let qx = wp.qx ?? 0,
-              qy = wp.qy ?? 0,
-              qz = wp.qz ?? 0,
-              qw = wp.qw ?? 1;
-            if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-              const halfYaw = wp.yaw / 2.0;
-              qz = Math.sin(halfYaw);
-              qw = Math.cos(halfYaw);
-            }
+              result.forEach((wp: any) => {
+                let qx = wp.qx ?? 0,
+                  qy = wp.qy ?? 0,
+                  qz = wp.qz ?? 0,
+                  qw = wp.qw ?? 1;
+                if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
+                  const halfYaw = wp.yaw / 2.0;
+                  qz = Math.sin(halfYaw);
+                  qw = Math.cos(halfYaw);
+                }
 
-            const id = uuidv4();
-            store.addNode(
-              {
-                id,
-                type: "manual",
-                transform: wp.transform || {
-                  position: { x: wp.x ?? 0, y: wp.y ?? 0, z: wp.z ?? 0 },
-                  orientation: { x: qx, y: qy, z: qz, w: qw },
-                },
-                options: wp.options || wp.properties || {},
-              },
-              parentId
-            );
-          });
-        });
-      }
+                const id = uuidv4();
+                store.addNode(
+                  {
+                    id,
+                    type: "manual",
+                    transform: wp.transform || {
+                      position: { x: wp.x ?? 0, y: wp.y ?? 0, z: wp.z ?? 0 },
+                      orientation: { x: qx, y: qy, z: qz, w: qw },
+                    },
+                    options: wp.options || wp.properties || {},
+                  },
+                  parentId
+                );
+              });
+            });
+          }
+        }
+      );
     } catch (err) {
       console.error('Failed to run plugin in workflow action:', err);
     }

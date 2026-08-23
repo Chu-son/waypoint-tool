@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { Copy } from 'lucide-react';
+import { Copy, Loader2 } from 'lucide-react';
 
 export const StatusBar: React.FC = () => {
   const cursorPosition = useAppStore(state => state.cursorPosition);
@@ -48,6 +48,10 @@ export const StatusBar: React.FC = () => {
   const showOccupancyHighlight = useAppStore(state => state.showOccupancyHighlight);
   const occupancyHighlightAlpha = useAppStore(state => state.occupancyHighlightAlpha);
   const setOccupancyHighlightAlpha = useAppStore(state => state.setOccupancyHighlightAlpha);
+  const activeLoadingTasks = useAppStore(state => state.activeLoadingTasks);
+
+  const backgroundTasks = Object.values(activeLoadingTasks).filter(t => t.blocking === false);
+  const activeBgTask = backgroundTasks.sort((a, b) => b.createdAt - a.createdAt)[0];
 
   return (
     <div className="h-6 flex items-center justify-between px-3 bg-surface-panel border-t border-border-base text-xs text-text-muted flex-shrink-0 z-50">
@@ -92,6 +96,11 @@ export const StatusBar: React.FC = () => {
               <span className="text-[10px] font-mono">{Math.round(occupancyHighlightAlpha * 100)}%</span>
             </div>
           </div>
+        ) : activeBgTask ? (
+          <span className="text-primary-base font-medium flex items-center gap-1.5 animate-pulse">
+            <Loader2 size={12} className="animate-spin" />
+            {activeBgTask.message}
+          </span>
         ) : (
           <span>Ready</span>
         )}

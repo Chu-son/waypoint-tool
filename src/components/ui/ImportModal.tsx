@@ -43,6 +43,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
   const optionsSchema = useAppStore((state) => state.optionsSchema);
   const addNode = useAppStore((state) => state.addNode);
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [filePath, setFilePath] = useState<string | null>(null);
   const [formatId, setFormatId] = useState<string>("__default_yaml__");
@@ -98,25 +99,36 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
       if (!pathStr) return;
       setFilePath(pathStr);
       setPreview(null);
-      const lastSlash = Math.max(pathStr.lastIndexOf("/"), pathStr.lastIndexOf("\\"));
-      if (lastSlash > -1) setLastDirectory(pathStr.substring(0, lastSlash));
+      if (lastDirectory !== pathStr) {
+        const lastSlash = Math.max(pathStr.lastIndexOf("/"), pathStr.lastIndexOf("\\"));
+        if (lastSlash > -1) setLastDirectory(pathStr.substring(0, lastSlash));
+      }
     }
   };
 
   const runParse = async () => {
     if (!filePath) {
-      alert("インポートするファイルを選択してください。");
+      alert("Please select a file to import.");
       return null;
     }
     try {
       setIsBusy(true);
-      const raw = await BackendAPI.importWaypointsRaw(filePath);
-      const { nodes, errors } = buildWaypointsFromImport(
-        raw,
-        mapping,
-        applyOptionsSchema ? optionsSchema : null,
+      return await runWithLoading(
+        {
+          message: "ウェイポイントファイルを解析中...",
+          detail: filePath ? filePath.split('/').pop() : undefined,
+          blocking: true,
+        },
+        async () => {
+          const raw = await BackendAPI.importWaypointsRaw(filePath);
+          const { nodes, errors } = buildWaypointsFromImport(
+            raw,
+            mapping,
+            applyOptionsSchema ? optionsSchema : null,
+          );
+          return { nodes, errors };
+        }
       );
-      return { nodes, errors };
     } catch (err) {
       alert(`ファイルの解析に失敗しました。\nエラー詳細: ${String(err)}`);
       return null;

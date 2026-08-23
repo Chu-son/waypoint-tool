@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
+import { v4 as uuidv4 } from 'uuid';
 
 export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
 export type ElementCopyCoordSystem = 'world' | 'anchor';
@@ -10,6 +11,14 @@ export type ElementCopyState = {
   coordSystem: ElementCopyCoordSystem;
   previewNodeId: string | null;
 } | null;
+
+export interface LoadingTask {
+  id: string;
+  message: string;
+  detail?: string;
+  blocking?: boolean;
+  createdAt: number;
+}
 
 export type UISlice = {
   activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region';
@@ -83,11 +92,59 @@ export type UISlice = {
   setWelcomeModalOpen: (open: boolean) => void;
   setIsInitialLaunch: (initial: boolean) => void;
   
+  // Loading Tasks State
+  activeLoadingTasks: Record<string, LoadingTask>;
+  startLoading: (task: { id?: string; message: string; detail?: string; blocking?: boolean }) => string;
+  stopLoading: (id: string) => void;
+  runWithLoading: <T>(
+    options: { id?: string; message: string; detail?: string; blocking?: boolean },
+    fn: () => Promise<T>
+  ) => Promise<T>;
+
   // Note: setDirty is mapped to setIsDirty in original store
   setDirty: (dirty: boolean) => void;
 };
 
-export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set) => ({
+export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get) => ({
+  activeLoadingTasks: {},
+
+  startLoading: (task) => {
+    const id = task.id || uuidv4();
+    const newTask: LoadingTask = {
+      id,
+      message: task.message,
+      detail: task.detail,
+      blocking: task.blocking !== false,
+      createdAt: Date.now(),
+    };
+    set((state) => ({
+      activeLoadingTasks: {
+        ...state.activeLoadingTasks,
+        [id]: newTask,
+      },
+    }));
+    return id;
+  },
+
+  stopLoading: (id: string) => {
+    set((state) => {
+      if (!state.activeLoadingTasks[id]) return state;
+      const { [id]: _, ...rest } = state.activeLoadingTasks;
+      return { activeLoadingTasks: rest };
+    });
+  },
+
+  runWithLoading: async (options, fn) => {
+    const id = get().startLoading(options);
+    // Yield a frame to allow React to commit state and browser to paint the LoadingOverlay
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    try {
+      return await fn();
+    } finally {
+      get().stopLoading(id);
+    }
+  },
+
   activeTool: 'select',
   isSidebarOpen: true,
   mouseCenteredZoom: true,

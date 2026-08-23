@@ -39,10 +39,16 @@ vi.mock('pixi.js', () => {
         width: img?.width || 100,
         height: img?.height || 100,
         destroyed: false,
-        source: { alphaMode: 'premultiply-alpha-on-upload' },
-        destroy: vi.fn(function (this: any) {
+        source: {
+          alphaMode: 'premultiply-alpha-on-upload',
+          destroyed: false,
+          style: { addressModeU: 'clamp-to-edge' },
+        },
+        destroy: vi.fn(function (this: any, destroySource: boolean = false) {
           this.destroyed = true;
-          this.source = null;
+          if (destroySource) {
+            this.source = null;
+          }
         }),
       })),
     },
@@ -119,7 +125,7 @@ describe('MapLayerSprite Texture Lifecycle & Regression Test', () => {
     // 2. Re-generate / update layer with new image data
     const updatedLayer = {
       ...initialLayer,
-      image_base64: 'data:image/png;base64,REGENERATED_IMAGE',
+      image_base64: 'REGENERATED_RAW_BASE64_WITHOUT_PREFIX',
     };
 
     rerender(
@@ -130,10 +136,10 @@ describe('MapLayerSprite Texture Lifecycle & Regression Test', () => {
       />
     );
 
-    // New Image 2 is instantiated, but onload has NOT fired yet
+    // New Image 2 is instantiated with normalized data: prefix, but onload has NOT fired yet
     expect(createdImages).toHaveLength(2);
     const img2 = createdImages[1];
-    expect(img2.src).toBe('data:image/png;base64,REGENERATED_IMAGE');
+    expect(img2.src).toBe('data:image/png;base64,REGENERATED_RAW_BASE64_WITHOUT_PREFIX');
 
     // =========================================================================
     // REGRESSION TEST ASSERTION:
@@ -153,16 +159,16 @@ describe('MapLayerSprite Texture Lifecycle & Regression Test', () => {
     expect(Texture.from).toHaveBeenCalledTimes(2);
     texture2 = (Texture.from as any).mock.results[1].value;
 
-    // Now texture1 should be cleanly destroyed, and texture2 is active
-    expect(texture1.destroy).toHaveBeenCalledWith(true);
+    // Now texture1 should be cleanly destroyed with false (preserving source style)
+    expect(texture1.destroy).toHaveBeenCalledWith(false);
     expect(texture1.destroyed).toBe(true);
     expect(texture2.destroyed).toBe(false);
 
     // 4. Unmount component
     unmount();
 
-    // Final active texture (texture2) should now be destroyed
-    expect(texture2.destroy).toHaveBeenCalledWith(true);
+    // Final active texture (texture2) should now be destroyed with false
+    expect(texture2.destroy).toHaveBeenCalledWith(false);
     expect(texture2.destroyed).toBe(true);
   });
 });

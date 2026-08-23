@@ -80,6 +80,9 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
     }
     let cancelled = false;
     if (layer.image_base64) {
+      const src = layer.image_base64.startsWith('data:')
+        ? layer.image_base64
+        : `data:image/png;base64,${layer.image_base64}`;
       const img = new Image();
       img.onload = () => {
         if (cancelled) return;
@@ -87,23 +90,35 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
         setTexture(newTexture);
         setImgSize({ w: img.width, h: img.height });
       };
-      img.src = layer.image_base64;
+      img.onerror = (err) => {
+        console.error(`[MapLayerSprite] Failed to load image for layer "${layer.name}":`, err);
+      };
+      img.src = src;
     }
     return () => {
       cancelled = true;
     };
-  }, [layer.image_base64, overrideTexture]);
+  }, [layer.image_base64, layer.name, overrideTexture]);
 
-  // Clean up the previous texture ONLY after React has committed the new texture to the Sprite!
+  // Clean up the previous texture safely without nulling shared TextureSource style
   useEffect(() => {
     return () => {
       if (texture && !texture.destroyed && !overrideTexture) {
-        texture.destroy(true);
+        texture.destroy(false);
       }
     };
   }, [texture, overrideTexture]);
 
-  if (!texture || texture.destroyed || !texture.source || !layer.visible) return null;
+  if (
+    !texture ||
+    texture.destroyed ||
+    !texture.source ||
+    texture.source.destroyed ||
+    !texture.source.style ||
+    !layer.visible
+  ) {
+    return null;
+  }
   
   // Extract metadata (with safe fallbacks)
   const { resolution = 0.05, origin = [0, 0, 0] } = layer.info || {};
@@ -187,7 +202,6 @@ export function MapCanvas() {
 
   const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
   const [previewInfo, setPreviewInfo] = useState<any>(null);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -232,16 +246,23 @@ export function MapCanvas() {
     return `${shouldShowBlendedPreview}::${mapKey}::${customKey}::${occKey}`;
   }, [shouldShowBlendedPreview, mapLayers, customLayers, occupancySettings]);
 
+  const startLoading = useAppStore(state => state.startLoading);
+  const stopLoading = useAppStore(state => state.stopLoading);
+
   useEffect(() => {
     if (!shouldShowBlendedPreview) {
       setPreviewTexture(null);
-      setIsPreviewLoading(false);
+      stopLoading('blended-preview');
       setPreviewError(null);
       return;
     }
 
     let cancelled = false;
-    setIsPreviewLoading(true);
+    startLoading({
+      id: 'blended-preview',
+      message: isExportPreview ? 'エクスポートプレビューを生成中...' : '占有状態プレビューを生成中...',
+      blocking: true,
+    });
     setPreviewError(null);
 
     prepareLayersForExport(mapLayers, customLayers).then(layerInputs => {
@@ -249,7 +270,10 @@ export function MapCanvas() {
       if (!layerInputs || layerInputs.length === 0) return null;
       return BackendAPI.blendMapPreview(layerInputs);
     }).then(result => {
-      if (cancelled || !result) return;
+      if (cancelled || !result) {
+        stopLoading('blended-preview');
+        return;
+      }
       const img = new Image();
       img.onload = () => {
         if (cancelled) return;
@@ -262,28 +286,31 @@ export function MapCanvas() {
           free_thresh: occupancySettings.defaultFreeThresh,
           negate: occupancySettings.defaultNegate,
         });
-        setIsPreviewLoading(false);
+        stopLoading('blended-preview');
       };
       img.onerror = () => {
         if (cancelled) return;
         setPreviewError('Failed to load image texture from base64.');
-        setIsPreviewLoading(false);
+        stopLoading('blended-preview');
       };
       img.src = result.image_data_b64;
     }).catch(err => {
       if (cancelled) return;
       console.error('[Blend Preview] Blend Preview failed:', err);
       setPreviewError(String(err));
-      setIsPreviewLoading(false);
+      stopLoading('blended-preview');
     });
 
-    return () => { cancelled = true; };
-  }, [shouldShowBlendedPreview, previewSyncKey, mapLayers, customLayers, occupancySettings]);
+    return () => {
+      cancelled = true;
+      stopLoading('blended-preview');
+    };
+  }, [shouldShowBlendedPreview, previewSyncKey, mapLayers, customLayers, occupancySettings, isExportPreview, startLoading, stopLoading]);
 
   useEffect(() => {
     return () => {
       if (previewTexture && !previewTexture.destroyed) {
-        previewTexture.destroy(true);
+        previewTexture.destroy(false);
       }
     };
   }, [previewTexture]);
@@ -1442,11 +1469,9 @@ export function MapCanvas() {
           <pixiContainer label="map-layers-group">
             {shouldShowBlendedPreview ? (
               <>
-                {isPreviewLoading && !previewTexture ? (
-                  <pixiText text="Generating Preview..." x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-                ) : previewError && !previewTexture ? (
+                {previewError && !previewTexture ? (
                   <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-                ) : previewTexture ? (
+                ) : (previewTexture && !previewTexture.destroyed && previewTexture.source && !previewTexture.source.destroyed && previewTexture.source.style) ? (
                   <MapLayerSprite
                     layer={{
                       id: '__blended_preview__',

@@ -23,6 +23,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [includeImage, setIncludeImage] = useState(false);
   const [selectedFormats, setSelectedFormats] = useState<string[]>([
@@ -121,54 +122,63 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           })
           .filter((n) => n !== null);
 
-        // Extract image if requested
-        let imageDataB64 = undefined;
-        if (includeImage) {
-          useAppStore.setState({ shouldFitToMaps: Date.now() });
-          await new Promise((r) => setTimeout(r, 800)); // wait for Pixi
-          const canvas = document.querySelector("canvas");
-          if (canvas) {
-            imageDataB64 = canvas.toDataURL("image/png").split(",")[1];
-          }
-        }
+        await runWithLoading(
+          {
+            message: "ウェイポイントをエクスポート中...",
+            detail: `${selectedFormats.length} 種類のフォーマットを出力中`,
+            blocking: true,
+          },
+          async () => {
+            // Extract image if requested
+            let imageDataB64 = undefined;
+            if (includeImage) {
+              useAppStore.setState({ shouldFitToMaps: Date.now() });
+              await new Promise((r) => setTimeout(r, 800)); // wait for Pixi
+              const canvas = document.querySelector("canvas");
+              if (canvas) {
+                imageDataB64 = canvas.toDataURL("image/png").split(",")[1];
+              }
+            }
 
-        // Export each selected format
-        for (let i = 0; i < selectedFormats.length; i++) {
-          const formatId = selectedFormats[i];
+            // Export each selected format
+            for (let i = 0; i < selectedFormats.length; i++) {
+              const formatId = selectedFormats[i];
 
-          let extension = "yaml";
-          let suffix = "";
-          let templateContent = undefined;
+              let extension = "yaml";
+              let suffix = "";
+              let templateContent = undefined;
 
-          // Check Default Formats first
-          const defaultFormat = useAppStore
-            .getState()
-            .defaultExportFormats.find((f) => f.id === formatId);
-          if (defaultFormat) {
-            extension = defaultFormat.extension;
-            suffix = defaultFormat.suffix;
-          } else {
-            // Check Custom Templates
-            const t = exportTemplates.find((x) => x.id === formatId);
-            if (t) {
-              templateContent = t.content;
-              extension = t.extension;
-              suffix = t.suffix || "";
-            } else {
-              continue; // Skip invalid
+              // Check Default Formats first
+              const defaultFormat = useAppStore
+                .getState()
+                .defaultExportFormats.find((f) => f.id === formatId);
+              if (defaultFormat) {
+                extension = defaultFormat.extension;
+                suffix = defaultFormat.suffix;
+              } else {
+                // Check Custom Templates
+                const t = exportTemplates.find((x) => x.id === formatId);
+                if (t) {
+                  templateContent = t.content;
+                  extension = t.extension;
+                  suffix = t.suffix || "";
+                } else {
+                  continue; // Skip invalid
+                }
+              }
+
+              const finalPath = `${basePath}${suffix}.${extension}`;
+
+              // Only send image on the first format to avoid overwriting identical PNGs wastefully
+              await BackendAPI.exportWaypoints(
+                finalPath,
+                waypointsToExport as any[],
+                templateContent,
+                i === 0 ? imageDataB64 : undefined,
+              );
             }
           }
-
-          const finalPath = `${basePath}${suffix}.${extension}`;
-
-          // Only send image on the first format to avoid overwriting identical PNGs wastefully
-          await BackendAPI.exportWaypoints(
-            finalPath,
-            waypointsToExport as any[],
-            templateContent,
-            i === 0 ? imageDataB64 : undefined,
-          );
-        }
+        );
 
         alert("エクスポートが完了しました。");
         onClose();

@@ -16,6 +16,12 @@
 - **`NumericInput`** ([`src/components/ui/NumericInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/NumericInput.tsx))
   - **概要**: 数値編集用インプット。ドラッグによる値変更やステップ増減、フォーカス外確定をサポート。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`
+- **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
+  - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。
+  - **主要Props**: `className`
+- **`BackgroundLoadingBadge`** ([`src/components/ui/common/BackgroundLoadingBadge.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/BackgroundLoadingBadge.tsx))
+  - **概要**: 自動経路計算等の非ブロッキングバックグラウンド処理時にキャンバス右上に浮遊表示されるコンパクトなピル型インジケーター。
+  - **主要Props**: `className`
 - **`ElementCopyOverlay`** ([`src/components/ui/ElementCopyOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ElementCopyOverlay.tsx))
   - **概要**: 複数要素や特定の座標・プロパティを別のノードへ連続コピーする際のキャンバスオーバーレイ。
   - **主要Props**: なし（コピー状態を `appStore` より読み出し表示）

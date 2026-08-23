@@ -137,6 +137,7 @@ describe('PropertiesPanel', () => {
       removeNodes: mockRemoveNodes,
       updatePluginInteractionData: vi.fn(),
       pluginInteractionData: { start: { x: 0, y: 0 } },
+      runWithLoading: async (_: any, fn: any) => await fn(),
     }));
 
     (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 10, y: 10, yaw: 0 }]);

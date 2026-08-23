@@ -14,6 +14,8 @@ import { WelcomeModal } from "./components/ui/WelcomeModal";
 import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
 import { MapEditOverlay } from "./components/ui/MapEditOverlay";
+import { LoadingOverlay } from "./components/ui/common/LoadingOverlay";
+import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoadingBadge";
 import { ShortcutManager } from "./components/common/ShortcutManager";
 import { ThemeInjector } from "./components/ui/ThemeInjector";
 import { resolvePanelTabs, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
@@ -336,6 +338,7 @@ function App() {
         <div className="flex-1 bg-surface-base relative overflow-hidden flex flex-col">
           <ElementCopyOverlay />
           <MapEditOverlay />
+          <BackgroundLoadingBadge />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
             {!isLeftPanelOpen ? (
@@ -409,6 +412,7 @@ function App() {
         isOpen={isWelcomeModalOpen}
         onClose={() => setWelcomeModalOpen(false)}
       />
+      <LoadingOverlay />
     </div>
   );
 }

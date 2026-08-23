@@ -75,6 +75,7 @@ export function LayerPanel() {
 
   const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
   const setShowOccupancyHighlight = useAppStore((state) => state.setShowOccupancyHighlight);
+  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
 
@@ -98,14 +99,23 @@ export function LayerPanel() {
         const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
         setLastDirectory(dir);
 
-        const result = await BackendAPI.loadROSMap(pathStr);
-        const filename = pathStr.split(/[/\\]/).pop() || "Map";
-        addMapLayer(
-          filename,
-          result.info,
-          result.image_data_b64,
-          result.width,
-          result.height,
+        await runWithLoading(
+          {
+            message: "マップを読み込み中...",
+            detail: pathStr.split(/[/\\]/).pop() || pathStr,
+            blocking: true,
+          },
+          async () => {
+            const result = await BackendAPI.loadROSMap(pathStr);
+            const filename = pathStr.split(/[/\\]/).pop() || "Map";
+            addMapLayer(
+              filename,
+              result.info,
+              result.image_data_b64,
+              result.width,
+              result.height,
+            );
+          }
         );
       }
     } catch (err) {
