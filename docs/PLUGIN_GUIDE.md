@@ -77,6 +77,8 @@ if __name__ == "__main__":
 
 ### 2) マップレイヤー生成 (`MapLayerGenerator`)
 マップ上の指定位置や占有格子データを元に、透過PNGオーバーレイレイヤーを生成します。
+走行可能領域の抽出や、モルフォロジー演算（Opening/Closing）によるノイズ除去・穴埋めマスクなどの用途に利用できます。
+
 ```python
 from wpt_plugin import MapLayerGenerator, OccupancyGrid, Point
 
@@ -99,6 +101,7 @@ class DrivableAreaGenerator(MapLayerGenerator):
 if __name__ == "__main__":
     DrivableAreaGenerator().run_from_stdin()
 ```
+
 
 ### 3) パス計算 (`PathCalculator`)
 ウェイポイント間をA*/ダイクストラ等のアルゴリズムで補間し、各区間のポリラインを出力します。

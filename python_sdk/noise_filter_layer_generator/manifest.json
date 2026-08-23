@@ -1,0 +1,49 @@
+{
+  "name": "Morphological Noise Filter",
+  "category": "map_layer_generator",
+  "version": "1.0.0",
+  "description": "Performs morphological operations (Opening / Closing) to remove isolated obstacle noise and fill small holes on the map, outputting a sparse overlay mask.",
+  "type": "python",
+  "executable": "main.py",
+  "icon": "Sparkles",
+  "inputs": [
+    {
+      "id": "roi_region",
+      "label": "ROI Region (Optional)",
+      "type": "rectangle",
+      "description": "Select rectangular region to apply noise filter. If omitted or not drawn, entire map will be processed."
+    }
+  ],
+  "needs": ["occupancy_grid"],
+  "properties": [
+    {
+      "name": "mode",
+      "label": "Filter Mode",
+      "type": "string",
+      "options": ["remove_obstacles", "fill_holes", "both"],
+      "default": "remove_obstacles",
+      "description": "Select morphological operation: remove isolated obstacles (Opening), fill small holes (Closing), or both."
+    },
+    {
+      "name": "noise_size",
+      "label": "Noise Size (m)",
+      "type": "float",
+      "default": 0.10,
+      "description": "Target noise diameter in meters (automatically converted to grid cell radius)."
+    },
+    {
+      "name": "kernel_shape",
+      "label": "Kernel Shape",
+      "type": "string",
+      "options": ["disk", "cross", "square"],
+      "default": "disk",
+      "description": "Structuring element shape for morphology operations."
+    },
+    {
+      "name": "layer_name",
+      "label": "Layer Name",
+      "type": "string",
+      "default": "Noise Filter Layer"
+    }
+  ]
+}
