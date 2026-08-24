@@ -7,13 +7,17 @@ import unittest
 import zlib
 import base64
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import importlib.util
+
+_parent = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, _parent)
 from wpt_plugin import MapLayerGenerator, OccupancyGrid
 from wpt_plugin.layer import _parse_color_rgba
 
-# Import DrivableAreaLayerGenerator plugin
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'drivable_area_layer_generator'))
-from main import DrivableAreaLayerGenerator
+_spec = importlib.util.spec_from_file_location('drivable_area_main', os.path.join(_parent, 'drivable_area_layer_generator', 'main.py'))
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+DrivableAreaLayerGenerator = _mod.DrivableAreaLayerGenerator
 
 
 class TestLayerColorAndDrivableArea(unittest.TestCase):

@@ -71,6 +71,51 @@ class PluginBase:
             yaw=data.get("yaw", 0.0)
         )
 
+    def get_annotation(self, context: Dict[str, Any], input_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve single annotation object from interaction_data."""
+        data = self.get_interaction_data(context, input_id)
+        if not data:
+            return None
+        if isinstance(data, list):
+            return data[0] if data else None
+        return data
+
+    def get_annotations(self, context: Dict[str, Any], input_id: str) -> List[Dict[str, Any]]:
+        """Retrieve list of annotation objects from interaction_data."""
+        data = self.get_interaction_data(context, input_id)
+        if not data:
+            return []
+        if isinstance(data, list):
+            return data
+        return [data]
+
+    def get_custom_layer(self, context: Dict[str, Any], input_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve single custom layer payload from interaction_data."""
+        data = self.get_interaction_data(context, input_id)
+        if not data:
+            return None
+        if isinstance(data, list):
+            return data[0] if data else None
+        return data
+
+    def get_custom_layers(self, context: Dict[str, Any], input_id: str) -> List[Dict[str, Any]]:
+        """Retrieve list of custom layer payloads from interaction_data."""
+        data = self.get_interaction_data(context, input_id)
+        if not data:
+            return []
+        if isinstance(data, list):
+            return data
+        return [data]
+
+    def get_custom_layer_grid(self, custom_layer: Dict[str, Any]) -> Optional['OccupancyGrid']:
+        """If custom layer contains occupancy_grid data, return an OccupancyGrid instance, else None."""
+        if not custom_layer or not isinstance(custom_layer, dict):
+            return None
+        grid_data = custom_layer.get("occupancy_grid")
+        if grid_data and isinstance(grid_data, dict):
+            return OccupancyGrid(grid_data)
+        return None
+
     def get_occupancy_grid(self, context: Dict[str, Any]) -> Optional['OccupancyGrid']:
         """context["occupancy_grid"] を OccupancyGrid インスタンスとして返す。
         needs に "occupancy_grid" / "occupancy_grid_in_region" を指定していない場合は None。"""

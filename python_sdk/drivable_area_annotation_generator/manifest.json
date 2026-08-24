@@ -1,0 +1,65 @@
+{
+  "name": "Drivable Area (Annotation Seeds)",
+  "category": "map_layer_generator",
+  "version": "1.0.0",
+  "description": "Expands drivable area from selected annotation Point objects using multi-source flood-fill with robot footprint clearance, unknown space handling, and customizable overlay colors.",
+  "type": "python",
+  "executable": "main.py",
+  "icon": "Sparkles",
+  "inputs": [
+    {
+      "id": "seed_annotations",
+      "label": "Seed Point Annotations",
+      "type": "annotation",
+      "object_type": "point",
+      "multiple": true,
+      "description": "Select one or more annotation points to use as flood-fill seeds."
+    }
+  ],
+  "needs": ["occupancy_grid", "robot_footprint"],
+  "properties": [
+    {
+      "name": "max_radius",
+      "label": "Max Expansion Radius (m)",
+      "type": "float",
+      "default": 10.0
+    },
+    {
+      "name": "use_robot_footprint",
+      "label": "Consider Robot Footprint",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "extra_margin",
+      "label": "Extra Clearance Margin (m)",
+      "type": "float",
+      "default": 0.05
+    },
+    {
+      "name": "allow_unknown",
+      "label": "Allow Unknown Space",
+      "type": "boolean",
+      "default": false,
+      "description": "If enabled, unknown/unmapped areas are also considered traversable."
+    },
+    {
+      "name": "dilation_cells",
+      "label": "Dilation Width (cells)",
+      "type": "integer",
+      "default": 0
+    },
+    {
+      "name": "layer_color",
+      "label": "Layer Color",
+      "type": "color",
+      "default": "#22c55e"
+    },
+    {
+      "name": "fill_opacity",
+      "label": "Fill Opacity (0~1)",
+      "type": "float",
+      "default": 0.6
+    }
+  ]
+}

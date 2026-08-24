@@ -180,3 +180,14 @@ class Rectangle:
                 if not any(ipt.distance_to(existing) < 1e-6 for existing in intersections):
                     intersections.append(ipt)
         return intersections
+
+class Circle:
+    def __init__(self, center: Point, radius: float):
+        self.center = center
+        self.radius = float(radius)
+
+    def contains(self, p: Point) -> bool:
+        return self.center.distance_to(p) <= self.radius
+
+    def __repr__(self):
+        return f"Circle(center={self.center}, radius={self.radius})"
