@@ -8,7 +8,7 @@ import { PluginInputEditor } from "../PluginInputEditor";
 import { Play, Settings2, RefreshCcw, BoxSelect } from "lucide-react";
 import { WaypointNode } from "../../../types/store";
 import { v4 as uuidv4 } from "uuid";
-import { prepareLayersForExport } from "../../../utils/mapRasterize";
+import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from "../../../utils/mapRasterize";
 
 interface GeneratorNodePanelProps {
   node: WaypointNode;
@@ -31,7 +31,7 @@ export function GeneratorNodePanel({
     (state) => state.pluginInteractionData,
   );
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
-  const mapLayers = useAppStore((state) => state.mapLayers);
+  const mapLayers = useAppStore((state) => state.mapLayers) || [];
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
@@ -106,9 +106,21 @@ export function GeneratorNodePanel({
             ? await prepareLayersForExport(mapLayers, customLayers)
             : undefined;
 
+          const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+          const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
+            plugin.manifest.inputs,
+            contextData.interaction_data || {},
+            customLayers,
+            baseRes
+          );
+          const finalContextData = {
+            ...contextData,
+            interaction_data: enrichedInteractionData,
+          };
+
           const resultingWaypoints = await BackendAPI.runPlugin(
             plugin,
-            contextData,
+            finalContextData,
             pythonPathToUse,
             layersToPass,
           );

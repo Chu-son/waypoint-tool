@@ -8,6 +8,8 @@ pub enum PluginInputType {
     PointList,
     Rectangle,
     Waypoint,
+    Annotation,
+    CustomLayer,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -68,6 +70,10 @@ pub struct PluginInputDef {
     pub max_points: Option<usize>,
     #[serde(default)]
     pub allow_yaw: Option<bool>,
+    #[serde(default)]
+    pub object_type: Option<String>,
+    #[serde(default)]
+    pub multiple: Option<bool>,
     #[serde(default)]
     pub description: Option<String>,
 }
@@ -182,6 +188,40 @@ mod tests {
         assert_eq!(manifest.inputs[0].min_points, Some(1));
         assert_eq!(manifest.inputs[0].max_points, Some(50));
         assert_eq!(manifest.inputs[0].allow_yaw, Some(false));
+    }
+
+    #[test]
+    fn test_annotation_and_custom_layer_input_manifest_deserialize() {
+        let json = r#"{
+            "name": "Drivable Area (Annotation Seeds)",
+            "category": "map_layer_generator",
+            "type": "python",
+            "executable": "main.py",
+            "inputs": [
+                {
+                    "id": "seed_annotations",
+                    "label": "Seed Point Annotations",
+                    "type": "annotation",
+                    "object_type": "point",
+                    "multiple": true
+                },
+                {
+                    "id": "obstacle_layer",
+                    "label": "Obstacle Layer",
+                    "type": "custom_layer",
+                    "multiple": false
+                }
+            ],
+            "properties": []
+        }"#;
+        let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.name, "Drivable Area (Annotation Seeds)");
+        assert_eq!(manifest.inputs.len(), 2);
+        assert_eq!(manifest.inputs[0].input_type, PluginInputType::Annotation);
+        assert_eq!(manifest.inputs[0].object_type, Some("point".to_string()));
+        assert_eq!(manifest.inputs[0].multiple, Some(true));
+        assert_eq!(manifest.inputs[1].input_type, PluginInputType::CustomLayer);
+        assert_eq!(manifest.inputs[1].multiple, Some(false));
     }
 }
 

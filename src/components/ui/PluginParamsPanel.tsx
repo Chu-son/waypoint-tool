@@ -9,7 +9,7 @@ import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
 import { Label } from "./common/Label";
 import { AlertBox } from "./common/AlertBox";
-import { prepareLayersForExport } from "../../utils/mapRasterize";
+import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from "../../utils/mapRasterize";
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
@@ -22,8 +22,8 @@ export function PluginParamsPanel() {
   );
   const activeInputIndex = useAppStore((state) => state.activeInputIndex);
   const setActiveInputIndex = useAppStore((state) => state.setActiveInputIndex);
-  const nodes = useAppStore((state) => state.nodes);
-  const mapLayers = useAppStore((state) => state.mapLayers);
+  const nodes = useAppStore((state) => state.nodes) || {};
+  const mapLayers = useAppStore((state) => state.mapLayers) || [];
   const customLayers = useAppStore((state) => state.customLayers) || [];
 
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
@@ -197,9 +197,22 @@ export function PluginParamsPanel() {
             ? await prepareLayersForExport(mapLayers, customLayers)
             : undefined;
 
+          // Enrich interaction data for any custom_layer inputs
+          const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+          const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
+            plugin.manifest.inputs,
+            contextData.interaction_data || {},
+            customLayers,
+            baseRes
+          );
+          const finalContextData = {
+            ...contextData,
+            interaction_data: enrichedInteractionData,
+          };
+
           const resultingWaypoints = await BackendAPI.runPlugin(
             plugin,
-            contextData,
+            finalContextData,
             pythonPathToUse,
             layersToPass,
           );

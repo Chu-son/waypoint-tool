@@ -248,6 +248,109 @@ export async function rasterizeManualCustomLayerToExportLayer(
   };
 }
 
+/**
+ * Prepares a CustomLayer for plugin execution by resolving its metadata and rasterized image/info if available.
+ */
+export async function prepareCustomLayerPayload(
+  customLayer: CustomLayer,
+  targetResolution?: number
+): Promise<any> {
+  const resolution = targetResolution || 0.05;
+  if (customLayer.type === 'manual') {
+    let imageBase64: string | undefined;
+    let info: any = undefined;
+
+    if (customLayer.editObjects && customLayer.editObjects.length > 0) {
+      const bbox = getEditLayerBoundingBox(customLayer, resolution);
+      const canvas = document.createElement('canvas');
+      canvas.width = bbox.widthPx;
+      canvas.height = bbox.heightPx;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, bbox.widthPx, bbox.heightPx);
+        ctx.globalAlpha = 1.0;
+        info = {
+          image: `${customLayer.name.replace(/\s+/g, '_').toLowerCase()}.png`,
+          resolution,
+          origin: [bbox.minX, bbox.minY, 0],
+          width: bbox.widthPx,
+          height: bbox.heightPx,
+          negate: 0,
+          occupied_thresh: 0.65,
+          free_thresh: 0.196,
+        };
+        for (const obj of customLayer.editObjects) {
+          drawEditObjectToCanvas(ctx, obj, info);
+        }
+        imageBase64 = canvas.toDataURL('image/png');
+      }
+    }
+
+    return {
+      id: customLayer.id,
+      name: customLayer.name,
+      type: 'manual',
+      opacity: customLayer.opacity ?? 1.0,
+      blend_mode: customLayer.blend_mode || 'overwrite',
+      is_reference: customLayer.is_reference ?? false,
+      edit_objects: customLayer.editObjects,
+      image_base64: imageBase64,
+      info,
+    };
+  } else {
+    // Plugin custom layer
+    return {
+      id: customLayer.id,
+      name: customLayer.name,
+      type: 'plugin',
+      opacity: customLayer.opacity ?? 1.0,
+      blend_mode: customLayer.blend_mode || 'overwrite',
+      is_reference: customLayer.is_reference ?? false,
+      plugin_id: customLayer.plugin_id,
+      params: customLayer.params,
+      image_base64: customLayer.image_base64,
+      info: customLayer.info,
+    };
+  }
+}
+
+/**
+ * Traverses plugin inputs and enriches any 'custom_layer' interaction data entries with resolved payloads.
+ */
+export async function enrichInteractionDataWithCustomLayers(
+  inputs: any[] | undefined,
+  interactionData: Record<string, any>,
+  customLayers: CustomLayer[],
+  baseResolution?: number
+): Promise<Record<string, any>> {
+  if (!inputs || !interactionData) return interactionData;
+  const enriched = { ...interactionData };
+
+  for (const input of inputs) {
+    if (input.type === 'custom_layer') {
+      const key = input.name || input.id;
+      const rawVal = interactionData[key];
+      if (rawVal === undefined || rawVal === null) continue;
+
+      if (Array.isArray(rawVal)) {
+        enriched[key] = await Promise.all(
+          rawVal.map(async (item) => {
+            const id = typeof item === 'string' ? item : item?.id;
+            const found = customLayers.find((l) => l.id === id) || (typeof item === 'object' ? item : null);
+            return found ? await prepareCustomLayerPayload(found, baseResolution) : item;
+          })
+        );
+      } else {
+        const id = typeof rawVal === 'string' ? rawVal : rawVal?.id;
+        const found = customLayers.find((l) => l.id === id) || (typeof rawVal === 'object' ? rawVal : null);
+        enriched[key] = found ? await prepareCustomLayerPayload(found, baseResolution) : rawVal;
+      }
+    }
+  }
+
+  return enriched;
+}
+
 export type PreparedExportLayer = {
   id: string;
   name: string;

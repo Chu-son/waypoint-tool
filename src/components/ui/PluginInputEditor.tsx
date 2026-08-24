@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Label } from "./common/Label";
 import { cn } from "../../utils/cn";
 import { useAppStore } from "../../stores/appStore";
@@ -7,7 +7,7 @@ import { Input } from "./common/Input";
 import { Button } from "./common/Button";
 import { LabeledNumericInput } from "./common/LabeledNumericInput";
 import { quaternionToYaw } from "../../utils/transformUtils";
-import { Trash2, Plus, Crosshair } from "lucide-react";
+import { Trash2, Plus, Crosshair, Layers, X } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
 export interface PluginInput {
@@ -15,6 +15,8 @@ export interface PluginInput {
   name?: string;
   label?: string;
   type: string;
+  object_type?: 'point' | 'oriented_point' | 'line' | 'rect' | 'circle' | 'any';
+  multiple?: boolean;
   required?: boolean;
   description?: string;
   min_points?: number;
@@ -85,7 +87,9 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
                   ? "▶ Click on map to place"
                   : input.type === "waypoint"
                     ? "▶ Select a waypoint from list or map"
-                    : ""}
+                    : input.type === "annotation"
+                      ? "▶ Select annotation object(s)"
+                      : ""}
           </p>
         )}
 
@@ -153,6 +157,26 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
             />
           </div>
         )}
+
+        {input.type === "annotation" && (
+          <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
+            <AnnotationSelectForm
+              input={input}
+              value={interactionData}
+              onChange={onUpdate}
+            />
+          </div>
+        )}
+
+        {input.type === "custom_layer" && (
+          <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
+            <CustomLayerSelectForm
+              input={input}
+              value={interactionData}
+              onChange={onUpdate}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -163,7 +187,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
       <Label className="text-[13px] font-bold text-primary-base flex items-center justify-between uppercase tracking-tight">
         <span>{label}</span>
         <span className="text-[10px] text-text-muted font-normal opacity-70 normal-case">
-          ({input.type === "point" ? "Point" : isPointsType ? "Points List" : input.type === "waypoint" ? "Waypoint Reference" : "Rectangle Area"})
+          ({input.type === "point" ? "Point" : isPointsType ? "Points List" : input.type === "waypoint" ? "Waypoint Reference" : input.type === "annotation" ? "Annotation Reference" : input.type === "custom_layer" ? "Custom Layer Reference" : "Rectangle Area"})
         </span>
       </Label>
 
@@ -175,6 +199,26 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
             rootNodeIds={rootNodeIds}
             nodes={nodes}
             indexStartIndex={indexStartIndex}
+          />
+        </div>
+      )}
+
+      {input.type === "annotation" && (
+        <div className="space-y-2">
+          <AnnotationSelectForm
+            input={input}
+            value={interactionData}
+            onChange={onUpdate}
+          />
+        </div>
+      )}
+
+      {input.type === "custom_layer" && (
+        <div className="space-y-2">
+          <CustomLayerSelectForm
+            input={input}
+            value={interactionData}
+            onChange={onUpdate}
           />
         </div>
       )}
@@ -578,4 +622,224 @@ function PointsListForm({
     </div>
   );
 }
+
+// ----------------------------------------------------------------------
+// Annotation Select Form
+// ----------------------------------------------------------------------
+
+interface AnnotationSelectFormProps {
+  input: PluginInput;
+  value: any;
+  onChange: (val: any) => void;
+}
+
+function AnnotationSelectForm({ input, value, onChange }: AnnotationSelectFormProps) {
+  const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
+  const annotationOrder = useAppStore((state) => state.annotationOrder) || [];
+
+  const filterType = input.object_type;
+  const filteredAnnotations = annotationOrder
+    .map((id) => annotationObjects[id])
+    .filter((a) => a && (filterType === 'any' || !filterType || a.type === filterType));
+
+  const isMultiple = !!input.multiple;
+
+  if (filteredAnnotations.length === 0) {
+    return (
+      <div className="text-xs text-text-muted/60 italic py-1 text-center">
+        利用可能なアノテーション ({filterType || 'any'}) がありません
+      </div>
+    );
+  }
+
+  if (isMultiple) {
+    const selectedList: any[] = Array.isArray(value) ? value : [];
+    const selectedIds = new Set(selectedList.map((item) => (typeof item === 'string' ? item : item?.id)));
+
+    const handleToggle = (obj: any) => {
+      if (selectedIds.has(obj.id)) {
+        onChange(selectedList.filter((item) => (typeof item === 'string' ? item : item?.id) !== obj.id));
+      } else {
+        onChange([...selectedList, obj]);
+      }
+    };
+
+    return (
+      <div className="space-y-1 max-h-36 overflow-y-auto p-1 bg-surface-base/40 rounded border border-border-base/30">
+        {filteredAnnotations.map((obj) => (
+          <label
+            key={obj.id}
+            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-hover cursor-pointer text-xs select-none"
+          >
+            <input
+              type="checkbox"
+              checked={selectedIds.has(obj.id)}
+              onChange={() => handleToggle(obj)}
+              className="rounded border-border-base text-primary-base focus:ring-0"
+            />
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ backgroundColor: obj.color || '#3B82F6' }}
+            />
+            <span className="truncate flex-1 font-medium">{obj.name}</span>
+            <span className="text-[10px] text-text-muted uppercase font-mono">{obj.type}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  const currentId = typeof value === 'string' ? value : value?.id || '';
+
+  return (
+    <Select
+      value={currentId}
+      onChange={(e) => {
+        const found = annotationObjects[e.target.value];
+        onChange(found || null);
+      }}
+      className="h-8 text-xs w-full"
+    >
+      <option value="">-- アノテーションを選択 --</option>
+      {filteredAnnotations.map((obj) => (
+        <option key={obj.id} value={obj.id}>
+          {obj.name} ({obj.type})
+        </option>
+      ))}
+    </Select>
+  );
+}
+
+interface CustomLayerSelectFormProps {
+  input: PluginInput;
+  value: any;
+  onChange: (val: any) => void;
+}
+
+function CustomLayerSelectForm({ input, value, onChange }: CustomLayerSelectFormProps) {
+  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const isMultiple = !!input.multiple;
+  const [selectedLayerToAdd, setSelectedLayerToAdd] = useState<string>('');
+
+  if (customLayers.length === 0) {
+    return (
+      <div className="text-xs text-text-muted/60 italic py-1 text-center">
+        利用可能なカスタムレイヤーがありません
+      </div>
+    );
+  }
+
+  if (isMultiple) {
+    const selectedList: any[] = Array.isArray(value) ? value : [];
+    const selectedIds = selectedList.map((item) => (typeof item === 'string' ? item : item?.id)).filter(Boolean);
+
+    const handleAdd = () => {
+      if (!selectedLayerToAdd) return;
+      const targetLayer = customLayers.find((l) => l.id === selectedLayerToAdd);
+      if (targetLayer && !selectedIds.includes(targetLayer.id)) {
+        onChange([...selectedList, targetLayer]);
+        setSelectedLayerToAdd('');
+      }
+    };
+
+    const handleRemove = (idToRemove: string) => {
+      onChange(selectedList.filter((item) => (typeof item === 'string' ? item : item?.id) !== idToRemove));
+    };
+
+    const availableToAdd = customLayers.filter((l) => !selectedIds.includes(l.id));
+
+    return (
+      <div className="space-y-2">
+        {/* Selected custom layers list */}
+        <div className="space-y-1 max-h-36 overflow-y-auto p-1 bg-surface-base/40 rounded border border-border-base/30">
+          {selectedList.length === 0 ? (
+            <div className="text-xs text-text-muted/50 italic py-1 text-center">
+              レイヤーが選択されていません
+            </div>
+          ) : (
+            selectedList.map((item) => {
+              const layerId = typeof item === 'string' ? item : item?.id;
+              const layer = customLayers.find((l) => l.id === layerId) || item;
+              if (!layer) return null;
+
+              return (
+                <div
+                  key={layerId}
+                  className="flex items-center justify-between gap-2 px-2 py-1 bg-surface-base rounded border border-border-base/40 text-xs"
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <Layers size={12} className="text-primary-base shrink-0" />
+                    <span className="truncate font-medium">{layer.name || 'Unnamed Layer'}</span>
+                    <span className="text-[10px] text-text-muted uppercase font-mono px-1 py-0.5 rounded bg-surface-hover">
+                      {layer.type}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(layerId)}
+                    className="text-text-muted hover:text-red-400 p-0.5 rounded transition-colors"
+                    title="削除"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Add layer dropdown + button */}
+        {availableToAdd.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={selectedLayerToAdd}
+              onChange={(e) => setSelectedLayerToAdd(e.target.value)}
+              className="h-7 text-xs flex-1"
+            >
+              <option value="">-- レイヤーを選択 --</option>
+              {availableToAdd.map((layer) => (
+                <option key={layer.id} value={layer.id}>
+                  {layer.name} ({layer.type})
+                </option>
+              ))}
+            </Select>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={!selectedLayerToAdd}
+              onClick={handleAdd}
+              className="h-7 px-2 text-xs font-bold gap-1 shrink-0"
+            >
+              <Plus size={12} />
+              Add
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Single select
+  const currentId = typeof value === 'string' ? value : value?.id || '';
+
+  return (
+    <Select
+      value={currentId}
+      onChange={(e) => {
+        const found = customLayers.find((l) => l.id === e.target.value);
+        onChange(found || null);
+      }}
+      className="h-8 text-xs w-full"
+    >
+      <option value="">-- カスタムレイヤーを選択 --</option>
+      {customLayers.map((layer) => (
+        <option key={layer.id} value={layer.id}>
+          {layer.name} ({layer.type})
+        </option>
+      ))}
+    </Select>
+  );
+}
+
 

@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PluginInputEditor } from './PluginInputEditor';
+import { useAppStore } from '../../stores/appStore';
 
 describe('PluginInputEditor', () => {
   const mockOnUpdate = vi.fn();
@@ -252,6 +253,80 @@ describe('PluginInputEditor', () => {
       const updatedArg = mockOnUpdate.mock.calls[0][0];
       expect(updatedArg).toHaveLength(1);
       expect(updatedArg[0]).toMatchObject({ x: 0, y: 0 });
+    });
+
+    it('renders custom_layer single select correctly', () => {
+      const customLayerInput = {
+        id: 'layer-1',
+        name: 'target_layer',
+        label: 'Target Custom Layer',
+        type: 'custom_layer',
+      };
+
+      const mockLayers = [
+        { id: 'cl-1', name: 'Obstacle Layer', type: 'manual' },
+        { id: 'cl-2', name: 'Drivable Area', type: 'plugin' },
+      ];
+
+      // Mock useAppStore for customLayers
+      const originalState = (useAppStore as any).getState();
+      (useAppStore as any).setState({ ...originalState, customLayers: mockLayers });
+
+      render(
+        <PluginInputEditor
+          {...baseProps}
+          input={customLayerInput}
+          interactionData={mockLayers[0]}
+          mode="creation"
+          isActive={true}
+        />
+      );
+
+      expect(screen.getByText('Target Custom Layer')).toBeInTheDocument();
+      expect(screen.getByText('Obstacle Layer (manual)')).toBeInTheDocument();
+    });
+
+    it('renders custom_layer multiple list and handles add and remove', () => {
+      const customLayerMultipleInput = {
+        id: 'layers-input',
+        name: 'selected_layers',
+        label: 'Selected Custom Layers',
+        type: 'custom_layer',
+        multiple: true,
+      };
+
+      const mockLayers = [
+        { id: 'cl-1', name: 'Obstacle Layer', type: 'manual' },
+        { id: 'cl-2', name: 'Drivable Area', type: 'plugin' },
+      ];
+
+      const originalState = (useAppStore as any).getState();
+      (useAppStore as any).setState({ ...originalState, customLayers: mockLayers });
+
+      render(
+        <PluginInputEditor
+          {...baseProps}
+          input={customLayerMultipleInput}
+          interactionData={[mockLayers[0]]}
+          mode="creation"
+          isActive={true}
+        />
+      );
+
+      expect(screen.getByText('Obstacle Layer')).toBeInTheDocument();
+
+      // Test remove
+      const removeBtn = screen.getByTitle('削除');
+      fireEvent.click(removeBtn);
+      expect(mockOnUpdate).toHaveBeenCalledWith([]);
+
+      // Test select and add
+      const select = screen.getByRole('combobox');
+      fireEvent.change(select, { target: { value: 'cl-2' } });
+
+      const addBtn = screen.getByRole('button', { name: /add/i });
+      fireEvent.click(addBtn);
+      expect(mockOnUpdate).toHaveBeenCalledWith([mockLayers[0], mockLayers[1]]);
     });
   });
 });

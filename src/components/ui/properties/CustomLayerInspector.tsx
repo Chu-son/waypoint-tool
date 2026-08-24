@@ -15,7 +15,7 @@ import { PluginInputEditor } from "../PluginInputEditor";
 import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Bookmark } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { v4 as uuidv4 } from "uuid";
-import { prepareLayersForExport } from "../../../utils/mapRasterize";
+import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from "../../../utils/mapRasterize";
 
 export function CustomLayerInspector() {
   const customLayers = useAppStore((state) => state.customLayers) || [];
@@ -202,9 +202,21 @@ export function CustomLayerInspector() {
 
           const layersToPass = await prepareLayersForExport(mapLayers, otherCustomLayers);
 
+          const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+          const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
+            activePlugin.manifest.inputs,
+            contextData.interaction_data || {},
+            customLayers,
+            baseRes
+          );
+          const finalContextData = {
+            ...contextData,
+            interaction_data: enrichedInteractionData,
+          };
+
           const result = await BackendAPI.runPlugin(
             activePlugin,
-            contextData,
+            finalContextData,
             pythonPathToUse,
             layersToPass
           );
