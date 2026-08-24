@@ -33,6 +33,11 @@ my_plugin/
     - `allow_yaw`: 各点に向き（Yaw）を持たせるか（デフォルト `false`）。
   - `type: "rectangle"`: 範囲をドラッグで指定。
   - `type: "waypoint"`: 既存のウェイポイントを選択。
+  - `type: "annotation"`: プロジェクト内の参照用アノテーションオブジェクトを選択。
+    - `object_type`: 受け付けたいアノテーションの種類（`"point"`, `"oriented_point"`, `"line"`, `"rect"`, `"circle"`, `"any"`。デフォルト `"any"`）。
+    - `multiple`: 複数選択を許可するか（`true` の場合は配列、`false` の場合は単一オブジェクト）。
+  - `type: "custom_layer"`: プロジェクト内のカスタムレイヤー（手動描画またはプラグイン生成レイヤー）を選択。
+    - `multiple`: 複数選択を許可するか（`true` の場合はプルダウン選択＋追加リストUI、`false` の場合は単一選択プルダウン）。
 - `properties`: UI に表示されるパラメータ（数値、文字列、真偽値等）。
   - `interaction_hints`: キャンバス上にプレビュー図形を描画するためのヒント情報。
 - `needs`: アプリ本体から追加情報（マップや選択中のポイントなど）を要求する場合に指定。現在サポートされている値は以下の通りです：
@@ -150,10 +155,14 @@ world_x, world_y = grid.grid_to_world(row, col)
 - `Point(x, y, yaw)`: 座標と向き。`to_world()` メソッドで変換可能。
 - `Line(p1, p2)`: 線分。長さの取得や交点判定が可能。
 - `Rectangle(center, width, height, yaw)`: 矩形。頂点の取得や点の内包判定が可能。
+- `Circle(center, radius)`: 円形。点の内包判定が可能。
 - `Ray(origin, yaw, bidirectional)`: 仮想無限線。線分や矩形との交点取得に便利。
 - `RobotFootprint(type, radius, length, width, offset_x, offset_y, points)`: ロボットの形状・寸法。
 - `OccupancyGrid(data)`: 占有格子マップクラス（ROS Nav2互換）。
 - `find_dijkstra_path(grid, start_pos, goal_pos, safety_margin, step_size)`: 障害物回避ダイクストラ / A*探索ヘルパー。
+- `self.get_annotation(context, input_id)` / `self.get_annotations(context, input_id)`: アノテーション入力オブジェクトの取得ヘルパー。
+- `self.get_custom_layer(context, input_id)` / `self.get_custom_layers(context, input_id)`: カスタムレイヤー入力データの取得ヘルパー。
+- `self.get_custom_layer_grid(custom_layer)`: カスタムレイヤーに占有格子データが含まれる場合に `OccupancyGrid` を返すヘルパー。
 - `encode_rgba_to_png_base64(width, height, rgba_bytes)`: 純粋Pythonによる高速PNG Base64エンコーダー。
 
 ## 6. プラグインの登録
