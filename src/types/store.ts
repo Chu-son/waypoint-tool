@@ -101,7 +101,7 @@ export type RobotFootprint = CircularFootprint | RectangularFootprint | PolygonF
 
 // --- Plugin Architecture Types ---
 export type PluginCategory = 'waypoint_generator' | 'map_layer_generator' | 'path_calculator';
-export type PluginInputType = 'point' | 'points' | 'point_list' | 'rectangle' | 'waypoint';
+export type PluginInputType = 'point' | 'points' | 'point_list' | 'rectangle' | 'waypoint' | 'annotation' | 'custom_layer';
 
 export interface PluginInteractionPointItem {
   id: string;
@@ -120,6 +120,8 @@ export type PluginInputDef = {
   label: string; // The display label
   description?: string;
   type: PluginInputType | 'boolean' | 'integer' | 'float' | 'string';
+  object_type?: 'point' | 'oriented_point' | 'line' | 'rect' | 'circle' | 'any';
+  multiple?: boolean;
   min_points?: number;
   max_points?: number;
   allow_yaw?: boolean;
@@ -230,7 +232,62 @@ export type CustomLayer = ManualCustomLayer | PluginCustomLayer;
 // Aliases for type compatibility if needed
 export type EditLayer = ManualCustomLayer;
 export type GeneratedMapLayer = PluginCustomLayer;
-// ---------------------------------
+// --- Annotation Objects Types ---
+export type AnnotationType = 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
+
+export interface AnnotationBase {
+  id: string;
+  name: string;
+  type: AnnotationType;
+  visible: boolean;
+  labelVisible: boolean;
+  color?: string; // HEX color (e.g. '#3B82F6')
+}
+
+export interface PointAnnotation extends AnnotationBase {
+  type: 'point';
+  x: number;
+  y: number;
+}
+
+export interface OrientedPointAnnotation extends AnnotationBase {
+  type: 'oriented_point';
+  x: number;
+  y: number;
+  yaw: number; // radians
+}
+
+export interface LineAnnotation extends AnnotationBase {
+  type: 'line';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export interface RectAnnotation extends AnnotationBase {
+  type: 'rect';
+  cx: number;
+  cy: number;
+  width: number;
+  height: number;
+  angle: number; // radians
+}
+
+export interface CircleAnnotation extends AnnotationBase {
+  type: 'circle';
+  cx: number;
+  cy: number;
+  radius: number;
+}
+
+export type AnnotationObject =
+  | PointAnnotation
+  | OrientedPointAnnotation
+  | LineAnnotation
+  | RectAnnotation
+  | CircleAnnotation;
+// --------------------------------
 
 export type ObjectNode = WaypointNode;
 
@@ -282,6 +339,7 @@ export interface ProjectData {
   nodes: Record<string, ObjectNode>;
   map_layers?: ProjectMapLayer[];
   custom_layers?: CustomLayer[];
+  annotation_objects?: AnnotationObject[];
   edit_layers?: any[]; // Legacy
   generated_layers?: any[]; // Legacy
   robot_footprint?: RobotFootprint;

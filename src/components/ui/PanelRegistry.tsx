@@ -1,12 +1,13 @@
 import { ReactNode } from 'react';
 import { PanelTab } from './PanelContainer';
 import { CustomUiPanelTabDef } from '../../types/customUi';
-import { WaypointTree } from './WaypointTree';
+import { ObjectsPanel } from './ObjectsPanel';
 import { PluginListPanel } from './PluginListPanel';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
 import { PluginParamsPanel } from './PluginParamsPanel';
 import { CustomLayerInspector } from './properties/CustomLayerInspector';
+import { AnnotationInspector } from './properties/AnnotationInspector';
 import { WorkflowPanel } from './WorkflowPanel';
 import { CustomHtmlPanel } from './CustomHtmlPanel';
 import { Box, Puzzle, Layers, Settings2, ListOrdered, Globe, Code } from 'lucide-react';
@@ -26,6 +27,7 @@ export function useInspectorPanelComponent() {
   const activeTool = useAppStore((state) => state.activeTool);
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const activePluginId = useAppStore((state) => state.activePluginId);
+  const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds) || [];
   const plugins = useAppStore((state) => state.plugins) || {};
   const activePlugin = activePluginId ? plugins[activePluginId] : null;
 
@@ -42,7 +44,12 @@ export function useInspectorPanelComponent() {
     return <CustomLayerInspector />;
   }
 
-  // 3. Default to properties panel (selected waypoint nodes or project settings)
+  // 3. If an annotation object is selected
+  if (selectedAnnotationIds.length > 0) {
+    return <AnnotationInspector />;
+  }
+
+  // 4. Default to properties panel (selected waypoint nodes or project settings)
   return <PropertiesPanel />;
 }
 
@@ -61,9 +68,9 @@ export function resolvePanelTabs(
         case 'project':
           return {
             id: 'project',
-            title: tab.title || 'Waypoints',
+            title: tab.title || 'Objects',
             icon: resolveLucideIcon(tab.icon, <Box size={14} />),
-            component: <WaypointTree />,
+            component: <ObjectsPanel />,
           };
         case 'plugins':
           return {

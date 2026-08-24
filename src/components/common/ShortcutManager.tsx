@@ -3,7 +3,7 @@ import { useAppStore } from "../../stores/appStore";
 
 export function ShortcutManager() {
   const {
-    selectedNodeIds,
+    selectedNodeIds = [],
     activeTool,
     removeNodes,
     selectAllNodes,
@@ -19,6 +19,9 @@ export function ShortcutManager() {
     removeEditObject,
     setSelectedEditObjectId,
     pushHistorySnapshot,
+    selectedAnnotationIds = [],
+    removeAnnotationObjects,
+    clearAnnotationSelection,
   } = useAppStore();
 
   useEffect(() => {
@@ -34,11 +37,13 @@ export function ShortcutManager() {
       // Basic Actions
       if (e.key === "Delete" || e.key === "Backspace") {
         if (selectedEditObjectId && activeCustomLayerId) {
-          removeEditObject(activeCustomLayerId, selectedEditObjectId);
+          removeEditObject?.(activeCustomLayerId, selectedEditObjectId);
           if (setSelectedEditObjectId) setSelectedEditObjectId(null);
           if (pushHistorySnapshot) pushHistorySnapshot();
+        } else if (selectedAnnotationIds.length > 0) {
+          removeAnnotationObjects?.(selectedAnnotationIds);
         } else if (selectedNodeIds.length > 0) {
-          removeNodes(selectedNodeIds);
+          removeNodes?.(selectedNodeIds);
         }
       }
 
@@ -52,8 +57,12 @@ export function ShortcutManager() {
         if (activeCustomLayerId) {
           useAppStore.setState?.({ activeCustomLayerId: null });
         }
+        if (selectedAnnotationIds.length > 0) {
+          clearAnnotationSelection?.();
+        }
         useAppStore.setState?.({
           isMapEditMode: false,
+          isAnnotationEditMode: false,
           activeTool: "select",
           activePluginId: null,
           pluginInteractionData: {},

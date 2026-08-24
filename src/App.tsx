@@ -2,7 +2,7 @@ import "./App.css";
 import { useEffect, useCallback, useMemo } from "react";
 import { ToolPanel } from "./components/ui/ToolPanel";
 import { TopMenu } from "./components/ui/TopMenu";
-import { WaypointTree } from "./components/ui/WaypointTree";
+import { ObjectsPanel } from "./components/ui/ObjectsPanel";
 import { LayerPanel } from "./components/ui/LayerPanel";
 import { PluginListPanel } from "./components/ui/PluginListPanel";
 import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
@@ -14,6 +14,7 @@ import { WelcomeModal } from "./components/ui/WelcomeModal";
 import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
 import { MapEditOverlay } from "./components/ui/MapEditOverlay";
+import { AnnotationEditOverlay } from "./components/ui/AnnotationEditOverlay";
 import { LoadingOverlay } from "./components/ui/common/LoadingOverlay";
 import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoadingBadge";
 import { ShortcutManager } from "./components/common/ShortcutManager";
@@ -259,9 +260,9 @@ function App() {
   const defaultLeftPanels: PanelTab[] = useMemo(() => [
     {
       id: "project",
-      title: "Waypoints",
+      title: "Objects",
       icon: <Box size={14} />,
-      component: <WaypointTree />
+      component: <ObjectsPanel />
     },
     {
       id: "plugins",
@@ -338,6 +339,7 @@ function App() {
         <div className="flex-1 bg-surface-base relative overflow-hidden flex flex-col">
           <ElementCopyOverlay />
           <MapEditOverlay />
+          <AnnotationEditOverlay />
           <BackgroundLoadingBadge />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">

@@ -59,7 +59,7 @@ describe('App Integration', () => {
     render(<App />);
 
     // Validate main structural elements are mounted
-    expect(screen.getByText('Waypoints')).toBeInTheDocument();
+    expect(screen.getByText('Objects')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByTestId('mock-map-canvas')).toBeInTheDocument();
     
@@ -136,7 +136,7 @@ describe('App Integration', () => {
 
   it('renders the Project panel', async () => {
     render(<App />);
-    expect(screen.getByText('Waypoints')).toBeInTheDocument();
+    expect(screen.getByText('Objects')).toBeInTheDocument();
   });
 
   it('switches between Inspector and Layers tabs', async () => {

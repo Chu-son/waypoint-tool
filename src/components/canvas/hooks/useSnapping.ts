@@ -47,6 +47,55 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
         });
       }
     });
+
+    // Also include visible annotation objects as snap targets
+    const annos = currentState.annotationObjects || {};
+    const annoOrder = currentState.annotationOrder || [];
+    annoOrder.forEach((annoId) => {
+      const a = annos[annoId];
+      if (!a || !a.visible) return;
+      if (a.type === 'point') {
+        renderableNodes.push({
+          id: `anno_${a.id}`,
+          node: { id: a.id, type: 'manual', transform: { x: a.x, y: a.y, qx: 0, qy: 0, qz: 0, qw: 1 } },
+          parentIsGenerator: false,
+          globalIndex: globalIdx++,
+        });
+      } else if (a.type === 'oriented_point') {
+        const yaw = a.yaw || 0;
+        renderableNodes.push({
+          id: `anno_${a.id}`,
+          node: {
+            id: a.id,
+            type: 'manual',
+            transform: { x: a.x, y: a.y, qx: 0, qy: 0, qz: Math.sin(yaw / 2), qw: Math.cos(yaw / 2) },
+          },
+          parentIsGenerator: false,
+          globalIndex: globalIdx++,
+        });
+      } else if (a.type === 'line') {
+        renderableNodes.push({
+          id: `anno_${a.id}_start`,
+          node: { id: `${a.id}_start`, type: 'manual', transform: { x: a.x1, y: a.y1, qx: 0, qy: 0, qz: 0, qw: 1 } },
+          parentIsGenerator: false,
+          globalIndex: globalIdx++,
+        });
+        renderableNodes.push({
+          id: `anno_${a.id}_end`,
+          node: { id: `${a.id}_end`, type: 'manual', transform: { x: a.x2, y: a.y2, qx: 0, qy: 0, qz: 0, qw: 1 } },
+          parentIsGenerator: false,
+          globalIndex: globalIdx++,
+        });
+      } else if (a.type === 'rect' || a.type === 'circle') {
+        renderableNodes.push({
+          id: `anno_${a.id}_center`,
+          node: { id: `${a.id}_center`, type: 'manual', transform: { x: a.cx, y: a.cy, qx: 0, qy: 0, qz: 0, qw: 1 } },
+          parentIsGenerator: false,
+          globalIndex: globalIdx++,
+        });
+      }
+    });
+
     return renderableNodes;
   }, []);
 

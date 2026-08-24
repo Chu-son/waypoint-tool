@@ -13,10 +13,12 @@ import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
 import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
+import { AnnotationLayer } from './layers/AnnotationLayer';
 import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
 import { useMapEditCircle } from './hooks/useMapEditCircle';
 import { useMapEditFreehand } from './hooks/useMapEditFreehand';
+import { useAnnotationEdit } from './hooks/useAnnotationEdit';
 import { prepareLayersForExport } from '../../utils/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
 
@@ -358,6 +360,60 @@ export function MapCanvas() {
     handleFreehandDrawEnd,
   } = useMapEditFreehand();
 
+  // Annotation Edit hooks & state
+  const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
+  const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
+  const selectAnnotationObjects = useAppStore((state) => state.selectAnnotationObjects);
+  const clearAnnotationSelection = useAppStore((state) => state.clearAnnotationSelection);
+
+  const {
+    annotationPreview,
+    handleAnnotationDrawStart,
+    handleAnnotationDrawMove,
+    handleAnnotationDrawEnd,
+    handleStartMoveAnnotation,
+    handleMoveAnnotationMove,
+    handleMoveAnnotationEnd,
+    handleStartTransformAnnotation,
+    handleTransformAnnotationMove,
+    handleTransformAnnotationEnd,
+  } = useAnnotationEdit();
+
+  const handleAnnotationPointerDown = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, id: string) => {
+      if (useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      selectAnnotationObjects([id], (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey);
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect && e.nativeEvent instanceof PointerEvent) {
+        const mouseX = e.nativeEvent.clientX - rect.left;
+        const mouseY = e.nativeEvent.clientY - rect.top;
+        const worldPos = screenToWorld(mouseX, mouseY);
+        handleStartMoveAnnotation(id, worldPos);
+        interactionMode.current = 'move_annotation' as any;
+        containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+    [selectAnnotationObjects, screenToWorld, handleStartMoveAnnotation]
+  );
+
+  const handleAnnotationHandlePointerDown = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, id: string, handleType: string) => {
+      if (useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect && e.nativeEvent instanceof PointerEvent) {
+        const mouseX = e.nativeEvent.clientX - rect.left;
+        const mouseY = e.nativeEvent.clientY - rect.top;
+        const worldPos = screenToWorld(mouseX, mouseY);
+        handleStartTransformAnnotation(id, handleType, worldPos);
+        interactionMode.current = 'transform_annotation' as any;
+        containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+    [screenToWorld, handleStartTransformAnnotation]
+  );
+
   const movingEditObject = useRef<{
     layerId: string;
     objId: string;
@@ -596,6 +652,35 @@ export function MapCanvas() {
         }
         e.currentTarget.setPointerCapture(e.pointerId);
         return;
+      }
+      return;
+    }
+
+    if (isAnnotationEditMode) {
+      if (e.button === 1) {
+        interactionMode.current = 'pan_map';
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+        return;
+      }
+      if (e.button === 0 && interactionMode.current === 'none') {
+        const rect = containerRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const worldPos = screenToWorld(mouseX, mouseY);
+
+        if (activeAnnotationSubTool !== 'select') {
+          handleAnnotationDrawStart(worldPos);
+          interactionMode.current = 'draw_annotation' as any;
+          e.currentTarget.setPointerCapture(e.pointerId);
+          return;
+        } else {
+          interactionMode.current = 'pan_map';
+          lastMousePos.current = { x: e.clientX, y: e.clientY };
+          e.currentTarget.setPointerCapture(e.pointerId);
+          clearAnnotationSelection();
+          return;
+        }
       }
       return;
     }
@@ -1039,6 +1124,31 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === ('draw_annotation' as any)) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const curWorldPos = screenToWorld(mouseX, mouseY);
+      handleAnnotationDrawMove(curWorldPos);
+      return;
+    }
+    if (interactionMode.current === ('move_annotation' as any)) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const curWorldPos = screenToWorld(mouseX, mouseY);
+      handleMoveAnnotationMove(curWorldPos);
+      return;
+    }
+    if (interactionMode.current === ('transform_annotation' as any)) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const curWorldPos = screenToWorld(mouseX, mouseY);
+      handleTransformAnnotationMove(curWorldPos);
+      return;
+    }
+
     if (interactionMode.current === 'pan_map') {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
@@ -1358,6 +1468,31 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === ('draw_annotation' as any)) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      const mouseX = rect ? e.clientX - rect.left : e.clientX;
+      const mouseY = rect ? e.clientY - rect.top : e.clientY;
+      const worldPos = screenToWorld(mouseX, mouseY);
+      handleAnnotationDrawEnd(worldPos);
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      interactionMode.current = 'none';
+      return;
+    }
+
+    if (interactionMode.current === ('move_annotation' as any)) {
+      handleMoveAnnotationEnd();
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      interactionMode.current = 'none';
+      return;
+    }
+
+    if (interactionMode.current === ('transform_annotation' as any)) {
+      handleTransformAnnotationEnd();
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      interactionMode.current = 'none';
+      return;
+    }
+
     if (interactionMode.current !== 'none') {
       if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
         useAppStore.getState().endHistoryTransaction();
@@ -1444,7 +1579,11 @@ export function MapCanvas() {
   return (
     <div 
       ref={containerRef}
-      className={`absolute inset-0 w-full h-full ${activeTool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
+      className={`absolute inset-0 w-full h-full ${
+        (isAnnotationEditMode && activeAnnotationSubTool !== 'select') || isMapEditMode || activeTool !== 'select'
+          ? 'cursor-crosshair'
+          : 'cursor-grab active:cursor-grabbing'
+      }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1572,6 +1711,15 @@ export function MapCanvas() {
 
           {/* Render Robot Footprints (Selected waypoints always, all waypoints if toggled) */}
           <FootprintLayer scale={scale} />
+
+          {/* Render Annotation Layer */}
+          <AnnotationLayer
+            scale={scale}
+            textStyle={textStyle}
+            previewObject={annotationPreview}
+            onAnnotationPointerDown={handleAnnotationPointerDown}
+            onAnnotationHandlePointerDown={handleAnnotationHandlePointerDown}
+          />
 
           {/* Render Waypoints (manual root nodes and children of generator nodes) */}
           <WaypointLayer 

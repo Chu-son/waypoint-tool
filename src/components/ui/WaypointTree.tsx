@@ -142,10 +142,34 @@ export function WaypointTree() {
     }
   };
 
+  const totalWaypointsCount = useMemo(() => {
+    let count = 0;
+    rootNodeIds.forEach((id) => {
+      const node = nodes[id];
+      if (!node) return;
+      if (node.type === 'manual') {
+        count += 1;
+      } else if (node.type === 'generator') {
+        count += node.children_ids?.length || 0;
+      }
+    });
+    return count;
+  }, [rootNodeIds, nodes]);
+
   let globalIndex = 0;
 
   return (
-    <div className="flex-1 overflow-y-auto w-full relative">
+    <div className="w-full flex flex-col space-y-2 relative">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-text-base uppercase tracking-wider">Waypoints</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-hover text-text-muted font-bold">
+            {totalWaypointsCount}
+          </span>
+        </div>
+      </div>
+
       {rootNodeIds.length === 0 && insertionIndex === -1 && renderItems.length === 1 ? (
         <div className="text-sm text-slate-500 italic p-4 text-center">
           No items yet. Drag to create points on the map.

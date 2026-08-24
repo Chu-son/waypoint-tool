@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { WaypointNode, CustomLayer } from '../../types/store';
+import { WaypointNode, CustomLayer, AnnotationObject } from '../../types/store';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -10,6 +10,8 @@ export type HistorySnapshot = {
   selectedNodeIds: string[];
   anchorNodeId: string | null;
   customLayers: CustomLayer[];
+  annotationObjects: Record<string, AnnotationObject>;
+  annotationOrder: string[];
 };
 
 export type HistorySlice = {
@@ -32,6 +34,8 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   selectedNodeIds: state.selectedNodeIds,
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
+  annotationObjects: structuredClone(state.annotationObjects ?? {}),
+  annotationOrder: [...(state.annotationOrder ?? [])],
 });
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => ({
@@ -88,6 +92,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       selectedNodeIds: snapshot.selectedNodeIds,
       anchorNodeId: snapshot.anchorNodeId,
       customLayers: snapshot.customLayers,
+      annotationObjects: snapshot.annotationObjects ?? {},
+      annotationOrder: snapshot.annotationOrder ?? [],
       isDirty: true,
     };
   }),
@@ -106,6 +112,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       selectedNodeIds: snapshot.selectedNodeIds,
       anchorNodeId: snapshot.anchorNodeId,
       customLayers: snapshot.customLayers,
+      annotationObjects: snapshot.annotationObjects ?? {},
+      annotationOrder: snapshot.annotationOrder ?? [],
       isDirty: true,
     };
   }),

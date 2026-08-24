@@ -9,8 +9,9 @@ import { ProjectSlice, createProjectSlice } from './slices/projectSlice';
 import { HistorySlice, createHistorySlice } from './slices/historySlice';
 import { CustomUISlice, createCustomUISlice } from './slices/customUiSlice';
 import { WorkflowSlice, createWorkflowSlice } from './slices/workflowSlice';
+import { AnnotationSlice, createAnnotationSlice } from './slices/annotationSlice';
 
-export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice;
+export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -23,6 +24,7 @@ export const useAppStore = create<AppState>()(
       ...createHistorySlice(set, get, api),
       ...createCustomUISlice(set, get, api),
       ...createWorkflowSlice(set, get, api),
+      ...createAnnotationSlice(set, get, api),
     }),
     {
       name: 'waypoint-tool-storage',
