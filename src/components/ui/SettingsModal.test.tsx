@@ -28,6 +28,7 @@ describe('SettingsModal UI', () => {
       plugins: {},
       pluginSettings: [],
       defaultMapOpacity: 0.8,
+      robotFootprint: { type: 'circular', radius: 0.3 },
       defaultExportFormats: [
         { id: '__default_yaml__', name: 'YAML Document', extension: 'yaml', suffix: '_yaml', enabled: true },
         { id: '__default_json__', name: 'JSON Document', extension: 'json', suffix: '_json', enabled: true },
@@ -318,6 +319,47 @@ describe('SettingsModal UI', () => {
     await waitFor(() => {
       const state = useAppStore.getState();
       expect(state.robotFootprint.type).toBe('rectangular');
+    });
+  });
+
+  it('allows clearing and editing numeric inputs in Robot Footprint tab', async () => {
+    vi.stubGlobal('alert', vi.fn());
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const robotTab = screen.getByText('Robot Footprint');
+    act(() => {
+      robotTab.click();
+    });
+
+    // Default is circular footprint with radius
+    const radiusInput = screen.getByPlaceholderText('0.3') as HTMLInputElement;
+    expect(radiusInput).toBeInTheDocument();
+
+    // Clear value and re-type
+    act(() => {
+      fireEvent.focus(radiusInput);
+      fireEvent.change(radiusInput, { target: { value: '' } });
+    });
+    expect(radiusInput.value).toBe('');
+
+    act(() => {
+      fireEvent.change(radiusInput, { target: { value: '0.45' } });
+      fireEvent.blur(radiusInput);
+    });
+    expect(radiusInput.value).toBe('0.45');
+
+    // Apply and verify
+    const applyBtn = screen.getByRole('button', { name: /Apply/i });
+    act(() => {
+      applyBtn.click();
+    });
+
+    await waitFor(() => {
+      const state = useAppStore.getState();
+      expect(state.robotFootprint.type).toBe('circular');
+      if (state.robotFootprint.type === 'circular') {
+        expect(state.robotFootprint.radius).toBe(0.45);
+      }
     });
   });
 });

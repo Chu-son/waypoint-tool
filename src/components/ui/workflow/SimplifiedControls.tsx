@@ -5,6 +5,10 @@ import { executeWorkflowAction } from '../../../utils/workflowActions';
 import { Button } from '../common/Button';
 import { FormField } from '../common/FormField';
 import { ToggleSwitch } from '../common/ToggleSwitch';
+import { Slider } from '../common/Slider';
+import { Select } from '../common/Select';
+import { FieldLabel } from '../common/FieldLabel';
+import { NumericInput } from '../NumericInput';
 
 interface SimplifiedControlsProps {
   controls?: WorkflowControl[];
@@ -63,21 +67,14 @@ export function SimplifiedControls({
 
             if (c.type === 'slider') {
               return (
-                <FormField key={idx} label={c.label}>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={c.min ?? 0}
-                      max={c.max ?? 100}
-                      step={c.step ?? 1}
-                      value={val ?? c.default ?? 0}
-                      onChange={(e) => handleControlChange(c, parseFloat(e.target.value))}
-                      className="w-full accent-primary-base cursor-pointer"
-                    />
-                    <span className="text-xs font-mono font-bold text-primary-base w-12 text-right">
-                      {val ?? c.default ?? 0}
-                    </span>
-                  </div>
+                <FormField key={idx} label={c.label} labelRight={String(val ?? c.default ?? 0)}>
+                  <Slider
+                    min={c.min ?? 0}
+                    max={c.max ?? 100}
+                    step={c.step ?? 1}
+                    value={val ?? c.default ?? 0}
+                    onChange={(e) => handleControlChange(c, parseFloat(e.target.value))}
+                  />
                 </FormField>
               );
             }
@@ -85,17 +82,17 @@ export function SimplifiedControls({
             if (c.type === 'select') {
               return (
                 <FormField key={idx} label={c.label}>
-                  <select
+                  <Select
                     value={val ?? c.default}
                     onChange={(e) => handleControlChange(c, e.target.value)}
-                    className="w-full rounded border border-border-base bg-surface-base px-3 py-2 text-sm text-text-base outline-none"
+                    className="h-10 text-sm"
                   >
                     {c.options?.map((opt, oIdx) => (
                       <option key={oIdx} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </FormField>
               );
             }
@@ -115,14 +112,13 @@ export function SimplifiedControls({
             if (c.type === 'number') {
               return (
                 <FormField key={idx} label={c.label}>
-                  <input
-                    type="number"
+                  <NumericInput
                     min={c.min}
                     max={c.max}
                     step={c.step ?? 1}
                     value={val ?? c.default ?? 0}
-                    onChange={(e) => handleControlChange(c, parseFloat(e.target.value))}
-                    className="w-full rounded border border-border-base bg-surface-base px-3 py-2 text-sm text-text-base outline-none"
+                    onChange={(newVal) => handleControlChange(c, newVal)}
+                    className="h-10 text-sm font-mono"
                   />
                 </FormField>
               );
@@ -136,51 +132,44 @@ export function SimplifiedControls({
       {/* Simplified Plugin Parameters */}
       {simplifiedParams && simplifiedParams.length > 0 && (
         <div className="space-y-3 bg-surface-panel/40 p-3 rounded-lg border border-border-base/40">
-          <div className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
+          <FieldLabel>
             {pluginTarget ? `パラメータ設定 (${pluginTarget})` : 'パラメータ設定'}
-          </div>
+          </FieldLabel>
           {simplifiedParams.map((p, idx) => {
             const currentVal = pluginProperties[p.paramKey] ?? p.default ?? p.options?.[0]?.value;
 
             if (p.type === 'select') {
               return (
                 <FormField key={idx} label={p.label}>
-                  <select
+                  <Select
                     value={currentVal}
                     onChange={(e) => {
                       const raw = e.target.value;
                       const num = Number(raw);
                       handleParamChange(p.paramKey, isNaN(num) ? raw : num);
                     }}
-                    className="w-full rounded border border-border-base bg-surface-base px-3 py-1.5 text-xs text-text-base outline-none"
+                    className="h-8 text-xs"
                   >
                     {p.options?.map((opt, oIdx) => (
                       <option key={oIdx} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </FormField>
               );
             }
 
             if (p.type === 'slider') {
               return (
-                <FormField key={idx} label={p.label}>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={p.min ?? 0}
-                      max={p.max ?? 100}
-                      step={p.step ?? 1}
-                      value={currentVal ?? p.min ?? 0}
-                      onChange={(e) => handleParamChange(p.paramKey, parseFloat(e.target.value))}
-                      className="w-full accent-primary-base cursor-pointer"
-                    />
-                    <span className="text-xs font-mono font-bold text-primary-base w-12 text-right">
-                      {currentVal}
-                    </span>
-                  </div>
+                <FormField key={idx} label={p.label} labelRight={String(currentVal ?? p.min ?? 0)}>
+                  <Slider
+                    min={p.min ?? 0}
+                    max={p.max ?? 100}
+                    step={p.step ?? 1}
+                    value={currentVal ?? p.min ?? 0}
+                    onChange={(e) => handleParamChange(p.paramKey, parseFloat(e.target.value))}
+                  />
                 </FormField>
               );
             }

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { Copy, Loader2 } from 'lucide-react';
+import { Slider } from './common/Slider';
 
 export const StatusBar: React.FC = () => {
   const cursorPosition = useAppStore(state => state.cursorPosition);
@@ -81,19 +82,17 @@ export const StatusBar: React.FC = () => {
               <span className="w-2 h-2 rounded bg-purple-500 inline-block" />
               Unknown
             </span>
-            <div className="flex items-center gap-1 ml-2">
-              <span className="text-[10px] text-text-muted">Alpha:</span>
-              <input
-                type="range"
-                min="0.1"
-                max="1.0"
-                step="0.05"
+            <div className="flex items-center gap-1.5 ml-2 w-28">
+              <span className="text-[10px] text-text-muted shrink-0">Alpha:</span>
+              <Slider
+                min={0.1}
+                max={1.0}
+                step={0.05}
                 value={occupancyHighlightAlpha}
                 onChange={(e) => setOccupancyHighlightAlpha(parseFloat(e.target.value))}
-                className="w-14 h-1.5 accent-purple-400 cursor-pointer"
                 title={`Highlight Alpha: ${Math.round(occupancyHighlightAlpha * 100)}%`}
               />
-              <span className="text-[10px] font-mono">{Math.round(occupancyHighlightAlpha * 100)}%</span>
+              <span className="text-[10px] font-mono shrink-0">{Math.round(occupancyHighlightAlpha * 100)}%</span>
             </div>
           </div>
         ) : activeBgTask ? (

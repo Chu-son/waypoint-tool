@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Input } from './common/Input';
 
-interface NumericInputProps {
+export interface NumericInputProps {
   value: number;
   onChange: (value: number) => void;
   step?: number | string;
+  min?: number;
+  max?: number;
   precision?: number;
   placeholder?: string;
   className?: string;
@@ -20,7 +22,19 @@ interface NumericInputProps {
  * (empty field, minus sign, trailing decimal point) without blocking input.
  * Commits the parsed value on blur or Enter.
  */
-export function NumericInput({ value, onChange, step, precision = 6, placeholder, className, disabled, onEditStart, onEditEnd }: NumericInputProps) {
+export function NumericInput({
+  value,
+  onChange,
+  step,
+  min,
+  max,
+  precision = 6,
+  placeholder,
+  className,
+  disabled,
+  onEditStart,
+  onEditEnd,
+}: NumericInputProps) {
   const [text, setText] = useState(() => formatNum(value, precision));
   const [isFocused, setIsFocused] = useState(false);
 
@@ -32,15 +46,17 @@ export function NumericInput({ value, onChange, step, precision = 6, placeholder
   }, [value, precision, isFocused]);
 
   const commit = useCallback(() => {
-    const parsed = parseFloat(text);
+    let parsed = parseFloat(text);
     if (!isNaN(parsed)) {
+      if (min !== undefined) parsed = Math.max(min, parsed);
+      if (max !== undefined) parsed = Math.min(max, parsed);
       onChange(parsed);
       setText(formatNum(parsed, precision));
     } else {
       // Revert to the last valid value
       setText(formatNum(value, precision));
     }
-  }, [text, value, precision, onChange]);
+  }, [text, value, precision, min, max, onChange]);
 
   return (
     <Input
@@ -65,10 +81,14 @@ export function NumericInput({ value, onChange, step, precision = 6, placeholder
         // Allow empty, minus, decimal point, and any valid number fragment
         if (raw === '' || raw === '-' || raw === '.' || raw === '-.' || /^-?\d*\.?\d*$/.test(raw)) {
           setText(raw);
-          // Live-update if it's a valid number
+          // Live-update if it's a valid number and within optional bounds
           const parsed = parseFloat(raw);
           if (!isNaN(parsed)) {
-            onChange(parsed);
+            const isWithinMin = min === undefined || parsed >= min;
+            const isWithinMax = max === undefined || parsed <= max;
+            if (isWithinMin && isWithinMax) {
+              onChange(parsed);
+            }
           }
         }
       }}

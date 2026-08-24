@@ -3,6 +3,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { RobotFootprint, CircularFootprint, RectangularFootprint, PolygonFootprint } from "../../../types/store";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
+import { NumericInput } from "../NumericInput";
 import { FormField } from "../common/FormField";
 import { FieldLabel } from "../common/FieldLabel";
 import { TabSectionHeader } from "./TabSectionHeader";
@@ -241,16 +242,13 @@ function CircularEditor({
         label="Radius (m)"
         description="The distance from the robot center to its outer circular boundary."
       >
-        <Input
-          type="number"
+        <NumericInput
           step={0.01}
           min={0.01}
           max={10.0}
+          precision={3}
           value={footprint.radius}
-          onChange={(e) => {
-            const val = parseFloat(e.target.value);
-            if (!isNaN(val) && val > 0) onChange(val);
-          }}
+          onChange={onChange}
           className="h-10 text-sm font-mono"
           placeholder="0.3"
         />
@@ -273,15 +271,12 @@ function RectangularEditor({
           label="Length (X direction / meters)"
           description="Front-to-back dimension."
         >
-          <Input
-            type="number"
+          <NumericInput
             step={0.01}
             min={0.01}
+            precision={3}
             value={footprint.length}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val) && val > 0) onChange({ length: val });
-            }}
+            onChange={(val) => onChange({ length: val })}
             className="h-9 text-xs font-mono"
             placeholder="0.65"
           />
@@ -290,15 +285,12 @@ function RectangularEditor({
           label="Width (Y direction / meters)"
           description="Left-to-right dimension."
         >
-          <Input
-            type="number"
+          <NumericInput
             step={0.01}
             min={0.01}
+            precision={3}
             value={footprint.width}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val) && val > 0) onChange({ width: val });
-            }}
+            onChange={(val) => onChange({ width: val })}
             className="h-9 text-xs font-mono"
             placeholder="0.45"
           />
@@ -310,14 +302,11 @@ function RectangularEditor({
           label="Offset X (meters)"
           description="Offset of center from robot origin."
         >
-          <Input
-            type="number"
+          <NumericInput
             step={0.01}
+            precision={3}
             value={footprint.offset_x ?? 0}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val)) onChange({ offset_x: val });
-            }}
+            onChange={(val) => onChange({ offset_x: val })}
             className="h-9 text-xs font-mono"
             placeholder="0.0"
           />
@@ -326,14 +315,11 @@ function RectangularEditor({
           label="Offset Y (meters)"
           description="Offset of center from robot origin."
         >
-          <Input
-            type="number"
+          <NumericInput
             step={0.01}
+            precision={3}
             value={footprint.offset_y ?? 0}
-            onChange={(e) => {
-              const val = parseFloat(e.target.value);
-              if (!isNaN(val)) onChange({ offset_y: val });
-            }}
+            onChange={(val) => onChange({ offset_y: val })}
             className="h-9 text-xs font-mono"
             placeholder="0.0"
           />
@@ -380,27 +366,21 @@ function PolygonEditor({
             <span className="w-6 text-[10px] text-text-muted font-mono text-center">{idx + 1}</span>
             <div className="flex-1 flex items-center gap-1">
               <span className="text-[10px] text-text-muted font-mono">X:</span>
-              <Input
-                type="number"
+              <NumericInput
                 step={0.01}
+                precision={3}
                 value={pt[0]}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) onUpdatePoint(idx, val, pt[1]);
-                }}
+                onChange={(val) => onUpdatePoint(idx, val, pt[1])}
                 className="h-7 text-xs font-mono px-2"
               />
             </div>
             <div className="flex-1 flex items-center gap-1">
               <span className="text-[10px] text-text-muted font-mono">Y:</span>
-              <Input
-                type="number"
+              <NumericInput
                 step={0.01}
+                precision={3}
                 value={pt[1]}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  if (!isNaN(val)) onUpdatePoint(idx, pt[0], val);
-                }}
+                onChange={(val) => onUpdatePoint(idx, pt[0], val)}
                 className="h-7 text-xs font-mono px-2"
               />
             </div>

@@ -6,6 +6,7 @@ import { Button } from "./common/Button";
 import { Slider } from "./common/Slider";
 import { Select } from "./common/Select";
 import { Input } from "./common/Input";
+import { NumericInput } from "./NumericInput";
 import { FieldLabel } from "./common/FieldLabel";
 import { EmptyState } from "./common/EmptyState";
 import { ProjectMapLayer, CustomLayer, ExportRegion } from "../../types/store";
@@ -898,13 +899,13 @@ function RegionCard({
           <CoordField
             label="W"
             value={region.rect.width}
-            min="0"
+            min={0}
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, width: val } })}
           />
           <CoordField
             label="H"
             value={region.rect.height}
-            min="0"
+            min={0}
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, height: val } })}
           />
         </div>
@@ -916,7 +917,7 @@ function RegionCard({
 interface CoordFieldProps {
   label: string;
   value: number;
-  min?: string;
+  min?: number;
   onChange: (val: number) => void;
 }
 
@@ -924,13 +925,13 @@ function CoordField({ label, value, min, onChange }: CoordFieldProps) {
   return (
     <div className="flex-1 flex items-center gap-1">
       <span className="text-[10px] text-text-muted font-bold uppercase">{label}</span>
-      <Input
-        type="number"
-        step="0.1"
+      <NumericInput
+        step={0.1}
         min={min}
-        value={Math.round(value * 100) / 100}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className="h-6 text-xs p-1 bg-surface-base"
+        precision={2}
+        value={value}
+        onChange={onChange}
+        className="h-6 text-xs p-1 font-mono bg-surface-base"
       />
     </div>
   );

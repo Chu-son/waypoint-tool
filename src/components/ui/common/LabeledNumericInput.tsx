@@ -8,6 +8,8 @@ export interface LabeledNumericInputProps {
   onChange: (value: number) => void;
   precision?: number;
   step?: number | string;
+  min?: number;
+  max?: number;
   disabled?: boolean;
   className?: string;
   inputClassName?: string;
@@ -21,6 +23,8 @@ export function LabeledNumericInput({
   onChange,
   precision = 2,
   step,
+  min,
+  max,
   disabled,
   className,
   inputClassName,
@@ -35,6 +39,8 @@ export function LabeledNumericInput({
         onChange={onChange}
         precision={precision}
         step={step}
+        min={min}
+        max={max}
         disabled={disabled}
         className={cn("h-7 text-[11px]", inputClassName)}
         onEditStart={onEditStart}

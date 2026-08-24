@@ -3,8 +3,11 @@ import { useAppStore } from "../../stores/appStore";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";
 import { Button } from "./common/Button";
 import { Select } from "./common/Select";
+import { Input } from "./common/Input";
+import { Slider } from "./common/Slider";
 import { Label } from "./common/Label";
 import { Checkbox } from "./common/Checkbox";
+import { NumericInput } from "./NumericInput";
 import { Route, RefreshCcw, ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
 
@@ -164,13 +167,12 @@ export function PathRouterMenu() {
                   type="color"
                   value={pathColor}
                   onChange={(e) => setPathColor(e.target.value)}
-                  className="w-7 h-7 rounded border border-border-base cursor-pointer bg-transparent p-0"
+                  className="w-7 h-7 rounded border border-border-base cursor-pointer bg-transparent p-0 shrink-0"
                 />
-                <input
-                  type="text"
+                <Input
                   value={pathColor}
                   onChange={(e) => setPathColor(e.target.value)}
-                  className="flex-1 px-2 py-1 text-xs font-mono bg-surface-base border border-border-base rounded text-text-base focus:outline-none focus:border-primary-base"
+                  className="flex-1 h-7 px-2 py-1 text-xs font-mono"
                   placeholder="#10b981"
                 />
               </div>
@@ -184,14 +186,12 @@ export function PathRouterMenu() {
                   {Math.round((pathOpacity ?? 0.7) * 100)}%
                 </span>
               </div>
-              <input
-                type="range"
+              <Slider
                 min={0.1}
                 max={1.0}
                 step={0.05}
                 value={pathOpacity ?? 0.7}
                 onChange={(e) => setPathOpacity(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-surface-base rounded-lg appearance-none cursor-pointer accent-primary-base"
               />
             </div>
 
@@ -219,19 +219,14 @@ export function PathRouterMenu() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  step="0.01"
+                <NumericInput
+                  min={0.01}
+                  step={0.01}
+                  precision={2}
                   value={syncPathWidthWithFootprint ? currentFootprintWidth : pathWidth}
                   disabled={syncPathWidthWithFootprint}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    if (!isNaN(val)) setPathWidth(val);
-                  }}
-                  className={cn(
-                    "w-full px-2.5 py-1 text-xs bg-surface-base border border-border-base rounded text-text-base focus:outline-none focus:border-primary-base",
-                    syncPathWidthWithFootprint && "opacity-60 cursor-not-allowed bg-surface-base/40"
-                  )}
+                  onChange={(val) => setPathWidth(val)}
+                  className="w-full h-7 text-xs font-mono"
                 />
                 <span className="text-xs text-text-muted font-mono">m</span>
               </div>
