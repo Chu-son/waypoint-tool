@@ -197,13 +197,15 @@ export function PluginParamsPanel() {
             ? await prepareLayersForExport(mapLayers, customLayers)
             : undefined;
 
-          // Enrich interaction data for any custom_layer inputs
+          // Enrich interaction data for any custom_layer and annotation inputs
           const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+          const annotationObjects = useAppStore.getState().annotationObjects;
           const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
             plugin.manifest.inputs,
             contextData.interaction_data || {},
             customLayers,
-            baseRes
+            baseRes,
+            annotationObjects
           );
           const finalContextData = {
             ...contextData,

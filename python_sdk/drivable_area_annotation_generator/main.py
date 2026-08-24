@@ -20,14 +20,28 @@ class DrivableAreaAnnotationGenerator(MapLayerGenerator):
         annos = self.get_annotations(context, "seed_annotations")
         seeds = []
         for a in annos:
-            if isinstance(a, dict) and "x" in a and "y" in a:
-                seeds.append(Point(float(a["x"]), float(a["y"])))
+            if isinstance(a, dict):
+                if "x" in a and "y" in a:
+                    seeds.append(Point(float(a["x"]), float(a["y"])))
+                elif "cx" in a and "cy" in a:
+                    seeds.append(Point(float(a["cx"]), float(a["cy"])))
+                elif "x1" in a and "y1" in a:
+                    seeds.append(Point(float(a["x1"]), float(a["y1"])))
+                elif "center" in a and isinstance(a["center"], dict):
+                    seeds.append(Point(float(a["center"].get("x", 0.0)), float(a["center"].get("y", 0.0))))
         
         # フォールバック: 単一アノテーション入力または interaction_point
         if not seeds:
             single = self.get_annotation(context, "seed_annotations")
-            if single and isinstance(single, dict) and "x" in single and "y" in single:
-                seeds.append(Point(float(single["x"]), float(single["y"])))
+            if single and isinstance(single, dict):
+                if "x" in single and "y" in single:
+                    seeds.append(Point(float(single["x"]), float(single["y"])))
+                elif "cx" in single and "cy" in single:
+                    seeds.append(Point(float(single["cx"]), float(single["cy"])))
+                elif "x1" in single and "y1" in single:
+                    seeds.append(Point(float(single["x1"]), float(single["y1"])))
+                elif "center" in single and isinstance(single["center"], dict):
+                    seeds.append(Point(float(single["center"].get("x", 0.0)), float(single["center"].get("y", 0.0))))
 
         if not seeds:
             seeds = [Point(0.0, 0.0)]
@@ -150,58 +164,70 @@ class DrivableAreaAnnotationGenerator(MapLayerGenerator):
         visited = set()
         queue = deque()
 
-        max_radius_sq = max_radius * max_radius
+        for seed in seeds:
+            seed_c, seed_r = grid.world_to_grid(seed.x, seed.y)
+            seed_c = max(0, min(width - 1, seed_c))
+            seed_r = max(0, min(height - 1, seed_r))
 
-        for s in seeds:
-            scol, srow = grid.world_to_grid(s.x, s.y)
-            if not is_cell_traversable(srow, scol) or blocked[srow][scol]:
-                # シードが障害物近傍にある場合、近隣3x3セルで空いているセルを探す
-                found = False
-                for dr in [-1, 0, 1]:
-                    for dc in [-1, 0, 1]:
-                        nr, nc = srow + dr, scol + dc
-                        if is_cell_traversable(nr, nc) and not blocked[nr][nc]:
-                            srow, scol = nr, nc
-                            found = True
+            # シードが障害物クリアランス内の場合、近傍の非ブロック・通行可能セルを探索
+            start_r, start_c = seed_r, seed_c
+            if blocked[seed_r][seed_c] or not is_cell_traversable(seed_r, seed_c):
+                found_free = False
+                for radius in range(1, max(clearance_cells + 2, 10)):
+                    for dr in range(-radius, radius + 1):
+                        for dc in range(-radius, radius + 1):
+                            nr, nc = seed_r + dr, seed_c + dc
+                            if 0 <= nr < height and 0 <= nc < width:
+                                if not blocked[nr][nc] and is_cell_traversable(nr, nc):
+                                    start_r, start_c = nr, nc
+                                    found_free = True
+                                    break
+                        if found_free:
                             break
-                    if found:
+                    if found_free:
                         break
 
-            if is_cell_traversable(srow, scol) and not blocked[srow][scol]:
-                if (srow, scol) not in visited:
-                    visited.add((srow, scol))
-                    queue.append((srow, scol, s.x, s.y))
-                    mask[srow][scol] = 1
+            if not blocked[start_r][start_c] and is_cell_traversable(start_r, start_c):
+                if (start_r, start_c) not in visited:
+                    queue.append((start_r, start_c, seed_r, seed_c))
+                    visited.add((start_r, start_c))
 
-        # 3. 4近傍 Multi-source BFS による走行可能領域の拡張
+        max_radius_cells_sq = (max_radius / res) ** 2
+
+        # 3. BFS Flood-fill 走行可能領域拡張 (Multi-source BFS)
         while queue:
-            r, c, seed_wx, seed_wy = queue.popleft()
-            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nr, nc = r + dr, c + dc
-                if (nr, nc) not in visited and 0 <= nr < height and 0 <= nc < width:
-                    if is_cell_traversable(nr, nc) and not blocked[nr][nc]:
-                        n_wx, n_wy = grid.grid_to_world(nc, nr)
-                        if (n_wx - seed_wx) ** 2 + (n_wy - seed_wy) ** 2 <= max_radius_sq:
-                            visited.add((nr, nc))
-                            mask[nr][nc] = 1
-                            queue.append((nr, nc, seed_wx, seed_wy))
+            curr_r, curr_c, org_r, org_c = queue.popleft()
+            mask[curr_r][curr_c] = 1
 
-        # 4. オプション: Dilation（膨張）処理
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nr, nc = curr_r + dr, curr_c + dc
+                if 0 <= nr < height and 0 <= nc < width:
+                    if (nr, nc) not in visited and not blocked[nr][nc]:
+                        # 起点シードからの距離制限チェック
+                        dist_sq = (nr - org_r) ** 2 + (nc - org_c) ** 2
+                        if dist_sq <= max_radius_cells_sq:
+                            if is_cell_traversable(nr, nc):
+                                visited.add((nr, nc))
+                                queue.append((nr, nc, org_r, org_c))
+
+        # 4. オプション：Dilation（領域膨張）
         if dilation_cells > 0:
-            dilated = [row[:] for row in mask]
-            for r in range(height):
-                for c in range(width):
-                    if mask[r][c] == 1:
+            dilated_mask = [row[:] for row in mask]
+            for r_idx in range(height):
+                for c_idx in range(width):
+                    if mask[r_idx][c_idx] == 1:
                         for dr in range(-dilation_cells, dilation_cells + 1):
                             for dc in range(-dilation_cells, dilation_cells + 1):
-                                nr, nc = r + dr, c + dc
-                                if 0 <= nr < height and 0 <= nc < width:
-                                    if is_cell_traversable(nr, nc):
-                                        dilated[nr][nc] = 1
-            mask = dilated
+                                if dr * dr + dc * dc <= dilation_cells * dilation_cells:
+                                    nr, nc = r_idx + dr, c_idx + dc
+                                    if 0 <= nr < height and 0 <= nc < width:
+                                        if not blocked[nr][nc] and is_cell_traversable(nr, nc):
+                                            dilated_mask[nr][nc] = 1
+            mask = dilated_mask
 
+        seed_desc = f"{len(seeds)} annotation seed(s)" if len(seeds) > 1 else f"annotation seed ({seeds[0].x:.2f}, {seeds[0].y:.2f})"
         self.log(
-            f"Generated drivable area layer from {len(seeds)} annotation seed(s) "
+            f"Generated drivable area layer from {seed_desc} "
             f"[clearance={clearance:.2f}m, allow_unknown={allow_unknown}, color={layer_color}, opacity={fill_opacity:.2f}]"
         )
 

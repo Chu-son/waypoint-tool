@@ -107,11 +107,13 @@ export function GeneratorNodePanel({
             : undefined;
 
           const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+          const annotationObjects = useAppStore.getState().annotationObjects;
           const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
             plugin.manifest.inputs,
             contextData.interaction_data || {},
             customLayers,
-            baseRes
+            baseRes,
+            annotationObjects
           );
           const finalContextData = {
             ...contextData,

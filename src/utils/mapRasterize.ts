@@ -315,23 +315,24 @@ export async function prepareCustomLayerPayload(
 }
 
 /**
- * Traverses plugin inputs and enriches any 'custom_layer' interaction data entries with resolved payloads.
+ * Traverses plugin inputs and enriches any 'custom_layer' and 'annotation' interaction data entries with resolved payloads.
  */
 export async function enrichInteractionDataWithCustomLayers(
   inputs: any[] | undefined,
   interactionData: Record<string, any>,
   customLayers: CustomLayer[],
-  baseResolution?: number
+  baseResolution?: number,
+  annotationObjects?: Record<string, any>
 ): Promise<Record<string, any>> {
   if (!inputs || !interactionData) return interactionData;
   const enriched = { ...interactionData };
 
   for (const input of inputs) {
-    if (input.type === 'custom_layer') {
-      const key = input.name || input.id;
-      const rawVal = interactionData[key];
-      if (rawVal === undefined || rawVal === null) continue;
+    const key = input.name || input.id;
+    const rawVal = interactionData[key];
+    if (rawVal === undefined || rawVal === null) continue;
 
+    if (input.type === 'custom_layer') {
       if (Array.isArray(rawVal)) {
         enriched[key] = await Promise.all(
           rawVal.map(async (item) => {
@@ -344,6 +345,16 @@ export async function enrichInteractionDataWithCustomLayers(
         const id = typeof rawVal === 'string' ? rawVal : rawVal?.id;
         const found = customLayers.find((l) => l.id === id) || (typeof rawVal === 'object' ? rawVal : null);
         enriched[key] = found ? await prepareCustomLayerPayload(found, baseResolution) : rawVal;
+      }
+    } else if (input.type === 'annotation' && annotationObjects) {
+      if (Array.isArray(rawVal)) {
+        enriched[key] = rawVal.map((item) => {
+          const id = typeof item === 'string' ? item : item?.id;
+          return (id && annotationObjects[id]) ? annotationObjects[id] : item;
+        });
+      } else {
+        const id = typeof rawVal === 'string' ? rawVal : rawVal?.id;
+        enriched[key] = (id && annotationObjects[id]) ? annotationObjects[id] : rawVal;
       }
     }
   }
