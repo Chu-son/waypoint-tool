@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { WaypointNode } from '../../types/store';
+import { v4 as uuidv4 } from 'uuid';
 
 export type NodeSlice = {
   nodes: Record<string, WaypointNode>;
@@ -12,12 +13,14 @@ export type NodeSlice = {
   setAnchorNode: (id: string | null) => void;
   addNode: (node: WaypointNode, parentId?: string, options?: { skipRecalculate?: boolean }) => void;
   updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => void;
+  updateNodes: (updates: Record<string, Partial<WaypointNode>>, options?: { skipRecalculate?: boolean }) => void;
   removeNodes: (ids: string[]) => void;
   reorderNodes: (fromIndex: number, toIndex: number) => void;
   selectNodes: (ids: string[], multi?: boolean) => void;
   selectAllNodes: () => void;
   deselectAllNodes: () => void;
   explodeGenerator: (id: string) => void;
+  duplicateNodes: (ids: string[]) => string[];
   setInsertionIndex: (index: number) => void;
 };
 
@@ -72,6 +75,27 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       },
       isDirty: true
     }));
+    if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(200);
+    }
+  },
+
+  updateNodes: (updates: Record<string, Partial<WaypointNode>>, options?: { skipRecalculate?: boolean }) => {
+    if (!options?.skipRecalculate) {
+      get().pushHistorySnapshot();
+    }
+    set((state) => {
+      const nextNodes = { ...state.nodes };
+      Object.entries(updates).forEach(([id, upd]) => {
+        if (nextNodes[id]) {
+          nextNodes[id] = { ...nextNodes[id], ...upd };
+        }
+      });
+      return {
+        nodes: nextNodes,
+        isDirty: true
+      };
+    });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
       get().debouncedRecalculatePath(200);
     }
@@ -195,5 +219,117 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       isDirty: true
     };
     });
+  },
+
+  duplicateNodes: (ids: string[]) => {
+    if (!ids || ids.length === 0) return [];
+    get().pushHistorySnapshot();
+
+    const createdTopLevelIds: string[] = [];
+
+    set((state) => {
+      const newNodes = { ...state.nodes };
+      const newRootIds: string[] = [];
+      const idsSet = new Set(ids);
+
+      // Walk through rootNodeIds to maintain proper insertion order
+      state.rootNodeIds.forEach((rid) => {
+        newRootIds.push(rid);
+
+        if (idsSet.has(rid)) {
+          const original = state.nodes[rid];
+          if (original) {
+            if (original.type === 'manual') {
+              const newId = uuidv4();
+              const duplicated: WaypointNode = {
+                ...structuredClone(original),
+                id: newId,
+                name: original.name ? `${original.name} (Copy)` : undefined,
+              };
+              if (duplicated.transform) {
+                duplicated.transform = {
+                  ...duplicated.transform,
+                  x: duplicated.transform.x + 0.5,
+                  y: duplicated.transform.y + 0.5,
+                };
+              }
+              newNodes[newId] = duplicated;
+              newRootIds.push(newId);
+              createdTopLevelIds.push(newId);
+            } else if (original.type === 'generator') {
+              const newGenId = uuidv4();
+              const newChildIds: string[] = [];
+              (original.children_ids || []).forEach((cid) => {
+                const childOrig = state.nodes[cid];
+                if (childOrig) {
+                  const newChildId = uuidv4();
+                  const dupChild: WaypointNode = {
+                    ...structuredClone(childOrig),
+                    id: newChildId,
+                  };
+                  if (dupChild.transform) {
+                    dupChild.transform = {
+                      ...dupChild.transform,
+                      x: dupChild.transform.x + 0.5,
+                      y: dupChild.transform.y + 0.5,
+                    };
+                  }
+                  newNodes[newChildId] = dupChild;
+                  newChildIds.push(newChildId);
+                }
+              });
+
+              const duplicatedGen: WaypointNode = {
+                ...structuredClone(original),
+                id: newGenId,
+                children_ids: newChildIds,
+              };
+              newNodes[newGenId] = duplicatedGen;
+              newRootIds.push(newGenId);
+              createdTopLevelIds.push(newGenId);
+            }
+          }
+        }
+      });
+
+      // For any selected child manual nodes whose parent generator wasn't duplicated,
+      // clone them as root-level manual waypoints
+      ids.forEach((id) => {
+        if (!state.rootNodeIds.includes(id) && !createdTopLevelIds.includes(id)) {
+          const original = state.nodes[id];
+          if (original && original.type === 'manual') {
+            const newId = uuidv4();
+            const duplicated: WaypointNode = {
+              ...structuredClone(original),
+              id: newId,
+              name: original.name ? `${original.name} (Copy)` : undefined,
+            };
+            if (duplicated.transform) {
+              duplicated.transform = {
+                ...duplicated.transform,
+                x: duplicated.transform.x + 0.5,
+                y: duplicated.transform.y + 0.5,
+              };
+            }
+            newNodes[newId] = duplicated;
+            newRootIds.push(newId);
+            createdTopLevelIds.push(newId);
+          }
+        }
+      });
+
+      return {
+        nodes: newNodes,
+        rootNodeIds: newRootIds,
+        selectedNodeIds: createdTopLevelIds,
+        isDirty: true,
+      };
+    });
+
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(150);
+    }
+
+    return createdTopLevelIds;
   },
 });

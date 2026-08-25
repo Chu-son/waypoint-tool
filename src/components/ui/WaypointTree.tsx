@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { ChevronRight, Layers, GripVertical, Anchor, Code2, Unlink, Trash2 } from 'lucide-react';
+import { ChevronRight, Layers, GripVertical, Anchor, Code2, Unlink, Trash2, Copy } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
   DndContext,
@@ -43,6 +43,7 @@ export function WaypointTree() {
   const plugins = useAppStore(state => state.plugins);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const selectNodes = useAppStore(state => state.selectNodes);
+  const duplicateNodes = useAppStore(state => state.duplicateNodes);
   const reorderNodes = useAppStore(state => state.reorderNodes);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
   const insertionIndex = useAppStore(state => state.insertionIndex);
@@ -60,6 +61,7 @@ export function WaypointTree() {
 
   const [expandedGenerators, setExpandedGenerators] = useState<Set<string>>(new Set());
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; parentId?: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -82,15 +84,59 @@ export function WaypointTree() {
     });
   };
 
+  const flatVisibleNodeIds = useMemo(() => {
+    const ids: string[] = [];
+    rootNodeIds.forEach((id) => {
+      ids.push(id);
+      const node = nodes[id];
+      if (node?.type === 'generator' && expandedGenerators.has(id)) {
+        (node.children_ids || []).forEach((cid) => {
+          ids.push(cid);
+        });
+      }
+    });
+    return ids;
+  }, [rootNodeIds, nodes, expandedGenerators]);
+
   const handleNodeClick = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (elementCopyState) {
       // コピーモード中: 単一選択でプレビューノードを更新
       selectNodes([id]);
       setElementCopyState({ ...elementCopyState, previewNodeId: id });
+      setLastSelectedNodeId(id);
       return;
     }
-    selectNodes([id], e.shiftKey || e.metaKey);
+
+    if (e.shiftKey && lastSelectedNodeId && flatVisibleNodeIds.includes(lastSelectedNodeId)) {
+      const fromIdx = flatVisibleNodeIds.indexOf(lastSelectedNodeId);
+      const toIdx = flatVisibleNodeIds.indexOf(id);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const start = Math.min(fromIdx, toIdx);
+        const end = Math.max(fromIdx, toIdx);
+        const rangeIds = flatVisibleNodeIds.slice(start, end + 1);
+        if (e.ctrlKey || e.metaKey) {
+          const merged = Array.from(new Set([...selectedNodeIds, ...rangeIds]));
+          selectNodes(merged, false);
+        } else {
+          selectNodes(rangeIds, false);
+        }
+        return;
+      }
+    }
+
+    setLastSelectedNodeId(id);
+    selectNodes([id], e.shiftKey || e.ctrlKey || e.metaKey);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, nodeId: string, parentId?: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!selectedNodeIds.includes(nodeId)) {
+      selectNodes([nodeId]);
+      setLastSelectedNodeId(nodeId);
+    }
+    setContextMenu({ nodeId, parentId, x: e.clientX, y: e.clientY });
   };
 
   const sensors = useSensors(
@@ -223,12 +269,7 @@ export function WaypointTree() {
                         isSelected={isSelected}
                         variant="generator"
                         onClick={(e) => handleNodeClick(id, e)}
-                        onContextMenu={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          selectNodes([id]);
-                          setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
-                        }}
+                        onContextMenu={(e) => handleContextMenu(e, id)}
                         idTag={id.slice(0, 6)}
                       >
                         <button
@@ -253,12 +294,7 @@ export function WaypointTree() {
                               <li
                                 key={childId}
                                 onClick={(e) => handleNodeClick(childId, e)}
-                                onContextMenu={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  selectNodes([childId]);
-                                  setContextMenu({ nodeId: childId, parentId: id, x: e.clientX, y: e.clientY });
-                                }}
+                                onContextMenu={(e) => handleContextMenu(e, childId, id)}
                                 className={cn(
                                   "px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between",
                                   isChildSelected
@@ -292,12 +328,7 @@ export function WaypointTree() {
                       isAnchor={isAnchor}
                       variant="primary"
                       onClick={(e) => handleNodeClick(id, e)}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        selectNodes([id]);
-                        setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
-                      }}
+                      onContextMenu={(e) => handleContextMenu(e, id)}
                       idTag={id.slice(0, 6)}
                     >
                       <span className="opacity-75 font-mono text-xs mr-1">[{currentGlobalIndex + indexStartIndex}]</span>
@@ -323,9 +354,23 @@ export function WaypointTree() {
           {(() => {
             const targetNode = nodes[contextMenu.nodeId];
             const isGenerator = targetNode?.type === 'generator';
+            const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextMenu.nodeId);
+            const targetIds = isMultiSelected ? selectedNodeIds : [contextMenu.nodeId];
 
             return (
               <>
+                {/* 複製 (Duplicate) */}
+                <button
+                  onClick={() => {
+                    duplicateNodes(targetIds);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Copy size={13} className="text-cyan-400" />
+                  <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
+                </button>
+
                 {/* 内部プロパティ表示 (モーダル) */}
                 <button
                   onClick={() => {
@@ -367,7 +412,7 @@ export function WaypointTree() {
                 </button>
 
                 {/* アンカー設定 (ウェイポイントの場合) */}
-                {!isGenerator && (
+                {!isGenerator && !isMultiSelected && (
                   <button
                     onClick={() => {
                       if (anchorNodeId === contextMenu.nodeId) {
@@ -403,13 +448,13 @@ export function WaypointTree() {
                 {/* 削除 */}
                 <button
                   onClick={() => {
-                    removeNodes([contextMenu.nodeId]);
+                    removeNodes(targetIds);
                     setContextMenu(null);
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
                 >
                   <Trash2 size={13} />
-                  <span>削除 (Delete)</span>
+                  <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
                 </button>
               </>
             );
