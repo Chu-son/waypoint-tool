@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
-import { BackendAPI, DialogAPI } from "../../../api";
-import { PluginCustomLayer, PluginInstance } from "../../../types/store";
+import { DialogAPI } from "../../../api";
+import { PluginInstance } from "../../../types/store";
 import { Button } from "../common/Button";
 import { Label } from "../common/Label";
 import { Select } from "../common/Select";
@@ -12,24 +12,20 @@ import { AlertBox } from "../common/AlertBox";
 import { FieldLabel } from "../common/FieldLabel";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
-import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Bookmark } from "lucide-react";
+import { PluginDataViewer } from "../common/PluginDataViewer";
+import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Bookmark, Code2, Maximize2 } from "lucide-react";
 import { cn } from "../../../utils/cn";
-import { v4 as uuidv4 } from "uuid";
-import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from "../../../utils/mapRasterize";
 
 export function CustomLayerInspector() {
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const setActiveCustomLayerId = useAppStore((state) => state.setActiveCustomLayerId);
-  const addPluginCustomLayer = useAppStore((state) => state.addPluginCustomLayer);
   const updateCustomLayer = useAppStore((state) => state.updateCustomLayer);
   const removeCustomLayer = useAppStore((state) => state.removeCustomLayer);
   const removeEditObject = useAppStore((state) => state.removeEditObject);
+  const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
 
   const plugins = useAppStore((state) => state.plugins) || {};
-  const pluginSettings = useAppStore((state) => state.pluginSettings) || [];
-  const globalPythonPath = useAppStore((state) => state.globalPythonPath);
-  const mapLayers = useAppStore((state) => state.mapLayers) || [];
   const pluginInteractionData = useAppStore((state) => state.pluginInteractionData) || {};
   const updatePluginInteractionData = useAppStore((state) => state.updatePluginInteractionData);
   const clearPluginInteractionData = useAppStore((state) => state.clearPluginInteractionData);
@@ -168,14 +164,6 @@ export function CustomLayerInspector() {
           blocking: true,
         },
         async () => {
-          let pythonPathToUse = globalPythonPath?.trim() || "python3";
-          if (activePlugin.manifest.type === "python") {
-            const setting = pluginSettings.find((s) => s.id === activePlugin.id);
-            if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== "") {
-              pythonPathToUse = setting.pythonOverridePath.trim();
-            }
-          }
-
           const filteredInteractionData: Record<string, any> = {};
           activePlugin.manifest.inputs?.forEach((inp) => {
             const key = inp.name || inp.id;
@@ -184,91 +172,30 @@ export function CustomLayerInspector() {
             }
           });
 
-          const robotFootprint = useAppStore.getState().robotFootprint;
-
-          const contextData: any = {
+          const result = await useAppStore.getState().executeGeneratorPlugin({
+            plugin: activePlugin,
             properties: params,
-            interaction_data: filteredInteractionData,
-          };
+            interactionData: filteredInteractionData,
+            existingExecutionId: (existingLayer as any)?.source_execution_id,
+            targetCustomLayerId: existingLayer?.id,
+          });
 
-          if (activePlugin.manifest.needs?.includes("robot_footprint") || robotFootprint) {
-            contextData.robot_footprint = robotFootprint;
-          }
-
-          // 自分自身の再生成の場合は、古い結果が混ざらないように customLayers から自分自身を除外してマージ
-          const otherCustomLayers = existingLayer
-            ? customLayers.filter((l) => l.id !== existingLayer.id)
-            : customLayers;
-
-          const layersToPass = await prepareLayersForExport(mapLayers, otherCustomLayers);
-
-          const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
-          const annotationObjects = useAppStore.getState().annotationObjects;
-          const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
-            activePlugin.manifest.inputs,
-            contextData.interaction_data || {},
-            customLayers,
-            baseRes,
-            annotationObjects
-          );
-          const finalContextData = {
-            ...contextData,
-            interaction_data: enrichedInteractionData,
-          };
-
-          const result = await BackendAPI.runPlugin(
-            activePlugin,
-            finalContextData,
-            pythonPathToUse,
-            layersToPass
-          );
-
-          if (!result || !result.image_base64 || !result.info) {
-            throw new Error(
-              "Plugin returned invalid layer output. Expected { image_base64, info }."
-            );
-          }
-
-          const normalizedImageBase64 = String(result.image_base64).startsWith("data:")
-            ? String(result.image_base64)
-            : `data:image/png;base64,${result.image_base64}`;
-
-          if (existingLayer && existingLayer.type === "plugin") {
-            updateCustomLayer(existingLayer.id, {
-              name: layerName || result.name || existingLayer.name,
-              params,
-              interaction_data: filteredInteractionData,
-              image_base64: normalizedImageBase64,
-              info: result.info,
+          if (result.success && result.customLayerIds.length > 0) {
+            setActiveCustomLayerId(result.customLayerIds[0]);
+            // Apply visual overrides from UI inputs if set
+            updateCustomLayer(result.customLayerIds[0], {
+              ...(layerName ? { name: layerName } : {}),
               opacity: layerOpacity,
-              blend_mode: blendMode || result.blend_mode || "overwrite",
+              blend_mode: blendMode,
               is_reference: isReference,
             });
-          } else {
-            const newId = uuidv4();
-            const newLayer: PluginCustomLayer = {
-              id: newId,
-              name: layerName || result.name || activePlugin.manifest.name || "Generated Layer",
-              type: "plugin",
-              plugin_id: activePlugin.id,
-              params,
-              interaction_data: filteredInteractionData,
-              image_base64: normalizedImageBase64,
-              info: result.info,
-              visible: true,
-              opacity: layerOpacity,
-              z_index: customLayers.length,
-              blend_mode: blendMode || result.blend_mode || "overwrite",
-              is_reference: isReference,
-            };
-            addPluginCustomLayer(newLayer);
-            setActiveCustomLayerId(newId);
+            setActiveTool("select");
           }
         }
       );
     } catch (err: any) {
-      console.error("Layer generation failed:", err);
-      setErrorInfo(String(err));
+      console.error("Custom layer generation failed:", err);
+      setErrorInfo(err.toString());
     } finally {
       setIsExecuting(false);
     }
@@ -583,6 +510,50 @@ export function CustomLayerInspector() {
                     />
                   );
                 })}
+              </div>
+            )}
+
+            {/* Internal Properties (Read-only Metadata) */}
+            {!isNewPluginLayer && existingLayer?.type === "plugin" && (
+              <div className="space-y-2 pt-3 border-t border-border-base/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Code2 size={13} className="text-cyan-400" />
+                    <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
+                  </div>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
+                    Read-only
+                  </span>
+                </div>
+
+                {(existingLayer as any).plugin_data && Object.keys((existingLayer as any).plugin_data).length > 0 ? (
+                  <div className="space-y-1.5">
+                    <PluginDataViewer
+                      data={(existingLayer as any).plugin_data}
+                      title="Layer Plugin Data"
+                      defaultExpanded={true}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        openPluginDataModal(
+                          `カスタムレイヤー: ${existingLayer.name}`,
+                          (existingLayer as any).plugin_data,
+                          `プラグイン: ${(existingLayer as any).plugin_id} • 内部メタデータ (Read-only)`
+                        )
+                      }
+                      className="w-full text-[10px] text-cyan-400 hover:bg-cyan-500/10 gap-1 h-6"
+                    >
+                      <Maximize2 size={11} />
+                      <span>全画面ダイアログで開く</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-text-muted/60 bg-surface-base/30 p-2 rounded-lg border border-border-base/20 italic">
+                    内部プロパティ（plugin_data）はありません。
+                  </p>
+                )}
               </div>
             )}
           </div>

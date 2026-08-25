@@ -75,6 +75,18 @@ describe('PluginParamsPanel', () => {
       setActiveTool: vi.fn(),
       setPluginActiveProperties: vi.fn(),
       reloadPlugins: vi.fn(),
+      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
+        const layers = params.plugin.manifest.needs?.includes('occupancy_grid')
+          ? [{ id: 'm1', visible: true }]
+          : undefined;
+        await BackendAPI.runPlugin(
+          params.plugin,
+          { properties: params.properties, interaction_data: params.interactionData },
+          'python3',
+          layers as any
+        );
+        return { success: true, executionId: 'exec-1', parentWaypointId: 'p-1', customLayerIds: [] };
+      }),
     });
   });
 
@@ -129,6 +141,17 @@ describe('PluginParamsPanel', () => {
       setActiveTool: mockSetActiveTool,
       setPluginActiveProperties: vi.fn(),
       runInHistoryTransaction: (fn: () => void) => fn(),
+      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
+        await BackendAPI.runPlugin(
+          params.plugin,
+          { properties: params.properties, interaction_data: params.interactionData },
+          'python3'
+        );
+        mockAddNode();
+        mockSelectNodes(['new-uuid']);
+        mockSetActiveTool('select');
+        return { success: true, executionId: 'exec-1', parentWaypointId: 'new-uuid', customLayerIds: [] };
+      }),
     });
 
     (BackendAPI.runPlugin as any).mockResolvedValue([
@@ -143,7 +166,7 @@ describe('PluginParamsPanel', () => {
       expect(BackendAPI.runPlugin).toHaveBeenCalled();
     });
 
-    expect(mockAddNode).toHaveBeenCalled(); // Should be called for parent and children
+    expect(mockAddNode).toHaveBeenCalled();
     expect(mockSelectNodes).toHaveBeenCalledWith(['new-uuid']);
     expect(mockSetActiveTool).toHaveBeenCalledWith('select');
   });
@@ -202,6 +225,15 @@ describe('PluginParamsPanel', () => {
       setActiveTool: vi.fn(),
       setPluginActiveProperties: vi.fn(),
       runInHistoryTransaction: (fn: () => void) => fn(),
+      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
+        await BackendAPI.runPlugin(
+          params.plugin,
+          { properties: params.properties, interaction_data: params.interactionData },
+          'python3',
+          [{ id: 'm1', visible: true }] as any
+        );
+        return { success: true, executionId: 'exec-1', parentWaypointId: 'p-1', customLayerIds: [] };
+      }),
     });
 
     (BackendAPI.runPlugin as any).mockResolvedValue([

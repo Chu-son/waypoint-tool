@@ -67,6 +67,8 @@ describe('AnnotationTree', () => {
         'point-1': mockPoint,
         'line-1': mockLine,
       },
+      annotationGroups: {},
+      rootAnnotationIds: ['point-1', 'line-1'],
       annotationOrder: ['point-1', 'line-1'],
     });
 

@@ -1,32 +1,24 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { BackendAPI } from "../../api";
 import { Play, Settings2, X, RefreshCcw } from "lucide-react";
-import { v4 as uuidv4 } from "uuid";
 import { PluginPropertyEditor } from "./PluginPropertyEditor";
 import { PluginInputEditor } from "./PluginInputEditor";
 import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
 import { Label } from "./common/Label";
 import { AlertBox } from "./common/AlertBox";
-import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from "../../utils/mapRasterize";
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
   const activePluginId = useAppStore((state) => state.activePluginId);
   const plugins = useAppStore((state) => state.plugins);
-  const pluginSettings = useAppStore((state) => state.pluginSettings);
-  const globalPythonPath = useAppStore((state) => state.globalPythonPath);
+  const nodes = useAppStore((state) => state.nodes) || {};
+  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds) || [];
   const pluginInteractionData = useAppStore(
     (state) => state.pluginInteractionData,
   );
   const activeInputIndex = useAppStore((state) => state.activeInputIndex);
   const setActiveInputIndex = useAppStore((state) => state.setActiveInputIndex);
-  const nodes = useAppStore((state) => state.nodes) || {};
-  const mapLayers = useAppStore((state) => state.mapLayers) || [];
-  const customLayers = useAppStore((state) => state.customLayers) || [];
-
-  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const updatePluginInteractionData = useAppStore(
     (state) => state.updatePluginInteractionData,
@@ -154,140 +146,38 @@ export function PluginParamsPanel() {
           // Collect waypoint range if waypoint inputs are used
           let idsToConsume: string[] = [];
           let insertIndex = -1;
-          const waypointInputs = inputs.filter(inp => inp.type === 'waypoint');
+          const waypointInputs = inputs.filter((inp) => inp.type === "waypoint");
           if (waypointInputs.length > 0) {
             const waypointIndices = waypointInputs
-              .map(inp => pluginInteractionData[inp.name || inp.id])
-              .filter(idx => idx !== undefined && idx !== null);
-            
+              .map((inp) => pluginInteractionData[inp.name || inp.id])
+              .filter((idx) => idx !== undefined && idx !== null);
+
             if (waypointIndices.length > 0) {
               const rootNodeIds = useAppStore.getState().rootNodeIds;
               const minIdx = Math.min(...waypointIndices);
               const maxIdx = Math.max(...waypointIndices);
               insertIndex = minIdx;
               idsToConsume = rootNodeIds.slice(minIdx, maxIdx + 1);
-              
-              // Pass the full data of waypoints in range to the plugin
-              contextData.waypoint_range = idsToConsume.map(id => nodes[id]).filter(Boolean);
             }
           }
 
-          // ----------------------------------------------------------------------
-          // Python Configuration Injection
-          // ----------------------------------------------------------------------
-          let pythonPathToUse = globalPythonPath?.trim() || "python3";
-          if (plugin.manifest.type === "python") {
-            const setting = pluginSettings.find((s) => s.id === plugin.id);
-            if (
-              setting &&
-              setting.pythonOverridePath &&
-              setting.pythonOverridePath.trim() !== ""
-            ) {
-              pythonPathToUse = setting.pythonOverridePath.trim();
-            }
-          }
-
-          // Execute plugin through backend API (passing contextual Python path)
-          // occupancy_grid 系 needs があるときは合成マップレイヤー（CustomLayers含む）を渡す
-          const needsOccupancyGrid = plugin.manifest.needs?.some(
-            (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
-          );
-
-          const layersToPass = needsOccupancyGrid
-            ? await prepareLayersForExport(mapLayers, customLayers)
-            : undefined;
-
-          // Enrich interaction data for any custom_layer and annotation inputs
-          const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
-          const annotationObjects = useAppStore.getState().annotationObjects;
-          const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
-            plugin.manifest.inputs,
-            contextData.interaction_data || {},
-            customLayers,
-            baseRes,
-            annotationObjects
-          );
-          const finalContextData = {
-            ...contextData,
-            interaction_data: enrichedInteractionData,
-          };
-
-          const resultingWaypoints = await BackendAPI.runPlugin(
+          const result = await useAppStore.getState().executeGeneratorPlugin({
             plugin,
-            finalContextData,
-            pythonPathToUse,
-            layersToPass,
-          );
+            properties: params,
+            interactionData: pluginInteractionData,
+            idsToConsume,
+            insertIndex,
+          });
 
-          if (Array.isArray(resultingWaypoints) && resultingWaypoints.length > 0) {
-            // Create Parent Generator Node
-            const parentId = uuidv4();
-            const store = useAppStore.getState();
-
-            store.runInHistoryTransaction(() => {
-              // Remove consumed nodes first
-              if (idsToConsume.length > 0) {
-                store.removeNodes(idsToConsume);
-              }
-
-              store.addNode({
-                id: parentId,
-                type: "generator",
-                plugin_id: plugin.id,
-                generator_params: contextData,
-                children_ids: [],
-              });
-
-              // If we have an insert index, we need to move the newly added node to that index
-              if (insertIndex !== -1) {
-                const currentRootIds = useAppStore.getState().rootNodeIds;
-                const newIdx = currentRootIds.indexOf(parentId);
-                if (newIdx !== -1 && newIdx !== insertIndex) {
-                  store.reorderNodes(newIdx, insertIndex);
-                }
-              }
-
-              // Build new child nodes
-              resultingWaypoints.forEach((wp) => {
-                let qx = wp.qx ?? 0,
-                  qy = wp.qy ?? 0,
-                  qz = wp.qz ?? 0,
-                  qw = wp.qw ?? 1;
-                // If python returned Euler yaw and skipped quaternions, convert it
-                if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-                  const halfYaw = wp.yaw / 2.0;
-                  qz = Math.sin(halfYaw);
-                  qw = Math.cos(halfYaw);
-                }
-
-                const id = uuidv4();
-                useAppStore.getState().addNode(
-                  {
-                    id,
-                    type: "manual",
-                    transform: wp.transform || {
-                      x: wp.x ?? 0,
-                      y: wp.y ?? 0,
-                      qx,
-                      qy,
-                      qz,
-                      qw,
-                    },
-                    options: wp.options || {},
-                  },
-                  parentId,
-                ); // append to parent
-              });
-            });
-
-            // Auto select the newly generated parent node
-            useAppStore.getState().selectNodes([parentId]);
-            // Switch tool back to select, which triggers inspector to switch to Regenerate
+          if (result.success) {
+            if (result.parentWaypointId) {
+              useAppStore.getState().selectNodes([result.parentWaypointId]);
+            } else if (result.annotationGroupId) {
+              useAppStore.getState().selectAnnotationObjects([result.annotationGroupId]);
+            } else if (result.customLayerIds.length > 0) {
+              useAppStore.getState().setActiveCustomLayerId(result.customLayerIds[0]);
+            }
             useAppStore.getState().setActiveTool("select");
-          } else {
-            setErrorInfo(
-              "Plugin executed successfully but returned 0 waypoints. Check your settings.",
-            );
           }
         }
       );

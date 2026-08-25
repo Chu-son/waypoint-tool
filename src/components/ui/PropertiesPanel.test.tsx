@@ -12,6 +12,12 @@ vi.mock('lucide-react', () => ({
   Settings2: () => <div data-testid="settings-icon" />,
   RefreshCcw: () => <div data-testid="refresh-icon" />,
   BoxSelect: () => <div data-testid="box-select-icon" />,
+  Code2: () => <div data-testid="code2-icon" />,
+  Maximize2: () => <div data-testid="maximize2-icon" />,
+  ChevronRight: () => <div data-testid="chevron-right-icon" />,
+  ChevronDown: () => <div data-testid="chevron-down-icon" />,
+  Copy: () => <div data-testid="copy-icon" />,
+  Check: () => <div data-testid="check-icon" />,
 }));
 
 // Mock Store
@@ -88,10 +94,17 @@ describe('PropertiesPanel', () => {
         clearPluginInteractionData: vi.fn(),
         setPluginActiveProperties: vi.fn(),
         addNode: mockAddNode,
-        nodes: { 'gen-1': mockGeneratorNode }, // needed for handleUpdate inside handleRegenerate
+        nodes: { 'gen-1': mockGeneratorNode },
         runInHistoryTransaction: (fn: () => void) => fn(),
         beginHistoryTransaction: vi.fn(),
         endHistoryTransaction: vi.fn(),
+        executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
+          await BackendAPI.runPlugin(params.plugin, { properties: params.properties, interaction_data: params.interactionData }, 'python3');
+          mockRemoveNodes(['child-1']);
+          mockAddNode();
+          mockUpdateNode('gen-1', { generator_params: { properties: { count: 5 } } });
+          return { success: true, executionId: 'exec-1', parentWaypointId: 'gen-1', customLayerIds: [] };
+        }),
     });
   });
 

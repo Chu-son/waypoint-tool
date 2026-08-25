@@ -1,29 +1,24 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
-import { BackendAPI } from "../../../api";
 import { Button } from "../common/Button";
 import { AlertBox } from "../common/AlertBox";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
-import { Play, Settings2, RefreshCcw, BoxSelect } from "lucide-react";
+import { PluginDataViewer } from "../common/PluginDataViewer";
+import { Play, Settings2, RefreshCcw, BoxSelect, Code2, Maximize2 } from "lucide-react";
 import { WaypointNode } from "../../../types/store";
-import { v4 as uuidv4 } from "uuid";
-import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from "../../../utils/mapRasterize";
 
 interface GeneratorNodePanelProps {
   node: WaypointNode;
-  handleUpdate: (id: string, updates: any) => void;
+  handleUpdate?: (id: string, updates: any) => void;
 }
 
 export function GeneratorNodePanel({
   node,
-  handleUpdate,
 }: GeneratorNodePanelProps) {
   const plugins = useAppStore((state) => state.plugins);
-  const pluginSettings = useAppStore((state) => state.pluginSettings);
-  const globalPythonPath = useAppStore((state) => state.globalPythonPath);
   const explodeGenerator = useAppStore((state) => state.explodeGenerator);
-  const removeNodes = useAppStore((state) => state.removeNodes);
+  const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
   const updatePluginInteractionData = useAppStore(
     (state) => state.updatePluginInteractionData,
   );
@@ -31,8 +26,6 @@ export function GeneratorNodePanel({
     (state) => state.pluginInteractionData,
   );
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
-  const mapLayers = useAppStore((state) => state.mapLayers) || [];
-  const customLayers = useAppStore((state) => state.customLayers) || [];
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
@@ -76,107 +69,17 @@ export function GeneratorNodePanel({
             }
           });
 
-          const contextData: Record<string, any> = {
-            ...node.generator_params,
-            properties: genParams,
-            interaction_data: filteredInteractionData,
-          };
-
-          if (plugin.manifest.needs?.includes('robot_footprint')) {
-            contextData.robot_footprint = useAppStore.getState().robotFootprint;
-          }
-
-          let pythonPathToUse = globalPythonPath?.trim() || "python3";
-          if (plugin.manifest.type === "python") {
-            const setting = pluginSettings.find((s) => s.id === plugin.id);
-            if (
-              setting &&
-              setting.pythonOverridePath &&
-              setting.pythonOverridePath.trim() !== ""
-            ) {
-              pythonPathToUse = setting.pythonOverridePath.trim();
-            }
-          }
-
-          const needsOccupancyGrid = plugin.manifest.needs?.some(
-            (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
-          );
-
-          const layersToPass = needsOccupancyGrid
-            ? await prepareLayersForExport(mapLayers, customLayers)
-            : undefined;
-
-          const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
-          const annotationObjects = useAppStore.getState().annotationObjects;
-          const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
-            plugin.manifest.inputs,
-            contextData.interaction_data || {},
-            customLayers,
-            baseRes,
-            annotationObjects
-          );
-          const finalContextData = {
-            ...contextData,
-            interaction_data: enrichedInteractionData,
-          };
-
-          const resultingWaypoints = await BackendAPI.runPlugin(
+          await useAppStore.getState().executeGeneratorPlugin({
             plugin,
-            finalContextData,
-            pythonPathToUse,
-            layersToPass,
-          );
-
-          if (
-            Array.isArray(resultingWaypoints) &&
-            resultingWaypoints.length > 0
-          ) {
-            useAppStore.getState().runInHistoryTransaction(() => {
-              if (node.children_ids && node.children_ids.length > 0) {
-                removeNodes(node.children_ids);
-              }
-
-              const newChildIds: string[] = [];
-              resultingWaypoints.forEach((wp) => {
-                let qx = wp.qx ?? 0,
-                  qy = wp.qy ?? 0,
-                  qz = wp.qz ?? 0,
-                  qw = wp.qw ?? 1;
-                if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-                  const halfYaw = wp.yaw / 2.0;
-                  qz = Math.sin(halfYaw);
-                  qw = Math.cos(halfYaw);
-                }
-                const id = uuidv4();
-                newChildIds.push(id);
-                useAppStore.getState().addNode(
-                  {
-                    id,
-                    type: "manual",
-                    transform: wp.transform || {
-                      x: wp.x ?? 0,
-                      y: wp.y ?? 0,
-                      qx,
-                      qy,
-                      qz,
-                      qw,
-                    },
-                    options: wp.options || {},
-                  },
-                  node.id,
-                );
-              });
-
-              handleUpdate(node.id, { generator_params: contextData });
-            });
-          } else {
-            alert("Plugin executed but returned 0 waypoints.");
-          }
+            properties: genParams,
+            interactionData: filteredInteractionData,
+            existingExecutionId: node.source_execution_id,
+            targetParentWaypointId: node.id,
+          });
         }
       );
     } catch (err: any) {
-      console.error("Re-generation failed:", err);
-      alert(`Failed to re-generate:\n${err.toString()}`);
+      console.error("Generator regeneration failed:", err);
     } finally {
       setIsExecuting(false);
     }
@@ -232,6 +135,44 @@ export function GeneratorNodePanel({
               />
             );
           })}
+
+          {/* Internal Properties (Read-only Metadata) */}
+          <div className="space-y-2 pt-3 border-t border-border-base/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Code2 size={13} className="text-cyan-400" />
+                <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
+              </div>
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
+                Read-only
+              </span>
+            </div>
+
+            {node.plugin_data && Object.keys(node.plugin_data).length > 0 ? (
+              <div className="space-y-1.5">
+                <PluginDataViewer data={node.plugin_data} title="Waypoint Plugin Data" defaultExpanded={true} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    openPluginDataModal(
+                      `ジェネレーター: ${plugin?.manifest.name || 'Waypoint Generator'}`,
+                      node.plugin_data,
+                      `ノードID: ${node.id} • 内部メタデータ (Read-only)`
+                    )
+                  }
+                  className="w-full text-[10px] text-cyan-400 hover:bg-cyan-500/10 gap-1 h-6"
+                >
+                  <Maximize2 size={11} />
+                  <span>全画面ダイアログで開く</span>
+                </Button>
+              </div>
+            ) : (
+              <p className="text-[10px] text-text-muted/60 bg-surface-base/30 p-2 rounded-lg border border-border-base/20 italic">
+                内部プロパティ（plugin_data）はありません。
+              </p>
+            )}
+          </div>
 
           <div className="pt-4 mt-6 border-t border-border-base space-y-2">
             <Button
