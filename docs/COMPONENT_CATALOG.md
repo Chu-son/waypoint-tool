@@ -28,6 +28,9 @@
 - **`AnnotationEditOverlay`** ([`src/components/ui/AnnotationEditOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationEditOverlay.tsx))
   - **概要**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）の配置・編集モード時にキャンバス上部に表示されるフローティングアクションバナー（サブツール・カラー選択・削除・完了）。
   - **主要Props**: なし
+- **`MapEditOverlay`** ([`src/components/ui/MapEditOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/MapEditOverlay.tsx))
+  - **概要**: マップ編集モード時にキャンバス上部に表示されるフローティングアクションバナー（直線・矩形・円形・ブラシのサブツール切り替え、塗りつぶし値設定、ブラシサイズ、削除、完了）。
+  - **主要Props**: なし
 - **`Modal`** ([`src/components/ui/common/Modal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Modal.tsx))
   - **概要**: 汎用モーダルダイアログコンテナ（アニメーション背景・ヘッダー・フッター標準化）。
   - **主要Props**: `isOpen`, `onClose`, `title`, `children`, `footer`
@@ -88,7 +91,7 @@
   - **概要**: 生成されたジェネレーターノードの再編集・引数調整・Waypoint展開 (Explode) を行うUI。
   - **主要Props**: `nodeId`
 - **`CustomLayerInspector`** ([`src/components/ui/properties/CustomLayerInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/CustomLayerInspector.tsx))
-  - **概要**: 手動ベクター描画レイヤー（矩形・円形・ブラシ）のツール設定や、プラグイン生成マップレイヤーの新規作成・パラメータ編集・再生成・透過度・ブレンドモード調整を行う統合インスペクターUI。
+  - **概要**: 手動ベクター描画レイヤー（直線・矩形・円形・ブラシ）のツール設定や、プラグイン生成マップレイヤーの新規作成・パラメータ編集・再生成・透過度・ブレンドモード調整を行う統合インスペクターUI。
   - **主要Props**: なし（`appStore` の `activeCustomLayerId` と連動）
 - **`AnnotationInspector`** ([`src/components/ui/properties/AnnotationInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/AnnotationInspector.tsx))
   - **概要**: 選択中のアノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）の名前・カラー・表示トグル・各幾何座標（位置、サイズ、角度、半径等）を編集するインスペクターUI。
@@ -126,7 +129,7 @@
   - **概要**: ウェイポイントツリー (`WaypointTree`) とアノテーション一覧 (`AnnotationTree`) を統合してホストする左サイドバーのメインオブジェクトパネル。
   - **主要Props**: なし
 - **`WaypointTree`** ([`src/components/ui/WaypointTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WaypointTree.tsx))
-  - **概要**: 全 Waypoint / ジェネレーター要素を階層表示・ドラッグ＆ドロップで並び替えるツリーペイン。先頭にタイトル「WAYPOINTS」および総ウェイポイント数のバッジを表示。
+  - **概要**: 全 Waypoint / ジェネレーター要素を階層表示・ドラッグ＆ドロップで並び替えるツリーペイン。Shiftキーによる範囲選択、右クリックコンテキストメニュー（単一/複数選択項目の一括複製・一括削除・アンカー設定・内部プロパティ表示・Explode）に対応。
   - **主要Props**: なし
 - **`AnnotationTree`** ([`src/components/ui/AnnotationTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationTree.tsx))
   - **概要**: アノテーションオブジェクトの一覧表示、ドラッグ＆ドロップ並び替え、可視性/ラベル表示トグル、削除、名前編集、複製、配置モード開始トリガーを提供するコンポーネント。
@@ -184,6 +187,8 @@
   - **概要**: マップ画像を 2D Occupancy Grid の 3 領域（Obstacle: 赤, Free: 緑, Unknown: 紫）にリアルタイム色分けする PixiJS GPU GLSL シェーダーフィルター。
 - **`AnnotationLayer`** ([`src/components/canvas/layers/AnnotationLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/AnnotationLayer.tsx))
   - **概要**: Point (円), OrientedPoint (矢印), Line (線分), Rect (矩形), Circle (円形) のアノテーション図形、色枠線、半透明塗りつぶし、変形操作ハンドル、テキストラベルの高速 WebGL 描画およびインタラクション。
+- **`MapEditLayer`** / **`MapEditSingleLayer`** ([`src/components/canvas/layers/MapEditLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/MapEditLayer.tsx))
+  - **概要**: 手動カスタムレイヤー（ManualCustomLayer）の描画オブジェクト（Line, Rect, Circle, Freehand）の高速 WebGL 描画、塗りつぶし色反映、選択時のリサイズ・回転・端点操作ハンドル描画。
 - **`FootprintLayer`** ([`src/components/canvas/layers/FootprintLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/FootprintLayer.tsx))
   - **概要**: 選択中の Waypoint および（表示トグル有効時の）全 Waypoint に対して、ロボットの向き (yaw) に合わせたフットプリント外枠・塗りつぶし・進行方向インジケーターを高速 WebGL 描画。
 - **`WaypointLayer`** ([`src/components/canvas/layers/WaypointLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/WaypointLayer.tsx))
