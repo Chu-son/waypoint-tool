@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, AnnotationObject, RobotFootprint, OccupancySettings, RecentProjectItem } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, AnnotationObject, AnnotationGroup, RobotFootprint, OccupancySettings, RecentProjectItem } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -115,6 +115,12 @@ export type ProjectSlice = {
     map_layers?: ProjectMapLayer[];
     customLayers?: CustomLayer[];
     custom_layers?: CustomLayer[];
+    annotation_objects?: AnnotationObject[];
+    annotationObjects?: Record<string, AnnotationObject> | AnnotationObject[];
+    annotation_groups?: Record<string, AnnotationGroup>;
+    annotationGroups?: Record<string, AnnotationGroup>;
+    root_annotation_ids?: string[];
+    rootAnnotationIds?: string[];
     edit_layers?: any[];
     generated_layers?: any[];
     export_templates?: ExportTemplate[];
@@ -242,6 +248,16 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         }
       });
 
+      const annotationGroups: Record<string, AnnotationGroup> = data.annotation_groups || data.annotationGroups || {};
+      const rootAnnotationIds: string[] = data.root_annotation_ids || data.rootAnnotationIds || (
+        Object.keys(annotationGroups).length > 0
+          ? [
+              ...Object.keys(annotationGroups),
+              ...rawAnnotations.filter(a => !a.group_id).map(a => a.id)
+            ]
+          : annotationOrder
+      );
+
       return {
         rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
         nodes: data.nodes || {},
@@ -250,6 +266,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         customLayers,
         activeCustomLayerId: null,
         annotationObjects: annotationMap,
+        annotationGroups,
+        rootAnnotationIds,
         annotationOrder: annotationOrder,
         selectedAnnotationIds: [],
         isAnnotationEditMode: false,
@@ -287,6 +305,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       customLayers: [],
       activeCustomLayerId: null,
       annotationObjects: {},
+      annotationGroups: {},
+      rootAnnotationIds: [],
       annotationOrder: [],
       selectedAnnotationIds: [],
       isAnnotationEditMode: false,
@@ -344,6 +364,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
               blend_mode: layer.blend_mode || 'overwrite'
             })),
             custom_layers: projectData.custom_layers,
+            annotation_objects: projectData.annotation_objects,
+            annotation_groups: projectData.annotation_groups,
+            root_annotation_ids: projectData.root_annotation_ids,
             generated_layers: projectData.generated_layers,
             edit_layers: projectData.edit_layers,
             export_regions: projectData.export_regions,
@@ -466,6 +489,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           map_layers: mapLayersToSave,
           custom_layers: customLayers,
           annotation_objects: annotationObjectsToSave,
+          annotation_groups: get().annotationGroups || {},
+          root_annotation_ids: get().rootAnnotationIds || [],
           export_regions: get().exportRegions,
           options_schema: get().optionsSchema,
           export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),

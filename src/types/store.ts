@@ -67,14 +67,32 @@ export interface PluginSetting {
 
 export type WaypointOptions = Record<string, string | number | boolean | Array<string | number | boolean>>;
 
+export interface GeneratorMetadata {
+  /** 1回の生成セッションを一意に識別するUUID。複合出力されたオブジェクト間で共有される */
+  source_execution_id?: string;
+  /** 実行されたプラグインのID */
+  plugin_id?: string;
+  /** 実行時に渡されたパラメータおよびインタラクション入力のスナップショット */
+  generator_params?: {
+    properties?: Record<string, any>;
+    interaction_data?: Record<string, any>;
+    [key: string]: any;
+  };
+  /** プラグインが出力した内部計算データ（ベクトル場、探索グラフ、数値メトリクスなど） */
+  plugin_data?: Record<string, any>;
+}
+
 export type WaypointNode = {
   id: string;
   type: 'manual' | 'generator';
+  name?: string;
   transform?: Transform;
   generator_params?: Record<string, any>;
   options?: WaypointOptions;
   children_ids?: string[];
   plugin_id?: string; // Add plugin reference for generator nodes
+  source_execution_id?: string;
+  plugin_data?: Record<string, any>;
 };
 
 // --- Robot Footprint Types ---
@@ -100,7 +118,8 @@ export type RobotFootprint = CircularFootprint | RectangularFootprint | PolygonF
 // -----------------------------
 
 // --- Plugin Architecture Types ---
-export type PluginCategory = 'waypoint_generator' | 'map_layer_generator' | 'path_calculator';
+export type PluginPrimaryOutput = 'waypoints' | 'custom_layer' | 'annotations' | 'path_calculator';
+export type PluginCategory = 'waypoint_generator' | 'map_layer_generator' | 'path_calculator' | PluginPrimaryOutput;
 export type PluginInputType = 'point' | 'points' | 'point_list' | 'rectangle' | 'waypoint' | 'annotation' | 'custom_layer';
 
 export interface PluginInteractionPointItem {
@@ -132,6 +151,7 @@ export type PluginInputDef = {
 export type PluginManifest = {
   name: string;
   category?: PluginCategory;
+  primary_output?: PluginPrimaryOutput;
   version?: string;
   description?: string;
   type: 'python' | 'wasm';
@@ -213,6 +233,8 @@ export interface ManualCustomLayer extends CustomLayerBase {
 export interface PluginCustomLayer extends CustomLayerBase {
   type: 'plugin';
   plugin_id: string;
+  source_execution_id?: string;
+  plugin_data?: Record<string, any>;
   params: Record<string, any>;
   interaction_data?: Record<string, any>;
   image_base64: string;
@@ -242,6 +264,9 @@ export interface AnnotationBase {
   visible: boolean;
   labelVisible: boolean;
   color?: string; // HEX color (e.g. '#3B82F6')
+  group_id?: string; // 親グループID（存在する場合）
+  source_execution_id?: string;
+  plugin_data?: Record<string, any>;
 }
 
 export interface PointAnnotation extends AnnotationBase {
@@ -287,7 +312,90 @@ export type AnnotationObject =
   | LineAnnotation
   | RectAnnotation
   | CircleAnnotation;
-// --------------------------------
+
+export interface AnnotationGroup {
+  id: string;
+  name: string;
+  type: 'generator' | 'manual_group';
+  visible: boolean;
+  color?: string;
+  children_ids: string[];
+  plugin_id?: string;
+  source_execution_id?: string;
+  generator_params?: Record<string, any>;
+  plugin_data?: Record<string, any>;
+}
+
+// --- Unified Plugin Run Result Types ---
+export interface PluginWaypointOutputItem {
+  x?: number;
+  y?: number;
+  yaw?: number;
+  qx?: number;
+  qy?: number;
+  qz?: number;
+  qw?: number;
+  transform?: Transform;
+  options?: WaypointOptions;
+}
+
+export interface PluginCustomLayerOutputItem {
+  id?: string;
+  name: string;
+  image_base64: string;
+  info: {
+    resolution: number;
+    origin: [number, number, number];
+    width: number;
+    height: number;
+    negate?: number;
+    occupied_thresh?: number;
+    free_thresh?: number;
+  };
+  blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
+  opacity?: number;
+  plugin_data?: Record<string, any>;
+}
+
+export interface PluginAnnotationOutputItem {
+  id?: string;
+  name?: string;
+  type: AnnotationType;
+  visible?: boolean;
+  labelVisible?: boolean;
+  color?: string;
+  x?: number;
+  y?: number;
+  yaw?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  cx?: number;
+  cy?: number;
+  width?: number;
+  height?: number;
+  angle?: number;
+  radius?: number;
+  plugin_data?: Record<string, any>;
+}
+
+export interface PluginUnifiedResult {
+  waypoints?: {
+    name?: string;
+    items: PluginWaypointOutputItem[];
+    plugin_data?: Record<string, any>;
+  } | PluginWaypointOutputItem[];
+  custom_layers?: PluginCustomLayerOutputItem[];
+  annotations?: {
+    name?: string;
+    items: PluginAnnotationOutputItem[];
+    plugin_data?: Record<string, any>;
+  } | PluginAnnotationOutputItem[];
+  plugin_data?: Record<string, any>;
+  segments?: Array<Array<{ x: number; y: number }>>; // For path calculators
+}
+// ---------------------------------------
 
 export type ObjectNode = WaypointNode;
 
@@ -340,6 +448,8 @@ export interface ProjectData {
   map_layers?: ProjectMapLayer[];
   custom_layers?: CustomLayer[];
   annotation_objects?: AnnotationObject[];
+  annotation_groups?: Record<string, AnnotationGroup>;
+  root_annotation_ids?: string[];
   edit_layers?: any[]; // Legacy
   generated_layers?: any[]; // Legacy
   robot_footprint?: RobotFootprint;

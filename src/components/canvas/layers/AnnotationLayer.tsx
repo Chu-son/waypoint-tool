@@ -33,6 +33,7 @@ export function AnnotationLayer({
   onAnnotationHandlePointerDown,
 }: AnnotationLayerProps) {
   const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
+  const annotationGroups = useAppStore((state) => state.annotationGroups) || {};
   const annotationOrder = useAppStore((state) => state.annotationOrder) || [];
   const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds) || [];
   const showAnnotations = useAppStore((state) => state.showAnnotations);
@@ -57,7 +58,10 @@ export function AnnotationLayer({
   );
 
   const renderSingleAnnotation = (obj: AnnotationObject, isPreview = false) => {
-    if (!obj.visible && !isPreview) return null;
+    if (!isPreview) {
+      if (!obj.visible) return null;
+      if (obj.group_id && annotationGroups[obj.group_id]?.visible === false) return null;
+    }
 
     const isSelected = !isPreview && selectedAnnotationIds.includes(obj.id);
     const baseColorHex = parseHexColor(obj.color, 0x3b82f6);

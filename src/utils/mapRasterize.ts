@@ -310,6 +310,8 @@ export async function prepareCustomLayerPayload(
       params: customLayer.params,
       image_base64: customLayer.image_base64,
       info: customLayer.info,
+      plugin_data: (customLayer as any).plugin_data,
+      source_execution_id: (customLayer as any).source_execution_id,
     };
   }
 }

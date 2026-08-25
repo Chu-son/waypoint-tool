@@ -1,8 +1,21 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { PluginInstance, PluginSetting } from '../../types/store';
+import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject } from '../../types/store';
 import { BackendAPI } from '../../api';
-import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
+import { v4 as uuidv4 } from 'uuid';
+
+export interface ExecutePluginParams {
+  plugin: PluginInstance;
+  properties: Record<string, any>;
+  interactionData?: Record<string, any>;
+  existingExecutionId?: string;
+  targetParentWaypointId?: string;
+  targetCustomLayerId?: string;
+  targetAnnotationGroupId?: string;
+  idsToConsume?: string[];
+  insertIndex?: number;
+}
 
 export type PluginSlice = {
   plugins: Record<string, PluginInstance>;
@@ -27,6 +40,15 @@ export type PluginSlice = {
   setPluginActiveProperties: (props: Record<string, any>) => void;
   setActiveInputIndex: (index: number) => void;
   reloadPlugins: () => Promise<void>;
+
+  executeGeneratorPlugin: (params: ExecutePluginParams) => Promise<{
+    success: boolean;
+    executionId: string;
+    parentWaypointId?: string;
+    customLayerIds: string[];
+    annotationGroupId?: string;
+    error?: string;
+  }>;
 
   setActivePathCalculatorPluginId: (pluginId: string | null) => void;
   setPathCalculatorParams: (params: Record<string, any>) => void;
@@ -90,6 +112,375 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   setPluginActiveProperties: (props) => set({ pluginActiveProperties: props }),
   
   setActiveInputIndex: (index) => set({ activeInputIndex: index }),
+
+  executeGeneratorPlugin: async (params) => {
+    const {
+      plugin,
+      properties,
+      interactionData = {},
+      existingExecutionId,
+      targetParentWaypointId,
+      targetCustomLayerId,
+      targetAnnotationGroupId,
+      idsToConsume = [],
+      insertIndex = -1,
+    } = params;
+
+    const {
+      globalPythonPath,
+      pluginSettings,
+      mapLayers,
+      customLayers,
+      nodes,
+      selectedNodeIds,
+      robotFootprint,
+      annotationObjects,
+    } = get();
+
+    const executionId = existingExecutionId || uuidv4();
+    const inputs = plugin.manifest.inputs || [];
+    const needsSelection = plugin.manifest.needs?.includes('selected_points') || false;
+
+    if (needsSelection && selectedNodeIds.length === 0 && !params.existingExecutionId) {
+      throw new Error('This plugin requires selecting waypoint(s) on the canvas first.');
+    }
+
+    const contextData: any = {
+      properties,
+      interaction_data: {},
+    };
+
+    inputs.forEach((inp) => {
+      const key = inp.name || inp.id;
+      if (key && interactionData[key] !== undefined) {
+        contextData.interaction_data[key] = interactionData[key];
+      }
+    });
+
+    if (needsSelection) {
+      contextData.selected_points = selectedNodeIds
+        .map((id) => nodes[id]?.transform)
+        .filter(Boolean);
+    }
+
+    if (plugin.manifest.needs?.includes('robot_footprint')) {
+      contextData.robot_footprint = robotFootprint;
+    }
+
+    let pythonPathToUse = globalPythonPath?.trim() || 'python3';
+    if (plugin.manifest.type === 'python') {
+      const setting = pluginSettings.find((s) => s.id === plugin.id);
+      if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== '') {
+        pythonPathToUse = setting.pythonOverridePath.trim();
+      }
+    }
+
+    const needsOccupancyGrid = plugin.manifest.needs?.some(
+      (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+    );
+
+    const layersToPass = needsOccupancyGrid
+      ? await prepareLayersForExport(mapLayers, customLayers)
+      : undefined;
+
+    const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+    const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
+      plugin.manifest.inputs,
+      contextData.interaction_data || {},
+      customLayers,
+      baseRes,
+      annotationObjects
+    );
+
+    const finalContextData = {
+      ...contextData,
+      interaction_data: enrichedInteractionData,
+    };
+
+    const rawResult: any = await BackendAPI.runPlugin(
+      plugin,
+      finalContextData,
+      pythonPathToUse,
+      layersToPass
+    );
+
+    let resultingParentWaypointId: string | undefined = undefined;
+    const resultingCustomLayerIds: string[] = [];
+    let resultingAnnotationGroupId: string | undefined = undefined;
+
+    get().runInHistoryTransaction(() => {
+      const store = get();
+
+      // ----------------------------------------------------
+      // 1. Waypoint Output Handling
+      // ----------------------------------------------------
+      let waypointItems: any[] | null = null;
+      let waypointPluginData: Record<string, any> | undefined = undefined;
+      let waypointGroupName: string | undefined = undefined;
+
+      if (rawResult && rawResult.waypoints) {
+        if (Array.isArray(rawResult.waypoints)) {
+          waypointItems = rawResult.waypoints;
+        } else if (rawResult.waypoints.items && Array.isArray(rawResult.waypoints.items)) {
+          waypointItems = rawResult.waypoints.items;
+          waypointPluginData = rawResult.waypoints.plugin_data;
+          waypointGroupName = rawResult.waypoints.name;
+        }
+      } else if (Array.isArray(rawResult) && rawResult.length > 0 && (rawResult[0].transform || rawResult[0].x !== undefined)) {
+        // Direct list of waypoints
+        waypointItems = rawResult;
+      }
+
+      if (waypointItems && waypointItems.length > 0) {
+        let parentId = targetParentWaypointId;
+        if (!parentId && existingExecutionId) {
+          // Find parent node with matching execution_id
+          const found = Object.values(store.nodes).find(n => n.type === 'generator' && n.source_execution_id === existingExecutionId);
+          if (found) parentId = found.id;
+        }
+
+        if (parentId && store.nodes[parentId]) {
+          // Existing generator node -> replace children
+          const existingParent = store.nodes[parentId];
+          if (existingParent.children_ids && existingParent.children_ids.length > 0) {
+            store.removeNodes(existingParent.children_ids);
+          }
+          store.updateNode(parentId, {
+            plugin_id: plugin.id,
+            source_execution_id: executionId,
+            generator_params: finalContextData,
+            plugin_data: waypointPluginData || rawResult.plugin_data || existingParent.plugin_data,
+            name: waypointGroupName || existingParent.name,
+          });
+          resultingParentWaypointId = parentId;
+        } else {
+          // New parent generator node
+          parentId = uuidv4();
+          if (idsToConsume.length > 0) {
+            store.removeNodes(idsToConsume);
+          }
+          store.addNode({
+            id: parentId,
+            type: 'generator',
+            name: waypointGroupName || plugin.manifest.name,
+            plugin_id: plugin.id,
+            source_execution_id: executionId,
+            generator_params: finalContextData,
+            plugin_data: waypointPluginData || rawResult.plugin_data,
+            children_ids: [],
+          });
+
+          if (insertIndex !== -1) {
+            const currentRootIds = store.rootNodeIds;
+            const newIdx = currentRootIds.indexOf(parentId);
+            if (newIdx !== -1 && newIdx !== insertIndex) {
+              store.reorderNodes(newIdx, insertIndex);
+            }
+          }
+          resultingParentWaypointId = parentId;
+        }
+
+        // Add child waypoint nodes
+        waypointItems.forEach((wp) => {
+          let qx = wp.qx ?? 0,
+            qy = wp.qy ?? 0,
+            qz = wp.qz ?? 0,
+            qw = wp.qw ?? 1;
+          if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
+            const halfYaw = wp.yaw / 2.0;
+            qz = Math.sin(halfYaw);
+            qw = Math.cos(halfYaw);
+          }
+
+          const childId = uuidv4();
+          store.addNode(
+            {
+              id: childId,
+              type: 'manual',
+              transform: wp.transform || {
+                x: wp.x ?? 0,
+                y: wp.y ?? 0,
+                qx,
+                qy,
+                qz,
+                qw,
+              },
+              options: wp.options || {},
+            },
+            parentId
+          );
+        });
+      }
+
+      // ----------------------------------------------------
+      // 2. Custom Layer Output Handling
+      // ----------------------------------------------------
+      let layerList: any[] = [];
+      if (rawResult && rawResult.custom_layers && Array.isArray(rawResult.custom_layers)) {
+        layerList = rawResult.custom_layers;
+      } else if (rawResult && rawResult.image_base64 && rawResult.info) {
+        // Direct single layer output
+        layerList = [rawResult];
+      }
+
+      layerList.forEach((layerItem) => {
+        let existingLayerId = targetCustomLayerId;
+        if (!existingLayerId && existingExecutionId) {
+          const found = store.customLayers.find(
+            (l) => l.type === 'plugin' && (l as any).source_execution_id === existingExecutionId
+          );
+          if (found) existingLayerId = found.id;
+        }
+
+        const layerPluginData = layerItem.plugin_data || rawResult.plugin_data;
+
+        if (existingLayerId) {
+          store.updateCustomLayer(existingLayerId, {
+            name: layerItem.name || 'Generated Layer',
+            image_base64: layerItem.image_base64,
+            info: layerItem.info,
+            blend_mode: layerItem.blend_mode || 'overwrite',
+            opacity: layerItem.opacity ?? 0.7,
+            params: properties,
+            interaction_data: contextData.interaction_data,
+            plugin_id: plugin.id,
+            source_execution_id: executionId,
+            plugin_data: layerPluginData,
+          } as Partial<PluginCustomLayer>);
+          resultingCustomLayerIds.push(existingLayerId);
+        } else {
+          const newLayerId = layerItem.id || uuidv4();
+          const newPluginLayer: PluginCustomLayer = {
+            id: newLayerId,
+            name: layerItem.name || `${plugin.manifest.name} Layer`,
+            type: 'plugin',
+            plugin_id: plugin.id,
+            source_execution_id: executionId,
+            plugin_data: layerPluginData,
+            params: properties,
+            interaction_data: contextData.interaction_data,
+            image_base64: layerItem.image_base64,
+            info: layerItem.info,
+            visible: true,
+            opacity: layerItem.opacity ?? 0.7,
+            z_index: store.customLayers.length,
+            blend_mode: layerItem.blend_mode || 'overwrite',
+            is_reference: false,
+          };
+          store.addPluginCustomLayer(newPluginLayer);
+          resultingCustomLayerIds.push(newLayerId);
+        }
+      });
+
+      // ----------------------------------------------------
+      // 3. Annotation Output Handling
+      // ----------------------------------------------------
+      let annotationItems: any[] | null = null;
+      let annotationPluginData: Record<string, any> | undefined = undefined;
+      let annotationGroupName: string | undefined = undefined;
+
+      if (rawResult && rawResult.annotations) {
+        if (Array.isArray(rawResult.annotations)) {
+          annotationItems = rawResult.annotations;
+        } else if (rawResult.annotations.items && Array.isArray(rawResult.annotations.items)) {
+          annotationItems = rawResult.annotations.items;
+          annotationPluginData = rawResult.annotations.plugin_data;
+          annotationGroupName = rawResult.annotations.name;
+        }
+      }
+
+      if (annotationItems && annotationItems.length > 0) {
+        let groupId = targetAnnotationGroupId;
+        if (!groupId && existingExecutionId) {
+          const found = Object.values(store.annotationGroups).find(
+            (g) => g.source_execution_id === existingExecutionId
+          );
+          if (found) groupId = found.id;
+        }
+
+        const annoPluginData = annotationPluginData || rawResult.plugin_data;
+
+        if (groupId && store.annotationGroups[groupId]) {
+          // Existing group -> remove old children and replace
+          const existingGroup = store.annotationGroups[groupId];
+          if (existingGroup.children_ids && existingGroup.children_ids.length > 0) {
+            store.removeAnnotationObjects(existingGroup.children_ids);
+          }
+
+          const newChildrenIds: string[] = [];
+          annotationItems.forEach((anno) => {
+            const childId = anno.id || uuidv4();
+            const childObj: AnnotationObject = {
+              id: childId,
+              name: anno.name || `${existingGroup.name} Item`,
+              type: anno.type || 'point',
+              visible: anno.visible ?? true,
+              labelVisible: anno.labelVisible ?? true,
+              color: anno.color || existingGroup.color || '#3B82F6',
+              group_id: groupId,
+              source_execution_id: executionId,
+              plugin_data: anno.plugin_data,
+              ...(anno as any),
+            };
+            store.addAnnotationObject(childObj, groupId);
+            newChildrenIds.push(childId);
+          });
+
+          store.updateAnnotationGroup(groupId, {
+            name: annotationGroupName || existingGroup.name,
+            plugin_id: plugin.id,
+            source_execution_id: executionId,
+            generator_params: finalContextData,
+            plugin_data: annoPluginData || existingGroup.plugin_data,
+            children_ids: newChildrenIds,
+          });
+          resultingAnnotationGroupId = groupId;
+        } else {
+          // New Annotation Group
+          groupId = uuidv4();
+          const newGroup: AnnotationGroup = {
+            id: groupId,
+            name: annotationGroupName || `${plugin.manifest.name} Annotations`,
+            type: 'generator',
+            visible: true,
+            color: '#3B82F6',
+            children_ids: [],
+            plugin_id: plugin.id,
+            source_execution_id: executionId,
+            generator_params: finalContextData,
+            plugin_data: annoPluginData,
+          };
+          store.addAnnotationGroup(newGroup);
+
+          annotationItems.forEach((anno) => {
+            const childId = anno.id || uuidv4();
+            const childObj: AnnotationObject = {
+              id: childId,
+              name: anno.name || 'Annotation',
+              type: anno.type || 'point',
+              visible: anno.visible ?? true,
+              labelVisible: anno.labelVisible ?? true,
+              color: anno.color || '#3B82F6',
+              group_id: groupId,
+              source_execution_id: executionId,
+              plugin_data: anno.plugin_data,
+              ...(anno as any),
+            };
+            store.addAnnotationObject(childObj, groupId);
+          });
+          resultingAnnotationGroupId = groupId;
+        }
+      }
+    });
+
+    return {
+      success: true,
+      executionId,
+      parentWaypointId: resultingParentWaypointId,
+      customLayerIds: resultingCustomLayerIds,
+      annotationGroupId: resultingAnnotationGroupId,
+    };
+  },
 
   setActivePathCalculatorPluginId: (pluginId) => {
     set({ activePathCalculatorPluginId: pluginId, isDirty: true });
