@@ -85,32 +85,18 @@ def _parse_color_rgba(color_input: Any, default_alpha: int = 180) -> Tuple[int, 
     return (34, 197, 94, default_alpha)
 
 
-class MapLayerGenerator(PluginBase):
-    """マップレイヤーを生成するプラグインの基底クラス。"""
+from .core import PluginBase, PluginGenerator, PluginResult
+
+
+class MapLayerGenerator(PluginGenerator):
+    """マップレイヤーを生成するプラグインの基底クラス（後方互換対応）。"""
 
     def generate_layer(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """マップレイヤーの辞書を生成して返す。サブクラスで必ずオーバーライドしてください。"""
-        raise NotImplementedError("Plugins must implement the 'generate_layer' method.")
+        """マップレイヤーの辞書を生成して返す。サブクラスでオーバーライド可能です。"""
+        raise NotImplementedError("Plugins must implement 'generate_layer' or 'generate'.")
 
-    def run_from_stdin(self):
-        """標準入出力 (stdin / stdout) 通信ループ。"""
-        try:
-            input_data = sys.stdin.read()
-            if not input_data.strip():
-                print("{}")
-                return
-
-            context = json.loads(input_data)
-            result = self.generate_layer(context)
-
-            if not isinstance(result, dict):
-                raise ValueError(f"Expected dict from generate_layer, got {type(result)}")
-
-            print(json.dumps(result))
-
-        except Exception:
-            print(traceback.format_exc(), file=sys.stderr)
-            sys.exit(1)
+    def generate(self, context: Dict[str, Any]) -> Any:
+        return self.generate_layer(context)
 
     @staticmethod
     def create_layer_from_mask(

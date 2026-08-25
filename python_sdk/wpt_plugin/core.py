@@ -2,7 +2,7 @@ import sys
 import json
 import math
 import traceback
-from typing import Dict, Any, List, Optional, TypedDict
+from typing import Dict, Any, List, Optional, TypedDict, Sequence, Union
 
 from .geometry import Point, Rectangle, Line
 from .utils import normalize_yaw, quaternion_to_yaw, yaw_to_quaternion
@@ -124,6 +124,13 @@ class PluginBase:
             return None
         return OccupancyGrid(data)
 
+    @staticmethod
+    def get_plugin_data(obj: Any) -> Optional[Dict[str, Any]]:
+        """Retrieve plugin_data dictionary from any object (layer, annotation, waypoint, etc.)."""
+        if not obj or not isinstance(obj, dict):
+            return None
+        return obj.get("plugin_data")
+
     def get_robot_footprint(self, context: Dict[str, Any]) -> Optional[RobotFootprint]:
         """context["robot_footprint"] を RobotFootprint インスタンスとして返す。
         needs に "robot_footprint" を指定していない場合は None。"""
@@ -145,11 +152,100 @@ class PluginBase:
         return yaw_to_quaternion(yaw)
 
 
-class WaypointGenerator(PluginBase):
-    """Base class for Waypoint Generator plugins."""
+class PluginResult:
+    """Builder class for unified multi-object plugin outputs."""
 
-    def generate(self, context: Dict[str, Any]) -> List[Waypoint]:
-        """Generate waypoints. MUST be overridden by subclasses."""
+    def __init__(self):
+        self._waypoints: Optional[Dict[str, Any]] = None
+        self._custom_layers: List[Dict[str, Any]] = []
+        self._annotations: Optional[Dict[str, Any]] = None
+        self._plugin_data: Optional[Dict[str, Any]] = None
+
+    def add_waypoints(self,
+                      items: Sequence[Any],
+                      name: Optional[str] = None,
+                      plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
+        """Add generated waypoints to output."""
+        self._waypoints = {
+            "items": list(items),
+        }
+        if name is not None:
+            self._waypoints["name"] = name
+        if plugin_data is not None:
+            self._waypoints["plugin_data"] = plugin_data
+        return self
+
+    def add_custom_layer_dict(self,
+                              layer_dict: Dict[str, Any],
+                              plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
+        """Add a custom layer dictionary to output."""
+        l = dict(layer_dict)
+        if plugin_data is not None:
+            l["plugin_data"] = plugin_data
+        self._custom_layers.append(l)
+        return self
+
+    def add_custom_layer(self,
+                         name: str,
+                         mask: Sequence[Sequence[Any]],
+                         origin: Sequence[float],
+                         resolution: float,
+                         blend_mode: str = "overwrite",
+                         color_rgba: Any = (34, 197, 94, 180),
+                         bg_rgba: Any = (0, 0, 0, 0),
+                         plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
+        """Create and add a custom layer from a 2D mask."""
+        from .layer import MapLayerGenerator
+        layer_dict = MapLayerGenerator.create_layer_from_mask(
+            mask_2d=mask,
+            origin=origin,
+            resolution=resolution,
+            name=name,
+            blend_mode=blend_mode,
+            color_rgba=color_rgba,
+            bg_rgba=bg_rgba,
+        )
+        return self.add_custom_layer_dict(layer_dict, plugin_data=plugin_data)
+
+    def add_annotations(self,
+                        items: Sequence[Dict[str, Any]],
+                        name: Optional[str] = None,
+                        plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
+        """Add generated annotations to output."""
+        self._annotations = {
+            "items": list(items),
+        }
+        if name is not None:
+            self._annotations["name"] = name
+        if plugin_data is not None:
+            self._annotations["plugin_data"] = plugin_data
+        return self
+
+    def set_plugin_data(self, plugin_data: Dict[str, Any]) -> 'PluginResult':
+        """Set root-level plugin_data."""
+        self._plugin_data = plugin_data
+        return self
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize into unified output JSON structure."""
+        out: Dict[str, Any] = {}
+        if self._waypoints is not None:
+            out["waypoints"] = self._waypoints
+        if self._custom_layers:
+            out["custom_layers"] = self._custom_layers
+        if self._annotations is not None:
+            out["annotations"] = self._annotations
+        if self._plugin_data is not None:
+            out["plugin_data"] = self._plugin_data
+        return out
+
+
+class PluginGenerator(PluginBase):
+    """Base class for all unified Waypoint Tool generators."""
+    empty_output: Any = {}
+
+    def generate(self, context: Dict[str, Any]) -> Union[PluginResult, List[Any], Dict[str, Any]]:
+        """Generate outputs. MUST be overridden by subclasses."""
         raise NotImplementedError("Plugins must implement the 'generate' method.")
 
     def run_from_stdin(self):
@@ -157,17 +253,24 @@ class WaypointGenerator(PluginBase):
         try:
             input_data = sys.stdin.read()
             if not input_data.strip():
-                print("[]")
+                print(json.dumps(self.empty_output))
                 return
 
             context = json.loads(input_data)
             result = self.generate(context)
 
-            if not isinstance(result, list):
-                result = [result]
-
-            self._validate_output(result)
-            print(json.dumps(result))
+            if isinstance(result, PluginResult):
+                payload = result.to_dict()
+                print(json.dumps(payload))
+            elif isinstance(result, list):
+                # Legacy / direct waypoint list return
+                self._validate_waypoints(result)
+                print(json.dumps(result))
+            elif isinstance(result, dict):
+                # Legacy / direct layer or unified dict return
+                print(json.dumps(result))
+            else:
+                raise ValueError(f"Unexpected generator return type: {type(result)}")
 
         except Exception:
             print(traceback.format_exc(), file=sys.stderr)
@@ -192,11 +295,52 @@ class WaypointGenerator(PluginBase):
             wp["options"] = options
         return wp
 
-    def _validate_output(self, waypoints: List[Any]):
+    @staticmethod
+    def make_annotation_point(x: float, y: float, name: str = "Point", color: Optional[str] = None) -> Dict[str, Any]:
+        anno: Dict[str, Any] = {"type": "point", "x": x, "y": y, "name": name, "visible": True, "labelVisible": True}
+        if color:
+            anno["color"] = color
+        return anno
+
+    @staticmethod
+    def make_annotation_oriented_point(x: float, y: float, yaw: float, name: str = "Oriented Point", color: Optional[str] = None) -> Dict[str, Any]:
+        anno: Dict[str, Any] = {"type": "oriented_point", "x": x, "y": y, "yaw": yaw, "name": name, "visible": True, "labelVisible": True}
+        if color:
+            anno["color"] = color
+        return anno
+
+    @staticmethod
+    def make_annotation_line(x1: float, y1: float, x2: float, y2: float, name: str = "Line", color: Optional[str] = None) -> Dict[str, Any]:
+        anno: Dict[str, Any] = {"type": "line", "x1": x1, "y1": y1, "x2": x2, "y2": y2, "name": name, "visible": True, "labelVisible": True}
+        if color:
+            anno["color"] = color
+        return anno
+
+    @staticmethod
+    def make_annotation_rect(cx: float, cy: float, width: float, height: float, angle: float = 0.0, name: str = "Rect", color: Optional[str] = None) -> Dict[str, Any]:
+        anno: Dict[str, Any] = {"type": "rect", "cx": cx, "cy": cy, "width": width, "height": height, "angle": angle, "name": name, "visible": True, "labelVisible": True}
+        if color:
+            anno["color"] = color
+        return anno
+
+    @staticmethod
+    def make_annotation_circle(cx: float, cy: float, radius: float, name: str = "Circle", color: Optional[str] = None) -> Dict[str, Any]:
+        anno: Dict[str, Any] = {"type": "circle", "cx": cx, "cy": cy, "radius": radius, "name": name, "visible": True, "labelVisible": True}
+        if color:
+            anno["color"] = color
+        return anno
+
+    def _validate_waypoints(self, waypoints: List[Any]):
         for i, wp in enumerate(waypoints):
             if not isinstance(wp, dict):
                 self.log(f"WARNING: Waypoint [{i}] is not a dict: {type(wp)}")
                 continue
             if "transform" not in wp and ("x" not in wp or "y" not in wp):
                 self.log(f"WARNING: Waypoint [{i}] has no positional data")
+
+
+class WaypointGenerator(PluginGenerator):
+    """Backward compatible class for Waypoint Generator plugins."""
+    empty_output: Any = []
+
 

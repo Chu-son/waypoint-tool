@@ -8,7 +8,7 @@ import unittest
 
 # Add parent directory to path so we can import wpt_plugin
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from wpt_plugin import WaypointGenerator, MapLayerGenerator, PathCalculator, OccupancyGrid
+from wpt_plugin import WaypointGenerator, MapLayerGenerator, PathCalculator, OccupancyGrid, PluginGenerator, PluginResult
 
 
 
@@ -253,6 +253,93 @@ class TestPathCalculator(unittest.TestCase):
         self.assertEqual(result["segments"][0][-1]["x"], 1.0)
 
 
+class DummyUnifiedPlugin(PluginGenerator):
+    def generate(self, context):
+        res = PluginResult()
+        res.add_waypoints([
+            self.make_waypoint(1.0, 2.0, 0.0, options={"speed": 1.5}),
+            self.make_waypoint(3.0, 4.0, 1.57),
+        ], name="Test Path", plugin_data={"total_dist": 2.82})
+        
+        mask = [[1, 0], [0, 1]]
+        res.add_custom_layer(
+            name="Test Layer",
+            mask=mask,
+            origin=[0.0, 0.0, 0.0],
+            resolution=0.05,
+            plugin_data={"coverage": 50.0}
+        )
+        
+        res.add_annotations([
+            self.make_annotation_rect(2.0, 3.0, 4.0, 5.0, name="Boundary Rect", color="#ff0000"),
+            self.make_annotation_point(1.0, 2.0, name="Start Point"),
+        ], name="Test Anno Group", plugin_data={"area": 20.0})
+        
+        res.set_plugin_data({"global_val": 42})
+        return res
+
+
+class TestPluginGeneratorUnified(unittest.TestCase):
+    def test_plugin_result_serialization(self):
+        plugin = DummyUnifiedPlugin()
+        context = {"properties": {}}
+        res = plugin.generate(context)
+        self.assertIsInstance(res, PluginResult)
+        d = res.to_dict()
+        
+        # Check waypoints
+        self.assertIn("waypoints", d)
+        self.assertEqual(len(d["waypoints"]["items"]), 2)
+        self.assertEqual(d["waypoints"]["name"], "Test Path")
+        self.assertEqual(d["waypoints"]["plugin_data"]["total_dist"], 2.82)
+        
+        # Check custom layers
+        self.assertIn("custom_layers", d)
+        self.assertEqual(len(d["custom_layers"]), 1)
+        self.assertEqual(d["custom_layers"][0]["name"], "Test Layer")
+        self.assertEqual(d["custom_layers"][0]["plugin_data"]["coverage"], 50.0)
+        self.assertTrue(d["custom_layers"][0]["image_base64"].startswith("data:image/png;base64,"))
+        
+        # Check annotations
+        self.assertIn("annotations", d)
+        self.assertEqual(len(d["annotations"]["items"]), 2)
+        self.assertEqual(d["annotations"]["name"], "Test Anno Group")
+        self.assertEqual(d["annotations"]["plugin_data"]["area"], 20.0)
+        
+        # Check global plugin_data
+        self.assertIn("plugin_data", d)
+        self.assertEqual(d["plugin_data"]["global_val"], 42)
+
+    def test_run_from_stdin_unified(self):
+        old_stdin, old_stdout = sys.stdin, sys.stdout
+        context = {"properties": {}}
+        sys.stdin = io.StringIO(json.dumps(context))
+        sys.stdout = captured = io.StringIO()
+        try:
+            plugin = DummyUnifiedPlugin()
+            plugin.run_from_stdin()
+        finally:
+            sys.stdin, sys.stdout = old_stdin, old_stdout
+
+        result = json.loads(captured.getvalue())
+        self.assertIn("waypoints", result)
+        self.assertIn("custom_layers", result)
+        self.assertIn("annotations", result)
+        self.assertIn("plugin_data", result)
+
+    def test_get_plugin_data_helper(self):
+        plugin = DummyUnifiedPlugin()
+        layer = {"name": "L1", "plugin_data": {"val": 123}}
+        anno = {"name": "A1", "plugin_data": {"val": 456}}
+        raw = {"name": "NoData"}
+        
+        self.assertEqual(plugin.get_plugin_data(layer), {"val": 123})
+        self.assertEqual(plugin.get_plugin_data(anno), {"val": 456})
+        self.assertIsNone(plugin.get_plugin_data(raw))
+        self.assertIsNone(plugin.get_plugin_data(None))
+
+
 if __name__ == '__main__':
     unittest.main()
+
 

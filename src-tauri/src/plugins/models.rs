@@ -85,6 +85,8 @@ pub struct PluginManifest {
     #[serde(default)]
     pub category: Option<String>, // "waypoint_generator" | "map_layer_generator" | "path_calculator"
     #[serde(default)]
+    pub primary_output: Option<String>, // "waypoints" | "custom_layer" | "annotations" | "path_calculator"
+    #[serde(default)]
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub plugin_type: String, // "python" or "wasm"
