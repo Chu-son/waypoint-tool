@@ -51,6 +51,16 @@ export type UISlice = {
   isInitialLaunch: boolean;
   settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins';
 
+  // Plugin Data Viewer Modal State
+  pluginDataModalState: {
+    isOpen: boolean;
+    title: string;
+    subtitle?: string;
+    data: any;
+  };
+  openPluginDataModal: (title: string, data: any, subtitle?: string) => void;
+  closePluginDataModal: () => void;
+
   // Map Edit UI State
   isMapEditMode: boolean;
   mapEditSubTool: 'rect' | 'circle' | 'freehand';
@@ -175,6 +185,29 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   isShortcutsModalOpen: false,
   isWelcomeModalOpen: true,
   isInitialLaunch: true,
+
+  pluginDataModalState: {
+    isOpen: false,
+    title: '',
+    subtitle: undefined,
+    data: null,
+  },
+  openPluginDataModal: (title, data, subtitle) =>
+    set({
+      pluginDataModalState: {
+        isOpen: true,
+        title,
+        subtitle,
+        data,
+      },
+    }),
+  closePluginDataModal: () =>
+    set((state) => ({
+      pluginDataModalState: {
+        ...state.pluginDataModalState,
+        isOpen: false,
+      },
+    })),
 
   isMapEditMode: false,
   mapEditSubTool: 'rect',

@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { ChevronRight, Layers, GripVertical, Anchor } from 'lucide-react';
-import { Button } from './common/Button';
+import { ChevronRight, Layers, GripVertical, Anchor, Code2, Unlink, Trash2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
   DndContext,
@@ -48,6 +47,11 @@ export function WaypointTree() {
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
   const insertionIndex = useAppStore(state => state.insertionIndex);
   const setInsertionIndex = useAppStore(state => state.setInsertionIndex);
+  const explodeGenerator = useAppStore(state => state.explodeGenerator);
+  const removeNodes = useAppStore(state => state.removeNodes);
+  const setRightPanelActiveTab = useAppStore(state => state.setRightPanelActiveTab);
+  const setRightPanelOpen = useAppStore(state => state.setRightPanelOpen);
+  const openPluginDataModal = useAppStore(state => state.openPluginDataModal);
 
   const anchorNodeId = useAppStore(state => state.anchorNodeId);
   const setAnchorNode = useAppStore(state => state.setAnchorNode);
@@ -56,7 +60,7 @@ export function WaypointTree() {
 
   const [expandedGenerators, setExpandedGenerators] = useState<Set<string>>(new Set());
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; parentId?: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -219,6 +223,12 @@ export function WaypointTree() {
                         isSelected={isSelected}
                         variant="generator"
                         onClick={(e) => handleNodeClick(id, e)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          selectNodes([id]);
+                          setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
+                        }}
                         idTag={id.slice(0, 6)}
                       >
                         <button
@@ -246,7 +256,8 @@ export function WaypointTree() {
                                 onContextMenu={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setContextMenu({ nodeId: childId, x: e.clientX, y: e.clientY });
+                                  selectNodes([childId]);
+                                  setContextMenu({ nodeId: childId, parentId: id, x: e.clientX, y: e.clientY });
                                 }}
                                 className={cn(
                                   "px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between",
@@ -284,6 +295,7 @@ export function WaypointTree() {
                       onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
+                        selectNodes([id]);
                         setContextMenu({ nodeId: id, x: e.clientX, y: e.clientY });
                       }}
                       idTag={id.slice(0, 6)}
@@ -306,23 +318,102 @@ export function WaypointTree() {
         <div
           ref={menuRef}
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-[9999] bg-surface-panel border border-border-base rounded-lg shadow-xl py-1 min-w-[160px] text-xs text-text-base select-none"
+          className="fixed z-[9999] bg-surface-panel border border-border-base rounded-xl shadow-xl py-1 min-w-[180px] text-xs text-text-base select-none backdrop-blur-md flex flex-col gap-0.5"
         >
-          <Button
-            variant="ghost"
-            onClick={() => {
-              if (anchorNodeId === contextMenu.nodeId) {
-                setAnchorNode(null);
-              } else {
-                setAnchorNode(contextMenu.nodeId);
-              }
-              setContextMenu(null);
-            }}
-            className="w-full justify-start px-3 py-2 text-left text-xs flex items-center gap-2 text-text-base hover:bg-surface-hover rounded-none border-none transition-colors"
-          >
-            <Anchor size={14} className="text-amber-400" />
-            {anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}
-          </Button>
+          {(() => {
+            const targetNode = nodes[contextMenu.nodeId];
+            const isGenerator = targetNode?.type === 'generator';
+
+            return (
+              <>
+                {/* 内部プロパティ表示 (モーダル) */}
+                <button
+                  onClick={() => {
+                    const dataObj = isGenerator ? targetNode : (contextMenu.parentId ? nodes[contextMenu.parentId] : targetNode);
+                    const titleName = isGenerator
+                      ? (targetNode?.plugin_id && plugins[targetNode.plugin_id]?.manifest.name) || 'Waypoint Generator'
+                      : 'Waypoint';
+                    openPluginDataModal(
+                      `内部プロパティ: ${titleName}`,
+                      dataObj?.plugin_data,
+                      `ノードID: ${dataObj?.id} • 内部メタデータ (Read-only)`
+                    );
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Code2 size={13} className="text-cyan-400" />
+                  <span>内部プロパティを表示</span>
+                </button>
+
+                {/* インスペクターを開く */}
+                <button
+                  onClick={() => {
+                    if (isGenerator) {
+                      selectNodes([contextMenu.nodeId]);
+                    } else if (contextMenu.parentId) {
+                      selectNodes([contextMenu.parentId]);
+                    } else {
+                      selectNodes([contextMenu.nodeId]);
+                    }
+                    setRightPanelActiveTab('inspector');
+                    setRightPanelOpen(true);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Layers size={13} className="text-text-muted" />
+                  <span>インスペクターを開く</span>
+                </button>
+
+                {/* アンカー設定 (ウェイポイントの場合) */}
+                {!isGenerator && (
+                  <button
+                    onClick={() => {
+                      if (anchorNodeId === contextMenu.nodeId) {
+                        setAnchorNode(null);
+                      } else {
+                        setAnchorNode(contextMenu.nodeId);
+                      }
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Anchor size={13} className="text-amber-400" />
+                    <span>{anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
+                  </button>
+                )}
+
+                {/* ジェネレーター解除 (Explode) */}
+                {isGenerator && (
+                  <button
+                    onClick={() => {
+                      explodeGenerator(contextMenu.nodeId);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Unlink size={13} className="text-amber-400" />
+                    <span>ジェネレーター解除 (Explode)</span>
+                  </button>
+                )}
+
+                <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 削除 */}
+                <button
+                  onClick={() => {
+                    removeNodes([contextMenu.nodeId]);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                >
+                  <Trash2 size={13} />
+                  <span>削除 (Delete)</span>
+                </button>
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

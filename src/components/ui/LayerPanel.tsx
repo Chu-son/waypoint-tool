@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette, Bookmark } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette, Bookmark, Code2 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI, BackendAPI } from "../../api";
 import { Button } from "./common/Button";
@@ -19,16 +19,19 @@ function CardFrame({
   className,
   isActive = false,
   onClick,
+  onContextMenu,
 }: {
   visible?: boolean;
   children: React.ReactNode;
   className?: string;
   isActive?: boolean;
   onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   return (
     <div
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={cn(
         "bg-surface-panel/40 backdrop-blur-sm border rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer",
         isActive ? "border-primary-base/80 bg-primary-base/5 ring-1 ring-primary-base/30" : "border-border-base/30",
@@ -73,12 +76,30 @@ export function LayerPanel() {
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
   const selectNodes = useAppStore((state) => state.selectNodes);
+  const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
 
   const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
   const setShowOccupancyHighlight = useAppStore((state) => state.setShowOccupancyHighlight);
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{
+    type: "custom" | "map";
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLoadMap = async () => {
     try {
@@ -234,6 +255,13 @@ export function LayerPanel() {
                     setRightPanelActiveTab("inspector");
                     setRightPanelOpen(true);
                   }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    selectNodes([]);
+                    setActiveCustomLayerId(layer.id);
+                    setContextMenu({ type: "custom", id: layer.id, x: e.clientX, y: e.clientY });
+                  }}
                   onToggleEdit={() => {
                     if (layer.type === "manual") {
                       if (isEditing) {
@@ -301,6 +329,11 @@ export function LayerPanel() {
                   onSelect={() => {
                     if (isMapEditMode) setActiveMapLayerId(layer.id);
                   }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setContextMenu({ type: "map", id: layer.id, x: e.clientX, y: e.clientY });
+                  }}
                   onMoveUp={() => moveUpMap(index)}
                   onMoveDown={() => moveDownMap(index)}
                   onToggleVisible={() => updateMapLayer(layer.id, { visible: !layer.visible })}
@@ -363,6 +396,179 @@ export function LayerPanel() {
         isOpen={isNewCustomLayerModalOpen}
         onClose={() => setIsNewCustomLayerModalOpen(false)}
       />
+
+      {/* Layer Context Menu */}
+      {contextMenu && (
+        <div
+          ref={menuRef}
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 w-52 text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
+        >
+          {contextMenu.type === "custom" && (() => {
+            const layer = customLayers.find((l) => l.id === contextMenu.id);
+            if (!layer) return null;
+            const isManual = layer.type === "manual";
+            const isEditing = isMapEditMode && activeCustomLayerId === layer.id && isManual;
+
+            return (
+              <>
+                {/* 内部プロパティ / インスペクター表示 */}
+                {!isManual ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        openPluginDataModal(
+                          `カスタムレイヤー: ${layer.name}`,
+                          layer.plugin_data,
+                          `プラグイン: ${layer.plugin_id || 'Unknown'} • 内部メタデータ (Read-only)`
+                        );
+                        setContextMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    >
+                      <Code2 size={13} className="text-cyan-400" />
+                      <span>内部プロパティを表示</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        selectNodes([]);
+                        setActiveCustomLayerId(layer.id);
+                        setRightPanelActiveTab("inspector");
+                        setRightPanelOpen(true);
+                        setContextMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    >
+                      <Settings2 size={13} className="text-text-muted" />
+                      <span>パラメータ編集 / 再生成</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      selectNodes([]);
+                      setActiveCustomLayerId(layer.id);
+                      setMapEditMode(!isEditing);
+                      setRightPanelActiveTab("inspector");
+                      setRightPanelOpen(true);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Pencil size={13} className="text-primary-base" />
+                    <span>{isEditing ? "ベクター編集を終了" : "ベクター編集を開始"}</span>
+                  </button>
+                )}
+
+                {/* 参照レイヤー切り替え */}
+                <button
+                  onClick={() => {
+                    updateCustomLayer(layer.id, { is_reference: !layer.is_reference });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Bookmark size={13} className={layer.is_reference ? "fill-purple-300 text-purple-300" : "text-text-muted"} />
+                  <span>{layer.is_reference ? "参照レイヤー解除" : "参照レイヤーに設定"}</span>
+                </button>
+
+                {/* 表示 / 非表示 */}
+                <button
+                  onClick={() => {
+                    updateCustomLayer(layer.id, { visible: !layer.visible });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  {layer.visible ? <EyeOff size={13} className="text-text-muted" /> : <Eye size={13} className="text-text-base" />}
+                  <span>{layer.visible ? "非表示にする" : "表示する"}</span>
+                </button>
+
+                <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 削除 */}
+                <button
+                  onClick={async () => {
+                    setContextMenu(null);
+                    const confirmed = await DialogAPI.ask(
+                      `Remove custom layer '${layer.name}'?`,
+                      { title: "Remove Custom Layer", kind: "warning" }
+                    );
+                    if (confirmed) {
+                      removeCustomLayer(layer.id);
+                      if (activeCustomLayerId === layer.id) {
+                        setActiveCustomLayerId(null);
+                        setMapEditMode(false);
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                >
+                  <Trash2 size={13} />
+                  <span>削除 (Delete)</span>
+                </button>
+              </>
+            );
+          })()}
+
+          {contextMenu.type === "map" && (() => {
+            const layer = mapLayers.find((l) => l.id === contextMenu.id);
+            if (!layer) return null;
+
+            return (
+              <>
+                {/* 編集対象マップに設定 */}
+                <button
+                  onClick={() => {
+                    setActiveMapLayerId(layer.id);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Crop size={13} className="text-primary-base" />
+                  <span>編集対象マップに設定</span>
+                </button>
+
+                {/* 表示 / 非表示 */}
+                <button
+                  onClick={() => {
+                    updateMapLayer(layer.id, { visible: !layer.visible });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  {layer.visible ? <EyeOff size={13} className="text-text-muted" /> : <Eye size={13} className="text-text-base" />}
+                  <span>{layer.visible ? "非表示にする" : "表示する"}</span>
+                </button>
+
+                <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 削除 */}
+                <button
+                  onClick={async () => {
+                    setContextMenu(null);
+                    const confirmed = await DialogAPI.ask(
+                      `Remove map layer '${layer.name}'?`,
+                      { title: "Remove Map", kind: "warning" }
+                    );
+                    if (confirmed) {
+                      removeMapLayer(layer.id);
+                      if (activeMapLayerId === layer.id) {
+                        setActiveMapLayerId(null);
+                      }
+                    }
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                >
+                  <Trash2 size={13} />
+                  <span>削除 (Delete)</span>
+                </button>
+              </>
+            );
+          })()}
+        </div>
+      )}
     </div>
   );
 }
@@ -377,6 +583,7 @@ interface CustomLayerCardProps {
   isActive: boolean;
   isEditing: boolean;
   onSelect: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   onToggleEdit: () => void;
   onOpenInspector: () => void;
   onMoveUp: () => void;
@@ -394,6 +601,7 @@ function CustomLayerCard({
   isActive,
   isEditing,
   onSelect,
+  onContextMenu,
   onToggleEdit,
   onOpenInspector,
   onMoveUp,
@@ -405,7 +613,7 @@ function CustomLayerCard({
   const isManual = layer.type === "manual";
 
   return (
-    <CardFrame visible={layer.visible} isActive={isActive || isEditing} onClick={onSelect}>
+    <CardFrame visible={layer.visible} isActive={isActive || isEditing} onClick={onSelect} onContextMenu={onContextMenu}>
       <div className="flex items-center justify-between mb-3 relative z-10">
         <div className="flex items-center gap-3">
           <div className="flex flex-col gap-0.5">
@@ -586,6 +794,7 @@ interface LayerCardProps {
   isActiveTargetMap: boolean;
   isMapEditMode: boolean;
   onSelect: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onToggleVisible: () => void;
@@ -601,6 +810,7 @@ function LayerCard({
   isActiveTargetMap,
   isMapEditMode,
   onSelect,
+  onContextMenu,
   onMoveUp,
   onMoveDown,
   onToggleVisible,
@@ -635,7 +845,7 @@ function LayerCard({
   };
 
   return (
-    <CardFrame visible={layer.visible} isActive={isActiveTargetMap} onClick={onSelect}>
+    <CardFrame visible={layer.visible} isActive={isActiveTargetMap} onClick={onSelect} onContextMenu={onContextMenu}>
       <div className="flex items-center justify-between mb-4 relative z-10">
         <div className="flex items-center gap-3">
           <div className="flex flex-col gap-0.5">

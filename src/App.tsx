@@ -11,6 +11,7 @@ import { SettingsModal } from "./components/ui/SettingsModal";
 import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
 import { ExportMapsModal } from "./components/ui/ExportMapsModal";
 import { WelcomeModal } from "./components/ui/WelcomeModal";
+import { PluginDataModal } from "./components/ui/PluginDataModal";
 import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
 import { MapEditOverlay } from "./components/ui/MapEditOverlay";
@@ -414,6 +415,7 @@ function App() {
         isOpen={isWelcomeModalOpen}
         onClose={() => setWelcomeModalOpen(false)}
       />
+      <PluginDataModal />
       <LoadingOverlay />
     </div>
   );
