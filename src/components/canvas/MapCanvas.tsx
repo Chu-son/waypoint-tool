@@ -4,7 +4,7 @@ import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
-import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer, EditObject } from '../../types/store';
+import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer, EditObject, WaypointNode } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
 import { FootprintLayer } from './layers/FootprintLayer';
@@ -18,6 +18,7 @@ import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
 import { useMapEditCircle } from './hooks/useMapEditCircle';
 import { useMapEditFreehand } from './hooks/useMapEditFreehand';
+import { useMapEditLine } from './hooks/useMapEditLine';
 import { useAnnotationEdit } from './hooks/useAnnotationEdit';
 import { prepareLayersForExport } from '../../utils/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
@@ -176,6 +177,7 @@ export function MapCanvas() {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
+  const updateNodes = useAppStore(state => state.updateNodes);
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
@@ -320,6 +322,11 @@ export function MapCanvas() {
   const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region' | 'drag_points_item' | 'set_yaw_points_item'>('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
+  const movingNodesState = useRef<{
+    activeId: string;
+    startWorldPos: { x: number; y: number };
+    initialTransforms: Record<string, { x: number; y: number; z?: number; qx: number; qy: number; qz: number; qw: number }>;
+  } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const latestMousePos = useRef({ x: 0, y: 0 }); // Track screen mouse pos constantly
   const containerRef = useRef<HTMLDivElement>(null);
@@ -359,6 +366,13 @@ export function MapCanvas() {
     handleFreehandDrawMove,
     handleFreehandDrawEnd,
   } = useMapEditFreehand();
+
+  const {
+    linePreview,
+    handleLineDrawStart,
+    handleLineDrawMove,
+    handleLineDrawEnd,
+  } = useMapEditLine();
 
   // Annotation Edit hooks & state
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
@@ -451,7 +465,11 @@ export function MapCanvas() {
         objId,
         startWorldPos: worldPos,
         initialCenterOrPoints: structuredClone(
-          targetObj.type === 'freehand' ? targetObj.points : { cx: targetObj.cx, cy: targetObj.cy }
+          targetObj.type === 'freehand'
+            ? targetObj.points
+            : targetObj.type === 'line'
+            ? { x1: targetObj.x1, y1: targetObj.y1, x2: targetObj.x2, y2: targetObj.y2 }
+            : { cx: targetObj.cx, cy: targetObj.cy }
         ),
       };
 
@@ -649,6 +667,9 @@ export function MapCanvas() {
         } else if (mapEditSubTool === 'freehand') {
           handleFreehandDrawStart(worldPos);
           interactionMode.current = 'edit_map_freehand' as any;
+        } else if (mapEditSubTool === 'line') {
+          handleLineDrawStart(worldPos);
+          interactionMode.current = 'edit_map_draw_line' as any;
         }
         e.currentTarget.setPointerCapture(e.pointerId);
         return;
@@ -1054,6 +1075,10 @@ export function MapCanvas() {
         handleFreehandDrawMove({ x: worldX, y: worldY });
         return;
       }
+      if (interactionMode.current === ('edit_map_draw_line' as any)) {
+        handleLineDrawMove({ x: worldX, y: worldY });
+        return;
+      }
       if (interactionMode.current === ('edit_map_move_object' as any) && movingEditObject.current) {
         const { layerId, objId, startWorldPos, initialCenterOrPoints } = movingEditObject.current;
         const dx = worldX - startWorldPos.x;
@@ -1062,6 +1087,13 @@ export function MapCanvas() {
         if (Array.isArray(initialCenterOrPoints)) {
           const newPoints = initialCenterOrPoints.map((p: any) => ({ x: p.x + dx, y: p.y + dy }));
           updateEditObject(layerId, objId, { points: newPoints });
+        } else if ('x1' in initialCenterOrPoints) {
+          updateEditObject(layerId, objId, {
+            x1: initialCenterOrPoints.x1 + dx,
+            y1: initialCenterOrPoints.y1 + dy,
+            x2: initialCenterOrPoints.x2 + dx,
+            y2: initialCenterOrPoints.y2 + dy,
+          });
         } else {
           updateEditObject(layerId, objId, {
             cx: initialCenterOrPoints.cx + dx,
@@ -1071,7 +1103,7 @@ export function MapCanvas() {
         return;
       }
       if (interactionMode.current === ('edit_map_resize_object' as any) && resizingEditObject.current) {
-        const { layerId, objId, initialObject } = resizingEditObject.current;
+        const { layerId, objId, handle, initialObject, startWorldPos } = resizingEditObject.current;
         const curWorldPos = { x: worldX, y: worldY };
 
         if (initialObject.type === 'rect') {
@@ -1098,6 +1130,27 @@ export function MapCanvas() {
           updateEditObject(layerId, objId, {
             radius: newRadius,
           });
+        } else if (initialObject.type === 'line') {
+          if (handle === 'start') {
+            updateEditObject(layerId, objId, {
+              x1: curWorldPos.x,
+              y1: curWorldPos.y,
+            });
+          } else if (handle === 'end') {
+            updateEditObject(layerId, objId, {
+              x2: curWorldPos.x,
+              y2: curWorldPos.y,
+            });
+          } else if (handle === 'midpoint') {
+            const dx = curWorldPos.x - startWorldPos.x;
+            const dy = curWorldPos.y - startWorldPos.y;
+            updateEditObject(layerId, objId, {
+              x1: initialObject.x1 + dx,
+              y1: initialObject.y1 + dy,
+              x2: initialObject.x2 + dx,
+              y2: initialObject.y2 + dy,
+            });
+          }
         } else if (initialObject.type === 'freehand') {
           const bbox = computePointsBoundingBox(initialObject.points);
           const initialWidth = Math.max(0.01, bbox.width);
@@ -1155,20 +1208,40 @@ export function MapCanvas() {
       setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } 
-    else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
-      const node = useAppStore.getState().nodes[activeNodeId.current];
-      if (node) {
-        updateNode(activeNodeId.current, {
-          transform: { 
-             x: worldX, 
-             y: worldY, 
-             z: node.transform?.z, 
-             qx: node.transform?.qx || 0, 
-             qy: node.transform?.qy || 0, 
-             qz: node.transform?.qz || 0, 
-             qw: node.transform?.qw ?? 1 
-          }
-        }, { skipRecalculate: true });
+    else if (interactionMode.current === 'drag_node') {
+      if (movingNodesState.current) {
+        const { activeId, startWorldPos, initialTransforms } = movingNodesState.current;
+        const activeInitial = initialTransforms[activeId];
+        const dx = activeInitial ? worldX - activeInitial.x : worldX - startWorldPos.x;
+        const dy = activeInitial ? worldY - activeInitial.y : worldY - startWorldPos.y;
+
+        const updates: Record<string, Partial<WaypointNode>> = {};
+        Object.entries(initialTransforms).forEach(([id, initTr]) => {
+          updates[id] = {
+            transform: {
+              ...initTr,
+              x: initTr.x + dx,
+              y: initTr.y + dy,
+            },
+          };
+        });
+
+        updateNodes(updates, { skipRecalculate: true });
+      } else if (activeNodeId.current) {
+        const node = useAppStore.getState().nodes[activeNodeId.current];
+        if (node) {
+          updateNode(activeNodeId.current, {
+            transform: { 
+               x: worldX, 
+               y: worldY, 
+               z: node.transform?.z, 
+               qx: node.transform?.qx || 0, 
+               qy: node.transform?.qy || 0, 
+               qz: node.transform?.qz || 0, 
+               qw: node.transform?.qw ?? 1 
+            }
+          }, { skipRecalculate: true });
+        }
       }
     }
     else if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
@@ -1452,6 +1525,8 @@ export function MapCanvas() {
         handleCircleDrawEnd();
       } else if (interactionMode.current === ('edit_map_freehand' as any)) {
         handleFreehandDrawEnd();
+      } else if (interactionMode.current === ('edit_map_draw_line' as any)) {
+        handleLineDrawEnd();
       } else if (interactionMode.current === ('edit_map_move_object' as any) && movingEditObject.current) {
         movingEditObject.current = null;
         useAppStore.getState().endHistoryTransaction();
@@ -1521,6 +1596,7 @@ export function MapCanvas() {
       e.currentTarget.releasePointerCapture(e.pointerId);
       interactionMode.current = 'none';
       activeNodeId.current = null;
+      movingNodesState.current = null;
       pointsInputKey.current = '';
       pointsItemIndex.current = -1;
     } else {
@@ -1596,6 +1672,7 @@ export function MapCanvas() {
         }
         interactionMode.current = 'none';
         activeNodeId.current = null;
+        movingNodesState.current = null;
         setCursorPosition(null);
       }}
       onWheel={handleWheel}
@@ -1698,7 +1775,7 @@ export function MapCanvas() {
             {/* Transient editing tool previews and brush cursor overlay */}
             <MapEditToolOverlay
               scale={scale}
-              previewObject={rectPreview || circlePreview || freehandPreview}
+              previewObject={rectPreview || circlePreview || freehandPreview || linePreview}
               brushPreviewPos={isMapEditMode && mapEditSubTool === 'freehand' ? brushPreviewPos : null}
               brushPreviewRadius={brushRadiusWorld}
               isExportPreview={shouldShowBlendedPreview}
@@ -1730,10 +1807,62 @@ export function MapCanvas() {
               if (isMapEditMode) return;
               if (activeTool === 'select') {
                 e.stopPropagation();
-                selectNodes([nodeId], e.shiftKey || e.metaKey);
+                const isModifier = (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey || (e.nativeEvent as any)?.ctrlKey;
+                const currentSelected = useAppStore.getState().selectedNodeIds;
+                let targetIds: string[];
+
+                if (currentSelected.includes(nodeId)) {
+                  if (isModifier) {
+                    targetIds = currentSelected.filter((id) => id !== nodeId);
+                    selectNodes(targetIds);
+                  } else {
+                    targetIds = currentSelected;
+                  }
+                } else {
+                  if (isModifier) {
+                    targetIds = [...currentSelected, nodeId];
+                    selectNodes(targetIds);
+                  } else {
+                    targetIds = [nodeId];
+                    selectNodes([nodeId]);
+                  }
+                }
+
                 useAppStore.getState().beginHistoryTransaction();
                 interactionMode.current = 'drag_node';
                 activeNodeId.current = nodeId;
+
+                const rect = containerRef.current?.getBoundingClientRect();
+                const mouseX = rect ? e.nativeEvent.clientX - rect.left : e.nativeEvent.clientX;
+                const mouseY = rect ? e.nativeEvent.clientY - rect.top : e.nativeEvent.clientY;
+                const worldPos = screenToWorld(mouseX, mouseY);
+
+                const initialTransforms: Record<string, any> = {};
+                const allNodes = useAppStore.getState().nodes;
+                targetIds.forEach((id) => {
+                  const n = allNodes[id];
+                  if (n?.transform) {
+                    initialTransforms[id] = { ...n.transform };
+                  } else if (n?.type === 'generator' && n.children_ids) {
+                    n.children_ids.forEach((cid) => {
+                      const cn = allNodes[cid];
+                      if (cn?.transform) {
+                        initialTransforms[cid] = { ...cn.transform };
+                      }
+                    });
+                  }
+                });
+
+                if (!initialTransforms[nodeId] && allNodes[nodeId]?.transform) {
+                  initialTransforms[nodeId] = { ...allNodes[nodeId].transform };
+                }
+
+                movingNodesState.current = {
+                  activeId: nodeId,
+                  startWorldPos: worldPos,
+                  initialTransforms,
+                };
+
                 if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
                   containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
                 }

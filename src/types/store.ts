@@ -191,12 +191,21 @@ export interface CustomLayerBase {
   is_reference?: boolean;
 }
 
-export type EditObjectType = 'rect' | 'circle' | 'freehand';
+export type EditObjectType = 'rect' | 'circle' | 'freehand' | 'line';
 
 interface EditObjectBase {
   id: string;
   type: EditObjectType;
   fillValue: number; // 0~255 (0=black=obstacle, 255=white=free space)
+}
+
+export interface LineEditObject extends EditObjectBase {
+  type: 'line';
+  x1: number; // Start world coordinate X (meters)
+  y1: number; // Start world coordinate Y (meters)
+  x2: number; // End world coordinate X (meters)
+  y2: number; // End world coordinate Y (meters)
+  lineWidth?: number; // Line width in world units (meters, optional)
 }
 
 export interface RectEditObject extends EditObjectBase {
@@ -221,7 +230,7 @@ export interface FreehandEditObject extends EditObjectBase {
   brushRadius: number; // Brush radius in world units (meters)
 }
 
-export type EditObject = RectEditObject | CircleEditObject | FreehandEditObject;
+export type EditObject = RectEditObject | CircleEditObject | FreehandEditObject | LineEditObject;
 
 /** Manual Vector Edit Layer */
 export interface ManualCustomLayer extends CustomLayerBase {

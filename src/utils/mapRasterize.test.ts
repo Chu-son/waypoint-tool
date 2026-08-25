@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prepareLayersForExport } from "./mapRasterize";
+import { prepareLayersForExport, getEditLayerBoundingBox } from "./mapRasterize";
 import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer } from "../types/store";
 
 describe("prepareLayersForExport ordering and z_index tests", () => {
@@ -113,5 +113,34 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
     const res2 = await prepareLayersForExport(reorderedMapLayers, []);
     expect(res2.find(l => l.id === "map-2")!.z_index).toBe(1);
     expect(res2.find(l => l.id === "map-1")!.z_index).toBe(0);
+  });
+
+  it("calculates bounding box correctly for line edit objects", () => {
+    const editLayer: ManualCustomLayer = {
+      id: "manual-1",
+      name: "Manual Layer",
+      type: "manual",
+      visible: true,
+      opacity: 1.0,
+      z_index: 0,
+      editObjects: [
+        {
+          id: "line-1",
+          type: "line",
+          x1: 2.0,
+          y1: 3.0,
+          x2: 8.0,
+          y2: 7.0,
+          fillValue: 0,
+          lineWidth: 0.2,
+        },
+      ],
+    };
+
+    const bbox = getEditLayerBoundingBox(editLayer);
+    expect(bbox.minX).toBeLessThanOrEqual(2.0);
+    expect(bbox.maxX).toBeGreaterThanOrEqual(8.0);
+    expect(bbox.minY).toBeLessThanOrEqual(3.0);
+    expect(bbox.maxY).toBeGreaterThanOrEqual(7.0);
   });
 });

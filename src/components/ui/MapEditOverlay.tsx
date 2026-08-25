@@ -2,7 +2,7 @@ import { useAppStore } from '../../stores/appStore';
 import { FloatingActionBanner } from './common/FloatingActionBanner';
 import { Button } from './common/Button';
 import { Slider } from './common/Slider';
-import { Pencil, Square, Circle, Check, Trash2 } from 'lucide-react';
+import { Pencil, Square, Circle, Slash, Check, Trash2 } from 'lucide-react';
 import { EditObjectType } from '../../types/store';
 
 export function MapEditOverlay() {
@@ -47,6 +47,7 @@ export function MapEditOverlay() {
   };
 
   const subtools: { type: EditObjectType; label: string; icon: React.ReactNode }[] = [
+    { type: 'line', label: '直線', icon: <Slash size={14} /> },
     { type: 'rect', label: '矩形', icon: <Square size={14} /> },
     { type: 'circle', label: '円形', icon: <Circle size={14} /> },
     { type: 'freehand', label: 'フリー', icon: <Pencil size={14} /> },

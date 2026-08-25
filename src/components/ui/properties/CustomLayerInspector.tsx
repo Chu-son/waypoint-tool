@@ -13,7 +13,7 @@ import { FieldLabel } from "../common/FieldLabel";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
 import { PluginDataViewer } from "../common/PluginDataViewer";
-import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Bookmark, Code2, Maximize2 } from "lucide-react";
+import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Slash, Bookmark, Code2, Maximize2 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 
 export function CustomLayerInspector() {
@@ -288,7 +288,24 @@ export function CustomLayerInspector() {
             {/* Draw Mode Banner / Toggle */}
             <div className="space-y-2">
               <FieldLabel className="text-[10px]">Vector Drawing Tools</FieldLabel>
-              <div className="grid grid-cols-3 gap-1.5 bg-surface-base/60 p-1 rounded-xl border border-border-base/40">
+              <div className="grid grid-cols-4 gap-1.5 bg-surface-base/60 p-1 rounded-xl border border-border-base/40">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMapEditSubTool("line");
+                    setMapEditMode(true);
+                  }}
+                  className={cn(
+                    "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
+                    isMapEditMode && mapEditSubTool === "line"
+                      ? "bg-primary-base text-white shadow-sm"
+                      : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
+                  )}
+                >
+                  <Slash size={14} />
+                  <span>Line</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -418,7 +435,15 @@ export function CustomLayerInspector() {
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        {obj.type === "rect" ? <Square size={13} /> : obj.type === "circle" ? <Circle size={13} /> : <Pencil size={13} />}
+                        {obj.type === "line" ? (
+                          <Slash size={13} />
+                        ) : obj.type === "rect" ? (
+                          <Square size={13} />
+                        ) : obj.type === "circle" ? (
+                          <Circle size={13} />
+                        ) : (
+                          <Pencil size={13} />
+                        )}
                         <span className="font-medium capitalize">{obj.type} #{idx + 1}</span>
                         <span className="text-[9px] px-1 py-0.5 rounded bg-surface-panel/80 text-text-muted">
                           {obj.fillValue === 0 ? "Obstacle" : "Free"}

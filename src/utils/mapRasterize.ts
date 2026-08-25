@@ -83,6 +83,19 @@ function drawEditObjectToCanvas(
       ctx.stroke();
     }
     ctx.restore();
+  } else if (obj.type === 'line') {
+    const p1 = worldToPixel(obj.x1, obj.y1, info);
+    const p2 = worldToPixel(obj.x2, obj.y2, info);
+    const strokeWidth = obj.lineWidth ? (obj.lineWidth / resolution) : Math.max(1, 2);
+
+    ctx.save();
+    ctx.lineWidth = strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(p1.px, p1.py);
+    ctx.lineTo(p2.px, p2.py);
+    ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -167,6 +180,12 @@ export function getEditLayerBoundingBox(
         minY = Math.min(minY, p.y - obj.brushRadius);
         maxY = Math.max(maxY, p.y + obj.brushRadius);
       }
+    } else if (obj.type === 'line') {
+      const padding = (obj.lineWidth || 0.1) / 2;
+      minX = Math.min(minX, obj.x1 - padding, obj.x2 - padding);
+      maxX = Math.max(maxX, obj.x1 + padding, obj.x2 + padding);
+      minY = Math.min(minY, obj.y1 - padding, obj.y2 - padding);
+      maxY = Math.max(maxY, obj.y1 + padding, obj.y2 + padding);
     }
   }
 

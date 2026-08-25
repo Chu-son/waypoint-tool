@@ -223,6 +223,99 @@ function renderSingleEditObject(
           ))}
       </pixiContainer>
     );
+  } else if (obj.type === 'line') {
+    const midX = (obj.x1 + obj.x2) / 2;
+    const midY = (obj.y1 + obj.y2) / 2;
+    const lineStrokeWidth = Math.max(2 / safeScale, obj.lineWidth || 0);
+
+    return (
+      <pixiContainer key={obj.id}>
+        <pixiGraphics
+          eventMode={isEffectiveExportPreview || isPreview ? 'none' : 'dynamic'}
+          cursor="pointer"
+          onPointerDown={(e: FederatedPointerEvent) => onObjectPointerDown?.(e, layerId, obj.id)}
+          draw={(g) => {
+            g.clear();
+            // Invisible broad stroke for easy hit test
+            g.strokeStyle = { width: 14 / safeScale, color: 0xffffff, alpha: 0.001 };
+            g.moveTo(obj.x1, obj.y1);
+            g.lineTo(obj.x2, obj.y2);
+            g.stroke();
+
+            // Selection glow outline
+            if (isSelected) {
+              g.strokeStyle = { width: lineStrokeWidth + 4 / safeScale, color: 0x3b82f6, alpha: 0.6 };
+              g.moveTo(obj.x1, obj.y1);
+              g.lineTo(obj.x2, obj.y2);
+              g.stroke();
+            }
+
+            // Visible line stroke
+            if (!isEffectiveExportPreview || isPreview) {
+              g.strokeStyle = {
+                width: lineStrokeWidth,
+                color: strokeColor,
+                alpha: opacity,
+                cap: 'round',
+              };
+              g.moveTo(obj.x1, obj.y1);
+              g.lineTo(obj.x2, obj.y2);
+              g.stroke();
+
+              // Endpoints
+              g.fillStyle = { color: colorHex, alpha: opacity };
+              g.circle(obj.x1, obj.y1, 3 / safeScale);
+              g.circle(obj.x2, obj.y2, 3 / safeScale);
+              g.fill();
+            } else if (isSelected) {
+              g.strokeStyle = { width: lineStrokeWidth, color: 0x3b82f6, alpha: 1.0 };
+              g.moveTo(obj.x1, obj.y1);
+              g.lineTo(obj.x2, obj.y2);
+              g.stroke();
+            }
+          }}
+        />
+
+        {/* Handles when selected */}
+        {isSelected && (
+          <>
+            <CanvasHandle
+              x={obj.x1}
+              y={obj.y1}
+              scale={scale}
+              type="square"
+              colorHex={0x3b82f6}
+              cursor="crosshair"
+              onPointerDown={(e: FederatedPointerEvent) =>
+                onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'start')
+              }
+            />
+            <CanvasHandle
+              x={obj.x2}
+              y={obj.y2}
+              scale={scale}
+              type="square"
+              colorHex={0x3b82f6}
+              cursor="crosshair"
+              onPointerDown={(e: FederatedPointerEvent) =>
+                onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'end')
+              }
+            />
+            <CanvasHandle
+              x={midX}
+              y={midY}
+              scale={scale}
+              type="circle"
+              colorHex={0x3b82f6}
+              cursor="move"
+              onPointerDown={(e: FederatedPointerEvent) =>
+                onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'midpoint')
+              }
+            />
+          </>
+        )}
+      </pixiContainer>
+    );
   }
   return null;
 }

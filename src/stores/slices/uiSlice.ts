@@ -63,7 +63,7 @@ export type UISlice = {
 
   // Map Edit UI State
   isMapEditMode: boolean;
-  mapEditSubTool: 'rect' | 'circle' | 'freehand';
+  mapEditSubTool: 'rect' | 'circle' | 'freehand' | 'line';
   mapEditFillValue: number;
   mapEditBrushSize: number;
   activeEditLayerId: string | null;
@@ -71,7 +71,7 @@ export type UISlice = {
   selectedEditObjectId: string | null;
 
   setMapEditMode: (enabled: boolean) => void;
-  setMapEditSubTool: (tool: 'rect' | 'circle' | 'freehand') => void;
+  setMapEditSubTool: (tool: 'rect' | 'circle' | 'freehand' | 'line') => void;
   setMapEditFillValue: (value: number) => void;
   setMapEditBrushSize: (size: number) => void;
   setActiveEditLayerId: (id: string | null) => void;
