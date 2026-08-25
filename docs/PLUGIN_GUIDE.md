@@ -21,10 +21,13 @@ my_plugin/
 `manifest.json` では、プラグインの名前、入力方法、およびプロパティを定義します。
 
 ### 主なフィールド
-- `category`: プラグインのカテゴリを指定（省略時は `"waypoint_generator"`）。
-  - `"waypoint_generator"`: ウェイポイント列を生成するプラグイン（デフォルト）。
-  - `"map_layer_generator"`: オーバーレイ用のマップレイヤー画像を生成するプラグイン。
-  - `"path_calculator"`: ウェイポイント間を障害物回避等で補間するパス計算プラグイン。
+### 主なフィールド
+- `primary_output`: プラグインの主要出力タイプ（UIでの配置タブやフィルタに使用）。
+  - `"waypoints"`: ウェイポイントを主に出力（デフォルト）。
+  - `"custom_layer"`: カスタムレイヤー画像を主に出力（Map Layers タブ）。
+  - `"annotations"`: アノテーショングループを主に出力（Annotations タブ）。
+  - `"path_calculator"`: ウェイポイント間パス補間（Path Router メニュー）。
+- `category`: 旧仕様互換カテゴリ（`"waypoint_generator"` | `"map_layer_generator"` | `"path_calculator"`）。
 - `inputs`: キャンバス上での操作入力を定義。
   - `type: "point"`: 座標と向き（Yaw）をクリックで指定。
   - `type: "points"`: 複数座標のリスト（点群）。キャンバスクリックで追加、ドラッグで移動、右クリック/リスト操作で削除。
@@ -54,11 +57,61 @@ my_plugin/
 
 ## 5. Python SDK の利用
 
-組み込みの `wpt_plugin` パッケージを利用することを推奨します。SDK には、座標計算を容易にする幾何学クラスや基底クラスが含まれています。
+組み込みの `wpt_plugin` パッケージを利用することを推奨します。SDK には、座標計算を容易にする幾何学クラス、統合ジェネレーター基底クラス、および結果ビルダーが含まれています。
 
-### 1) ウェイポイント生成 (`WaypointGenerator`)
+### 1) 統合ジェネレーター (`PluginGenerator` & `PluginResult`) - 推奨
+`PluginGenerator` と `PluginResult` を使用すると、**ウェイポイント、カスタムレイヤー、アノテーション、および計算メタデータ（`plugin_data`）を同時に1回の実行で出力**できます。
+
 ```python
-from wpt_plugin import WaypointGenerator, Point, RobotFootprint
+from wpt_plugin import PluginGenerator, PluginResult, Point
+
+class MultiOutputSearchPlugin(PluginGenerator):
+    def generate(self, context):
+        res = PluginResult()
+        
+        # 1. ウェイポイントの生成・追加
+        waypoints = [
+            self.make_waypoint(0.0, 0.0, 0.0),
+            self.make_waypoint(2.0, 0.0, 0.0),
+            self.make_waypoint(2.0, 2.0, 1.57),
+        ]
+        res.add_waypoints(waypoints, name="Search Route", plugin_data={"total_length": 4.0})
+
+        # 2. カスタムレイヤー（探索エリアマスク等）の追加
+        mask = [[1 if (r + c) % 2 == 0 else 0 for c in range(50)] for r in range(50)]
+        res.add_custom_layer(
+            name="Explored Mask",
+            mask=mask,
+            origin=[0.0, 0.0, 0.0],
+            resolution=0.05,
+            color_rgba=(59, 130, 246, 150),
+            plugin_data={"coverage_rate": 78.5}
+        )
+
+        # 3. アノテーション（危険領域や検索境界等）の追加
+        res.add_annotations([
+            self.make_annotation_rect(1.0, 1.0, 2.5, 2.5, name="Search Boundary", color="#ef4444"),
+            self.make_annotation_point(0.0, 0.0, name="Base Point"),
+        ], name="Boundary Annotations")
+
+        # 4. 全体共通の内部データ (JSON Viewerで確認可能、他プラグインへ入力連携)
+        res.set_plugin_data({
+            "algorithm": "Grid Coverage Search v2",
+            "estimated_time_sec": 120.5,
+            "waypoints_count": len(waypoints)
+        })
+
+        return res
+
+if __name__ == "__main__":
+    MultiOutputSearchPlugin().run_from_stdin()
+```
+
+### 2) 従来形式のウェイポイント生成 (`WaypointGenerator` / リスト返却)
+既存プラグインとの後方互換性も完全に維持されています。
+
+```python
+from wpt_plugin import WaypointGenerator, Point
 
 class MyGenerator(WaypointGenerator):
     def generate(self, context):
@@ -80,10 +133,7 @@ if __name__ == "__main__":
     MyGenerator().run_from_stdin()
 ```
 
-### 2) マップレイヤー生成 (`MapLayerGenerator`)
-マップ上の指定位置や占有格子データを元に、透過PNGオーバーレイレイヤーを生成します。
-走行可能領域の抽出や、モルフォロジー演算（Opening/Closing）によるノイズ除去・穴埋めマスクなどの用途に利用できます。
-
+### 3) 従来形式のマップレイヤー生成 (`MapLayerGenerator`)
 ```python
 from wpt_plugin import MapLayerGenerator, OccupancyGrid, Point
 
@@ -92,7 +142,6 @@ class DrivableAreaGenerator(MapLayerGenerator):
         seeds = self.get_interaction_points(context, "seed_points") or [Point(0, 0)]
         grid = self.get_occupancy_grid(context)
         
-        # 2値マスク (1: 描画, 0: 透過) からレイヤーを生成
         mask = [[1 if (r + c) % 2 == 0 else 0 for c in range(100)] for r in range(100)]
         return self.create_layer_from_mask(
             mask,
@@ -107,8 +156,7 @@ if __name__ == "__main__":
     DrivableAreaGenerator().run_from_stdin()
 ```
 
-
-### 3) パス計算 (`PathCalculator`)
+### 4) パス計算 (`PathCalculator`)
 ウェイポイント間をA*/ダイクストラ等のアルゴリズムで補間し、各区間のポリラインを出力します。
 ```python
 from wpt_plugin import PathCalculator
@@ -121,7 +169,7 @@ if __name__ == "__main__":
     DijkstraCalculator().run_from_stdin()
 ```
 
-### 4) 占有格子データ仕様とセマンティック API (`OccupancyGrid`)
+### 5) 占有格子データ仕様とセマンティック API (`OccupancyGrid`)
 
 アプリ本体からプラグインへ渡される占有格子データ (`context["occupancy_grid"]`) は、ROS 2 Nav2 標準に準拠した signed 8-bit (`int8`) 配列として zlib 圧縮・Base64 エンコードされて渡されます。
 
@@ -151,6 +199,20 @@ col, row = grid.world_to_grid(x, y)
 world_x, world_y = grid.grid_to_world(row, col)
 ```
 
+### 6) プラグイン間データ連携 (`plugin_data` Pipeline)
+他プラグインの出力結果（レイヤーやアノテーション）を入力として受け取った際、`self.get_plugin_data(obj)` ヘルパーで内部計算結果を取得できます。
+
+```python
+class PathFollowerPlugin(PluginGenerator):
+    def generate(self, context):
+        layer = self.get_custom_layer(context, "cost_layer")
+        layer_data = self.get_plugin_data(layer)
+        if layer_data:
+            coverage = layer_data.get("coverage_rate", 0)
+            self.log(f"Cost layer coverage: {coverage}%")
+        ...
+```
+
 ### 利用可能な幾何学クラス・ヘルパー
 - `Point(x, y, yaw)`: 座標と向き。`to_world()` メソッドで変換可能。
 - `Line(p1, p2)`: 線分。長さの取得や交点判定が可能。
@@ -159,9 +221,11 @@ world_x, world_y = grid.grid_to_world(row, col)
 - `Ray(origin, yaw, bidirectional)`: 仮想無限線。線分や矩形との交点取得に便利。
 - `RobotFootprint(type, radius, length, width, offset_x, offset_y, points)`: ロボットの形状・寸法。
 - `OccupancyGrid(data)`: 占有格子マップクラス（ROS Nav2互換）。
+- `PluginResult()`: 複数オブジェクト出力用ビルダー（`add_waypoints`, `add_custom_layer`, `add_annotations`, `set_plugin_data`）。
 - `find_dijkstra_path(grid, start_pos, goal_pos, safety_margin, step_size)`: 障害物回避ダイクストラ / A*探索ヘルパー。
 - `self.get_annotation(context, input_id)` / `self.get_annotations(context, input_id)`: アノテーション入力オブジェクトの取得ヘルパー。
 - `self.get_custom_layer(context, input_id)` / `self.get_custom_layers(context, input_id)`: カスタムレイヤー入力データの取得ヘルパー。
+- `self.get_plugin_data(obj)`: オブジェクト（レイヤー/アノテーション等）に紐付く `plugin_data` を安全に取得するヘルパー。
 - `self.get_custom_layer_grid(custom_layer)`: カスタムレイヤーに占有格子データが含まれる場合に `OccupancyGrid` を返すヘルパー。
 - `encode_rgba_to_png_base64(width, height, rgba_bytes)`: 純粋Pythonによる高速PNG Base64エンコーダー。
 
