@@ -16,6 +16,7 @@ export type NodeSlice = {
   updateNodes: (updates: Record<string, Partial<WaypointNode>>, options?: { skipRecalculate?: boolean }) => void;
   removeNodes: (ids: string[]) => void;
   reorderNodes: (fromIndex: number, toIndex: number) => void;
+  reorderMultipleNodes: (movingIds: string[], targetId: string, position: 'before' | 'after') => void;
   selectNodes: (ids: string[], multi?: boolean) => void;
   selectAllNodes: () => void;
   deselectAllNodes: () => void;
@@ -108,6 +109,31 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       const [moved] = newRootIds.splice(fromIndex, 1);
       newRootIds.splice(toIndex, 0, moved);
       return { rootNodeIds: newRootIds, isDirty: true };
+    });
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(100);
+    }
+  },
+
+  reorderMultipleNodes: (movingIds: string[], targetId: string, position: 'before' | 'after') => {
+    if (!movingIds || movingIds.length === 0) return;
+    get().pushHistorySnapshot();
+    set((state) => {
+      const movingSet = new Set(movingIds);
+      const orderedMovingIds = state.rootNodeIds.filter((id) => movingSet.has(id));
+      if (orderedMovingIds.length === 0) return state;
+
+      const remainingIds = state.rootNodeIds.filter((id) => !movingSet.has(id));
+
+      let targetIndex = remainingIds.indexOf(targetId);
+      if (targetIndex === -1) {
+        targetIndex = remainingIds.length;
+      } else if (position === 'after') {
+        targetIndex += 1;
+      }
+
+      remainingIds.splice(targetIndex, 0, ...orderedMovingIds);
+      return { rootNodeIds: remainingIds, isDirty: true };
     });
     if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
       get().debouncedRecalculatePath(100);

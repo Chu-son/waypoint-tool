@@ -25,6 +25,7 @@ describe('WaypointTree', () => {
   const mockDuplicateNodes = vi.fn();
   const mockRemoveNodes = vi.fn();
   const mockReorderNodes = vi.fn();
+  const mockReorderMultipleNodes = vi.fn();
 
   const mockNodes = {
     'wp-1': { id: 'wp-1', type: 'manual' },
@@ -53,6 +54,7 @@ describe('WaypointTree', () => {
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
       reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
     }));
   });
 
@@ -73,6 +75,8 @@ describe('WaypointTree', () => {
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
     }));
 
     render(<WaypointTree />);
@@ -100,6 +104,8 @@ describe('WaypointTree', () => {
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
     }));
 
     render(<WaypointTree />);
@@ -128,6 +134,8 @@ describe('WaypointTree', () => {
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
     }));
 
     render(<WaypointTree />);
@@ -155,6 +163,8 @@ describe('WaypointTree', () => {
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
     }));
 
     render(<WaypointTree />);

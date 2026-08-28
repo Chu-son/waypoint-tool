@@ -11,9 +11,9 @@ import {
   useSensors,
   DragEndEvent,
   DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
@@ -26,7 +26,7 @@ function SortableItem({ id, children, isDragging }: { id: string; children: Reac
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging ? 50 : 'auto',
     position: 'relative' as const,
   };
@@ -37,6 +37,79 @@ function SortableItem({ id, children, isDragging }: { id: string; children: Reac
   );
 }
 
+interface TreeDragOverlayProps {
+  activeId: string;
+  selectedNodeIds: string[];
+  nodes: Record<string, import('../../types/store').WaypointNode>;
+  plugins: Record<string, import('../../types/store').PluginInstance>;
+  rootNodeIds: string[];
+}
+
+function TreeDragOverlay({
+  activeId,
+  selectedNodeIds,
+  nodes,
+  plugins,
+  rootNodeIds,
+}: TreeDragOverlayProps) {
+  const isMulti = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1;
+  const movingIds = isMulti ? rootNodeIds.filter((id) => selectedNodeIds.includes(id)) : [activeId];
+  const activeNode = nodes[activeId];
+  if (!activeNode) return null;
+
+  const isGenerator = activeNode.type === 'generator';
+  const pluginName = isGenerator && activeNode.plugin_id && plugins[activeNode.plugin_id]
+    ? plugins[activeNode.plugin_id].manifest.name
+    : 'Generator';
+
+  return (
+    <div className="relative cursor-grabbing pointer-events-none select-none w-full max-w-[280px]">
+      {/* 複数選択時の背面スタックレイヤー 2 (3枚以上) */}
+      {isMulti && movingIds.length >= 3 && (
+        <div className="absolute inset-0 bg-surface-panel/70 border border-border-base/50 rounded-xl shadow-md transform translate-x-2.5 translate-y-2.5 rotate-2 scale-[0.97] -z-20" />
+      )}
+      {/* 複数選択時の背面スタックレイヤー 1 (2枚以上) */}
+      {isMulti && movingIds.length >= 2 && (
+        <div className="absolute inset-0 bg-surface-panel/90 border border-primary-base/40 rounded-xl shadow-lg transform translate-x-1.5 translate-y-1.5 -rotate-1 scale-[0.985] -z-10" />
+      )}
+
+      {/* メインドラッグカード */}
+      <div
+        className={cn(
+          "px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center justify-between shadow-2xl backdrop-blur-md transition-all",
+          isGenerator
+            ? "bg-surface-panel border-emerald-500 text-text-base ring-2 ring-emerald-500/30"
+            : "bg-surface-panel border-primary-base text-text-base ring-2 ring-primary-base/30"
+        )}
+      >
+        <div className="flex items-center gap-1.5 truncate">
+          <GripVertical size={14} className="text-text-muted opacity-80 shrink-0" />
+          {isGenerator ? (
+            <>
+              <Layers size={14} className="text-emerald-400 shrink-0" />
+              <span className="truncate font-semibold">{pluginName}</span>
+              <span className="text-[10px] text-text-muted/70 ml-0.5">({activeNode.children_ids?.length || 0} pts)</span>
+            </>
+          ) : (
+            <>
+              <span className="font-mono text-xs text-primary-base font-bold shrink-0">🎯 Waypoint</span>
+              {activeNode.name && <span className="text-text-muted truncate ml-1">({activeNode.name})</span>}
+            </>
+          )}
+        </div>
+
+        {/* 複数選択数バッジ */}
+        {isMulti && (
+          <div className="ml-2 px-2 py-0.5 rounded-full bg-primary-base text-white text-[10px] font-bold shadow-sm shrink-0 flex items-center gap-1">
+            <Copy size={10} />
+            <span>{movingIds.length} items</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function WaypointTree() {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const nodes = useAppStore(state => state.nodes);
@@ -44,7 +117,7 @@ export function WaypointTree() {
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const selectNodes = useAppStore(state => state.selectNodes);
   const duplicateNodes = useAppStore(state => state.duplicateNodes);
-  const reorderNodes = useAppStore(state => state.reorderNodes);
+  const reorderMultipleNodes = useAppStore(state => state.reorderMultipleNodes);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
   const insertionIndex = useAppStore(state => state.insertionIndex);
   const setInsertionIndex = useAppStore(state => state.setInsertionIndex);
@@ -168,28 +241,38 @@ export function WaypointTree() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragId(null);
     const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    if (over && active.id !== over.id) {
-      const oldIndex = renderItems.indexOf(active.id as string);
-      const newIndex = renderItems.indexOf(over.id as string);
+    const activeId = active.id as string;
+    const overId = over.id as string;
 
-      if (active.id === '__insertion_bar__') {
-        setInsertionIndex(newIndex === rootNodeIds.length ? -1 : newIndex);
-      } else {
-        const newRenderItems = arrayMove(renderItems, oldIndex, newIndex);
-        const newInsertionIdx = newRenderItems.indexOf('__insertion_bar__');
-        const newRootNodeIds = newRenderItems.filter(id => id !== '__insertion_bar__');
-
-        const activeNodeId = active.id as string;
-        const origOldIndex = rootNodeIds.indexOf(activeNodeId);
-        const origNewIndex = newRootNodeIds.indexOf(activeNodeId);
-        
-        if (origOldIndex !== origNewIndex) {
-          reorderNodes(origOldIndex, origNewIndex);
-        }
-        setInsertionIndex(newInsertionIdx === newRootNodeIds.length ? -1 : newInsertionIdx);
-      }
+    if (activeId === '__insertion_bar__') {
+      const newIndex = renderItems.indexOf(overId);
+      setInsertionIndex(newIndex === rootNodeIds.length ? -1 : newIndex);
+      return;
     }
+
+    const isMultiDrag = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1;
+    const movingIds = isMultiDrag
+      ? rootNodeIds.filter((id) => selectedNodeIds.includes(id))
+      : [activeId];
+
+    if (movingIds.includes(overId)) return;
+
+    const oldIndex = renderItems.indexOf(activeId);
+    const newIndex = renderItems.indexOf(overId);
+
+    if (overId === '__insertion_bar__') {
+      const nonBarItems = renderItems.filter((id) => id !== '__insertion_bar__');
+      const fallbackTarget = nonBarItems[Math.min(newIndex, nonBarItems.length - 1)];
+      if (fallbackTarget) {
+        reorderMultipleNodes(movingIds, fallbackTarget, newIndex >= nonBarItems.length ? 'after' : 'before');
+      }
+      return;
+    }
+
+    const position: 'before' | 'after' = oldIndex < newIndex ? 'after' : 'before';
+    reorderMultipleNodes(movingIds, overId, position);
   };
 
   const totalWaypointsCount = useMemo(() => {
@@ -231,6 +314,7 @@ export function WaypointTree() {
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => setActiveDragId(null)}
       >
         <div className="p-2">
           <SortableContext
@@ -239,6 +323,12 @@ export function WaypointTree() {
           >
             <ul className="space-y-1">
               {renderItems.map((id, _index) => {
+                const isItemDragging = activeDragId === id || (
+                  !!activeDragId &&
+                  selectedNodeIds.includes(activeDragId) &&
+                  selectedNodeIds.includes(id)
+                );
+
                 if (id === '__insertion_bar__') {
                   return (
                     <SortableItem key={id} id={id} isDragging={activeDragId === id}>
@@ -264,7 +354,7 @@ export function WaypointTree() {
                   globalIndex += childIds.length;
 
                   return (
-                    <SortableItem key={id} id={id} isDragging={activeDragId === id}>
+                    <SortableItem key={id} id={id} isDragging={isItemDragging}>
                       <TreeItemRow
                         isSelected={isSelected}
                         variant="generator"
@@ -322,7 +412,7 @@ export function WaypointTree() {
                 // Manual waypoint node
                 const currentGlobalIndex = globalIndex++;
                 return (
-                  <SortableItem key={id} id={id} isDragging={activeDragId === id}>
+                  <SortableItem key={id} id={id} isDragging={isItemDragging}>
                     <TreeItemRow
                       isSelected={isSelected}
                       isAnchor={isAnchor}
@@ -343,6 +433,19 @@ export function WaypointTree() {
             </ul>
           </SortableContext>
         </div>
+
+        {/* ドラッグ中の視覚的オーバーレイ表示（スタックカード & バッジ） */}
+        <DragOverlay dropAnimation={{ duration: 150, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
+          {activeDragId && activeDragId !== '__insertion_bar__' ? (
+            <TreeDragOverlay
+              activeId={activeDragId}
+              selectedNodeIds={selectedNodeIds}
+              nodes={nodes}
+              plugins={plugins}
+              rootNodeIds={rootNodeIds}
+            />
+          ) : null}
+        </DragOverlay>
       </DndContext>
 
       {contextMenu && (

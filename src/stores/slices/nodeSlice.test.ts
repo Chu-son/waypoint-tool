@@ -150,4 +150,88 @@ describe('NodeSlice - duplicateNodes', () => {
     expect(state.nodes['node-2'].transform?.y).toBe(21);
     expect(state.isDirty).toBe(true);
   });
+
+  describe('reorderMultipleNodes', () => {
+    it('moves non-contiguous nodes to after a target node in contiguous block', () => {
+      // Setup [node-1, node-2, node-3, node-4, node-5, node-6, node-7]
+      const ids = ['node-1', 'node-2', 'node-3', 'node-4', 'node-5', 'node-6', 'node-7'];
+      const nodes: Record<string, WaypointNode> = {};
+      ids.forEach((id) => {
+        nodes[id] = { id, type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } };
+      });
+
+      useAppStore.setState({
+        nodes,
+        rootNodeIds: [...ids],
+        selectedNodeIds: ['node-2', 'node-4', 'node-6'],
+      });
+
+      // Move [node-2, node-4, node-6] to after node-7
+      useAppStore.getState().reorderMultipleNodes(['node-2', 'node-4', 'node-6'], 'node-7', 'after');
+
+      const state = useAppStore.getState();
+      expect(state.rootNodeIds).toEqual([
+        'node-1',
+        'node-3',
+        'node-5',
+        'node-7',
+        'node-2',
+        'node-4',
+        'node-6',
+      ]);
+      expect(state.isDirty).toBe(true);
+    });
+
+    it('moves non-contiguous nodes to before a target node', () => {
+      const ids = ['node-1', 'node-2', 'node-3', 'node-4', 'node-5', 'node-6', 'node-7'];
+      const nodes: Record<string, WaypointNode> = {};
+      ids.forEach((id) => {
+        nodes[id] = { id, type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } };
+      });
+
+      useAppStore.setState({
+        nodes,
+        rootNodeIds: [...ids],
+        selectedNodeIds: ['node-2', 'node-4', 'node-6'],
+      });
+
+      // Move [node-2, node-4, node-6] to before node-1
+      useAppStore.getState().reorderMultipleNodes(['node-2', 'node-4', 'node-6'], 'node-1', 'before');
+
+      const state = useAppStore.getState();
+      expect(state.rootNodeIds).toEqual([
+        'node-2',
+        'node-4',
+        'node-6',
+        'node-1',
+        'node-3',
+        'node-5',
+        'node-7',
+      ]);
+    });
+
+    it('moves nodes to intermediate position correctly', () => {
+      const ids = ['node-1', 'node-2', 'node-3', 'node-4', 'node-5'];
+      const nodes: Record<string, WaypointNode> = {};
+      ids.forEach((id) => {
+        nodes[id] = { id, type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } };
+      });
+
+      useAppStore.setState({
+        nodes,
+        rootNodeIds: [...ids],
+      });
+
+      // Move [node-1, node-5] to before node-3 -> [node-2, node-1, node-5, node-3, node-4]
+      useAppStore.getState().reorderMultipleNodes(['node-1', 'node-5'], 'node-3', 'before');
+
+      expect(useAppStore.getState().rootNodeIds).toEqual([
+        'node-2',
+        'node-1',
+        'node-5',
+        'node-3',
+        'node-4',
+      ]);
+    });
+  });
 });

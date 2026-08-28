@@ -129,7 +129,7 @@
   - **概要**: ウェイポイントツリー (`WaypointTree`) とアノテーション一覧 (`AnnotationTree`) を統合してホストする左サイドバーのメインオブジェクトパネル。
   - **主要Props**: なし
 - **`WaypointTree`** ([`src/components/ui/WaypointTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WaypointTree.tsx))
-  - **概要**: 全 Waypoint / ジェネレーター要素を階層表示・ドラッグ＆ドロップで並び替えるツリーペイン。Shiftキーによる範囲選択、右クリックコンテキストメニュー（単一/複数選択項目の一括複製・一括削除・アンカー設定・内部プロパティ表示・Explode）に対応。
+  - **概要**: 全 Waypoint / ジェネレーター要素を階層表示・ドラッグ＆ドロップで並び替えるツリーペイン。Shiftキーによる範囲選択、不連続選択を含む複数ノードの一括ドラッグ並び替え（連続化配置 & DragOverlayによるスタックカード視覚表示）、右クリックコンテキストメニュー（単一/複数選択項目の一括複製・一括削除・アンカー設定・内部プロパティ表示・Explode）に対応。
   - **主要Props**: なし
 - **`AnnotationTree`** ([`src/components/ui/AnnotationTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationTree.tsx))
   - **概要**: アノテーションオブジェクトの一覧表示、ドラッグ＆ドロップ並び替え、可視性/ラベル表示トグル、削除、名前編集、複製、配置モード開始トリガーを提供するコンポーネント。
