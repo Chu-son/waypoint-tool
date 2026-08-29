@@ -149,16 +149,16 @@ function SortableAnnotationTreeNode({
       <div
         onClick={onClick}
         onContextMenu={onContextMenu}
-        style={{ paddingLeft: `${Math.max(8, depth * 16 + 8)}px` }}
+        style={{ paddingLeft: `${Math.min(depth * 10 + 6, 32)}px` }}
         className={cn(
-          'group relative flex items-center justify-between gap-1.5 py-1.5 pr-2 rounded-lg text-xs transition-all cursor-pointer border',
+          'group relative flex items-center justify-between gap-1 py-1.5 pr-1.5 rounded-lg text-xs transition-all cursor-pointer border overflow-hidden',
           isSelected
             ? 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30 font-bold'
             : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
           !isVisible && 'opacity-60 grayscale-[0.3]'
         )}
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
           {/* Grip Icon */}
           <div
             {...attributes}
@@ -183,7 +183,7 @@ function SortableAnnotationTreeNode({
               />
             </button>
           ) : (
-            <span className="w-4 shrink-0" />
+            <span className="w-3 shrink-0" />
           )}
 
           {/* Group / Annotation Icon */}
@@ -218,11 +218,11 @@ function SortableAnnotationTreeNode({
                 }
               }}
               onClick={(e) => e.stopPropagation()}
-              className="flex-1 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
+              className="flex-1 min-w-0 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
             />
           ) : (
             <span
-              className="truncate font-medium flex-1 text-text-base"
+              className="truncate font-medium flex-1 min-w-0 text-text-base"
               title={group?.name || obj?.name || ''}
             >
               {group?.name || obj?.name || ''}
@@ -235,14 +235,14 @@ function SortableAnnotationTreeNode({
               {childCount}
             </span>
           ) : obj ? (
-            <span className="text-[9px] px-1 py-0.2 rounded bg-surface-hover/80 text-text-muted border border-border-base/30 shrink-0 font-mono">
+            <span className="text-[9px] px-1 py-0.2 rounded bg-surface-hover/80 text-text-muted border border-border-base/30 shrink-0 font-mono hidden xs:inline-block sm:inline-block">
               {getTypeLabel(obj.type)}
             </span>
           ) : null}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100">
+        <div className="flex items-center gap-0.5 shrink-0 ml-1 opacity-80 group-hover:opacity-100">
           {!isGroup && obj && (
             <Button
               variant="ghost"

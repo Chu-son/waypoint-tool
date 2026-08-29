@@ -57,7 +57,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       </ModalHeader>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-56 bg-surface-panel/40 border-r border-border-base/40 p-3 shrink-0 space-y-1">
+        <div className="w-40 sm:w-52 md:w-56 bg-surface-panel/40 border-r border-border-base/40 p-2 sm:p-3 shrink-0 space-y-1 overflow-y-auto">
           {([
             { id: "general", label: "General" },
             { id: "options", label: "Option Schema" },
@@ -70,20 +70,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               variant={activeTab === tab.id ? "secondary" : "ghost"}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "w-full justify-start font-bold text-[13px] h-10 px-4 transition-all",
+                "w-full justify-start font-bold text-xs sm:text-[13px] h-9 sm:h-10 px-2.5 sm:px-4 transition-all truncate",
                 activeTab === tab.id
                   ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm"
                   : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
               )}
             >
-              {tab.label}
+              <span className="truncate">{tab.label}</span>
             </Button>
           ))}
         </div>
 
         {/* Content Area */}
         <ModalContent className="p-0">
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
             {activeTab === "general" && <GeneralTab />}
             {activeTab === "options" && <OptionSchemaTab />}
             {activeTab === "robot" && <RobotFootprintTab />}

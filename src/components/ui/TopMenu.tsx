@@ -391,13 +391,13 @@ export function TopMenu() {
 
   return (
     <div 
-      className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm"
+      className="h-9 bg-surface-base border-b border-border-base flex items-center px-4 shrink-0 text-text-muted z-50 relative select-none shadow-sm justify-between gap-2"
       data-tauri-drag-region
     >
-      <div className="flex items-center gap-6" data-tauri-drag-region>
+      <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1" data-tauri-drag-region>
         <AppBrand />
 
-        <div className="flex gap-1 items-center">
+        <div className="flex gap-0.5 sm:gap-1 items-center shrink-0">
           {menuSections.map((section) => (
             <DropdownMenu
               key={section.label}
@@ -411,12 +411,16 @@ export function TopMenu() {
           ))}
         </div>
 
-        <div className="h-4 w-px bg-border-base/50" />
+        <div className="h-4 w-px bg-border-base/50 shrink-0 hidden sm:block" />
 
-        <PathRouterMenu />
+        <div className="shrink-0">
+          <PathRouterMenu />
+        </div>
       </div>
 
-      <WindowControls onExit={handleExit} />
+      <div className="shrink-0 ml-2">
+        <WindowControls onExit={handleExit} />
+      </div>
     </div>
   );
 }

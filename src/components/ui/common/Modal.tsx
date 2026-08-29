@@ -10,9 +10,9 @@ export interface ModalProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const sizeVariants = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
+  sm: "max-w-sm w-full",
+  md: "max-w-md w-full",
+  lg: "max-w-lg w-full",
   xl: "max-w-2xl w-[90vw]",
   "2xl": "max-w-4xl w-[90vw]",
   full: "max-w-[95vw] w-full",
@@ -29,7 +29,7 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-surface-base/80 backdrop-blur-sm animate-in fade-in duration-200" 
@@ -61,20 +61,20 @@ export interface ModalHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
 export function ModalHeader({ className, onClose, icon, title, children, ...props }: ModalHeaderProps) {
   return (
     <div
-      className={cn("px-6 py-4 border-b border-border-base flex items-center justify-between bg-surface-base/30", className)}
+      className={cn("px-4 sm:px-6 py-3 sm:py-4 border-b border-border-base flex items-center justify-between bg-surface-base/30 shrink-0", className)}
       {...props}
     >
-      <div className="text-lg font-bold text-text-base flex items-center gap-2">
+      <div className="text-base sm:text-lg font-bold text-text-base flex items-center gap-2 min-w-0">
         {icon && <span className="flex items-center shrink-0">{icon}</span>}
-        {title ? <span>{title}</span> : children}
+        {title ? <span className="truncate">{title}</span> : children}
       </div>
       {onClose && (
         <button
           onClick={onClose}
-          className="text-text-muted hover:text-text-base hover:bg-surface-hover p-1.5 rounded-lg transition-all"
+          className="text-text-muted hover:text-text-base hover:bg-surface-hover p-1.5 rounded-lg transition-all shrink-0 ml-2"
           aria-label="Close"
         >
-          <X size={20} />
+          <X size={18} />
         </button>
       )}
     </div>
@@ -84,7 +84,7 @@ export function ModalHeader({ className, onClose, icon, title, children, ...prop
 export function ModalContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("px-6 py-4 overflow-y-auto flex-1", className)}
+      className={cn("px-4 sm:px-6 py-3 sm:py-4 overflow-y-auto flex-1", className)}
       {...props}
     />
   );

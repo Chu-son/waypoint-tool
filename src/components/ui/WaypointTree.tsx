@@ -114,9 +114,9 @@ function SortableTreeNodeItem({
       <div
         onClick={onClick}
         onContextMenu={onContextMenu}
-        style={{ paddingLeft: `${Math.max(8, depth * 16 + 8)}px` }}
+        style={{ paddingLeft: `${Math.min(depth * 10 + 6, 32)}px` }}
         className={cn(
-          'group relative flex items-center justify-between gap-1.5 py-1.5 pr-2 rounded-lg text-xs transition-all cursor-pointer border',
+          'group relative flex items-center justify-between gap-1 py-1.5 pr-1.5 rounded-lg text-xs transition-all cursor-pointer border overflow-hidden',
           isSelected
             ? isGenerator
               ? 'bg-emerald-500/20 border-emerald-500 text-text-base shadow-sm ring-1 ring-emerald-500/30'
@@ -125,7 +125,7 @@ function SortableTreeNodeItem({
           isAnchor && 'border-amber-400/60 bg-amber-950/20'
         )}
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
           {/* Grip Icon for DnD */}
           <div
             {...attributes}
@@ -150,7 +150,7 @@ function SortableTreeNodeItem({
               />
             </button>
           ) : (
-            <span className="w-4 shrink-0" />
+            <span className="w-3 shrink-0" />
           )}
 
           {/* Node Icon */}
