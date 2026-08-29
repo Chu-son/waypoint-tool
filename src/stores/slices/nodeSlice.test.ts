@@ -235,3 +235,199 @@ describe('NodeSlice - duplicateNodes', () => {
     });
   });
 });
+
+describe('NodeSlice - groupNodes and ungroupNode', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      nodes: {},
+      rootNodeIds: [],
+      selectedNodeIds: [],
+      historyPast: [],
+      historyFuture: [],
+    });
+  });
+
+  it('groups multiple manual waypoints into a new manual_group', () => {
+    const node1: WaypointNode = { id: 'wp-1', type: 'manual', name: 'WP 1' };
+    const node2: WaypointNode = { id: 'wp-2', type: 'manual', name: 'WP 2' };
+    const node3: WaypointNode = { id: 'wp-3', type: 'manual', name: 'WP 3' };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': node1, 'wp-2': node2, 'wp-3': node3 },
+      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
+      selectedNodeIds: ['wp-1', 'wp-2'],
+    });
+
+    const newGroupId = useAppStore.getState().groupNodes(['wp-1', 'wp-2']);
+    expect(newGroupId).toBeTruthy();
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual([newGroupId!, 'wp-3']);
+    expect(state.selectedNodeIds).toEqual([newGroupId!]);
+
+    const groupNode = state.nodes[newGroupId!];
+    expect(groupNode).toBeDefined();
+    expect(groupNode.type).toBe('manual_group');
+    expect(groupNode.name).toBe('Group 1');
+    expect(groupNode.children_ids).toEqual(['wp-1', 'wp-2']);
+  });
+
+  it('groups nested nodes at the shallowest level', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const subWp1: WaypointNode = { id: 'sub-wp-1', type: 'manual' };
+    const subWp2: WaypointNode = { id: 'sub-wp-2', type: 'manual' };
+    const group1: WaypointNode = { id: 'group-1', type: 'manual_group', name: 'Group 1', children_ids: ['sub-wp-1', 'sub-wp-2'] };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, 'wp-2': wp2, 'group-1': group1, 'sub-wp-1': subWp1, 'sub-wp-2': subWp2 },
+      rootNodeIds: ['wp-1', 'group-1', 'wp-2'],
+    });
+
+    // Select wp-2 (root) and group-1 (root) -> placed at root
+    const newGroupId = useAppStore.getState().groupNodes(['group-1', 'wp-2']);
+    expect(newGroupId).toBeTruthy();
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-1', newGroupId!]);
+    const createdGroup = state.nodes[newGroupId!];
+    expect(createdGroup.children_ids).toEqual(['group-1', 'wp-2']);
+    expect(createdGroup.name).toBe('Group 2'); // Group 1 already existed
+  });
+
+  it('ungroups a group and expands its children into the parent list', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const wp3: WaypointNode = { id: 'wp-3', type: 'manual' };
+    const group1: WaypointNode = { id: 'group-1', type: 'manual_group', children_ids: ['wp-1', 'wp-2'] };
+
+    useAppStore.setState({
+      nodes: { 'group-1': group1, 'wp-1': wp1, 'wp-2': wp2, 'wp-3': wp3 },
+      rootNodeIds: ['group-1', 'wp-3'],
+    });
+
+    useAppStore.getState().ungroupNode('group-1');
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-1', 'wp-2', 'wp-3']);
+    expect(state.nodes['group-1']).toBeUndefined();
+    expect(state.selectedNodeIds).toEqual(['wp-1', 'wp-2']);
+  });
+
+  it('renames a node using renameNode', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual', name: 'Old Name' };
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1 },
+      rootNodeIds: ['wp-1'],
+    });
+
+    useAppStore.getState().renameNode('wp-1', 'New Name');
+    expect(useAppStore.getState().nodes['wp-1'].name).toBe('New Name');
+  });
+
+  it('removes group and all its descendants recursively', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const wp3: WaypointNode = { id: 'wp-3', type: 'manual' };
+    const subGroup: WaypointNode = { id: 'sub-g', type: 'manual_group', children_ids: ['wp-2'] };
+    const topGroup: WaypointNode = { id: 'top-g', type: 'manual_group', children_ids: ['wp-1', 'sub-g'] };
+
+    useAppStore.setState({
+      nodes: { 'top-g': topGroup, 'sub-g': subGroup, 'wp-1': wp1, 'wp-2': wp2, 'wp-3': wp3 },
+      rootNodeIds: ['top-g', 'wp-3'],
+    });
+
+    useAppStore.getState().removeNodes(['top-g']);
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-3']);
+    expect(state.nodes['top-g']).toBeUndefined();
+    expect(state.nodes['sub-g']).toBeUndefined();
+    expect(state.nodes['wp-1']).toBeUndefined();
+    expect(state.nodes['wp-2']).toBeUndefined();
+    expect(state.nodes['wp-3']).toBeDefined();
+  });
+});
+
+describe('NodeSlice - moveNodesInTree', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      nodes: {},
+      rootNodeIds: [],
+      selectedNodeIds: [],
+      historyPast: [],
+      historyFuture: [],
+    });
+  });
+
+  it('moves nodes within the same group', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const wp3: WaypointNode = { id: 'wp-3', type: 'manual' };
+    const grp: WaypointNode = { id: 'grp-1', type: 'manual_group', children_ids: ['wp-1', 'wp-2', 'wp-3'] };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, 'wp-2': wp2, 'wp-3': wp3, 'grp-1': grp },
+      rootNodeIds: ['grp-1'],
+    });
+
+    // Move wp-3 before wp-1 in grp-1
+    useAppStore.getState().moveNodesInTree(['wp-3'], 'wp-1', 'before');
+
+    const updatedGrp = useAppStore.getState().nodes['grp-1'];
+    expect(updatedGrp.children_ids).toEqual(['wp-3', 'wp-1', 'wp-2']);
+  });
+
+  it('moves a node from root into a group', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const grp: WaypointNode = { id: 'grp-1', type: 'manual_group', children_ids: ['wp-2'] };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, 'wp-2': wp2, 'grp-1': grp },
+      rootNodeIds: ['wp-1', 'grp-1'],
+    });
+
+    // Move wp-1 before wp-2 (which is inside grp-1)
+    useAppStore.getState().moveNodesInTree(['wp-1'], 'wp-2', 'before');
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['grp-1']);
+    expect(state.nodes['grp-1'].children_ids).toEqual(['wp-1', 'wp-2']);
+  });
+
+  it('moves a node from a group out to root', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const grp: WaypointNode = { id: 'grp-1', type: 'manual_group', children_ids: ['wp-1', 'wp-2'] };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, 'wp-2': wp2, 'grp-1': grp },
+      rootNodeIds: ['grp-1'],
+    });
+
+    // Move wp-2 after grp-1 (at root)
+    useAppStore.getState().moveNodesInTree(['wp-2'], 'grp-1', 'after');
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['grp-1', 'wp-2']);
+    expect(state.nodes['grp-1'].children_ids).toEqual(['wp-1']);
+  });
+
+  it('prevents circular reference when moving a parent into its child', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const grp: WaypointNode = { id: 'grp-1', type: 'manual_group', children_ids: ['wp-1'] };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, 'grp-1': grp },
+      rootNodeIds: ['grp-1'],
+    });
+
+    // Attempt to move grp-1 into wp-1 -> should be blocked
+    useAppStore.getState().moveNodesInTree(['grp-1'], 'wp-1', 'inside');
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['grp-1']);
+    expect(state.nodes['grp-1'].children_ids).toEqual(['wp-1']);
+  });
+});

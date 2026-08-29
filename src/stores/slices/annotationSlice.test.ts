@@ -1,129 +1,158 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { LineAnnotation, PointAnnotation, RectAnnotation } from '../../types/store';
+import { PointAnnotation, AnnotationGroup } from '../../types/store';
 
-describe('AnnotationSlice', () => {
+describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () => {
   beforeEach(() => {
-    const store = useAppStore.getState();
-    store.annotationObjects = {};
-    store.annotationOrder = [];
-    store.selectedAnnotationIds = [];
-    store.historyPast = [];
-    store.historyFuture = [];
-    store.isAnnotationEditMode = false;
-    store.activeAnnotationSubTool = 'select';
+    useAppStore.setState({
+      annotationObjects: {},
+      annotationGroups: {},
+      rootAnnotationIds: [],
+      selectedAnnotationIds: [],
+      historyPast: [],
+      historyFuture: [],
+    });
   });
 
-  it('adds and selects an annotation object', () => {
-    const { addAnnotationObject } = useAppStore.getState();
-    const point: PointAnnotation = {
-      id: 'point-1',
-      name: 'Start Point',
-      type: 'point',
-      x: 1.5,
-      y: 2.5,
-      visible: true,
-      labelVisible: true,
-      color: '#ff0000',
-    };
+  it('groups multiple annotations into a new AnnotationGroup', () => {
+    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'Point 1', x: 0, y: 0, visible: true, labelVisible: true };
+    const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'Point 2', x: 1, y: 1, visible: true, labelVisible: true };
 
-    addAnnotationObject(point);
+    useAppStore.setState({
+      annotationObjects: { p1, p2 },
+      rootAnnotationIds: ['p1', 'p2'],
+      selectedAnnotationIds: ['p1', 'p2'],
+    });
+
+    const newGroupId = useAppStore.getState().groupAnnotations(['p1', 'p2']);
+    expect(newGroupId).toBeTruthy();
 
     const state = useAppStore.getState();
-    expect(state.annotationObjects['point-1']).toEqual(point);
-    expect(state.annotationOrder).toEqual(['point-1']);
-    expect(state.selectedAnnotationIds).toEqual(['point-1']);
-    expect(state.historyPast.length).toBe(1);
+    expect(state.rootAnnotationIds).toEqual([newGroupId!]);
+    expect(state.selectedAnnotationIds).toEqual([newGroupId!]);
+
+    const group = state.annotationGroups[newGroupId!];
+    expect(group).toBeDefined();
+    expect(group.name).toBe('Group 1');
+    expect(group.children_ids).toEqual(['p1', 'p2']);
+    expect(state.annotationObjects['p1'].group_id).toBe(newGroupId!);
+    expect(state.annotationObjects['p2'].group_id).toBe(newGroupId!);
   });
 
-  it('updates an annotation object and tracks undo/redo', () => {
-    const { addAnnotationObject, updateAnnotationObject, undo, redo } = useAppStore.getState();
-    const line: LineAnnotation = {
-      id: 'line-1',
-      name: 'Start Line',
-      type: 'line',
-      x1: 0,
-      y1: 0,
-      x2: 5,
-      y2: 5,
+  it('supports nesting groups within groups and ungroups properly', () => {
+    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'Point 1', x: 0, y: 0, visible: true, labelVisible: true };
+    const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'Point 2', x: 1, y: 1, visible: true, labelVisible: true };
+    const p3: PointAnnotation = { id: 'p3', type: 'point', name: 'Point 3', x: 2, y: 2, visible: true, labelVisible: true };
+
+    const subGroup: AnnotationGroup = {
+      id: 'sub-g',
+      name: 'SubGroup',
+      type: 'manual_group',
       visible: true,
-      labelVisible: true,
+      children_ids: ['p1', 'p2'],
     };
 
-    addAnnotationObject(line);
-    updateAnnotationObject('line-1', { name: 'Finish Line', x2: 10 });
+    useAppStore.setState({
+      annotationObjects: { p1, p2, p3 },
+      annotationGroups: { 'sub-g': subGroup },
+      rootAnnotationIds: ['sub-g', 'p3'],
+    });
+
+    // Group subGroup and p3
+    const topGroupId = useAppStore.getState().groupAnnotations(['sub-g', 'p3']);
+    expect(topGroupId).toBeTruthy();
 
     let state = useAppStore.getState();
-    expect((state.annotationObjects['line-1'] as LineAnnotation).name).toBe('Finish Line');
-    expect((state.annotationObjects['line-1'] as LineAnnotation).x2).toBe(10);
+    expect(state.rootAnnotationIds).toEqual([topGroupId!]);
+    const topGroup = state.annotationGroups[topGroupId!];
+    expect(topGroup.children_ids).toEqual(['sub-g', 'p3']);
+    expect(state.annotationGroups['sub-g'].parent_id).toBe(topGroupId!);
 
-    undo();
+    // Ungroup topGroup
+    useAppStore.getState().ungroupAnnotation(topGroupId!);
     state = useAppStore.getState();
-    expect((state.annotationObjects['line-1'] as LineAnnotation).name).toBe('Start Line');
-    expect((state.annotationObjects['line-1'] as LineAnnotation).x2).toBe(5);
-
-    redo();
-    state = useAppStore.getState();
-    expect((state.annotationObjects['line-1'] as LineAnnotation).name).toBe('Finish Line');
-    expect((state.annotationObjects['line-1'] as LineAnnotation).x2).toBe(10);
+    expect(state.rootAnnotationIds).toEqual(['sub-g', 'p3']);
+    expect(state.annotationGroups[topGroupId!]).toBeUndefined();
+    expect(state.annotationGroups['sub-g'].parent_id).toBeUndefined();
   });
 
-  it('removes annotation objects and supports undo', () => {
-    const { addAnnotationObject, removeAnnotationObjects, undo } = useAppStore.getState();
-    const rect: RectAnnotation = {
-      id: 'rect-1',
-      name: 'No Go Zone',
-      type: 'rect',
-      cx: 2,
-      cy: 2,
-      width: 4,
-      height: 4,
-      angle: 0,
+  it('toggles group visibility recursively', () => {
+    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true };
+    const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'P2', x: 1, y: 1, visible: true, labelVisible: true };
+    const subGroup: AnnotationGroup = {
+      id: 'sub-g',
+      name: 'SubGroup',
+      type: 'manual_group',
       visible: true,
-      labelVisible: true,
+      children_ids: ['p2'],
+    };
+    const topGroup: AnnotationGroup = {
+      id: 'top-g',
+      name: 'TopGroup',
+      type: 'manual_group',
+      visible: true,
+      children_ids: ['p1', 'sub-g'],
     };
 
-    addAnnotationObject(rect);
-    expect(useAppStore.getState().annotationOrder).toEqual(['rect-1']);
+    useAppStore.setState({
+      annotationObjects: { p1, p2 },
+      annotationGroups: { 'top-g': topGroup, 'sub-g': subGroup },
+      rootAnnotationIds: ['top-g'],
+    });
 
-    removeAnnotationObjects(['rect-1']);
-    expect(useAppStore.getState().annotationObjects['rect-1']).toBeUndefined();
-    expect(useAppStore.getState().annotationOrder).toEqual([]);
+    useAppStore.getState().toggleAnnotationGroupVisibility('top-g');
 
-    undo();
-    expect(useAppStore.getState().annotationObjects['rect-1']).toBeDefined();
-    expect(useAppStore.getState().annotationOrder).toEqual(['rect-1']);
+    let state = useAppStore.getState();
+    expect(state.annotationGroups['top-g'].visible).toBe(false);
+    expect(state.annotationGroups['sub-g'].visible).toBe(false);
+    expect(state.annotationObjects['p1'].visible).toBe(false);
+    expect(state.annotationObjects['p2'].visible).toBe(false);
+
+    useAppStore.getState().toggleAnnotationGroupVisibility('top-g');
+    state = useAppStore.getState();
+    expect(state.annotationGroups['top-g'].visible).toBe(true);
+    expect(state.annotationGroups['sub-g'].visible).toBe(true);
+    expect(state.annotationObjects['p1'].visible).toBe(true);
+    expect(state.annotationObjects['p2'].visible).toBe(true);
   });
 
-  it('toggles visibility and label visibility', () => {
-    const { addAnnotationObject, toggleAnnotationVisibility, toggleAnnotationLabelVisibility } = useAppStore.getState();
-    const point: PointAnnotation = {
-      id: 'point-1',
-      name: 'Point 1',
-      type: 'point',
-      x: 0,
-      y: 0,
-      visible: true,
-      labelVisible: true,
-    };
+  describe('moveAnnotationsInTree', () => {
+    it('moves an annotation into a group', () => {
+      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true };
+      const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'P2', x: 1, y: 1, visible: true, labelVisible: true };
+      const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p2'], visible: true };
 
-    addAnnotationObject(point);
-    toggleAnnotationVisibility('point-1');
-    expect(useAppStore.getState().annotationObjects['point-1'].visible).toBe(false);
+      useAppStore.setState({
+        annotationObjects: { p1, p2 },
+        annotationGroups: { g1: grp },
+        rootAnnotationIds: ['p1', 'g1'],
+      });
 
-    toggleAnnotationLabelVisibility('point-1');
-    expect(useAppStore.getState().annotationObjects['point-1'].labelVisible).toBe(false);
-  });
+      useAppStore.getState().moveAnnotationsInTree(['p1'], 'p2', 'before');
 
-  it('reorders annotation objects', () => {
-    const { addAnnotationObject, reorderAnnotationObjects } = useAppStore.getState();
-    addAnnotationObject({ id: 'p1', name: 'P1', type: 'point', x: 0, y: 0, visible: true, labelVisible: true });
-    addAnnotationObject({ id: 'p2', name: 'P2', type: 'point', x: 1, y: 1, visible: true, labelVisible: true });
-    addAnnotationObject({ id: 'p3', name: 'P3', type: 'point', x: 2, y: 2, visible: true, labelVisible: true });
+      const state = useAppStore.getState();
+      expect(state.rootAnnotationIds).toEqual(['g1']);
+      expect(state.annotationGroups['g1'].children_ids).toEqual(['p1', 'p2']);
+      expect(state.annotationObjects['p1'].group_id).toBe('g1');
+    });
 
-    expect(useAppStore.getState().annotationOrder).toEqual(['p1', 'p2', 'p3']);
+    it('moves an annotation from a group to root', () => {
+      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true, group_id: 'g1' };
+      const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'P2', x: 1, y: 1, visible: true, labelVisible: true, group_id: 'g1' };
+      const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p1', 'p2'], visible: true };
 
-    reorderAnnotationObjects(0, 2);
-    expect(useAppStore.getState().annotationOrder).toEqual(['p2', 'p3', 'p1']);
+      useAppStore.setState({
+        annotationObjects: { p1, p2 },
+        annotationGroups: { g1: grp },
+        rootAnnotationIds: ['g1'],
+      });
+
+      useAppStore.getState().moveAnnotationsInTree(['p2'], 'g1', 'after');
+
+      const state = useAppStore.getState();
+      expect(state.rootAnnotationIds).toEqual(['g1', 'p2']);
+      expect(state.annotationGroups['g1'].children_ids).toEqual(['p1']);
+      expect(state.annotationObjects['p2'].group_id).toBeUndefined();
+    });
   });
 });

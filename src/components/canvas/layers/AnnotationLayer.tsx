@@ -60,7 +60,12 @@ export function AnnotationLayer({
   const renderSingleAnnotation = (obj: AnnotationObject, isPreview = false) => {
     if (!isPreview) {
       if (!obj.visible) return null;
-      if (obj.group_id && annotationGroups[obj.group_id]?.visible === false) return null;
+      let currentGid = obj.group_id;
+      while (currentGid) {
+        const grp = annotationGroups[currentGid];
+        if (grp && grp.visible === false) return null;
+        currentGid = grp?.parent_id;
+      }
     }
 
     const isSelected = !isPreview && selectedAnnotationIds.includes(obj.id);

@@ -1,6 +1,11 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { AnnotationObject, AnnotationGroup } from '../../types/store';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  findHighestLevelParent,
+  collectDescendantIds,
+} from '../../utils/treeUtils';
 
 export type AnnotationToolType = 'select' | 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
 
@@ -26,6 +31,10 @@ export interface AnnotationSlice {
   updateAnnotationObject: (id: string, updates: Partial<AnnotationObject>) => void;
   addAnnotationGroup: (group: AnnotationGroup) => void;
   updateAnnotationGroup: (id: string, updates: Partial<AnnotationGroup>) => void;
+  renameAnnotation: (id: string, name: string) => void;
+  groupAnnotations: (selectedIds: string[]) => string | null;
+  ungroupAnnotation: (groupId: string) => void;
+  moveAnnotationsInTree: (movingIds: string[], targetId: string, position: 'before' | 'after' | 'inside') => void;
   removeAnnotationGroup: (id: string) => void;
   explodeAnnotationGroup: (groupId: string) => void;
   removeAnnotationObjects: (ids: string[]) => void;
@@ -146,37 +155,121 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
     });
   },
 
-  removeAnnotationGroup: (id: string) => {
-    get().pushHistorySnapshot();
-    set((state) => {
-      const group = state.annotationGroups[id];
-      if (!group) return state;
+  renameAnnotation: (id: string, name: string) => {
+    const state = get();
+    if (state.annotationGroups[id]) {
+      get().updateAnnotationGroup(id, { name });
+    } else if (state.annotationObjects[id]) {
+      get().updateAnnotationObject(id, { name });
+    }
+  },
 
-      const childrenSet = new Set(group.children_ids || []);
-      const newObjects = { ...state.annotationObjects };
-      childrenSet.forEach((childId) => {
-        delete newObjects[childId];
+  groupAnnotations: (selectedIds: string[]): string | null => {
+    if (!selectedIds || selectedIds.length === 0) return null;
+    get().pushHistorySnapshot();
+
+    const newGroupId = uuidv4();
+
+    set((state) => {
+      // 1. 親探索用の辞書を構築
+      const groupMap = state.annotationGroups;
+      const { parentId: targetParentId, insertIndex } = findHighestLevelParent(
+        selectedIds,
+        state.rootAnnotationIds,
+        groupMap
+      );
+
+      // 2. 連番でグループ名を生成 ("Group 1", "Group 2", ...)
+      const existingNames = new Set(
+        Object.values(state.annotationGroups).map((g) => g.name).filter(Boolean)
+      );
+      let groupNum = 1;
+      while (existingNames.has(`Group ${groupNum}`)) {
+        groupNum++;
+      }
+      const groupName = `Group ${groupNum}`;
+
+      // 3. 親が選択されている場合の子孫重複排除
+      const directMovingIds: string[] = [];
+
+      selectedIds.forEach((id) => {
+        const isDescendantOfSelected = selectedIds.some((pId) => {
+          if (pId === id) return false;
+          const descendants = collectDescendantIds(pId, groupMap);
+          return descendants.includes(id);
+        });
+        if (!isDescendantOfSelected && !directMovingIds.includes(id)) {
+          directMovingIds.push(id);
+        }
       });
 
-      const newGroups = { ...state.annotationGroups };
-      delete newGroups[id];
+      if (directMovingIds.length === 0) return state;
 
-      const newRootIds = state.rootAnnotationIds.filter((rid) => rid !== id);
-      const newOrder = state.annotationOrder.filter((aid) => !childrenSet.has(aid));
-      const newSelected = state.selectedAnnotationIds.filter((sid) => sid !== id && !childrenSet.has(sid));
+      const newObjects = { ...state.annotationObjects };
+      const newGroups = { ...state.annotationGroups };
+      let newRootIds = [...state.rootAnnotationIds];
+      const movingSet = new Set(directMovingIds);
+
+      // 4. 移動ノードを元の親 / Root から削除し、親参照を更新
+      newRootIds = newRootIds.filter((id) => !movingSet.has(id));
+      Object.keys(newGroups).forEach((gid) => {
+        const grp = newGroups[gid];
+        if (grp.children_ids) {
+          newGroups[gid] = {
+            ...grp,
+            children_ids: grp.children_ids.filter((cid) => !movingSet.has(cid)),
+          };
+        }
+      });
+
+      directMovingIds.forEach((id) => {
+        if (newObjects[id]) {
+          newObjects[id] = { ...newObjects[id], group_id: newGroupId };
+        }
+        if (newGroups[id]) {
+          newGroups[id] = { ...newGroups[id], parent_id: newGroupId };
+        }
+      });
+
+      // 5. 新規グループを作成
+      const newGroup: AnnotationGroup = {
+        id: newGroupId,
+        name: groupName,
+        type: 'manual_group',
+        visible: true,
+        children_ids: directMovingIds,
+        parent_id: targetParentId || undefined,
+      };
+      newGroups[newGroupId] = newGroup;
+
+      // 6. 新規グループを親階層に配置
+      if (targetParentId && newGroups[targetParentId]) {
+        const parentGrp = newGroups[targetParentId];
+        const currentChildren = [...(parentGrp.children_ids || [])];
+        const safeIdx = Math.min(insertIndex, currentChildren.length);
+        currentChildren.splice(safeIdx, 0, newGroupId);
+        newGroups[targetParentId] = {
+          ...parentGrp,
+          children_ids: currentChildren,
+        };
+      } else {
+        const safeIdx = Math.min(insertIndex, newRootIds.length);
+        newRootIds.splice(safeIdx, 0, newGroupId);
+      }
 
       return {
         annotationObjects: newObjects,
         annotationGroups: newGroups,
         rootAnnotationIds: newRootIds,
-        annotationOrder: newOrder,
-        selectedAnnotationIds: newSelected,
+        selectedAnnotationIds: [newGroupId],
         isDirty: true,
       };
     });
+
+    return newGroupId;
   },
 
-  explodeAnnotationGroup: (groupId: string) => {
+  ungroupAnnotation: (groupId: string) => {
     get().pushHistorySnapshot();
     set((state) => {
       const group = state.annotationGroups[groupId];
@@ -184,53 +277,228 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
 
       const childrenIds = group.children_ids || [];
       const newObjects = { ...state.annotationObjects };
+      const newGroups = { ...state.annotationGroups };
+      delete newGroups[groupId];
+
+      const parentId = group.parent_id;
+
+      // 子要素の親参照を解除または更新
       childrenIds.forEach((childId) => {
         if (newObjects[childId]) {
           newObjects[childId] = {
             ...newObjects[childId],
-            group_id: undefined,
+            group_id: parentId,
+            source_execution_id: undefined,
+          };
+        }
+        if (newGroups[childId]) {
+          newGroups[childId] = {
+            ...newGroups[childId],
+            parent_id: parentId,
             source_execution_id: undefined,
           };
         }
       });
 
-      const newGroups = { ...state.annotationGroups };
-      delete newGroups[groupId];
+      let newRootIds = [...state.rootAnnotationIds];
+      const groupRootIdx = newRootIds.indexOf(groupId);
 
-      const groupIdx = state.rootAnnotationIds.indexOf(groupId);
-      const newRootIds = [...state.rootAnnotationIds];
-      if (groupIdx !== -1) {
-        newRootIds.splice(groupIdx, 1, ...childrenIds);
+      if (groupRootIdx !== -1) {
+        newRootIds.splice(groupRootIdx, 1, ...childrenIds);
+      } else if (parentId && newGroups[parentId]) {
+        const parent = newGroups[parentId];
+        const idx = (parent.children_ids || []).indexOf(groupId);
+        const nextChildren = [...(parent.children_ids || [])];
+        if (idx !== -1) {
+          nextChildren.splice(idx, 1, ...childrenIds);
+        } else {
+          nextChildren.push(...childrenIds);
+        }
+        newGroups[parentId] = {
+          ...parent,
+          children_ids: nextChildren,
+        };
       } else {
-        newRootIds.push(...childrenIds);
+        // フォールバック: 親グループを探索
+        Object.keys(newGroups).forEach((gid) => {
+          const parent = newGroups[gid];
+          if (parent.children_ids && parent.children_ids.includes(groupId)) {
+            const idx = parent.children_ids.indexOf(groupId);
+            const nextChildren = [...parent.children_ids];
+            nextChildren.splice(idx, 1, ...childrenIds);
+            newGroups[gid] = {
+              ...parent,
+              children_ids: nextChildren,
+            };
+          }
+        });
       }
 
       return {
         annotationObjects: newObjects,
         annotationGroups: newGroups,
         rootAnnotationIds: newRootIds,
-        selectedAnnotationIds: childrenIds.length > 0 ? [childrenIds[0]] : [],
+        selectedAnnotationIds: childrenIds.length > 0 ? childrenIds : [],
         isDirty: true,
       };
     });
+  },
+
+  moveAnnotationsInTree: (movingIds: string[], targetId: string, position: 'before' | 'after' | 'inside') => {
+    if (!movingIds || movingIds.length === 0 || !targetId) return;
+    if (movingIds.includes(targetId) && position !== 'inside') return;
+
+    get().pushHistorySnapshot();
+
+    set((state) => {
+      // 1. 循環参照チェック
+      for (const movingId of movingIds) {
+        if (state.annotationGroups[movingId]) {
+          const descendants = collectDescendantIds(movingId, state.annotationGroups);
+          if (descendants.includes(targetId) || movingId === targetId) {
+            return state;
+          }
+        }
+      }
+
+      const directMovingIds: string[] = [];
+
+      // 親が選択されている場合の子孫重複排除
+      movingIds.forEach((id) => {
+        const isDescendant = movingIds.some((pId) => {
+          if (pId === id || !state.annotationGroups[pId]) return false;
+          const desc = collectDescendantIds(pId, state.annotationGroups);
+          return desc.includes(id);
+        });
+        if (!isDescendant && !directMovingIds.includes(id)) {
+          directMovingIds.push(id);
+        }
+      });
+
+      if (directMovingIds.length === 0) return state;
+
+      const directMovingSet = new Set(directMovingIds);
+      const newObjects = { ...state.annotationObjects };
+      const newGroups = { ...state.annotationGroups };
+      let newRootIds = [...state.rootAnnotationIds];
+
+      // 2. 元の親から削除
+      newRootIds = newRootIds.filter((id) => !directMovingSet.has(id));
+      Object.keys(newGroups).forEach((gid) => {
+        const grp = newGroups[gid];
+        if (grp.children_ids) {
+          newGroups[gid] = {
+            ...grp,
+            children_ids: grp.children_ids.filter((cid) => !directMovingSet.has(cid)),
+          };
+        }
+      });
+
+      // 3. ドロップ位置に挿入＆親参照を更新
+      if (position === 'inside') {
+        const targetGroup = newGroups[targetId];
+        if (targetGroup) {
+          newGroups[targetId] = {
+            ...targetGroup,
+            children_ids: [...(targetGroup.children_ids || []), ...directMovingIds],
+          };
+          directMovingIds.forEach((id) => {
+            if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: targetId };
+            if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: targetId };
+          });
+        }
+      } else {
+        // targetId の親グループを特定
+        let targetParentId: string | undefined = undefined;
+        if (newObjects[targetId]?.group_id) {
+          targetParentId = newObjects[targetId].group_id;
+        } else if (newGroups[targetId]?.parent_id) {
+          targetParentId = newGroups[targetId].parent_id;
+        } else {
+          // children_ids から逆引き
+          Object.keys(newGroups).forEach((gid) => {
+            if (newGroups[gid].children_ids?.includes(targetId)) {
+              targetParentId = gid;
+            }
+          });
+        }
+
+        if (targetParentId && newGroups[targetParentId]) {
+          const parent = newGroups[targetParentId];
+          const siblings = [...(parent.children_ids || [])];
+          let targetIndex = siblings.indexOf(targetId);
+          if (targetIndex === -1) {
+            targetIndex = siblings.length;
+          } else if (position === 'after') {
+            targetIndex += 1;
+          }
+          siblings.splice(targetIndex, 0, ...directMovingIds);
+          newGroups[targetParentId] = {
+            ...parent,
+            children_ids: siblings,
+          };
+          directMovingIds.forEach((id) => {
+            if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: targetParentId };
+            if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: targetParentId };
+          });
+        } else {
+          // Root 階層に挿入
+          let targetIndex = newRootIds.indexOf(targetId);
+          if (targetIndex === -1) {
+            targetIndex = newRootIds.length;
+          } else if (position === 'after') {
+            targetIndex += 1;
+          }
+          newRootIds.splice(targetIndex, 0, ...directMovingIds);
+          directMovingIds.forEach((id) => {
+            if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: undefined };
+            if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: undefined };
+          });
+        }
+      }
+
+      return {
+        annotationObjects: newObjects,
+        annotationGroups: newGroups,
+        rootAnnotationIds: newRootIds,
+        isDirty: true,
+      };
+    });
+  },
+
+  explodeAnnotationGroup: (groupId: string) => {
+    get().ungroupAnnotation(groupId);
+  },
+
+  removeAnnotationGroup: (id: string) => {
+    get().removeAnnotationObjects([id]);
   },
 
   removeAnnotationObjects: (ids: string[]) => {
     if (ids.length === 0) return;
     get().pushHistorySnapshot();
     set((state) => {
-      const idSet = new Set(ids);
       const groupsToRemove = new Set<string>();
       const objectsToRemove = new Set<string>();
 
-      ids.forEach((id) => {
+      const collectRecursively = (id: string) => {
         if (state.annotationGroups[id]) {
           groupsToRemove.add(id);
-          (state.annotationGroups[id].children_ids || []).forEach((cid) => objectsToRemove.add(cid));
+          const descendants = collectDescendantIds(id, state.annotationGroups);
+          descendants.forEach((dId) => {
+            if (state.annotationGroups[dId]) groupsToRemove.add(dId);
+            if (state.annotationObjects[dId]) objectsToRemove.add(dId);
+          });
+          (state.annotationGroups[id].children_ids || []).forEach((cid) => {
+            if (state.annotationObjects[cid]) objectsToRemove.add(cid);
+            if (state.annotationGroups[cid]) collectRecursively(cid);
+          });
         } else if (state.annotationObjects[id]) {
           objectsToRemove.add(id);
         }
-      });
+      };
+
+      ids.forEach(collectRecursively);
 
       const newObjects = { ...state.annotationObjects };
       objectsToRemove.forEach((id) => delete newObjects[id]);
@@ -238,20 +506,26 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       const newGroups = { ...state.annotationGroups };
       groupsToRemove.forEach((gid) => delete newGroups[gid]);
 
-      // Remove child references from remaining groups
+      // 残ったグループの children_ids から削除要素を除去
       Object.keys(newGroups).forEach((gid) => {
         const grp = newGroups[gid];
         if (grp.children_ids) {
           newGroups[gid] = {
             ...grp,
-            children_ids: grp.children_ids.filter((cid) => !objectsToRemove.has(cid)),
+            children_ids: grp.children_ids.filter(
+              (cid) => !objectsToRemove.has(cid) && !groupsToRemove.has(cid)
+            ),
           };
         }
       });
 
-      const newRootIds = state.rootAnnotationIds.filter((id) => !groupsToRemove.has(id) && !objectsToRemove.has(id));
+      const newRootIds = state.rootAnnotationIds.filter(
+        (id) => !groupsToRemove.has(id) && !objectsToRemove.has(id)
+      );
       const newOrder = state.annotationOrder.filter((id) => !objectsToRemove.has(id));
-      const newSelected = state.selectedAnnotationIds.filter((id) => !idSet.has(id) && !objectsToRemove.has(id) && !groupsToRemove.has(id));
+      const newSelected = state.selectedAnnotationIds.filter(
+        (id) => !objectsToRemove.has(id) && !groupsToRemove.has(id)
+      );
 
       return {
         annotationObjects: newObjects,
@@ -367,16 +641,26 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       if (!group) return state;
       const nextVisible = !group.visible;
       const newObjects = { ...state.annotationObjects };
-      (group.children_ids || []).forEach((cid) => {
-        if (newObjects[cid]) {
-          newObjects[cid] = { ...newObjects[cid], visible: nextVisible };
+      const newGroups = { ...state.annotationGroups };
+
+      const setVisibilityRecursive = (gid: string, vis: boolean) => {
+        if (newGroups[gid]) {
+          newGroups[gid] = { ...newGroups[gid], visible: vis };
+          (newGroups[gid].children_ids || []).forEach((cid) => {
+            if (newObjects[cid]) {
+              newObjects[cid] = { ...newObjects[cid], visible: vis };
+            }
+            if (newGroups[cid]) {
+              setVisibilityRecursive(cid, vis);
+            }
+          });
         }
-      });
+      };
+
+      setVisibilityRecursive(groupId, nextVisible);
+
       return {
-        annotationGroups: {
-          ...state.annotationGroups,
-          [groupId]: { ...group, visible: nextVisible },
-        },
+        annotationGroups: newGroups,
         annotationObjects: newObjects,
         isDirty: true,
       };
@@ -414,7 +698,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
     }
 
     const finalRootIds = rootIds || (groups && groups.length > 0 ? [
-      ...groups.map(g => g.id),
+      ...groups.filter(g => !g.parent_id).map(g => g.id),
       ...objects.filter(o => !o.group_id).map(o => o.id)
     ] : order);
 

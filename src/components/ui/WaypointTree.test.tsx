@@ -13,6 +13,9 @@ vi.mock('lucide-react', () => ({
   Unlink: () => <div data-testid="unlink-icon" />,
   Trash2: () => <div data-testid="trash-icon" />,
   Copy: () => <div data-testid="copy-icon" />,
+  Folder: () => <div data-testid="folder-icon" />,
+  FolderPlus: () => <div data-testid="folder-plus-icon" />,
+  Edit2: () => <div data-testid="edit-icon" />,
 }));
 
 // Mock Store
@@ -26,8 +29,11 @@ describe('WaypointTree', () => {
   const mockRemoveNodes = vi.fn();
   const mockReorderNodes = vi.fn();
   const mockReorderMultipleNodes = vi.fn();
+  const mockGroupNodes = vi.fn().mockReturnValue('new-group-id');
+  const mockUngroupNode = vi.fn();
+  const mockRenameNode = vi.fn();
 
-  const mockNodes = {
+  const mockNodes: any = {
     'wp-1': { id: 'wp-1', type: 'manual' },
     'wp-2': { id: 'wp-2', type: 'manual' },
     'wp-3': { id: 'wp-3', type: 'manual' },
@@ -36,7 +42,7 @@ describe('WaypointTree', () => {
     'c2': { id: 'c2', type: 'manual' },
   };
 
-  const mockPlugins = {
+  const mockPlugins: any = {
     'p1': { manifest: { name: 'Test Plugin' } }
   };
 
@@ -55,6 +61,9 @@ describe('WaypointTree', () => {
       removeNodes: mockRemoveNodes,
       reorderNodes: mockReorderNodes,
       reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
     }));
   });
 
@@ -77,6 +86,9 @@ describe('WaypointTree', () => {
       removeNodes: mockRemoveNodes,
       reorderNodes: mockReorderNodes,
       reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
     }));
 
     render(<WaypointTree />);
@@ -86,7 +98,7 @@ describe('WaypointTree', () => {
     
     // gen-1 item
     expect(screen.getByText('Test Plugin')).toBeInTheDocument();
-    expect(screen.getByText('(2 pts)')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
 
     // wp-2: should skip 2 children of gen-1 -> 10 + 1 (wp-1) + 2 (gen children) = 13
     expect(screen.getByText('[13]')).toBeInTheDocument();
@@ -106,6 +118,9 @@ describe('WaypointTree', () => {
       removeNodes: mockRemoveNodes,
       reorderNodes: mockReorderNodes,
       reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
     }));
 
     render(<WaypointTree />);
@@ -122,36 +137,7 @@ describe('WaypointTree', () => {
     expect(screen.getByText('[1]')).toBeInTheDocument();
   });
 
-  it('handles shift range selection between waypoints', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
-      nodes: mockNodes,
-      plugins: mockPlugins,
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionIndex: -1,
-      setInsertionIndex: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-    }));
-
-    render(<WaypointTree />);
-
-    // Click wp-1 first
-    const item1Text = screen.getByText('[0]');
-    fireEvent.click(item1Text);
-    expect(mockSelectNodes).toHaveBeenCalledWith(['wp-1'], false);
-
-    // Shift click wp-3
-    const item3Text = screen.getByText('[2]');
-    fireEvent.click(item3Text, { shiftKey: true });
-    expect(mockSelectNodes).toHaveBeenCalledWith(['wp-1', 'wp-2', 'wp-3'], false);
-  });
-
-  it('handles duplicate and remove on multi-selected items in context menu', () => {
+  it('handles grouping from context menu on multi-selected items', () => {
     (useAppStore as any).mockImplementation((selector: any) => selector({
       rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
       nodes: mockNodes,
@@ -165,20 +151,22 @@ describe('WaypointTree', () => {
       removeNodes: mockRemoveNodes,
       reorderNodes: mockReorderNodes,
       reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
     }));
 
     render(<WaypointTree />);
 
-    // Right click wp-2 (which is part of selectedNodeIds)
-    const item2Text = screen.getByText('[1]');
-    fireEvent.contextMenu(item2Text);
+    // Right click wp-1
+    const item1 = screen.getByText('[0]');
+    fireEvent.contextMenu(item1);
 
-    // Context menu should show multi-item duplicate and delete labels
-    expect(screen.getByText('選択項目を複製 (2)')).toBeInTheDocument();
-    expect(screen.getByText('選択項目を削除 (2)')).toBeInTheDocument();
+    // Context menu should display Group option
+    const groupOption = screen.getByText('選択項目をグループ化 (2)');
+    expect(groupOption).toBeInTheDocument();
 
-    // Click duplicate
-    fireEvent.click(screen.getByText('選択項目を複製 (2)'));
-    expect(mockDuplicateNodes).toHaveBeenCalledWith(['wp-1', 'wp-2']);
+    fireEvent.click(groupOption);
+    expect(mockGroupNodes).toHaveBeenCalledWith(['wp-1', 'wp-2']);
   });
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { v4 as uuidv4 } from 'uuid';
+import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
 
 interface UseSnappingProps {
   scale: number;
@@ -33,18 +34,11 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
     
     const renderableNodes: { id: string, node: typeof currentNodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
     let globalIdx = 0;
-    currentRootIds.forEach(id => {
+    const flatIds = getFlattenedWaypointIds(currentRootIds, currentNodes);
+    flatIds.forEach(id => {
       const node = currentNodes[id];
-      if (!node) return;
-      if (node.type === 'manual' && node.transform) {
+      if (node && node.transform) {
         renderableNodes.push({ id, node, parentIsGenerator: false, globalIndex: globalIdx++ });
-      } else if (node.type === 'generator' && node.children_ids) {
-        node.children_ids.forEach(childId => {
-          const child = currentNodes[childId];
-          if (child && child.transform) {
-            renderableNodes.push({ id: childId, node: child, parentIsGenerator: true, globalIndex: globalIdx++ });
-          }
-        });
       }
     });
 

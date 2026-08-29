@@ -1,6 +1,7 @@
 import { useAppStore } from '../../../stores/appStore';
 import { RobotFootprint } from '../../../types/store';
 import { quaternionToYaw } from '../../../utils/transformUtils';
+import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
 
 interface FootprintLayerProps {
   scale: number;
@@ -16,21 +17,11 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   if (!robotFootprint) return null;
 
   // Collect all renderable nodes (same logic as WaypointLayer)
-  const renderableNodes: { node: typeof nodes[string] }[] = [];
-  rootNodeIds.forEach((id) => {
-    const node = nodes[id];
-    if (!node) return;
-    if (node.type === 'manual' && node.transform) {
-      renderableNodes.push({ node });
-    } else if (node.type === 'generator' && node.children_ids) {
-      node.children_ids.forEach((childId) => {
-        const child = nodes[childId];
-        if (child && child.transform) {
-          renderableNodes.push({ node: child });
-        }
-      });
-    }
-  });
+  const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
+  const renderableNodes = flatIds
+    .map(id => nodes[id])
+    .filter(node => node && node.transform)
+    .map(node => ({ node }));
 
   const safeScale = Math.max(scale, 0.001);
 

@@ -24,20 +24,19 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
 
   const renderableNodes: { node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
   let globalIdx = 0;
-  rootNodeIds.forEach(id => {
+
+  function traverse(id: string, isUnderGenerator: boolean) {
     const node = nodes[id];
     if (!node) return;
-    if (node.type === 'manual' && node.transform) {
-      renderableNodes.push({ node, parentIsGenerator: false, globalIndex: globalIdx++ });
-    } else if (node.type === 'generator' && node.children_ids) {
-      node.children_ids.forEach(childId => {
-        const child = nodes[childId];
-        if (child && child.transform) {
-          renderableNodes.push({ node: child, parentIsGenerator: true, globalIndex: globalIdx++ });
-        }
-      });
+    const isGen = isUnderGenerator || node.type === 'generator';
+    if (node.children_ids && node.children_ids.length > 0) {
+      node.children_ids.forEach(cid => traverse(cid, isGen));
+    } else if (node.type === 'manual' && node.transform) {
+      renderableNodes.push({ node, parentIsGenerator: isGen, globalIndex: globalIdx++ });
     }
-  });
+  }
+
+  rootNodeIds.forEach(id => traverse(id, false));
 
   return (
     <>

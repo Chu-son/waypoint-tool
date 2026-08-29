@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import {
   Eye,
@@ -15,9 +15,11 @@ import {
   Copy,
   ChevronRight,
   Folder,
+  FolderPlus,
   Wand2,
   Unlink,
   Code2,
+  Edit2,
 } from 'lucide-react';
 import { Button } from './common/Button';
 import { cn } from '../../utils/cn';
@@ -29,6 +31,8 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -38,22 +42,23 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AnnotationObject, AnnotationGroup, AnnotationType } from '../../types/store';
+import { getVisibleAnnotationNodes } from '../../utils/treeUtils';
 import { v4 as uuidv4 } from 'uuid';
 
 function getAnnotationIcon(type: AnnotationType) {
   switch (type) {
     case 'point':
-      return <CircleDot size={14} className="text-blue-400" />;
+      return <CircleDot size={13} className="text-blue-400" />;
     case 'oriented_point':
-      return <Navigation size={14} className="text-emerald-400" />;
+      return <Navigation size={13} className="text-emerald-400" />;
     case 'line':
-      return <Minus size={14} className="text-amber-400" />;
+      return <Minus size={13} className="text-amber-400" />;
     case 'rect':
-      return <Square size={14} className="text-purple-400" />;
+      return <Square size={13} className="text-purple-400" />;
     case 'circle':
-      return <Circle size={14} className="text-pink-400" />;
+      return <Circle size={13} className="text-pink-400" />;
     default:
-      return <CircleDot size={14} />;
+      return <CircleDot size={13} />;
   }
 }
 
@@ -74,289 +79,131 @@ function getTypeLabel(type: AnnotationType) {
   }
 }
 
-interface SortableAnnotationCardProps {
+interface TreeNodeItemProps {
   id: string;
-  obj: AnnotationObject;
+  depth: number;
+  isGroup: boolean;
+  group?: AnnotationGroup;
+  obj?: AnnotationObject;
   isSelected: boolean;
-  isNested?: boolean;
-  onSelect: (e: React.MouseEvent) => void;
+  isExpanded?: boolean;
+  isEditing?: boolean;
+  onToggleExpand?: () => void;
+  onClick: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
-  onToggleVisible: () => void;
-  onToggleLabel: () => void;
-  onDelete: () => void;
   onRename: (newName: string) => void;
+  onCancelRename: () => void;
+  onToggleVisible: () => void;
+  onToggleLabel?: () => void;
+  onDelete: () => void;
 }
 
-function SortableAnnotationCard({
+function SortableAnnotationTreeNode({
   id,
+  depth,
+  isGroup,
+  group,
   obj,
   isSelected,
-  isNested = false,
-  onSelect,
+  isExpanded,
+  isEditing,
+  onToggleExpand,
+  onClick,
   onContextMenu,
+  onRename,
+  onCancelRename,
   onToggleVisible,
   onToggleLabel,
   onDelete,
-  onRename,
-}: SortableAnnotationCardProps) {
+}: TreeNodeItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(obj.name);
+  const [nameValue, setNameValue] = useState(group?.name || obj?.name || '');
 
   useEffect(() => {
-    setNameValue(obj.name);
-  }, [obj.name]);
+    setNameValue(group?.name || obj?.name || '');
+  }, [group?.name, obj?.name, isEditing]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 50 : 'auto',
     position: 'relative' as const,
   };
 
   const handleNameSubmit = () => {
-    if (nameValue.trim() && nameValue !== obj.name) {
+    const currentName = group?.name || obj?.name || '';
+    if (nameValue.trim() && nameValue !== currentName) {
       onRename(nameValue.trim());
     } else {
-      setNameValue(obj.name);
+      onCancelRename();
     }
-    setIsEditingName(false);
   };
+
+  const isVisible = isGroup ? group?.visible ?? true : obj?.visible ?? true;
+  const isGenerator = isGroup && group?.type === 'generator';
+  const childCount = group?.children_ids?.length || 0;
 
   return (
-    <li
-      ref={setNodeRef}
-      style={style}
-      onClick={onSelect}
-      onContextMenu={onContextMenu}
-      className={cn(
-        'group relative flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs select-none transition-all cursor-pointer border',
-        isSelected
-          ? 'bg-primary-base/15 border-primary-base/60 text-text-base shadow-sm ring-1 ring-primary-base/30'
-          : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
-        !obj.visible && 'opacity-60 grayscale-[0.3]',
-        isNested && 'ml-4'
-      )}
-    >
-      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <div
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing text-text-muted/40 hover:text-text-muted shrink-0 touch-none"
-        >
-          <GripVertical size={12} />
-        </div>
-
-        {/* Color Dot & Type Icon */}
-        <div className="flex items-center gap-1 shrink-0">
-          <span
-            className="w-2 h-2 rounded-full border border-slate-600 shadow-xs shrink-0"
-            style={{ backgroundColor: obj.color || '#3B82F6' }}
-            title={`Color: ${obj.color || '#3B82F6'}`}
-          />
-          {getAnnotationIcon(obj.type)}
-        </div>
-
-        {/* Name / Editable Name */}
-        {isEditingName ? (
-          <input
-            type="text"
-            value={nameValue}
-            autoFocus
-            onChange={(e) => setNameValue(e.target.value)}
-            onBlur={handleNameSubmit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleNameSubmit();
-              if (e.key === 'Escape') {
-                setNameValue(obj.name);
-                setIsEditingName(false);
-              }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            className="flex-1 bg-surface-base border border-primary-base/80 rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
-          />
-        ) : (
-          <span
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setIsEditingName(true);
-            }}
-            className="truncate font-medium flex-1 text-text-base"
-            title={`${obj.name} (ダブルクリックで名前変更)`}
-          >
-            {obj.name}
-          </span>
-        )}
-
-        {/* Type Badge */}
-        <span className="text-[9px] px-1 py-0.2 rounded bg-surface-hover/80 text-text-muted border border-border-base/30 shrink-0 font-mono">
-          {getTypeLabel(obj.type)}
-        </span>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleLabel();
-          }}
-          className={cn(
-            'w-5 h-5 p-0 hover:bg-surface-hover',
-            obj.labelVisible ? 'text-primary-base' : 'text-text-muted/40 hover:text-text-muted'
-          )}
-          title={obj.labelVisible ? 'ラベル: 表示中' : 'ラベル: 非表示中'}
-        >
-          <Tag size={11} />
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleVisible();
-          }}
-          className={cn(
-            'w-5 h-5 p-0 hover:bg-surface-hover',
-            obj.visible ? 'text-text-base' : 'text-text-muted/40 hover:text-text-muted'
-          )}
-          title={obj.visible ? '表示中' : '非表示中'}
-        >
-          {obj.visible ? <Eye size={11} /> : <EyeOff size={11} />}
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="w-5 h-5 p-0 hover:bg-danger-base/10 hover:text-danger-base text-text-muted/40 transition-colors"
-          title="削除"
-        >
-          <Trash2 size={11} />
-        </Button>
-      </div>
-    </li>
-  );
-}
-
-interface SortableGroupCardProps {
-  id: string;
-  group: AnnotationGroup;
-  childrenObjects: AnnotationObject[];
-  isExpanded: boolean;
-  isSelected: boolean;
-  selectedIds: string[];
-  onToggleExpand: () => void;
-  onSelectGroup: (e: React.MouseEvent) => void;
-  onContextMenuGroup: (e: React.MouseEvent) => void;
-  onToggleGroupVisible: () => void;
-  onDeleteGroup: () => void;
-  onRenameGroup: (newName: string) => void;
-  onSelectChild: (childId: string, e: React.MouseEvent) => void;
-  onContextMenuChild: (childId: string, e: React.MouseEvent) => void;
-  onToggleChildVisible: (childId: string) => void;
-  onToggleChildLabel: (childId: string) => void;
-  onDeleteChild: (childId: string) => void;
-  onRenameChild: (childId: string, newName: string) => void;
-}
-
-function SortableGroupCard({
-  id,
-  group,
-  childrenObjects,
-  isExpanded,
-  isSelected,
-  selectedIds,
-  onToggleExpand,
-  onSelectGroup,
-  onContextMenuGroup,
-  onToggleGroupVisible,
-  onDeleteGroup,
-  onRenameGroup,
-  onSelectChild,
-  onContextMenuChild,
-  onToggleChildVisible,
-  onToggleChildLabel,
-  onDeleteChild,
-  onRenameChild,
-}: SortableGroupCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(group.name);
-
-  useEffect(() => {
-    setNameValue(group.name);
-  }, [group.name]);
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 50 : 'auto',
-    position: 'relative' as const,
-  };
-
-  const handleNameSubmit = () => {
-    if (nameValue.trim() && nameValue !== group.name) {
-      onRenameGroup(nameValue.trim());
-    } else {
-      setNameValue(group.name);
-    }
-    setIsEditingName(false);
-  };
-
-  const isGenerator = group.type === 'generator';
-
-  return (
-    <li ref={setNodeRef} style={style} className="space-y-1">
+    <li ref={setNodeRef} style={style} className="space-y-1 select-none">
       <div
-        onClick={onSelectGroup}
-        onContextMenu={onContextMenuGroup}
+        onClick={onClick}
+        onContextMenu={onContextMenu}
+        style={{ paddingLeft: `${Math.max(8, depth * 16 + 8)}px` }}
         className={cn(
-          'group relative flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs select-none transition-all cursor-pointer border',
+          'group relative flex items-center justify-between gap-1.5 py-1.5 pr-2 rounded-lg text-xs transition-all cursor-pointer border',
           isSelected
-            ? 'bg-primary-base/20 border-primary-base/80 text-text-base shadow-sm ring-1 ring-primary-base/40 font-bold'
-            : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/50 text-text-muted hover:text-text-base',
-          !group.visible && 'opacity-60 grayscale-[0.3]'
+            ? 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30 font-bold'
+            : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+          !isVisible && 'opacity-60 grayscale-[0.3]'
         )}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {/* Grip Icon */}
           <div
             {...attributes}
             {...listeners}
             className="cursor-grab active:cursor-grabbing text-text-muted/40 hover:text-text-muted shrink-0 touch-none"
           >
-            <GripVertical size={12} />
+            <GripVertical size={13} />
           </div>
 
-          {/* Expand/Collapse Chevron */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleExpand();
-            }}
-            className="p-0.5 hover:bg-surface-hover rounded text-text-muted hover:text-text-base transition-transform"
-          >
-            <ChevronRight
-              size={13}
-              className={cn('transition-transform duration-150', isExpanded ? 'rotate-90' : '')}
-            />
-          </button>
+          {/* Expand/Collapse Chevron for Groups */}
+          {isGroup ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand?.();
+              }}
+              className="p-0.5 hover:bg-surface-hover rounded text-text-muted hover:text-text-base transition-transform shrink-0"
+            >
+              <ChevronRight
+                size={13}
+                className={cn('transition-transform duration-150', isExpanded ? 'rotate-90' : '')}
+              />
+            </button>
+          ) : (
+            <span className="w-4 shrink-0" />
+          )}
 
-          {/* Group Icon */}
-          <div className="shrink-0 text-primary-base">
-            {isGenerator ? <Wand2 size={13} /> : <Folder size={13} />}
+          {/* Group / Annotation Icon */}
+          <div className="shrink-0 flex items-center gap-1">
+            {isGroup ? (
+              isGenerator ? <Wand2 size={13} className="text-primary-base" /> : <Folder size={13} className="text-amber-400" />
+            ) : obj ? (
+              <>
+                <span
+                  className="w-2 h-2 rounded-full border border-slate-600 shadow-xs shrink-0"
+                  style={{ backgroundColor: obj.color || '#3B82F6' }}
+                  title={`Color: ${obj.color || '#3B82F6'}`}
+                />
+                {getAnnotationIcon(obj.type)}
+              </>
+            ) : null}
           </div>
 
-          {/* Group Name */}
-          {isEditingName ? (
+          {/* Name / Inline Editing */}
+          {isEditing ? (
             <input
               type="text"
               value={nameValue}
@@ -366,48 +213,68 @@ function SortableGroupCard({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleNameSubmit();
                 if (e.key === 'Escape') {
-                  setNameValue(group.name);
-                  setIsEditingName(false);
+                  setNameValue(group?.name || obj?.name || '');
+                  onCancelRename();
                 }
               }}
               onClick={(e) => e.stopPropagation()}
-              className="flex-1 bg-surface-base border border-primary-base/80 rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
+              className="flex-1 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
             />
           ) : (
             <span
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                setIsEditingName(true);
-              }}
-              className="truncate font-semibold flex-1 text-text-base"
-              title={`${group.name} (ダブルクリックで名前変更)`}
+              className="truncate font-medium flex-1 text-text-base"
+              title={group?.name || obj?.name || ''}
             >
-              {group.name}
+              {group?.name || obj?.name || ''}
             </span>
           )}
 
-          {/* Count Badge */}
-          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-surface-hover text-text-muted border border-border-base/30 shrink-0 font-mono font-bold">
-            {childrenObjects.length}
-          </span>
+          {/* Badge */}
+          {isGroup ? (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-surface-hover text-text-muted border border-border-base/30 shrink-0 font-mono font-bold">
+              {childCount}
+            </span>
+          ) : obj ? (
+            <span className="text-[9px] px-1 py-0.2 rounded bg-surface-hover/80 text-text-muted border border-border-base/30 shrink-0 font-mono">
+              {getTypeLabel(obj.type)}
+            </span>
+          ) : null}
         </div>
 
-        {/* Actions */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100">
+          {!isGroup && obj && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLabel?.();
+              }}
+              className={cn(
+                'w-5 h-5 p-0 hover:bg-surface-hover',
+                obj.labelVisible ? 'text-primary-base' : 'text-text-muted/40 hover:text-text-muted'
+              )}
+              title={obj.labelVisible ? 'ラベル: 表示中' : 'ラベル: 非表示中'}
+            >
+              <Tag size={11} />
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              onToggleGroupVisible();
+              onToggleVisible();
             }}
             className={cn(
               'w-5 h-5 p-0 hover:bg-surface-hover',
-              group.visible ? 'text-text-base' : 'text-text-muted/40 hover:text-text-muted'
+              isVisible ? 'text-text-base' : 'text-text-muted/40 hover:text-text-muted'
             )}
-            title={group.visible ? 'グループ表示中' : 'グループ非表示中'}
+            title={isVisible ? '表示中' : '非表示中'}
           >
-            {group.visible ? <Eye size={11} /> : <EyeOff size={11} />}
+            {isVisible ? <Eye size={11} /> : <EyeOff size={11} />}
           </Button>
 
           <Button
@@ -415,38 +282,15 @@ function SortableGroupCard({
             size="sm"
             onClick={(e) => {
               e.stopPropagation();
-              onDeleteGroup();
+              onDelete();
             }}
             className="w-5 h-5 p-0 hover:bg-danger-base/10 hover:text-danger-base text-text-muted/40 transition-colors"
-            title="グループ削除"
+            title="削除"
           >
             <Trash2 size={11} />
           </Button>
         </div>
       </div>
-
-      {/* Children list */}
-      {isExpanded && (
-        <SortableContext items={group.children_ids || []} strategy={verticalListSortingStrategy}>
-          <ul className="space-y-1">
-            {childrenObjects.map((child) => (
-              <SortableAnnotationCard
-                key={child.id}
-                id={child.id}
-                obj={child}
-                isNested
-                isSelected={selectedIds.includes(child.id)}
-                onSelect={(e) => onSelectChild(child.id, e)}
-                onContextMenu={(e) => onContextMenuChild(child.id, e)}
-                onToggleVisible={() => onToggleChildVisible(child.id)}
-                onToggleLabel={() => onToggleChildLabel(child.id)}
-                onDelete={() => onDeleteChild(child.id)}
-                onRename={(newName) => onRenameChild(child.id, newName)}
-              />
-            ))}
-          </ul>
-        </SortableContext>
-      )}
     </li>
   );
 }
@@ -457,12 +301,11 @@ export function AnnotationTree() {
   const rootAnnotationIds = useAppStore((state) => state.rootAnnotationIds) || [];
   const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds) || [];
   const selectAnnotationObjects = useAppStore((state) => state.selectAnnotationObjects);
-  const reorderRootAnnotations = useAppStore((state) => state.reorderRootAnnotations);
-  const reorderGroupChildren = useAppStore((state) => state.reorderGroupChildren);
-  const updateAnnotationObject = useAppStore((state) => state.updateAnnotationObject);
-  const updateAnnotationGroup = useAppStore((state) => state.updateAnnotationGroup);
+  const renameAnnotation = useAppStore((state) => state.renameAnnotation);
+  const groupAnnotations = useAppStore((state) => state.groupAnnotations);
+  const ungroupAnnotation = useAppStore((state) => state.ungroupAnnotation);
+  const moveAnnotationsInTree = useAppStore((state) => state.moveAnnotationsInTree);
   const removeAnnotationObjects = useAppStore((state) => state.removeAnnotationObjects);
-  const explodeAnnotationGroup = useAppStore((state) => state.explodeAnnotationGroup);
   const toggleAnnotationVisibility = useAppStore((state) => state.toggleAnnotationVisibility);
   const toggleAnnotationGroupVisibility = useAppStore((state) => state.toggleAnnotationGroupVisibility);
   const toggleAnnotationLabelVisibility = useAppStore((state) => state.toggleAnnotationLabelVisibility);
@@ -478,7 +321,9 @@ export function AnnotationTree() {
   const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [contextMenu, setContextMenu] = useState<{ id: string; isGroup: boolean; x: number; y: number } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -492,14 +337,8 @@ export function AnnotationTree() {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const toggleGroupExpand = (groupId: string) => {
@@ -511,35 +350,22 @@ export function AnnotationTree() {
     });
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    // Check if dragging at root level
-    const oldRootIdx = rootAnnotationIds.indexOf(activeId);
-    const newRootIdx = rootAnnotationIds.indexOf(overId);
-    if (oldRootIdx !== -1 && newRootIdx !== -1) {
-      reorderRootAnnotations(oldRootIdx, newRootIdx);
-      return;
-    }
-
-    // Check if dragging inside the same group
-    for (const [gid, grp] of Object.entries(annotationGroups)) {
-      const children = grp.children_ids || [];
-      const oldIdx = children.indexOf(activeId);
-      const newIdx = children.indexOf(overId);
-      if (oldIdx !== -1 && newIdx !== -1) {
-        reorderGroupChildren(gid, oldIdx, newIdx);
-        return;
-      }
-    }
-  };
-
   const handleStartAdd = () => {
     setAnnotationEditMode(true);
+  };
+
+  const handleCreateGroup = () => {
+    const targetIds = selectedAnnotationIds.length > 0
+      ? selectedAnnotationIds
+      : contextMenu ? [contextMenu.id] : [];
+    if (targetIds.length === 0) return;
+
+    const newGroupId = groupAnnotations(targetIds);
+    if (newGroupId) {
+      setExpandedGroups((prev) => new Set([...prev, newGroupId]));
+      setEditingId(newGroupId);
+    }
+    setContextMenu(null);
   };
 
   const handleDuplicate = (id: string) => {
@@ -566,6 +392,42 @@ export function AnnotationTree() {
     selectAnnotationObjects([duplicated.id]);
     setContextMenu(null);
   };
+
+  // 画面上に展開されている全ノードを深さ優先順で取得
+  const visibleNodes = useMemo(() => {
+    return getVisibleAnnotationNodes(rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups);
+  }, [rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups]);
+
+  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragId(null);
+    if (!over || active.id === over.id) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    const movingIds = selectedAnnotationIds.includes(activeId) && selectedAnnotationIds.length > 1
+      ? selectedAnnotationIds
+      : [activeId];
+
+    if (movingIds.includes(overId)) return;
+
+    const activeIdx = visibleIds.indexOf(activeId);
+    const overIdx = visibleIds.indexOf(overId);
+    const position: 'before' | 'after' = activeIdx < overIdx ? 'after' : 'before';
+
+    moveAnnotationsInTree(movingIds, overId, position);
+  };
+
+  const activeDragItem = activeDragId
+    ? annotationObjects[activeDragId] || annotationGroups[activeDragId]
+    : null;
 
   return (
     <div className="w-full flex flex-col space-y-2">
@@ -621,93 +483,84 @@ export function AnnotationTree() {
           アノテーションがありません。「+ Add」ボタンから配置できます。
         </div>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={rootAnnotationIds} strategy={verticalListSortingStrategy}>
-            <ul className="space-y-1.5">
-              {rootAnnotationIds.map((id) => {
-                const group = annotationGroups[id];
-                if (group) {
-                  const children = (group.children_ids || [])
-                    .map((cid) => annotationObjects[cid])
-                    .filter(Boolean);
-                  const isExpanded = expandedGroups.has(id);
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="p-1">
+            <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+              <ul className="space-y-1">
+                {visibleNodes.map(({ id, depth }) => {
+                  const group = annotationGroups[id];
+                  const obj = annotationObjects[id];
+                  if (!group && !obj) return null;
+
+                  const isGroup = !!group;
                   const isSelected = selectedAnnotationIds.includes(id);
+                  const isExpanded = expandedGroups.has(id);
+                  const isEditing = editingId === id;
 
                   return (
-                    <SortableGroupCard
+                    <SortableAnnotationTreeNode
                       key={id}
                       id={id}
+                      depth={depth}
+                      isGroup={isGroup}
                       group={group}
-                      childrenObjects={children}
-                      isExpanded={isExpanded}
+                      obj={obj}
                       isSelected={isSelected}
-                      selectedIds={selectedAnnotationIds}
+                      isExpanded={isExpanded}
+                      isEditing={isEditing}
                       onToggleExpand={() => toggleGroupExpand(id)}
-                      onSelectGroup={(e) => {
+                      onClick={(e) => {
                         e.stopPropagation();
                         selectAnnotationObjects([id], e.shiftKey || e.metaKey);
                         setRightPanelActiveTab('inspector');
                         setRightPanelOpen(true);
                       }}
-                      onContextMenuGroup={(e) => {
+                      onContextMenu={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        selectAnnotationObjects([id]);
-                        setContextMenu({ id, isGroup: true, x: e.clientX, y: e.clientY });
+                        if (!selectedAnnotationIds.includes(id)) {
+                          selectAnnotationObjects([id]);
+                        }
+                        setContextMenu({ id, x: e.clientX, y: e.clientY });
                       }}
-                      onToggleGroupVisible={() => toggleAnnotationGroupVisibility(id)}
-                      onDeleteGroup={() => removeAnnotationObjects([id])}
-                      onRenameGroup={(newName) => updateAnnotationGroup(id, { name: newName })}
-                      onSelectChild={(childId, e) => {
-                        e.stopPropagation();
-                        selectAnnotationObjects([childId], e.shiftKey || e.metaKey);
-                        setRightPanelActiveTab('inspector');
-                        setRightPanelOpen(true);
+                      onRename={(newName) => {
+                        renameAnnotation(id, newName);
+                        setEditingId(null);
                       }}
-                      onContextMenuChild={(childId, e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        selectAnnotationObjects([childId]);
-                        setContextMenu({ id: childId, isGroup: false, x: e.clientX, y: e.clientY });
+                      onCancelRename={() => setEditingId(null)}
+                      onToggleVisible={() => {
+                        if (isGroup) toggleAnnotationGroupVisibility(id);
+                        else toggleAnnotationVisibility(id);
                       }}
-                      onToggleChildVisible={(childId) => toggleAnnotationVisibility(childId)}
-                      onToggleChildLabel={(childId) => toggleAnnotationLabelVisibility(childId)}
-                      onDeleteChild={(childId) => removeAnnotationObjects([childId])}
-                      onRenameChild={(childId, newName) => updateAnnotationObject(childId, { name: newName })}
+                      onToggleLabel={() => {
+                        if (!isGroup) toggleAnnotationLabelVisibility(id);
+                      }}
+                      onDelete={() => removeAnnotationObjects([id])}
                     />
                   );
-                }
+                })}
+              </ul>
+            </SortableContext>
+          </div>
 
-                const obj = annotationObjects[id];
-                if (!obj) return null;
-                const isSelected = selectedAnnotationIds.includes(id);
-                return (
-                  <SortableAnnotationCard
-                    key={id}
-                    id={id}
-                    obj={obj}
-                    isSelected={isSelected}
-                    onSelect={(e) => {
-                      e.stopPropagation();
-                      selectAnnotationObjects([id], e.shiftKey || e.metaKey);
-                      setRightPanelActiveTab('inspector');
-                      setRightPanelOpen(true);
-                    }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      selectAnnotationObjects([id]);
-                      setContextMenu({ id, isGroup: false, x: e.clientX, y: e.clientY });
-                    }}
-                    onToggleVisible={() => toggleAnnotationVisibility(id)}
-                    onToggleLabel={() => toggleAnnotationLabelVisibility(id)}
-                    onDelete={() => removeAnnotationObjects([id])}
-                    onRename={(newName) => updateAnnotationObject(id, { name: newName })}
-                  />
-                );
-              })}
-            </ul>
-          </SortableContext>
+          <DragOverlay>
+            {activeDragItem && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-panel/90 border border-primary-base shadow-xl text-xs text-text-base">
+                <GripVertical size={13} className="text-primary-base" />
+                <span className="font-semibold">{activeDragItem.name || 'Annotation'}</span>
+                {selectedAnnotationIds.length > 1 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-primary-base text-surface-base font-bold text-[10px]">
+                    +{selectedAnnotationIds.length}
+                  </span>
+                )}
+              </div>
+            )}
+          </DragOverlay>
         </DndContext>
       )}
 
@@ -716,15 +569,69 @@ export function AnnotationTree() {
         <div
           ref={menuRef}
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 w-48 text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
+          className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 min-w-[190px] text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
         >
           {(() => {
-            const isGroup = contextMenu.isGroup;
+            const isGroup = !!annotationGroups[contextMenu.id];
             const groupObj = isGroup ? annotationGroups[contextMenu.id] : undefined;
             const itemObj = !isGroup ? annotationObjects[contextMenu.id] : undefined;
+            const isMultiSelected = selectedAnnotationIds.length > 1 && selectedAnnotationIds.includes(contextMenu.id);
+            const targetIds = isMultiSelected ? selectedAnnotationIds : [contextMenu.id];
 
             return (
               <>
+                {/* グループ化 (Group) */}
+                <button
+                  onClick={handleCreateGroup}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
+                >
+                  <FolderPlus size={13} className="text-amber-400" />
+                  <span>
+                    {targetIds.length > 1
+                      ? `選択項目をグループ化 (${targetIds.length})`
+                      : 'グループ化 (Group)'}
+                  </span>
+                </button>
+
+                {/* 名前を変更 (Rename) */}
+                <button
+                  onClick={() => {
+                    setEditingId(contextMenu.id);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Edit2 size={13} className="text-blue-400" />
+                  <span>名前を変更 (Rename)</span>
+                </button>
+
+                {/* グループ解除 (Ungroup) */}
+                {isGroup && (
+                  <button
+                    onClick={() => {
+                      ungroupAnnotation(contextMenu.id);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Unlink size={13} className="text-amber-400" />
+                    <span>グループ解除 (Ungroup)</span>
+                  </button>
+                )}
+
+                <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 複製 (Duplicate) */}
+                {!isGroup && (
+                  <button
+                    onClick={() => handleDuplicate(contextMenu.id)}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Copy size={13} className="text-text-muted" />
+                    <span>複製 (Duplicate)</span>
+                  </button>
+                )}
+
                 {/* 内部プロパティ表示 (モーダル) */}
                 <button
                   onClick={() => {
@@ -763,37 +670,18 @@ export function AnnotationTree() {
                   <span>インスペクターを開く</span>
                 </button>
 
-                {isGroup ? (
-                  <button
-                    onClick={() => {
-                      explodeAnnotationGroup(contextMenu.id);
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors"
-                  >
-                    <Unlink size={13} className="text-amber-400" />
-                    <span>グループ解除 (Explode)</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleDuplicate(contextMenu.id)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors"
-                  >
-                    <Copy size={13} className="text-text-muted" />
-                    <span>複製 (Duplicate)</span>
-                  </button>
-                )}
-
                 <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 削除 */}
                 <button
                   onClick={() => {
-                    removeAnnotationObjects([contextMenu.id]);
+                    removeAnnotationObjects(targetIds);
                     setContextMenu(null);
                   }}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
                 >
                   <Trash2 size={13} />
-                  <span>削除 (Delete)</span>
+                  <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
                 </button>
               </>
             );

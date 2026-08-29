@@ -1,5 +1,6 @@
 import { useAppStore } from '../../../stores/appStore';
 import * as PIXI from 'pixi.js';
+import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
 
 export function PathLayer({ scale }: { scale: number }) {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
@@ -42,22 +43,10 @@ export function PathLayer({ scale }: { scale: number }) {
         } else {
           // Default straight line path from waypoints tree
           type PathPoint = { x: number; y: number };
-          const allPoints: PathPoint[] = [];
-
-          rootNodeIds.forEach(id => {
-            const node = nodes[id];
-            if (!node) return;
-            if (node.type === 'manual' && node.transform) {
-              allPoints.push({ x: node.transform.x, y: node.transform.y });
-            } else if (node.type === 'generator' && node.children_ids) {
-              node.children_ids.forEach(childId => {
-                const child = nodes[childId];
-                if (child && child.transform) {
-                  allPoints.push({ x: child.transform.x, y: child.transform.y });
-                }
-              });
-            }
-          });
+          const flatWaypointIds = getFlattenedWaypointIds(rootNodeIds, nodes);
+          const allPoints: PathPoint[] = flatWaypointIds
+            .map(id => nodes[id]?.transform ? { x: nodes[id].transform!.x, y: nodes[id].transform!.y } : null)
+            .filter((p): p is PathPoint => p !== null);
 
           if (allPoints.length >= 2) {
             segmentsToDraw = [allPoints];

@@ -84,7 +84,7 @@ export interface GeneratorMetadata {
 
 export type WaypointNode = {
   id: string;
-  type: 'manual' | 'generator';
+  type: 'manual' | 'generator' | 'manual_group' | 'group';
   name?: string;
   transform?: Transform;
   generator_params?: Record<string, any>;
@@ -329,6 +329,7 @@ export interface AnnotationGroup {
   visible: boolean;
   color?: string;
   children_ids: string[];
+  parent_id?: string;
   plugin_id?: string;
   source_execution_id?: string;
   generator_params?: Record<string, any>;

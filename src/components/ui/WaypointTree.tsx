@@ -1,6 +1,18 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { ChevronRight, Layers, GripVertical, Anchor, Code2, Unlink, Trash2, Copy } from 'lucide-react';
+import {
+  ChevronRight,
+  Layers,
+  GripVertical,
+  Anchor,
+  Code2,
+  Unlink,
+  Trash2,
+  Copy,
+  Folder,
+  FolderPlus,
+  Edit2,
+} from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
   DndContext,
@@ -17,125 +29,213 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-  useSortable
+  useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { WaypointNode } from '../../types/store';
+import { getFlattenedWaypointIds, getFlattenedNodeIds, getVisibleTreeNodes } from '../../utils/treeUtils';
 
-function SortableItem({ id, children, isDragging }: { id: string; children: React.ReactNode; isDragging: boolean }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-  const style = { 
-    transform: CSS.Transform.toString(transform), 
+interface TreeItemRowProps {
+  id: string;
+  node: WaypointNode;
+  depth: number;
+  isSelected: boolean;
+  isAnchor?: boolean;
+  isExpanded?: boolean;
+  isEditing?: boolean;
+  globalIndex?: number;
+  indexStartIndex: number;
+  onToggleExpand?: () => void;
+  onClick: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onRename: (newName: string) => void;
+  onCancelRename: () => void;
+}
+
+function SortableTreeNodeItem({
+  id,
+  node,
+  depth,
+  isSelected,
+  isAnchor,
+  isExpanded,
+  isEditing,
+  globalIndex,
+  indexStartIndex,
+  onToggleExpand,
+  onClick,
+  onContextMenu,
+  onRename,
+  onCancelRename,
+}: TreeItemRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const [nameValue, setNameValue] = useState(node.name || '');
+  const plugins = useAppStore((state) => state.plugins);
+
+  useEffect(() => {
+    setNameValue(node.name || '');
+  }, [node.name, isEditing]);
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0 : 1,
+    opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 50 : 'auto',
     position: 'relative' as const,
   };
+
+  const isGenerator = node.type === 'generator';
+  const isGroup = node.type === 'manual_group' || node.type === 'group';
+  const isContainer = isGenerator || isGroup;
+
+  const pluginName = isGenerator && node.plugin_id && plugins[node.plugin_id]
+    ? plugins[node.plugin_id].manifest.name
+    : 'Generator';
+
+  const defaultDisplayName = isGenerator
+    ? pluginName
+    : isGroup
+    ? (node.name || 'Group')
+    : (node.name ? `Waypoint (${node.name})` : 'Waypoint');
+
+  const handleNameSubmit = () => {
+    if (nameValue.trim() && nameValue !== node.name) {
+      onRename(nameValue.trim());
+    } else {
+      onCancelRename();
+    }
+  };
+
+  const childCount = node.children_ids?.length || 0;
+
   return (
-    <li ref={setNodeRef} style={style} {...attributes} {...listeners} className="touch-none select-none">
-      {children}
+    <li ref={setNodeRef} style={style} className="space-y-1 select-none">
+      <div
+        onClick={onClick}
+        onContextMenu={onContextMenu}
+        style={{ paddingLeft: `${Math.max(8, depth * 16 + 8)}px` }}
+        className={cn(
+          'group relative flex items-center justify-between gap-1.5 py-1.5 pr-2 rounded-lg text-xs transition-all cursor-pointer border',
+          isSelected
+            ? isGenerator
+              ? 'bg-emerald-500/20 border-emerald-500 text-text-base shadow-sm ring-1 ring-emerald-500/30'
+              : 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30'
+            : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+          isAnchor && 'border-amber-400/60 bg-amber-950/20'
+        )}
+      >
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {/* Grip Icon for DnD */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-text-muted/40 hover:text-text-muted shrink-0 touch-none"
+          >
+            <GripVertical size={13} />
+          </div>
+
+          {/* Expand/Collapse Chevron for Groups/Generators */}
+          {isContainer ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand?.();
+              }}
+              className="p-0.5 hover:bg-surface-hover rounded text-text-muted hover:text-text-base transition-transform shrink-0"
+            >
+              <ChevronRight
+                size={13}
+                className={cn('transition-transform duration-150', isExpanded ? 'rotate-90' : '')}
+              />
+            </button>
+          ) : (
+            <span className="w-4 shrink-0" />
+          )}
+
+          {/* Node Icon */}
+          <div className="shrink-0 flex items-center">
+            {isGenerator ? (
+              <Layers size={13} className="text-emerald-400" />
+            ) : isGroup ? (
+              <Folder size={13} className="text-amber-400" />
+            ) : (
+              <span className="text-xs">🎯</span>
+            )}
+          </div>
+
+          {/* Node Name / Inline Editing */}
+          {isEditing ? (
+            <input
+              type="text"
+              value={nameValue}
+              autoFocus
+              onChange={(e) => setNameValue(e.target.value)}
+              onBlur={handleNameSubmit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleNameSubmit();
+                if (e.key === 'Escape') {
+                  setNameValue(node.name || '');
+                  onCancelRename();
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
+            />
+          ) : (
+            <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
+              {!isContainer && globalIndex !== undefined && (
+                <span className="opacity-60 font-mono text-[11px] shrink-0">
+                  [{globalIndex + indexStartIndex}]
+                </span>
+              )}
+              <span className="truncate font-medium text-text-base" title={defaultDisplayName}>
+                {isContainer ? (node.name || defaultDisplayName) : defaultDisplayName}
+              </span>
+              {isAnchor && (
+                <span className="text-amber-400 text-xs font-bold shrink-0" title="Anchor Point">
+                  ⚓
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Item Count Badge for Groups/Generators */}
+          {isContainer && (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-surface-hover text-text-muted border border-border-base/30 shrink-0 font-mono font-bold">
+              {childCount}
+            </span>
+          )}
+        </div>
+      </div>
     </li>
   );
 }
 
-interface TreeDragOverlayProps {
-  activeId: string;
-  selectedNodeIds: string[];
-  nodes: Record<string, import('../../types/store').WaypointNode>;
-  plugins: Record<string, import('../../types/store').PluginInstance>;
-  rootNodeIds: string[];
-}
-
-function TreeDragOverlay({
-  activeId,
-  selectedNodeIds,
-  nodes,
-  plugins,
-  rootNodeIds,
-}: TreeDragOverlayProps) {
-  const isMulti = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1;
-  const movingIds = isMulti ? rootNodeIds.filter((id) => selectedNodeIds.includes(id)) : [activeId];
-  const activeNode = nodes[activeId];
-  if (!activeNode) return null;
-
-  const isGenerator = activeNode.type === 'generator';
-  const pluginName = isGenerator && activeNode.plugin_id && plugins[activeNode.plugin_id]
-    ? plugins[activeNode.plugin_id].manifest.name
-    : 'Generator';
-
-  return (
-    <div className="relative cursor-grabbing pointer-events-none select-none w-full max-w-[280px]">
-      {/* 複数選択時の背面スタックレイヤー 2 (3枚以上) */}
-      {isMulti && movingIds.length >= 3 && (
-        <div className="absolute inset-0 bg-surface-panel/70 border border-border-base/50 rounded-xl shadow-md transform translate-x-2.5 translate-y-2.5 rotate-2 scale-[0.97] -z-20" />
-      )}
-      {/* 複数選択時の背面スタックレイヤー 1 (2枚以上) */}
-      {isMulti && movingIds.length >= 2 && (
-        <div className="absolute inset-0 bg-surface-panel/90 border border-primary-base/40 rounded-xl shadow-lg transform translate-x-1.5 translate-y-1.5 -rotate-1 scale-[0.985] -z-10" />
-      )}
-
-      {/* メインドラッグカード */}
-      <div
-        className={cn(
-          "px-2.5 py-1.5 rounded-xl border text-xs font-medium flex items-center justify-between shadow-2xl backdrop-blur-md transition-all",
-          isGenerator
-            ? "bg-surface-panel border-emerald-500 text-text-base ring-2 ring-emerald-500/30"
-            : "bg-surface-panel border-primary-base text-text-base ring-2 ring-primary-base/30"
-        )}
-      >
-        <div className="flex items-center gap-1.5 truncate">
-          <GripVertical size={14} className="text-text-muted opacity-80 shrink-0" />
-          {isGenerator ? (
-            <>
-              <Layers size={14} className="text-emerald-400 shrink-0" />
-              <span className="truncate font-semibold">{pluginName}</span>
-              <span className="text-[10px] text-text-muted/70 ml-0.5">({activeNode.children_ids?.length || 0} pts)</span>
-            </>
-          ) : (
-            <>
-              <span className="font-mono text-xs text-primary-base font-bold shrink-0">🎯 Waypoint</span>
-              {activeNode.name && <span className="text-text-muted truncate ml-1">({activeNode.name})</span>}
-            </>
-          )}
-        </div>
-
-        {/* 複数選択数バッジ */}
-        {isMulti && (
-          <div className="ml-2 px-2 py-0.5 rounded-full bg-primary-base text-white text-[10px] font-bold shadow-sm shrink-0 flex items-center gap-1">
-            <Copy size={10} />
-            <span>{movingIds.length} items</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function WaypointTree() {
-  const rootNodeIds = useAppStore(state => state.rootNodeIds);
-  const nodes = useAppStore(state => state.nodes);
-  const plugins = useAppStore(state => state.plugins);
-  const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
-  const selectNodes = useAppStore(state => state.selectNodes);
-  const duplicateNodes = useAppStore(state => state.duplicateNodes);
-  const reorderMultipleNodes = useAppStore(state => state.reorderMultipleNodes);
-  const indexStartIndex = useAppStore(state => state.indexStartIndex);
-  const insertionIndex = useAppStore(state => state.insertionIndex);
-  const setInsertionIndex = useAppStore(state => state.setInsertionIndex);
-  const explodeGenerator = useAppStore(state => state.explodeGenerator);
-  const removeNodes = useAppStore(state => state.removeNodes);
-  const setRightPanelActiveTab = useAppStore(state => state.setRightPanelActiveTab);
-  const setRightPanelOpen = useAppStore(state => state.setRightPanelOpen);
-  const openPluginDataModal = useAppStore(state => state.openPluginDataModal);
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
+  const nodes = useAppStore((state) => state.nodes);
+  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
+  const selectNodes = useAppStore((state) => state.selectNodes);
+  const duplicateNodes = useAppStore((state) => state.duplicateNodes);
+  const moveNodesInTree = useAppStore((state) => state.moveNodesInTree);
+  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
+  const groupNodes = useAppStore((state) => state.groupNodes);
+  const ungroupNode = useAppStore((state) => state.ungroupNode);
+  const renameNode = useAppStore((state) => state.renameNode);
+  const removeNodes = useAppStore((state) => state.removeNodes);
+  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
+  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
+  const anchorNodeId = useAppStore((state) => state.anchorNodeId);
+  const setAnchorNode = useAppStore((state) => state.setAnchorNode);
+  const elementCopyState = useAppStore((state) => state.elementCopyState);
+  const setElementCopyState = useAppStore((state) => state.setElementCopyState);
 
-  const anchorNodeId = useAppStore(state => state.anchorNodeId);
-  const setAnchorNode = useAppStore(state => state.setAnchorNode);
-  const elementCopyState = useAppStore(state => state.elementCopyState);
-  const setElementCopyState = useAppStore(state => state.setElementCopyState);
-
-  const [expandedGenerators, setExpandedGenerators] = useState<Set<string>>(new Set());
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ nodeId: string; parentId?: string; x: number; y: number } | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -149,7 +249,7 @@ export function WaypointTree() {
   }, []);
 
   const toggleExpand = (id: string) => {
-    setExpandedGenerators(prev => {
+    setExpandedNodes((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -157,37 +257,35 @@ export function WaypointTree() {
     });
   };
 
-  const flatVisibleNodeIds = useMemo(() => {
-    const ids: string[] = [];
-    rootNodeIds.forEach((id) => {
-      ids.push(id);
-      const node = nodes[id];
-      if (node?.type === 'generator' && expandedGenerators.has(id)) {
-        (node.children_ids || []).forEach((cid) => {
-          ids.push(cid);
-        });
-      }
-    });
-    return ids;
-  }, [rootNodeIds, nodes, expandedGenerators]);
+  // 全ノードの深さ優先フラット順
+  const allFlatNodeIds = useMemo(() => {
+    return getFlattenedNodeIds(rootNodeIds, nodes);
+  }, [rootNodeIds, nodes]);
+
+  // マニュアルウェイポイントのインデックスマップ
+  const waypointIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    const flatWpIds = getFlattenedWaypointIds(rootNodeIds, nodes);
+    flatWpIds.forEach((id, idx) => map.set(id, idx));
+    return map;
+  }, [rootNodeIds, nodes]);
 
   const handleNodeClick = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (elementCopyState) {
-      // コピーモード中: 単一選択でプレビューノードを更新
       selectNodes([id]);
       setElementCopyState({ ...elementCopyState, previewNodeId: id });
       setLastSelectedNodeId(id);
       return;
     }
 
-    if (e.shiftKey && lastSelectedNodeId && flatVisibleNodeIds.includes(lastSelectedNodeId)) {
-      const fromIdx = flatVisibleNodeIds.indexOf(lastSelectedNodeId);
-      const toIdx = flatVisibleNodeIds.indexOf(id);
+    if (e.shiftKey && lastSelectedNodeId && allFlatNodeIds.includes(lastSelectedNodeId)) {
+      const fromIdx = allFlatNodeIds.indexOf(lastSelectedNodeId);
+      const toIdx = allFlatNodeIds.indexOf(id);
       if (fromIdx !== -1 && toIdx !== -1) {
         const start = Math.min(fromIdx, toIdx);
         const end = Math.max(fromIdx, toIdx);
-        const rangeIds = flatVisibleNodeIds.slice(start, end + 1);
+        const rangeIds = allFlatNodeIds.slice(start, end + 1);
         if (e.ctrlKey || e.metaKey) {
           const merged = Array.from(new Set([...selectedNodeIds, ...rangeIds]));
           selectNodes(merged, false);
@@ -202,94 +300,69 @@ export function WaypointTree() {
     selectNodes([id], e.shiftKey || e.ctrlKey || e.metaKey);
   };
 
-  const handleContextMenu = (e: React.MouseEvent, nodeId: string, parentId?: string) => {
+  const handleContextMenu = (e: React.MouseEvent, nodeId: string) => {
     e.preventDefault();
     e.stopPropagation();
     if (!selectedNodeIds.includes(nodeId)) {
       selectNodes([nodeId]);
       setLastSelectedNodeId(nodeId);
     }
-    setContextMenu({ nodeId, parentId, x: e.clientX, y: e.clientY });
+    setContextMenu({ nodeId, x: e.clientX, y: e.clientY });
+  };
+
+  const handleCreateGroup = () => {
+    const targetIds = selectedNodeIds.length > 0
+      ? selectedNodeIds
+      : contextMenu ? [contextMenu.nodeId] : [];
+    if (targetIds.length === 0) return;
+
+    const newGroupId = groupNodes(targetIds);
+    if (newGroupId) {
+      setExpandedNodes((prev) => new Set([...prev, newGroupId]));
+      setEditingNodeId(newGroupId);
+    }
+    setContextMenu(null);
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const renderItems = useMemo(() => {
-    const items = [...rootNodeIds];
-    const targetIdx = insertionIndex === -1 ? items.length : insertionIndex;
-    if (targetIdx >= 0 && targetIdx <= items.length) {
-      items.splice(targetIdx, 0, '__insertion_bar__');
-    } else {
-      items.push('__insertion_bar__');
-    }
-    return items;
-  }, [rootNodeIds, insertionIndex]);
+  // 画面上に展開されている全ノードを深さ優先順で取得
+  const visibleNodes = useMemo(() => {
+    return getVisibleTreeNodes(rootNodeIds, nodes, expandedNodes);
+  }, [rootNodeIds, nodes, expandedNodes]);
+
+  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null);
     const { active, over } = event;
+    setActiveDragId(null);
     if (!over || active.id === over.id) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    if (activeId === '__insertion_bar__') {
-      const newIndex = renderItems.indexOf(overId);
-      setInsertionIndex(newIndex === rootNodeIds.length ? -1 : newIndex);
-      return;
-    }
-
-    const isMultiDrag = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1;
-    const movingIds = isMultiDrag
-      ? rootNodeIds.filter((id) => selectedNodeIds.includes(id))
+    const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1
+      ? selectedNodeIds
       : [activeId];
 
     if (movingIds.includes(overId)) return;
 
-    const oldIndex = renderItems.indexOf(activeId);
-    const newIndex = renderItems.indexOf(overId);
+    const activeIdx = visibleIds.indexOf(activeId);
+    const overIdx = visibleIds.indexOf(overId);
+    const position: 'before' | 'after' = activeIdx < overIdx ? 'after' : 'before';
 
-    if (overId === '__insertion_bar__') {
-      const nonBarItems = renderItems.filter((id) => id !== '__insertion_bar__');
-      const fallbackTarget = nonBarItems[Math.min(newIndex, nonBarItems.length - 1)];
-      if (fallbackTarget) {
-        reorderMultipleNodes(movingIds, fallbackTarget, newIndex >= nonBarItems.length ? 'after' : 'before');
-      }
-      return;
-    }
-
-    const position: 'before' | 'after' = oldIndex < newIndex ? 'after' : 'before';
-    reorderMultipleNodes(movingIds, overId, position);
+    moveNodesInTree(movingIds, overId, position);
   };
 
-  const totalWaypointsCount = useMemo(() => {
-    let count = 0;
-    rootNodeIds.forEach((id) => {
-      const node = nodes[id];
-      if (!node) return;
-      if (node.type === 'manual') {
-        count += 1;
-      } else if (node.type === 'generator') {
-        count += node.children_ids?.length || 0;
-      }
-    });
-    return count;
-  }, [rootNodeIds, nodes]);
-
-  let globalIndex = 0;
+  const totalWaypointsCount = waypointIndexMap.size;
+  const activeDragNode = activeDragId ? nodes[activeDragId] : null;
 
   return (
     <div className="w-full flex flex-col space-y-2 relative">
@@ -303,165 +376,129 @@ export function WaypointTree() {
         </div>
       </div>
 
-      {rootNodeIds.length === 0 && insertionIndex === -1 && renderItems.length === 1 ? (
+      {rootNodeIds.length === 0 ? (
         <div className="text-sm text-slate-500 italic p-4 text-center">
           No items yet. Drag to create points on the map.
         </div>
-      ) : null}
-      
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => setActiveDragId(null)}
-      >
-        <div className="p-2">
-          <SortableContext
-            items={renderItems}
-            strategy={verticalListSortingStrategy}
-          >
-            <ul className="space-y-1">
-              {renderItems.map((id, _index) => {
-                const isItemDragging = activeDragId === id || (
-                  !!activeDragId &&
-                  selectedNodeIds.includes(activeDragId) &&
-                  selectedNodeIds.includes(id)
-                );
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="p-1">
+            <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+              <ul className="space-y-1">
+                {visibleNodes.map(({ id, depth }) => {
+                  const node = nodes[id];
+                  if (!node) return null;
 
-                if (id === '__insertion_bar__') {
-                  return (
-                    <SortableItem key={id} id={id} isDragging={activeDragId === id}>
-                      <InsertionBar />
-                    </SortableItem>
-                  );
-                }
-
-                const node = nodes[id];
-                if (!node) return null;
-
-                const isSelected = selectedNodeIds.includes(id);
-                const isAnchor = anchorNodeId === id;
-
-                // Generator node
-                if (node.type === 'generator') {
-                  const isExpanded = expandedGenerators.has(id);
-                  const childIds = node.children_ids || [];
-                  const pluginName = node.plugin_id && plugins[node.plugin_id]
-                    ? plugins[node.plugin_id].manifest.name
-                    : 'Generator';
-                  const startIdx = globalIndex;
-                  globalIndex += childIds.length;
+                  const isSelected = selectedNodeIds.includes(id);
+                  const isAnchor = anchorNodeId === id;
+                  const isExpanded = expandedNodes.has(id);
+                  const isEditing = editingNodeId === id;
+                  const globalIdx = waypointIndexMap.get(id);
 
                   return (
-                    <SortableItem key={id} id={id} isDragging={isItemDragging}>
-                      <TreeItemRow
-                        isSelected={isSelected}
-                        variant="generator"
-                        onClick={(e) => handleNodeClick(id, e)}
-                        onContextMenu={(e) => handleContextMenu(e, id)}
-                        idTag={id.slice(0, 6)}
-                      >
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleExpand(id); }}
-                          className="text-text-muted hover:text-text-base transition-colors"
-                        >
-                          <ChevronRight size={14} className={`transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        </button>
-                        <Layers size={14} className="text-emerald-400" />
-                        <span className="font-medium text-xs">{pluginName}</span>
-                        <span className="text-[10px] text-text-muted/70 ml-1">({childIds.length} pts)</span>
-                      </TreeItemRow>
-                      
-                      {isExpanded && childIds.length > 0 && (
-                        <ul className="ml-4 mt-1 space-y-0.5 border-l-2 border-emerald-500/30 pl-2">
-                          {childIds.map((childId, childIdx) => {
-                            const child = nodes[childId];
-                            if (!child) return null;
-                            const isChildSelected = selectedNodeIds.includes(childId);
-                            const isChildAnchor = anchorNodeId === childId;
-                            return (
-                              <li
-                                key={childId}
-                                onClick={(e) => handleNodeClick(childId, e)}
-                                onContextMenu={(e) => handleContextMenu(e, childId, id)}
-                                className={cn(
-                                  "px-2 py-1 rounded text-xs border transition-colors cursor-pointer flex items-center justify-between",
-                                  isChildSelected
-                                    ? "bg-primary-base/20 border-primary-base text-text-base"
-                                    : "bg-surface-panel/80 border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-muted",
-                                  isChildAnchor && "border-amber-400/60 bg-amber-950/20"
-                                )}
-                              >
-                                <div className="flex items-center gap-1">
-                                  <span className="opacity-60 font-mono mr-1">[{startIdx + childIdx + indexStartIndex}]</span>
-                                  🎯 Waypoint
-                                </div>
-                                {isChildAnchor && (
-                                  <span className="text-amber-400 text-xs font-bold" title="Anchor Point">⚓</span>
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </SortableItem>
-                  );
-                }
-
-                // Manual waypoint node
-                const currentGlobalIndex = globalIndex++;
-                return (
-                  <SortableItem key={id} id={id} isDragging={isItemDragging}>
-                    <TreeItemRow
+                    <SortableTreeNodeItem
+                      key={id}
+                      id={id}
+                      node={node}
+                      depth={depth}
                       isSelected={isSelected}
                       isAnchor={isAnchor}
-                      variant="primary"
+                      isExpanded={isExpanded}
+                      isEditing={isEditing}
+                      globalIndex={globalIdx}
+                      indexStartIndex={indexStartIndex}
+                      onToggleExpand={() => toggleExpand(id)}
                       onClick={(e) => handleNodeClick(id, e)}
                       onContextMenu={(e) => handleContextMenu(e, id)}
-                      idTag={id.slice(0, 6)}
-                    >
-                      <span className="opacity-75 font-mono text-xs mr-1">[{currentGlobalIndex + indexStartIndex}]</span>
-                      🎯 Waypoint
-                      {isAnchor && (
-                        <span className="text-amber-400 text-xs font-bold ml-1" title="Anchor Point">⚓</span>
-                      )}
-                    </TreeItemRow>
-                  </SortableItem>
-                );
-              })}
-            </ul>
-          </SortableContext>
-        </div>
+                      onRename={(newName) => {
+                        renameNode(id, newName);
+                        setEditingNodeId(null);
+                      }}
+                      onCancelRename={() => setEditingNodeId(null)}
+                    />
+                  );
+                })}
+              </ul>
+            </SortableContext>
+          </div>
 
-        {/* ドラッグ中の視覚的オーバーレイ表示（スタックカード & バッジ） */}
-        <DragOverlay dropAnimation={{ duration: 150, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>
-          {activeDragId && activeDragId !== '__insertion_bar__' ? (
-            <TreeDragOverlay
-              activeId={activeDragId}
-              selectedNodeIds={selectedNodeIds}
-              nodes={nodes}
-              plugins={plugins}
-              rootNodeIds={rootNodeIds}
-            />
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+          <DragOverlay>
+            {activeDragNode && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-panel/90 border border-primary-base shadow-xl text-xs text-text-base">
+                <GripVertical size={13} className="text-primary-base" />
+                <span className="font-semibold">{activeDragNode.name || 'Waypoint'}</span>
+                {selectedNodeIds.length > 1 && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-primary-base text-surface-base font-bold text-[10px]">
+                    +{selectedNodeIds.length}
+                  </span>
+                )}
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+      )}
 
+      {/* Context Menu */}
       {contextMenu && (
         <div
           ref={menuRef}
           style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-[9999] bg-surface-panel border border-border-base rounded-xl shadow-xl py-1 min-w-[180px] text-xs text-text-base select-none backdrop-blur-md flex flex-col gap-0.5"
+          className="fixed z-[9999] bg-surface-panel border border-border-base rounded-xl shadow-xl py-1 min-w-[190px] text-xs text-text-base select-none backdrop-blur-md flex flex-col gap-0.5"
         >
           {(() => {
             const targetNode = nodes[contextMenu.nodeId];
-            const isGenerator = targetNode?.type === 'generator';
+            const isContainer = targetNode?.type === 'generator' || targetNode?.type === 'manual_group' || targetNode?.type === 'group';
             const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextMenu.nodeId);
             const targetIds = isMultiSelected ? selectedNodeIds : [contextMenu.nodeId];
 
             return (
               <>
+                {/* グループ化 (Group) */}
+                <button
+                  onClick={handleCreateGroup}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
+                >
+                  <FolderPlus size={13} className="text-amber-400" />
+                  <span>
+                    {targetIds.length > 1
+                      ? `選択項目をグループ化 (${targetIds.length})`
+                      : 'グループ化 (Group)'}
+                  </span>
+                </button>
+
+                {/* 名前を変更 (Rename) */}
+                <button
+                  onClick={() => {
+                    setEditingNodeId(contextMenu.nodeId);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Edit2 size={13} className="text-blue-400" />
+                  <span>名前を変更 (Rename)</span>
+                </button>
+
+                {/* グループ解除 (Ungroup) */}
+                {isContainer && (
+                  <button
+                    onClick={() => {
+                      ungroupNode(contextMenu.nodeId);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Unlink size={13} className="text-amber-400" />
+                    <span>グループ解除 (Ungroup)</span>
+                  </button>
+                )}
+
+                <div className="h-px bg-border-base/30 my-0.5" />
+
                 {/* 複製 (Duplicate) */}
                 <button
                   onClick={() => {
@@ -477,14 +514,11 @@ export function WaypointTree() {
                 {/* 内部プロパティ表示 (モーダル) */}
                 <button
                   onClick={() => {
-                    const dataObj = isGenerator ? targetNode : (contextMenu.parentId ? nodes[contextMenu.parentId] : targetNode);
-                    const titleName = isGenerator
-                      ? (targetNode?.plugin_id && plugins[targetNode.plugin_id]?.manifest.name) || 'Waypoint Generator'
-                      : 'Waypoint';
+                    const titleName = targetNode?.name || (targetNode?.type === 'generator' ? 'Generator' : 'Waypoint');
                     openPluginDataModal(
                       `内部プロパティ: ${titleName}`,
-                      dataObj?.plugin_data,
-                      `ノードID: ${dataObj?.id} • 内部メタデータ (Read-only)`
+                      targetNode?.plugin_data,
+                      `ノードID: ${targetNode?.id} • 内部メタデータ (Read-only)`
                     );
                     setContextMenu(null);
                   }}
@@ -497,13 +531,7 @@ export function WaypointTree() {
                 {/* インスペクターを開く */}
                 <button
                   onClick={() => {
-                    if (isGenerator) {
-                      selectNodes([contextMenu.nodeId]);
-                    } else if (contextMenu.parentId) {
-                      selectNodes([contextMenu.parentId]);
-                    } else {
-                      selectNodes([contextMenu.nodeId]);
-                    }
+                    selectNodes([contextMenu.nodeId]);
                     setRightPanelActiveTab('inspector');
                     setRightPanelOpen(true);
                     setContextMenu(null);
@@ -515,7 +543,7 @@ export function WaypointTree() {
                 </button>
 
                 {/* アンカー設定 (ウェイポイントの場合) */}
-                {!isGenerator && !isMultiSelected && (
+                {!isContainer && !isMultiSelected && (
                   <button
                     onClick={() => {
                       if (anchorNodeId === contextMenu.nodeId) {
@@ -529,20 +557,6 @@ export function WaypointTree() {
                   >
                     <Anchor size={13} className="text-amber-400" />
                     <span>{anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
-                  </button>
-                )}
-
-                {/* ジェネレーター解除 (Explode) */}
-                {isGenerator && (
-                  <button
-                    onClick={() => {
-                      explodeGenerator(contextMenu.nodeId);
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                  >
-                    <Unlink size={13} className="text-amber-400" />
-                    <span>ジェネレーター解除 (Explode)</span>
                   </button>
                 )}
 
@@ -567,79 +581,3 @@ export function WaypointTree() {
     </div>
   );
 }
-
-interface TreeItemRowProps {
-  isSelected: boolean;
-  isAnchor?: boolean;
-  variant?: "primary" | "generator";
-  onClick?: (e: React.MouseEvent) => void;
-  onContextMenu?: (e: React.MouseEvent) => void;
-  children: React.ReactNode;
-  idTag?: string;
-  showGrip?: boolean;
-}
-
-function TreeItemRow({
-  isSelected,
-  isAnchor,
-  variant = "primary",
-  onClick,
-  onContextMenu,
-  children,
-  idTag,
-  showGrip = true,
-}: TreeItemRowProps) {
-  const selectedBg =
-    variant === "generator"
-      ? "bg-emerald-500/20 border-emerald-500 text-text-base"
-      : "bg-primary-base/20 border-primary-base text-text-base";
-  const anchorBorder = isAnchor ? "border-amber-400/60 bg-amber-950/20" : "";
-
-  return (
-    <div
-      onClick={onClick}
-      onContextMenu={onContextMenu}
-      className={cn(
-        "px-3 py-2 rounded text-sm group border transition-colors cursor-pointer select-none",
-        isSelected
-          ? selectedBg
-          : "bg-surface-panel border-transparent hover:bg-surface-hover hover:border-border-base/60 text-text-base",
-        anchorBorder
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">{children}</div>
-        <div className="flex items-center gap-2">
-          {idTag && (
-            <span
-              className={cn(
-                "opacity-50 text-xs",
-                isSelected && (variant === "generator" ? "text-emerald-400" : "text-primary-base/80")
-              )}
-            >
-              {idTag}
-            </span>
-          )}
-          {showGrip && (
-            <GripVertical
-              size={14}
-              className="text-text-muted/40 group-hover:text-text-muted cursor-grab active:cursor-grabbing"
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InsertionBar() {
-  return (
-    <div className="py-1 cursor-ns-resize group relative flex items-center justify-center">
-      <div className="h-1 bg-emerald-500/50 group-hover:bg-emerald-400 rounded-full w-full transition-colors" />
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-surface-panel text-[10px] px-3 py-0.5 rounded-full border border-emerald-500/50 text-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none">
-        Insert Here
-      </div>
-    </div>
-  );
-}
-

@@ -1839,19 +1839,17 @@ export function MapCanvas() {
 
                 const initialTransforms: Record<string, any> = {};
                 const allNodes = useAppStore.getState().nodes;
-                targetIds.forEach((id) => {
+                const collectTransforms = (id: string) => {
                   const n = allNodes[id];
-                  if (n?.transform) {
+                  if (!n) return;
+                  if (n.transform) {
                     initialTransforms[id] = { ...n.transform };
-                  } else if (n?.type === 'generator' && n.children_ids) {
-                    n.children_ids.forEach((cid) => {
-                      const cn = allNodes[cid];
-                      if (cn?.transform) {
-                        initialTransforms[cid] = { ...cn.transform };
-                      }
-                    });
                   }
-                });
+                  if (n.children_ids) {
+                    n.children_ids.forEach(collectTransforms);
+                  }
+                };
+                targetIds.forEach(collectTransforms);
 
                 if (!initialTransforms[nodeId] && allNodes[nodeId]?.transform) {
                   initialTransforms[nodeId] = { ...allNodes[nodeId].transform };

@@ -9,6 +9,7 @@ import { Checkbox } from "./common/Checkbox";
 import { Label } from "./common/Label";
 import { cn } from "../../utils/cn";
 import { OptionCard } from "./common/OptionCard";
+import { getFlattenedWaypointIds } from "../../utils/treeUtils";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -63,16 +64,8 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
         if (lastSlash > -1) setLastDirectory(basePath.substring(0, lastSlash));
 
-        // 1. Flatten all waypoints including generator children
-        const flatIds: string[] = [];
-        rootNodeIds.forEach((id) => {
-          const node = nodes[id];
-          if (!node) return;
-          if (node.type === "manual") flatIds.push(id);
-          else if (node.type === "generator" && node.children_ids) {
-            flatIds.push(...node.children_ids);
-          }
-        });
+        // 1. Flatten all waypoints in depth-first order
+        const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
 
         // 2. Hydrate and map
         const waypointsToExport = flatIds

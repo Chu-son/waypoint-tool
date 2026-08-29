@@ -12,6 +12,8 @@ describe('AnnotationTree', () => {
   const mockSetAnnotationEditMode = vi.fn();
   const mockSetRightPanelActiveTab = vi.fn();
   const mockSetRightPanelOpen = vi.fn();
+  const mockGroupAnnotations = vi.fn().mockReturnValue('new-group-id');
+  const mockUngroupAnnotation = vi.fn();
 
   const mockPoint: PointAnnotation = {
     id: 'point-1',
@@ -41,6 +43,8 @@ describe('AnnotationTree', () => {
     vi.clearAllMocks();
     useAppStore.setState({
       annotationObjects: {},
+      annotationGroups: {},
+      rootAnnotationIds: [],
       annotationOrder: [],
       selectedAnnotationIds: [],
       isAnnotationEditMode: false,
@@ -53,6 +57,8 @@ describe('AnnotationTree', () => {
       setAnnotationEditMode: mockSetAnnotationEditMode,
       setRightPanelActiveTab: mockSetRightPanelActiveTab,
       setRightPanelOpen: mockSetRightPanelOpen,
+      groupAnnotations: mockGroupAnnotations,
+      ungroupAnnotation: mockUngroupAnnotation,
     });
   });
 
@@ -88,5 +94,28 @@ describe('AnnotationTree', () => {
     const addButton = screen.getByTitle('アノテーション配置モードを開始');
     fireEvent.click(addButton);
     expect(mockSetAnnotationEditMode).toHaveBeenCalledWith(true);
+  });
+
+  it('handles grouping from context menu on selected annotations', () => {
+    useAppStore.setState({
+      annotationObjects: {
+        'point-1': mockPoint,
+        'line-1': mockLine,
+      },
+      annotationGroups: {},
+      rootAnnotationIds: ['point-1', 'line-1'],
+      selectedAnnotationIds: ['point-1', 'line-1'],
+    });
+
+    render(<AnnotationTree />);
+
+    const item = screen.getByText('Start Point');
+    fireEvent.contextMenu(item);
+
+    const groupOption = screen.getByText('選択項目をグループ化 (2)');
+    expect(groupOption).toBeInTheDocument();
+
+    fireEvent.click(groupOption);
+    expect(mockGroupAnnotations).toHaveBeenCalledWith(['point-1', 'line-1']);
   });
 });
