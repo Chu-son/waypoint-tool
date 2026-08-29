@@ -6,7 +6,7 @@
 
 ## 1. ディレクトリ構造ルール
 
-UI関連のコンポーネントは `src/components/ui/` に配置し、役割と再利用性に応じて以下のように整理します。詳細なファイル一覧は、常にコードの実態を参照してください。
+UI関連のコンポーネントは `src/components/ui/` に配置し、役割と再利用性に応じて以下のように整理します。詳細なファイル一覧は、常にコードの実体を参照してください。
 
 ```
 src/components/ui/
@@ -22,7 +22,7 @@ src/components/ui/
 |---|---|
 | 2ファイル以上で共通利用される汎用UI | `common/` に新規作成 |
 | 特定の機能領域（Settings等）のみで使う中間部品 | `settings/`, `properties/` 等の該当ディレクトリ内に追加 |
-| 1ファイル内でしか使わない分解要素 | そのファイル内のローカルコンポーネントとして定義（export しない） |
+| 1ファイル内でしか使わない末端要素 | そのファイル内のローカルコンポーネントとして定義（export しない） |
 
 ---
 
@@ -137,7 +137,7 @@ const buttonVariants = cva(
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-8 px-3 text-xs",
-        icon: "h-10 w-10 p-0",
+        icon: "h-10 w-10",
       },
     },
     defaultVariants: {
@@ -150,34 +150,20 @@ const buttonVariants = cva(
 
 ---
 
-## 5. 新規コンポーネント追加時のチェックリスト
+## 5. 新規UI作成・リファクタリングのチェックリスト
 
-新しいコンポーネントを作成または切り出す際は、必ず以下の項目をチェックしてください。
+コンポーネントを新規作成またはリファクタリングする際は、以下のステップに従ってください。
 
-* [ ] **再利用性の検証**: 既存の `common/` 内コンポーネントで十分に代替できないか？
-* [ ] **位置の適切性**: 2ファイル以上で使われるか？（Yes → `common/`、No かつ特定ドメイン → 各サブフォルダ、1ファイル内のみ → ローカル配置）
-* [ ] **デザイントークン**: Raw Tailwindカラー（`slate-*`等）を使用せず、`DESIGN_SYSTEM.md` に定義されたセマンティックなトークンを使用しているか？
-* [ ] **className の結合**: `className` prop を受け取り、`cn()` で内部クラスと結合しているか？
-* [ ] **DOM伝搬**: 最小粒度要素である場合、`forwardRef` を使って `ref` を渡しているか？
-* [ ] **カタログ更新**: 新規共通コンポーネントの場合、`docs/COMPONENT_CATALOG.md` にエントリを追加したか？
+1. **共通部品の有無を確認**: `src/components/ui/common/` に同等の部品が存在しないか確認する。
+2. **デザイントークン遵守**: ハードコードされた色（`text-white`, `bg-slate-800` 等）がないかチェックする。
+3. **インラインスタイルの排除**: `style={{ ... }}` によるレイアウト指定を避け、Tailwindクラスまたは `cva` に集約する（動的な座標・サイズ計算を除く）。
+4. **アクセシビリティ & キーボード操作**: ボタンには適切な `title` や `aria-label` を付与し、フォーカスリング（`focus:ring-2`）を担保する。
+5. **Storybook/カタログ更新**: 作成したコンポーネントの役割を [`docs/COMPONENT_CATALOG.md`](./COMPONENT_CATALOG.md) に追記する。
 
 ---
 
-## 6. 宣言的コンポーネント記述指針
+## 6. 既存共通コンポーネント（`common/`）の積極活用
 
-本プロジェクトでは、Tailwind CSSのクラス文字列を直接JSXに長く並べる「命令的スタイリング」を避け、意味のある単位でコンポーネント化する「宣言的UI記述」を徹底します。
-
-### ① 宣言的記述の原則
-* **意図（What）を記述する**: JSX上では `<LayerCard>`, `<FieldLabel>`, `<AlertBox>` のように、「何を表示しているか」がひと目でわかるコンポーネント名を使用します。
-* **実装（How）を閉じ込める**: Tailwind クラスによるレイアウトや装飾は、共通コンポーネント（`src/components/ui/common/`）またはファイル内のローカルサブコンポーネント内にカプセル化します。
-
-### ② ローカルコンポーネント化の基準
-以下に該当する場合は、ファイル外に切り出さずともファイル内ローカルコンポーネント（非export）として抽出し、メインコンポーネントのJSXをシンプルに保ってください。
-1. ほぼ同じJSX構造や複雑なスタイリングが **2回以上出現する** 場合
-2. JSXの単一ブロックが **40行を超える** 大きなカードや複雑な行要素である場合
-3. 状態によるクラス切り替え（`cn(..., isActive && "...")` 等）が複雑な場合
-
-### ③ 既存共通コンポーネント（`common/`）の積極活用
 以下のパターンではインラインの `<div className="...">` を使わず、必ず `common/` 内の既存コンポーネントを適用してください。
 
 | パターン | 使用する `common/` コンポーネント |
@@ -205,3 +191,99 @@ const buttonVariants = cva(
 </FormField>
 ```
 
+---
+
+## 7. レスポンシブ & アダプティブ設計ガイドライン
+
+本アプリケーションはデスクトップ（Tauri）上で動作し、左右のサイドパネル（左 180〜600px、右 200〜800px）が開閉・リサイズされるため、中央キャンバス領域の有効幅が動的に大きく変化します（約 300px 〜 2500px+）。
+
+すべてのUIコンポーネントは、以下の5大原則およびカテゴリ別設計方針・注意点に準拠してください。
+
+### ① レスポンシブ設計の5大原則
+
+1. **コンテナ幅動的監視 (Container-Relative Responsive / `useResponsiveContainer`)**:
+   - ビューポート幅（`100vw`）メディアクエリ（`md:`, `xl:` 等）は、ウィンドウ全体の解像度のみに反応し、左右パネル開閉に伴う中央キャンバスの狭小化を検知できません。
+   - 中央キャンバス上のUIは、共通フック `useResponsiveContainer` を用いて**親コンテナ（中央キャンバス `parentElement`）の実際の利用可能幅（px）を動的に監視**し、以下の3段階ティアで表示を切り替えてください：
+     - **`compact` (幅 < 800px / パネル展開時・狭画面)**: **完全アイコンのみ表示**（テキスト完全非表示、28x28px 正方形ボタン）、タイトル短縮、不要なラベル非表示。
+     - **`normal` (幅 800px 〜 1080px)**: 短縮テキスト（例: `Point`, `Oriented`, `Line`）。
+     - **`wide` (幅 >= 1080px)**: フルテキスト（例: `丸 (Point)`, `三角 (Oriented)`）。
+2. **単一行（`flex-nowrap`）の徹底と縦折り返し禁止**:
+   - 単一行フローティングバー（`FloatingActionBanner` 等）内で子コンテナに `flex-wrap` を指定してはなりません（複数行に折り返された要素と縦中央配置 `items-center` の決定ボタンが上下・左右で直接重なるため）。
+   - 必ず `flex-nowrap` で統一し、各要素に `shrink-0` を適用した上で、幅が不足した場合は `overflow-x-auto` による安全な横スクロールを行わせてください。
+3. **重要アクションの可視性保証 (Guaranteed Action Visibility)**:
+   - 「完了」「確定」「削除」などの決定アクションボタン群には必ず `flex-shrink-0 ml-auto` を付与し、どんなに狭い画面幅でも操作完了ボタンが画面外に押し出されないようにしてください。
+4. **`min-w-0` と `truncate` の徹底**:
+   - `flex` アイテム（テキストや入力欄）は、デフォルトで `min-width: auto` となるため横にはみ出しやすい。必ず `min-w-0` を付与し、長い文字列には `truncate`（または `break-words`）を適用してください。
+5. **ポップオーバー・ドロップダウン親コンテナの `overflow` 禁則事項**:
+   - `TopMenu` やドロップダウンメニュー、コンテキストメニューなど、親コンテナの下や外側にポップオーバーを展開するUIコンポーネントの親要素には、絶対に `overflow-hidden` や `overflow-x-auto` を設定してはなりません（展開されたメニューが親境界でクリップされ開かなくなるため）。
+
+---
+
+### ② フローティングオーバーレイ設計方針 (Floating Overlays)
+
+`FloatingActionBanner` や各種編集モード用オーバーレイ（アノテーション・マップ編集・エレメントコピー等）は以下を満たすこと：
+
+```tsx
+// ✅ 推奨パターン: useResponsiveContainer による動的ティア連動
+export function CustomEditOverlay() {
+  const { containerRef, isCompact, isWide } = useResponsiveContainer<HTMLDivElement>({
+    compact: 800,
+    normal: 1080,
+  });
+
+  return (
+    <FloatingActionBanner
+      ref={containerRef}
+      icon={<EditIcon size={16} />}
+      title={isCompact ? '編集' : 'オブジェクト編集モード'}
+      subtitle={isCompact ? undefined : 'ドラッグまたはクリックで配置'}
+      statusText={
+        <div className="flex items-center gap-1.5 px-1 flex-nowrap shrink-0">
+          <div className="flex items-center gap-0.5 bg-surface-base/60 p-0.5 rounded-lg border border-border-base/30 flex-shrink-0">
+            {tools.map((t) => (
+              <Button
+                key={t.id}
+                size="sm"
+                className={`h-7 text-xs ${isCompact ? 'w-7 p-0 justify-center' : 'px-2 gap-1'}`}
+                title={t.label}
+              >
+                {t.icon}
+                {!isCompact && <span>{isWide ? t.label : t.shortLabel}</span>}
+              </Button>
+            ))}
+          </div>
+        </div>
+      }
+      actions={[
+        {
+          label: '完了',
+          icon: <Check size={14} />,
+          variant: 'primary',
+          onClick: handleDone,
+        },
+      ]}
+    />
+  );
+}
+```
+
+---
+
+### ③ サイドパネル内UI・ツリーリスト設計方針 (Panels & Tree Items)
+
+- パネル幅は 180px まで狭められるため、パネル内のリストアイテムやプロパティ項目は固定幅（`w-[300px]` など）を持たせず、`w-full min-w-0` で伸縮させること。
+- **ツリーリスト行（`AnnotationTree`, `WaypointTree` 等）の重なり防止**:
+  - 行コンテナ: `group relative flex items-center justify-between gap-1 py-1.5 pr-1.5 rounded-lg text-xs overflow-hidden`
+  - 左側コンテンツ領域: `flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden`
+  - 名前テキスト: `truncate min-w-0 flex-1 font-medium text-text-base`
+  - バッジ類: 狭幅パネルでは非表示または短縮（`hidden xs:inline-block sm:inline-block`）
+  - 右側操作ボタングループ: `flex items-center gap-0.5 shrink-0 ml-1`
+  - インデントパディングのクランプ: 深い階層でも文字領域を確保するため、`style={{ paddingLeft: `${Math.min(depth * 10 + 6, 32)}px` }}` などで最大インデント幅を制限すること。
+
+---
+
+### ④ モーダル設計方針 (Modals)
+
+- モーダル全体は `w-[90vw] max-w-* max-h-[90vh] flex flex-col` を基本とし、ヘッダー・フッターを固定、コンテンツ領域のみを `overflow-y-auto flex-1` とすること。
+- モーダルコンテンツのパディングは固定値（`p-8`）を避け、レスポンシブクラス（`p-4 sm:p-6 md:p-8`）を使用すること。
+- サイドバー付きモーダル（`SettingsModal` 等）は、狭画面でサイドバーとコンテンツが無理なく収まるようにサイドバー幅を `w-40 sm:w-52 md:w-56`、タブボタンを `truncate` に対応させること。
