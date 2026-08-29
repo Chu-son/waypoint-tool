@@ -33,7 +33,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { WaypointNode } from '../../types/store';
-import { getFlattenedWaypointIds, getFlattenedNodeIds, getVisibleTreeNodes } from '../../utils/treeUtils';
+import { getFlattenedWaypointIds, getVisibleTreeNodes, computeDragDropPosition } from '../../utils/treeUtils';
+import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
 
 interface TreeItemRowProps {
   id: string;
@@ -233,7 +234,6 @@ export function WaypointTree() {
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [lastSelectedNodeId, setLastSelectedNodeId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -257,11 +257,6 @@ export function WaypointTree() {
     });
   };
 
-  // 全ノードの深さ優先フラット順
-  const allFlatNodeIds = useMemo(() => {
-    return getFlattenedNodeIds(rootNodeIds, nodes);
-  }, [rootNodeIds, nodes]);
-
   // マニュアルウェイポイントのインデックスマップ
   const waypointIndexMap = useMemo(() => {
     const map = new Map<string, number>();
@@ -270,43 +265,32 @@ export function WaypointTree() {
     return map;
   }, [rootNodeIds, nodes]);
 
-  const handleNodeClick = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (elementCopyState) {
+  // 画面上に展開されている全ノードを深さ優先順で取得
+  const visibleNodes = useMemo(() => {
+    return getVisibleTreeNodes(rootNodeIds, nodes, expandedNodes);
+  }, [rootNodeIds, nodes, expandedNodes]);
+
+  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
+
+  const { handleItemClick, handleItemContextMenu } = useTreeItemSelection({
+    selectedIds: selectedNodeIds,
+    selectFn: selectNodes,
+    visibleIds,
+    onInspect: () => {
+      setRightPanelActiveTab('inspector');
+      setRightPanelOpen(true);
+    },
+    elementCopyState,
+    onElementCopySelect: (id) => {
       selectNodes([id]);
-      setElementCopyState({ ...elementCopyState, previewNodeId: id });
-      setLastSelectedNodeId(id);
-      return;
-    }
-
-    if (e.shiftKey && lastSelectedNodeId && allFlatNodeIds.includes(lastSelectedNodeId)) {
-      const fromIdx = allFlatNodeIds.indexOf(lastSelectedNodeId);
-      const toIdx = allFlatNodeIds.indexOf(id);
-      if (fromIdx !== -1 && toIdx !== -1) {
-        const start = Math.min(fromIdx, toIdx);
-        const end = Math.max(fromIdx, toIdx);
-        const rangeIds = allFlatNodeIds.slice(start, end + 1);
-        if (e.ctrlKey || e.metaKey) {
-          const merged = Array.from(new Set([...selectedNodeIds, ...rangeIds]));
-          selectNodes(merged, false);
-        } else {
-          selectNodes(rangeIds, false);
-        }
-        return;
+      if (elementCopyState) {
+        setElementCopyState({ ...elementCopyState, previewNodeId: id });
       }
-    }
-
-    setLastSelectedNodeId(id);
-    selectNodes([id], e.shiftKey || e.ctrlKey || e.metaKey);
-  };
+    },
+  });
 
   const handleContextMenu = (e: React.MouseEvent, nodeId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!selectedNodeIds.includes(nodeId)) {
-      selectNodes([nodeId]);
-      setLastSelectedNodeId(nodeId);
-    }
+    handleItemContextMenu(e, nodeId);
     setContextMenu({ nodeId, x: e.clientX, y: e.clientY });
   };
 
@@ -329,13 +313,6 @@ export function WaypointTree() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // 画面上に展開されている全ノードを深さ優先順で取得
-  const visibleNodes = useMemo(() => {
-    return getVisibleTreeNodes(rootNodeIds, nodes, expandedNodes);
-  }, [rootNodeIds, nodes, expandedNodes]);
-
-  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
-
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
   };
@@ -354,10 +331,7 @@ export function WaypointTree() {
 
     if (movingIds.includes(overId)) return;
 
-    const activeIdx = visibleIds.indexOf(activeId);
-    const overIdx = visibleIds.indexOf(overId);
-    const position: 'before' | 'after' = activeIdx < overIdx ? 'after' : 'before';
-
+    const position = computeDragDropPosition(activeId, overId, visibleIds);
     moveNodesInTree(movingIds, overId, position);
   };
 
@@ -413,7 +387,7 @@ export function WaypointTree() {
                       globalIndex={globalIdx}
                       indexStartIndex={indexStartIndex}
                       onToggleExpand={() => toggleExpand(id)}
-                      onClick={(e) => handleNodeClick(id, e)}
+                      onClick={(e) => handleItemClick(id, e)}
                       onContextMenu={(e) => handleContextMenu(e, id)}
                       onRename={(newName) => {
                         renameNode(id, newName);

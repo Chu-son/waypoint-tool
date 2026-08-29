@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   findHighestLevelParent,
   collectDescendantIds,
+  getNextSequentialName,
 } from '../../utils/treeUtils';
 
 export type AnnotationToolType = 'select' | 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
@@ -46,6 +47,7 @@ export interface AnnotationSlice {
   toggleAnnotationVisibility: (id: string) => void;
   toggleAnnotationGroupVisibility: (groupId: string) => void;
   toggleAnnotationLabelVisibility: (id: string) => void;
+  duplicateAnnotations: (ids: string[]) => string[];
   setAnnotationObjects: (objects: AnnotationObject[], groups?: AnnotationGroup[], rootIds?: string[]) => void;
 }
 
@@ -180,14 +182,8 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       );
 
       // 2. 連番でグループ名を生成 ("Group 1", "Group 2", ...)
-      const existingNames = new Set(
-        Object.values(state.annotationGroups).map((g) => g.name).filter(Boolean)
-      );
-      let groupNum = 1;
-      while (existingNames.has(`Group ${groupNum}`)) {
-        groupNum++;
-      }
-      const groupName = `Group ${groupNum}`;
+      const existingNames = Object.values(state.annotationGroups).map((g) => g.name);
+      const groupName = getNextSequentialName('Group', existingNames);
 
       // 3. 親が選択されている場合の子孫重複排除
       const directMovingIds: string[] = [];
@@ -680,6 +676,146 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         isDirty: true,
       };
     });
+  },
+
+  duplicateAnnotations: (ids: string[]) => {
+    if (!ids || ids.length === 0) return [];
+    get().pushHistorySnapshot();
+
+    const createdTopLevelIds: string[] = [];
+
+    set((state) => {
+      const nextObjects = { ...state.annotationObjects };
+      const nextGroups = { ...state.annotationGroups };
+      const nextRootIds = [...state.rootAnnotationIds];
+
+      // オブジェクトのディープコピー＆オフセット
+      const cloneObject = (origId: string, parentGroupId?: string): AnnotationObject | null => {
+        const orig = state.annotationObjects[origId];
+        if (!orig) return null;
+
+        const newId = uuidv4();
+        const dup: AnnotationObject = {
+          ...structuredClone(orig),
+          id: newId,
+          name: `${orig.name} (Copy)`,
+          group_id: parentGroupId,
+        };
+
+        if (dup.type === 'point' || dup.type === 'oriented_point') {
+          dup.x += 0.5;
+          dup.y += 0.5;
+        } else if (dup.type === 'line') {
+          dup.x1 += 0.5;
+          dup.y1 += 0.5;
+          dup.x2 += 0.5;
+          dup.y2 += 0.5;
+        } else if (dup.type === 'rect' || dup.type === 'circle') {
+          dup.cx += 0.5;
+          dup.cy += 0.5;
+        }
+
+        nextObjects[newId] = dup;
+        return dup;
+      };
+
+      // グループの再帰的クローン
+      const cloneGroupRecursive = (origId: string, parentGroupId?: string): AnnotationGroup | null => {
+        const orig = state.annotationGroups[origId];
+        if (!orig) return null;
+
+        const newId = uuidv4();
+        const newChildIds: string[] = [];
+
+        if (orig.children_ids) {
+          orig.children_ids.forEach((cid) => {
+            if (state.annotationObjects[cid]) {
+              const clonedObj = cloneObject(cid, newId);
+              if (clonedObj) newChildIds.push(clonedObj.id);
+            } else if (state.annotationGroups[cid]) {
+              const clonedSub = cloneGroupRecursive(cid, newId);
+              if (clonedSub) newChildIds.push(clonedSub.id);
+            }
+          });
+        }
+
+        const dupGroup: AnnotationGroup = {
+          ...structuredClone(orig),
+          id: newId,
+          name: `${orig.name} (Copy)`,
+          parent_id: parentGroupId,
+          children_ids: newChildIds,
+        };
+
+        nextGroups[newId] = dupGroup;
+        return dupGroup;
+      };
+
+      // 親が選択されている場合の子孫要素は直接複製しない（二重複製防止）
+      const directIds: string[] = [];
+      ids.forEach((id) => {
+        let isChildOfSelected = false;
+        let curr = id;
+        while (curr) {
+          const parentId = nextObjects[curr]?.group_id || nextGroups[curr]?.parent_id;
+          if (parentId && ids.includes(parentId)) {
+            isChildOfSelected = true;
+            break;
+          }
+          curr = parentId || '';
+        }
+        if (!isChildOfSelected) {
+          directIds.push(id);
+        }
+      });
+
+      // 複製と適切な位置への挿入
+      directIds.forEach((id) => {
+        if (state.annotationObjects[id]) {
+          const orig = state.annotationObjects[id];
+          const cloned = cloneObject(id, orig.group_id);
+          if (cloned) {
+            createdTopLevelIds.push(cloned.id);
+            if (orig.group_id && nextGroups[orig.group_id]) {
+              const grp = nextGroups[orig.group_id];
+              const children = [...(grp.children_ids || [])];
+              const idx = children.indexOf(id);
+              children.splice(idx !== -1 ? idx + 1 : children.length, 0, cloned.id);
+              nextGroups[orig.group_id] = { ...grp, children_ids: children };
+            } else {
+              const idx = nextRootIds.indexOf(id);
+              nextRootIds.splice(idx !== -1 ? idx + 1 : nextRootIds.length, 0, cloned.id);
+            }
+          }
+        } else if (state.annotationGroups[id]) {
+          const orig = state.annotationGroups[id];
+          const cloned = cloneGroupRecursive(id, orig.parent_id);
+          if (cloned) {
+            createdTopLevelIds.push(cloned.id);
+            if (orig.parent_id && nextGroups[orig.parent_id]) {
+              const grp = nextGroups[orig.parent_id];
+              const children = [...(grp.children_ids || [])];
+              const idx = children.indexOf(id);
+              children.splice(idx !== -1 ? idx + 1 : children.length, 0, cloned.id);
+              nextGroups[orig.parent_id] = { ...grp, children_ids: children };
+            } else {
+              const idx = nextRootIds.indexOf(id);
+              nextRootIds.splice(idx !== -1 ? idx + 1 : nextRootIds.length, 0, cloned.id);
+            }
+          }
+        }
+      });
+
+      return {
+        annotationObjects: nextObjects,
+        annotationGroups: nextGroups,
+        rootAnnotationIds: nextRootIds,
+        selectedAnnotationIds: createdTopLevelIds,
+        isDirty: true,
+      };
+    });
+
+    return createdTopLevelIds;
   },
 
   setAnnotationObjects: (objects: AnnotationObject[], groups?: AnnotationGroup[], rootIds?: string[]) => {

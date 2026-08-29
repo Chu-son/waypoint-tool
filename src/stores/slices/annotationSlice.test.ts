@@ -155,4 +155,54 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
       expect(state.annotationObjects['p2'].group_id).toBeUndefined();
     });
   });
+
+  describe('duplicateAnnotations', () => {
+    it('duplicates single and multiple annotation objects with offset and Copy suffix', () => {
+      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 10, y: 20, visible: true, labelVisible: true };
+
+      useAppStore.setState({
+        annotationObjects: { p1 },
+        rootAnnotationIds: ['p1'],
+      });
+
+      const newIds = useAppStore.getState().duplicateAnnotations(['p1']);
+      expect(newIds.length).toBe(1);
+
+      const state = useAppStore.getState();
+      expect(state.rootAnnotationIds).toEqual(['p1', newIds[0]]);
+      expect(state.selectedAnnotationIds).toEqual(newIds);
+
+      const dup = state.annotationObjects[newIds[0]] as PointAnnotation;
+      expect(dup.name).toBe('P1 (Copy)');
+      expect(dup.x).toBe(10.5);
+      expect(dup.y).toBe(20.5);
+    });
+
+    it('duplicates a group recursively along with its children', () => {
+      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true, group_id: 'g1' };
+      const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p1'], visible: true };
+
+      useAppStore.setState({
+        annotationObjects: { p1 },
+        annotationGroups: { g1: grp },
+        rootAnnotationIds: ['g1'],
+      });
+
+      const newIds = useAppStore.getState().duplicateAnnotations(['g1']);
+      expect(newIds.length).toBe(1);
+      const newGroupId = newIds[0];
+
+      const state = useAppStore.getState();
+      expect(state.rootAnnotationIds).toEqual(['g1', newGroupId]);
+      const dupGroup = state.annotationGroups[newGroupId];
+      expect(dupGroup.name).toBe('Group 1 (Copy)');
+      expect(dupGroup.children_ids?.length).toBe(1);
+
+      const dupChildId = dupGroup.children_ids![0];
+      const dupChild = state.annotationObjects[dupChildId] as PointAnnotation;
+      expect(dupChild).toBeDefined();
+      expect(dupChild.name).toBe('P1 (Copy)');
+      expect(dupChild.group_id).toBe(newGroupId);
+    });
+  });
 });

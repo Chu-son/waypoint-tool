@@ -42,8 +42,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AnnotationObject, AnnotationGroup, AnnotationType } from '../../types/store';
-import { getVisibleAnnotationNodes } from '../../utils/treeUtils';
-import { v4 as uuidv4 } from 'uuid';
+import { getVisibleAnnotationNodes, computeDragDropPosition } from '../../utils/treeUtils';
+import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
 
 function getAnnotationIcon(type: AnnotationType) {
   switch (type) {
@@ -301,6 +301,7 @@ export function AnnotationTree() {
   const rootAnnotationIds = useAppStore((state) => state.rootAnnotationIds) || [];
   const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds) || [];
   const selectAnnotationObjects = useAppStore((state) => state.selectAnnotationObjects);
+  const duplicateAnnotations = useAppStore((state) => state.duplicateAnnotations);
   const renameAnnotation = useAppStore((state) => state.renameAnnotation);
   const groupAnnotations = useAppStore((state) => state.groupAnnotations);
   const ungroupAnnotation = useAppStore((state) => state.ungroupAnnotation);
@@ -315,7 +316,6 @@ export function AnnotationTree() {
   const setShowAnnotations = useAppStore((state) => state.setShowAnnotations);
   const showAnnotationLabels = useAppStore((state) => state.showAnnotationLabels);
   const setShowAnnotationLabels = useAppStore((state) => state.setShowAnnotationLabels);
-  const addAnnotationObject = useAppStore((state) => state.addAnnotationObject);
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
   const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
@@ -354,6 +354,28 @@ export function AnnotationTree() {
     setAnnotationEditMode(true);
   };
 
+  // 画面上に展開されている全ノードを深さ優先順で取得
+  const visibleNodes = useMemo(() => {
+    return getVisibleAnnotationNodes(rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups);
+  }, [rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups]);
+
+  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
+
+  const { handleItemClick, handleItemContextMenu } = useTreeItemSelection({
+    selectedIds: selectedAnnotationIds,
+    selectFn: selectAnnotationObjects,
+    visibleIds,
+    onInspect: () => {
+      setRightPanelActiveTab('inspector');
+      setRightPanelOpen(true);
+    },
+  });
+
+  const handleContextMenu = (e: React.MouseEvent, id: string) => {
+    handleItemContextMenu(e, id);
+    setContextMenu({ id, x: e.clientX, y: e.clientY });
+  };
+
   const handleCreateGroup = () => {
     const targetIds = selectedAnnotationIds.length > 0
       ? selectedAnnotationIds
@@ -367,38 +389,6 @@ export function AnnotationTree() {
     }
     setContextMenu(null);
   };
-
-  const handleDuplicate = (id: string) => {
-    const obj = annotationObjects[id];
-    if (!obj) return;
-    const duplicated: AnnotationObject = {
-      ...structuredClone(obj),
-      id: uuidv4(),
-      name: `${obj.name} (Copy)`,
-    };
-    if (duplicated.type === 'point' || duplicated.type === 'oriented_point') {
-      duplicated.x += 0.5;
-      duplicated.y += 0.5;
-    } else if (duplicated.type === 'line') {
-      duplicated.x1 += 0.5;
-      duplicated.y1 += 0.5;
-      duplicated.x2 += 0.5;
-      duplicated.y2 += 0.5;
-    } else if (duplicated.type === 'rect' || duplicated.type === 'circle') {
-      duplicated.cx += 0.5;
-      duplicated.cy += 0.5;
-    }
-    addAnnotationObject(duplicated, obj.group_id);
-    selectAnnotationObjects([duplicated.id]);
-    setContextMenu(null);
-  };
-
-  // 画面上に展開されている全ノードを深さ優先順で取得
-  const visibleNodes = useMemo(() => {
-    return getVisibleAnnotationNodes(rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups);
-  }, [rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups]);
-
-  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
@@ -418,10 +408,7 @@ export function AnnotationTree() {
 
     if (movingIds.includes(overId)) return;
 
-    const activeIdx = visibleIds.indexOf(activeId);
-    const overIdx = visibleIds.indexOf(overId);
-    const position: 'before' | 'after' = activeIdx < overIdx ? 'after' : 'before';
-
+    const position = computeDragDropPosition(activeId, overId, visibleIds);
     moveAnnotationsInTree(movingIds, overId, position);
   };
 
@@ -514,20 +501,8 @@ export function AnnotationTree() {
                       isExpanded={isExpanded}
                       isEditing={isEditing}
                       onToggleExpand={() => toggleGroupExpand(id)}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        selectAnnotationObjects([id], e.shiftKey || e.metaKey);
-                        setRightPanelActiveTab('inspector');
-                        setRightPanelOpen(true);
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!selectedAnnotationIds.includes(id)) {
-                          selectAnnotationObjects([id]);
-                        }
-                        setContextMenu({ id, x: e.clientX, y: e.clientY });
-                      }}
+                      onClick={(e) => handleItemClick(id, e)}
+                      onContextMenu={(e) => handleContextMenu(e, id)}
                       onRename={(newName) => {
                         renameAnnotation(id, newName);
                         setEditingId(null);
@@ -622,15 +597,16 @@ export function AnnotationTree() {
                 <div className="h-px bg-border-base/30 my-0.5" />
 
                 {/* 複製 (Duplicate) */}
-                {!isGroup && (
-                  <button
-                    onClick={() => handleDuplicate(contextMenu.id)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                  >
-                    <Copy size={13} className="text-text-muted" />
-                    <span>複製 (Duplicate)</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    duplicateAnnotations(targetIds);
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Copy size={13} className="text-cyan-400" />
+                  <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
+                </button>
 
                 {/* 内部プロパティ表示 (モーダル) */}
                 <button

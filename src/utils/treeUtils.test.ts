@@ -6,6 +6,9 @@ import {
   getNodeDepth,
   collectDescendantIds,
   findHighestLevelParent,
+  computeRangeSelection,
+  computeDragDropPosition,
+  getNextSequentialName,
 } from './treeUtils';
 import { WaypointNode } from '../types/store';
 
@@ -69,5 +72,75 @@ describe('treeUtils', () => {
     const res3 = findHighestLevelParent(['wp-5', 'wp-3'], rootIds, nodes);
     expect(res3.parentId).toBeNull();
     expect(res3.insertIndex).toBe(2);
+  });
+
+  describe('computeRangeSelection', () => {
+    const orderedIds = ['a', 'b', 'c', 'd', 'e'];
+
+    it('selects range from lastSelectedId to targetId', () => {
+      const res = computeRangeSelection('d', 'b', orderedIds, ['b'], false);
+      expect(res).toEqual(['b', 'c', 'd']);
+    });
+
+    it('selects range backwards from lastSelectedId to targetId', () => {
+      const res = computeRangeSelection('b', 'd', orderedIds, ['d'], false);
+      expect(res).toEqual(['b', 'c', 'd']);
+    });
+
+    it('merges with existing selection when isCtrlOrMeta is true', () => {
+      const res = computeRangeSelection('d', 'b', orderedIds, ['a', 'b'], true);
+      expect(res).toEqual(['a', 'b', 'c', 'd']);
+    });
+
+    it('returns targetId if lastSelectedId is not in orderedIds', () => {
+      const res = computeRangeSelection('c', 'unknown', orderedIds, [], false);
+      expect(res).toEqual(['c']);
+    });
+  });
+
+  describe('computeDragDropPosition', () => {
+    const visibleIds = ['n1', 'n2', 'n3', 'n4'];
+
+    it('returns "after" when moving downwards', () => {
+      expect(computeDragDropPosition('n1', 'n3', visibleIds)).toBe('after');
+    });
+
+    it('returns "before" when moving upwards', () => {
+      expect(computeDragDropPosition('n4', 'n2', visibleIds)).toBe('before');
+    });
+  });
+
+  describe('getNextSequentialName', () => {
+    it('returns prefix 1 when no names exist', () => {
+      expect(getNextSequentialName('Point', [])).toBe('Point 1');
+    });
+
+    it('returns next incremented number when sequential names exist', () => {
+      const names = ['Point 1', 'Point 2', 'Point 3', 'Point 4'];
+      expect(getNextSequentialName('Point', names)).toBe('Point 5');
+    });
+
+    it('fills in the lowest gap when middle/tail numbers are deleted', () => {
+      // 5-8 deleted from 1-8 -> remaining 1-4 -> next is 5
+      const names = ['Point 1', 'Point 2', 'Point 3', 'Point 4'];
+      expect(getNextSequentialName('Point', names)).toBe('Point 5');
+
+      // 2 deleted -> remaining 1, 3, 4 -> next is 2
+      const namesWithGap = ['Point 1', 'Point 3', 'Point 4'];
+      expect(getNextSequentialName('Point', namesWithGap)).toBe('Point 2');
+    });
+
+    it('only matches exact prefix format and ignores other prefixes', () => {
+      const names = ['Point 1', 'Line 1', 'Line 2', 'Oriented Point 1'];
+      expect(getNextSequentialName('Point', names)).toBe('Point 2');
+      expect(getNextSequentialName('Line', names)).toBe('Line 3');
+      expect(getNextSequentialName('Oriented Point', names)).toBe('Oriented Point 2');
+      expect(getNextSequentialName('Rectangle', names)).toBe('Rectangle 1');
+    });
+
+    it('handles Group prefix correctly', () => {
+      const names = ['Group 1', 'Group 3'];
+      expect(getNextSequentialName('Group', names)).toBe('Group 2');
+    });
   });
 });

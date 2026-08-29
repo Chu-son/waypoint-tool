@@ -247,3 +247,101 @@ export function getVisibleAnnotationNodes(
   rootIds.forEach((id) => traverse(id, 0));
   return result;
 }
+
+/**
+ * グループとオブジェクトの両方を含む、深さ優先探索での全アノテーションノードIDリストを取得する。
+ */
+export function getFlattenedAnnotationNodeIds(
+  rootIds: string[],
+  groups: Record<string, AnnotationGroup>,
+  objects: Record<string, AnnotationObject>
+): string[] {
+  const result: string[] = [];
+
+  function traverse(id: string) {
+    if (objects[id]) {
+      result.push(id);
+      return;
+    }
+    const grp = groups[id];
+    if (grp) {
+      result.push(id);
+      if (grp.children_ids && grp.children_ids.length > 0) {
+        grp.children_ids.forEach(traverse);
+      }
+    }
+  }
+
+  rootIds.forEach(traverse);
+  return result;
+}
+
+/**
+ * リスト上の表示順（orderedIds）に基づいて、Shift範囲選択されたID配列を計算する。
+ */
+export function computeRangeSelection(
+  targetId: string,
+  lastSelectedId: string | null,
+  orderedIds: string[],
+  currentSelectedIds: string[],
+  isCtrlOrMeta: boolean
+): string[] {
+  if (!lastSelectedId || !orderedIds.includes(lastSelectedId) || !orderedIds.includes(targetId)) {
+    return [targetId];
+  }
+
+  const fromIdx = orderedIds.indexOf(lastSelectedId);
+  const toIdx = orderedIds.indexOf(targetId);
+  const start = Math.min(fromIdx, toIdx);
+  const end = Math.max(fromIdx, toIdx);
+  const rangeIds = orderedIds.slice(start, end + 1);
+
+  if (isCtrlOrMeta) {
+    return Array.from(new Set([...currentSelectedIds, ...rangeIds]));
+  }
+  return rangeIds;
+}
+
+/**
+ * ドラッグ中のアイテムとドロップ先アイテムのインデックス関係から、挿入方向（'before' | 'after'）を計算する。
+ */
+export function computeDragDropPosition(
+  activeId: string,
+  overId: string,
+  visibleIds: string[]
+): 'before' | 'after' {
+  const activeIdx = visibleIds.indexOf(activeId);
+  const overIdx = visibleIds.indexOf(overId);
+  return activeIdx < overIdx ? 'after' : 'before';
+}
+
+/**
+ * 既存の名前リストから、指定プレフィックスに続く最小の未使用正の整数（連番）を割り当てた名前を生成する。
+ * 例: prefix = "Point", existingNames = ["Point 1", "Point 2", "Point 4"] -> "Point 3"
+ */
+export function getNextSequentialName(
+  prefix: string,
+  existingNames: (string | undefined | null)[]
+): string {
+  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`^${escapedPrefix}\\s+(\\d+)$`);
+  const usedNumbers = new Set<number>();
+
+  existingNames.forEach((name) => {
+    if (!name) return;
+    const match = name.match(regex);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > 0) {
+        usedNumbers.add(num);
+      }
+    }
+  });
+
+  let num = 1;
+  while (usedNumbers.has(num)) {
+    num++;
+  }
+
+  return `${prefix} ${num}`;
+}
