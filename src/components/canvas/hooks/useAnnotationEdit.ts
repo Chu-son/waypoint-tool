@@ -8,6 +8,7 @@ import {
   RectAnnotation,
   CircleAnnotation,
 } from '../../../types/store';
+import { getNextSequentialName } from '../../../utils/treeUtils';
 import { v4 as uuidv4 } from 'uuid';
 
 export function useAnnotationEdit() {
@@ -225,7 +226,7 @@ export function useAnnotationEdit() {
         return;
       }
 
-      const count = Object.keys(useAppStore.getState().annotationObjects || {}).length + 1;
+      const existingNames = Object.values(useAppStore.getState().annotationObjects || {}).map((o) => o.name);
       const color = defaultAnnotationColor || '#3B82F6';
 
       let newObj: AnnotationObject | null = null;
@@ -236,7 +237,7 @@ export function useAnnotationEdit() {
         case 'point': {
           newObj = {
             id: uuidv4(),
-            name: `Point ${count}`,
+            name: getNextSequentialName('Point', existingNames),
             type: 'point',
             x: pt.x,
             y: pt.y,
@@ -250,7 +251,7 @@ export function useAnnotationEdit() {
           const op = annotationPreview as OrientedPointAnnotation;
           newObj = {
             id: uuidv4(),
-            name: `Oriented Point ${count}`,
+            name: getNextSequentialName('Oriented Point', existingNames),
             type: 'oriented_point',
             x: drawStartPos?.x ?? pt.x,
             y: drawStartPos?.y ?? pt.y,
@@ -266,7 +267,7 @@ export function useAnnotationEdit() {
           const isDragged = ln && (Math.abs(ln.x2 - ln.x1) > 0.05 || Math.abs(ln.y2 - ln.y1) > 0.05);
           newObj = {
             id: uuidv4(),
-            name: `Line ${count}`,
+            name: getNextSequentialName('Line', existingNames),
             type: 'line',
             x1: isDragged ? ln.x1 : pt.x - 1,
             y1: isDragged ? ln.y1 : pt.y,
@@ -283,7 +284,7 @@ export function useAnnotationEdit() {
           const isDragged = rect && (rect.width > 0.05 || rect.height > 0.05);
           newObj = {
             id: uuidv4(),
-            name: `Rectangle ${count}`,
+            name: getNextSequentialName('Rectangle', existingNames),
             type: 'rect',
             cx: isDragged ? rect.cx : pt.x,
             cy: isDragged ? rect.cy : pt.y,
@@ -301,7 +302,7 @@ export function useAnnotationEdit() {
           const isDragged = circle && circle.radius > 0.05;
           newObj = {
             id: uuidv4(),
-            name: `Circle ${count}`,
+            name: getNextSequentialName('Circle', existingNames),
             type: 'circle',
             cx: isDragged ? circle.cx : pt.x,
             cy: isDragged ? circle.cy : pt.y,

@@ -7,6 +7,7 @@ import {
   findNodeParentId,
   collectDescendantIds,
   getFlattenedNodeIds,
+  getNextSequentialName,
 } from '../../utils/treeUtils';
 
 export type NodeSlice = {
@@ -135,17 +136,10 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       );
 
       // 2. 連番でグループ名を生成 ("Group 1", "Group 2", ...)
-      const existingNames = new Set(
-        Object.values(state.nodes)
-          .filter((n) => n.type === 'manual_group' || n.type === 'group' || n.type === 'generator')
-          .map((n) => n.name)
-          .filter(Boolean)
-      );
-      let groupNum = 1;
-      while (existingNames.has(`Group ${groupNum}`)) {
-        groupNum++;
-      }
-      const groupName = `Group ${groupNum}`;
+      const existingNames = Object.values(state.nodes)
+        .filter((n) => n.type === 'manual_group' || n.type === 'group' || n.type === 'generator')
+        .map((n) => n.name);
+      const groupName = getNextSequentialName('Group', existingNames);
 
       // 3. 選択されたアイテム群の順序をツリー全体の走査順でソート
       const flatNodeIds = getFlattenedNodeIds(state.rootNodeIds, state.nodes);
