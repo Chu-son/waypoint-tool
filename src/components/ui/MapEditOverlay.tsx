@@ -4,6 +4,7 @@ import { Button } from './common/Button';
 import { Slider } from './common/Slider';
 import { Pencil, Square, Circle, Slash, Check, Trash2 } from 'lucide-react';
 import { EditObjectType } from '../../types/store';
+import { useResponsiveContainer } from '../../hooks/useResponsiveContainer';
 
 export function MapEditOverlay() {
   const isMapEditMode = useAppStore((state) => state.isMapEditMode);
@@ -22,6 +23,11 @@ export function MapEditOverlay() {
   const setMapEditFillValue = useAppStore((state) => state.setMapEditFillValue);
   const mapEditBrushSize = useAppStore((state) => state.mapEditBrushSize);
   const setMapEditBrushSize = useAppStore((state) => state.setMapEditBrushSize);
+
+  const { containerRef, isCompact } = useResponsiveContainer<HTMLDivElement>({
+    compact: 780,
+    normal: 1020,
+  });
 
   if (!isMapEditMode || !activeCustomLayerId) return null;
 
@@ -55,56 +61,59 @@ export function MapEditOverlay() {
 
   return (
     <FloatingActionBanner
+      ref={containerRef}
       icon={<Pencil size={16} className="animate-pulse" />}
-      title={`編集中: ${activeLayer?.name || 'Edit Layer'}`}
-      subtitle={selectedObject ? `選択中: ${selectedObject.type}` : "マップ編集モード"}
+      title={isCompact ? (activeLayer?.name || 'Layer') : `編集中: ${activeLayer?.name || 'Edit Layer'}`}
+      subtitle={selectedObject ? `選択中: ${selectedObject.type}` : (isCompact ? undefined : "マップ編集モード")}
       statusText={
-        <div className="flex items-center gap-4 px-2">
+        <div className="flex items-center gap-1.5 sm:gap-3 px-1 flex-nowrap shrink-0">
           {/* Subtool Selector */}
-          <div className="flex items-center gap-1 bg-surface-base/60 p-1 rounded-lg border border-border-base/30">
+          <div className="flex items-center gap-0.5 bg-surface-base/60 p-0.5 rounded-lg border border-border-base/30 flex-shrink-0">
             {subtools.map((st) => (
               <Button
                 key={st.type}
                 variant={mapEditSubTool === st.type ? 'primary' : 'ghost'}
                 size="sm"
                 onClick={() => setMapEditSubTool(st.type)}
-                className="h-7 text-xs px-2 gap-1"
+                className={`h-7 text-xs ${isCompact ? 'w-7 p-0 justify-center' : 'px-2 gap-1'}`}
                 title={`${st.label}ツールを選択`}
               >
                 {st.icon}
-                <span>{st.label}</span>
+                {!isCompact && <span>{st.label}</span>}
               </Button>
             ))}
           </div>
 
           {/* Fill Value Controls */}
-          <div className="flex items-center gap-2 border-l border-border-base/30 pl-3">
-            <span className="text-[11px] font-semibold text-text-muted">塗りつぶし:</span>
-            <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 sm:gap-1.5 border-l border-border-base/30 pl-1.5 sm:pl-2 flex-shrink-0">
+            {!isCompact && (
+              <span className="text-[11px] font-semibold text-text-muted">塗りつぶし:</span>
+            )}
+            <div className="flex items-center gap-0.5">
               <Button
                 variant={currentFillValue === 0 ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => handleFillValueChange(0)}
-                className={`h-6 text-[10px] px-1.5 font-bold ${
+                className={`h-6 text-[10px] px-1 font-bold ${
                   currentFillValue === 0 ? 'bg-slate-900 text-white border border-slate-700' : ''
                 }`}
                 title="障害物 (黒: 0)"
               >
-                黒 (0)
+                黒
               </Button>
               <Button
                 variant={currentFillValue === 255 ? 'secondary' : 'ghost'}
                 size="sm"
                 onClick={() => handleFillValueChange(255)}
-                className={`h-6 text-[10px] px-1.5 font-bold ${
+                className={`h-6 text-[10px] px-1 font-bold ${
                   currentFillValue === 255 ? 'bg-slate-100 text-slate-900 border border-slate-300' : ''
                 }`}
                 title="自由領域 (白: 255)"
               >
-                白 (255)
+                白
               </Button>
             </div>
-            <div className="w-24 ml-1">
+            <div className="w-14 sm:w-20 ml-0.5">
               <Slider
                 min="0"
                 max="255"
@@ -117,9 +126,11 @@ export function MapEditOverlay() {
 
           {/* Brush Size (Freehand mode only) */}
           {mapEditSubTool === 'freehand' && (
-            <div className="flex items-center gap-2 border-l border-border-base/30 pl-3">
-              <span className="text-[11px] font-semibold text-text-muted">ブラシサイズ:</span>
-              <div className="w-24">
+            <div className="flex items-center gap-1 border-l border-border-base/30 pl-1.5 flex-shrink-0">
+              {!isCompact && (
+                <span className="text-[11px] font-semibold text-text-muted">ブラシ:</span>
+              )}
+              <div className="w-14 sm:w-18">
                 <Slider
                   min="1"
                   max="100"
@@ -128,7 +139,7 @@ export function MapEditOverlay() {
                   onChange={(e) => setMapEditBrushSize(parseInt(e.target.value, 10))}
                 />
               </div>
-              <span className="text-[11px] font-mono text-text-base w-6 text-right">
+              <span className="text-[11px] font-mono text-text-base w-4 text-right">
                 {mapEditBrushSize}
               </span>
             </div>

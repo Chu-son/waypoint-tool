@@ -36,13 +36,15 @@ export function ElementCopyOverlay() {
       subtitle={elementCopyState.coordSystem === 'world' ? 'World' : '⚓ Anchor相対'}
       valueDisplay={elementCopyState.value}
       statusText={
-        targetNode ? (
-          <span className="text-emerald-400 font-medium flex items-center gap-1">
-            <span>🎯</span> Waypoint [{targetIndex >= 0 ? targetIndex + indexStartIndex : '?'}] に適用中
-          </span>
-        ) : (
-          <span className="italic text-text-muted/70">Waypointをクリックして選択</span>
-        )
+        <div className="truncate min-w-0">
+          {targetNode ? (
+            <span className="text-emerald-400 font-medium flex items-center gap-1 truncate">
+              <span>🎯</span> Waypoint [{targetIndex >= 0 ? targetIndex + indexStartIndex : '?'}] に適用中
+            </span>
+          ) : (
+            <span className="italic text-text-muted/70 truncate">Waypointをクリックして選択</span>
+          )}
+        </div>
       }
       actions={[
         {
