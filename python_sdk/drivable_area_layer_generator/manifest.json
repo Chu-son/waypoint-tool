@@ -8,13 +8,19 @@
   "icon": "Sparkles",
   "inputs": [
     {
+      "id": "sweep_rect",
+      "label": "Cleaning Area (Rectangle)",
+      "type": "rectangle",
+      "description": "清掃範囲の矩形領域を指定します（省略時はシード点またはマップ全体から展開）"
+    },
+    {
       "id": "seed_points",
       "label": "Seed Points",
       "type": "points",
-      "min_points": 1,
+      "min_points": 0,
       "max_points": 50,
       "allow_yaw": false,
-      "description": "Click on map to add seed points. Drag to move, right-click or delete via list to remove."
+      "description": "展開を開始するシード点（省略時は矩形中心）"
     }
   ],
   "needs": ["occupancy_grid", "robot_footprint"],

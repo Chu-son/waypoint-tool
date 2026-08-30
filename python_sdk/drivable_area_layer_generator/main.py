@@ -17,10 +17,27 @@ from wpt_plugin import MapLayerGenerator, OccupancyGrid, Point
 
 class DrivableAreaLayerGenerator(MapLayerGenerator):
     def generate_layer(self, context):
+        sweep_rect = self.get_interaction_rect(context, "sweep_rect")
+        if not sweep_rect:
+            raw_rect = self.get_interaction_data(context, "sweep_rect")
+            if isinstance(raw_rect, dict):
+                cx = float(raw_rect.get("cx", raw_rect.get("x", 0.0)))
+                cy = float(raw_rect.get("cy", raw_rect.get("y", 0.0)))
+                w = float(raw_rect.get("width", 1.0))
+                h = float(raw_rect.get("height", 1.0))
+                y = float(raw_rect.get("yaw", 0.0))
+                from wpt_plugin import Rectangle
+                sweep_rect = Rectangle(center=Point(cx, cy), width=w, height=h, yaw=y)
+
         seeds = self.get_interaction_points(context, "seed_points")
         if not seeds:
             single = self.get_interaction_point(context, "seed_point")
-            seeds = [single] if single else [Point(0.0, 0.0)]
+            if single:
+                seeds = [single]
+            elif sweep_rect:
+                seeds = [sweep_rect.center]
+            else:
+                seeds = [Point(0.0, 0.0)]
 
         grid = self.get_occupancy_grid(context)
         footprint = self.get_robot_footprint(context)
@@ -52,12 +69,19 @@ class DrivableAreaLayerGenerator(MapLayerGenerator):
         clearance = robot_radius + max(0.0, extra_margin)
 
         if grid is None:
-            # マップがない場合は全シードを内包する仮想グリッドを作成
+            # マップがない場合は全シード（またはsweep_rect）を内包する仮想グリッドを作成
             res = 0.05
-            min_x = min(s.x for s in seeds) - max_radius - 1.0
-            max_x = max(s.x for s in seeds) + max_radius + 1.0
-            min_y = min(s.y for s in seeds) - max_radius - 1.0
-            max_y = max(s.y for s in seeds) + max_radius + 1.0
+            if sweep_rect:
+                corners = sweep_rect.get_corners()
+                min_x = min(c.x for c in corners) - 0.5
+                max_x = max(c.x for c in corners) + 0.5
+                min_y = min(c.y for c in corners) - 0.5
+                max_y = max(c.y for c in corners) + 0.5
+            else:
+                min_x = min(s.x for s in seeds) - max_radius - 1.0
+                max_x = max(s.x for s in seeds) + max_radius + 1.0
+                min_y = min(s.y for s in seeds) - max_radius - 1.0
+                max_y = max(s.y for s in seeds) + max_radius + 1.0
 
             width = max(100, int(math.ceil((max_x - min_x) / res)))
             height = max(100, int(math.ceil((max_y - min_y) / res)))
@@ -69,6 +93,9 @@ class DrivableAreaLayerGenerator(MapLayerGenerator):
                 world_y = min_y + (row_idx + 0.5) * res
                 for col_idx in range(width):
                     world_x = min_x + (col_idx + 0.5) * res
+                    pt = Point(world_x, world_y)
+                    if sweep_rect and not sweep_rect.contains(pt):
+                        continue
                     for s in seeds:
                         if (world_x - s.x) ** 2 + (world_y - s.y) ** 2 <= max_radius_sq:
                             mask[row_idx][col_idx] = 1
@@ -91,6 +118,10 @@ class DrivableAreaLayerGenerator(MapLayerGenerator):
         def is_cell_traversable(r_pos: int, c_pos: int) -> bool:
             if r_pos < 0 or r_pos >= height or c_pos < 0 or c_pos >= width:
                 return False
+            if sweep_rect:
+                wx, wy = grid.grid_to_world(c_pos, r_pos)
+                if not sweep_rect.contains(Point(wx, wy)):
+                    return False
             if grid.is_obstacle_cell(r_pos, c_pos):
                 return False
             if not allow_unknown:

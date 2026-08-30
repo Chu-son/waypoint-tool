@@ -218,6 +218,30 @@ class TestLayerColorAndDrivableArea(unittest.TestCase):
         self.assertEqual(res["info"]["width"], 30)
         self.assertEqual(res["info"]["height"], 30)
 
+    def test_drivable_area_generator_sweep_rect(self):
+        gen = DrivableAreaLayerGenerator()
+        context = {
+            "occupancy_grid": self._create_mock_grid(40, 40, resolution=0.1, origin=(0.0, 0.0, 0.0)),
+            "properties": {
+                "use_robot_footprint": False,
+                "max_radius": 10.0,
+            },
+            "interaction_data": {
+                "sweep_rect": {
+                    "cx": 2.0,
+                    "cy": 2.0,
+                    "width": 2.0,
+                    "height": 2.0,
+                    "yaw": 0.0
+                }
+            }
+        }
+        res = gen.generate_layer(context)
+        self.assertIn("image_base64", res)
+        self.assertEqual(res["name"], "Drivable Area Layer")
+        self.assertEqual(res["info"]["width"], 40)
+        self.assertEqual(res["info"]["height"], 40)
+
 
 if __name__ == '__main__':
     unittest.main()
