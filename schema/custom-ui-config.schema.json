@@ -94,8 +94,34 @@
                 "properties": {
                   "label": { "type": "string" },
                   "action": { "type": "string" },
-                  "args": { "type": "object" }
+                  "args": { "type": "object" },
+                  "variant": { "type": "string", "enum": ["primary", "secondary", "outline", "danger", "ghost"] },
+                  "icon": { "type": "string" },
+                  "description": { "type": "string" },
+                  "fullWidth": { "type": "boolean" },
+                  "disabled": { "type": "boolean" }
                 }
+              },
+              "actionButtons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "action"],
+                  "properties": {
+                    "label": { "type": "string" },
+                    "action": { "type": "string" },
+                    "args": { "type": "object" },
+                    "variant": { "type": "string", "enum": ["primary", "secondary", "outline", "danger", "ghost"] },
+                    "icon": { "type": "string" },
+                    "description": { "type": "string" },
+                    "fullWidth": { "type": "boolean" },
+                    "disabled": { "type": "boolean" }
+                  }
+                }
+              },
+              "buttonsLayout": {
+                "type": "string",
+                "enum": ["column", "grid", "row"]
               },
               "controls": { "type": "array" },
               "pluginTarget": { "type": "string" },

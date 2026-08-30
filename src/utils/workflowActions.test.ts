@@ -1,41 +1,158 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useAppStore } from '../stores/appStore';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { executeWorkflowAction } from './workflowActions';
+import { useAppStore } from '../stores/appStore';
 
 describe('workflowActions', () => {
   beforeEach(() => {
-    useAppStore.getState().resetProject();
+    useAppStore.setState({
+      activeTool: 'select',
+      isAnnotationEditMode: false,
+      activeAnnotationSubTool: 'select',
+      defaultAnnotationColor: '#3B82F6',
+      isMapEditMode: false,
+      mapEditSubTool: 'rect',
+      mapEditFillValue: 0,
+      mapEditBrushSize: 10,
+      customLayers: [],
+      activeCustomLayerId: null,
+      robotFootprint: { type: 'circular', radius: 0.3 },
+      isExportModalOpen: false,
+      isExportMapsModalOpen: false,
+      isSettingsModalOpen: false,
+      activePluginId: null,
+      plugins: {},
+      pluginActiveProperties: {},
+      pluginInteractionData: {},
+    });
   });
 
-  it('executes triggerFitToMaps action', async () => {
-    const prevTimestamp = useAppStore.getState().shouldFitToMaps;
-    await executeWorkflowAction('triggerFitToMaps');
-    expect(useAppStore.getState().shouldFitToMaps).toBeGreaterThanOrEqual(prevTimestamp || 0);
+  it('handles reset_project', async () => {
+    useAppStore.setState({ isDirty: true });
+    await executeWorkflowAction('reset_project');
+    expect(useAppStore.getState().isDirty).toBe(false);
   });
 
-  it('executes ensureCustomLayer action', async () => {
-    expect(useAppStore.getState().customLayers.length).toBe(0);
-    await executeWorkflowAction('ensureCustomLayer', { layerName: 'My Layer' });
-    expect(useAppStore.getState().customLayers.length).toBe(1);
-    expect(useAppStore.getState().customLayers[0].name).toBe('My Layer');
-
-    // Does not create duplicate if one already exists
-    await executeWorkflowAction('ensureCustomLayer', { layerName: 'My Layer 2' });
-    expect(useAppStore.getState().customLayers.length).toBe(1);
-  });
-
-  it('executes setRobotFootprintRadius action', async () => {
+  it('handles set_robot_footprint and setRobotFootprintRadius', async () => {
     await executeWorkflowAction('setRobotFootprintRadius', { value: 0.25 });
-    const footprint = useAppStore.getState().robotFootprint;
-    expect(footprint.type).toBe('circular');
-    if (footprint.type === 'circular') {
-      expect(footprint.radius).toBe(0.25);
-    }
+    expect(useAppStore.getState().robotFootprint).toEqual({
+      type: 'circular',
+      radius: 0.25,
+    });
+
+    await executeWorkflowAction('set_robot_footprint', {
+      type: 'rectangular',
+      length: 0.6,
+      width: 0.4,
+    });
+    expect(useAppStore.getState().robotFootprint).toMatchObject({
+      type: 'rectangular',
+      length: 0.6,
+      width: 0.4,
+    });
   });
 
-  it('executes open_export_modal action', async () => {
-    useAppStore.setState({ isExportModalOpen: false });
+  it('handles set_annotation_tool', async () => {
+    await executeWorkflowAction('set_annotation_tool', {
+      tool: 'rect',
+      defaultColor: '#ef4444',
+    });
+
+    const state = useAppStore.getState();
+    expect(state.isAnnotationEditMode).toBe(true);
+    expect(state.activeAnnotationSubTool).toBe('rect');
+    expect(state.defaultAnnotationColor).toBe('#ef4444');
+    expect(state.activeTool).toBe('select');
+  });
+
+  it('handles start_map_edit and stop_map_edit', async () => {
+    await executeWorkflowAction('start_map_edit', {
+      subTool: 'circle',
+      fillValue: 0,
+      brushSize: 20,
+      layerName: 'Noise Cleanup',
+    });
+
+    const state = useAppStore.getState();
+    expect(state.isMapEditMode).toBe(true);
+    expect(state.mapEditSubTool).toBe('circle');
+    expect(state.mapEditFillValue).toBe(0);
+    expect(state.mapEditBrushSize).toBe(20);
+    expect(state.customLayers.length).toBe(1);
+    expect(state.customLayers[0].name).toBe('Noise Cleanup');
+    expect(state.activeCustomLayerId).toBe(state.customLayers[0].id);
+
+    await executeWorkflowAction('stop_map_edit');
+    expect(useAppStore.getState().isMapEditMode).toBe(false);
+  });
+
+  it('handles modal opening actions', async () => {
     await executeWorkflowAction('open_export_modal');
     expect(useAppStore.getState().isExportModalOpen).toBe(true);
+
+    await executeWorkflowAction('open_export_maps_modal');
+    expect(useAppStore.getState().isExportMapsModalOpen).toBe(true);
+
+    await executeWorkflowAction('open_settings_modal', { tab: 'robot' });
+    expect(useAppStore.getState().isSettingsModalOpen).toBe(true);
+    expect(useAppStore.getState().settingsModalTab).toBe('robot');
+  });
+
+  it('handles set_active_plugin and run_plugin', async () => {
+    const mockExecute = vi.fn().mockResolvedValue({ success: true });
+    const mockPlugin: any = {
+      id: 'test_plugin',
+      manifest: { name: 'Test Plugin', inputs: [] },
+    };
+
+    useAppStore.setState({
+      plugins: { test_plugin: mockPlugin },
+      executeGeneratorPlugin: mockExecute,
+    });
+
+    await executeWorkflowAction('set_active_plugin', { pluginId: 'test_plugin' });
+    expect(useAppStore.getState().activePluginId).toBe('test_plugin');
+
+    await executeWorkflowAction('run_plugin', {
+      pluginId: 'test_plugin',
+      properties: { step_size: 0.2 },
+    });
+
+    expect(mockExecute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plugin: mockPlugin,
+        properties: expect.objectContaining({ step_size: 0.2 }),
+      })
+    );
+  });
+
+  it('shows alert when plugin is not found with available plugins list', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const mockPlugin: any = {
+      id: 'existing_plugin',
+      manifest: { name: 'Existing Plugin', inputs: [] },
+    };
+
+    useAppStore.setState({
+      plugins: { existing_plugin: mockPlugin },
+    });
+
+    await executeWorkflowAction('run_plugin', {
+      pluginId: 'non_existent_plugin',
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      expect.stringContaining('プラグインが見つかりません: non_existent_plugin')
+    );
+    expect(alertSpy).toHaveBeenCalledWith(
+      expect.stringContaining('existing_plugin')
+    );
+    alertSpy.mockRestore();
+  });
+
+  it('gracefully handles unknown actions', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await executeWorkflowAction('unknown_action_name');
+    expect(warnSpy).toHaveBeenCalledWith('[WorkflowAction] Unknown action: unknown_action_name');
+    warnSpy.mockRestore();
   });
 });

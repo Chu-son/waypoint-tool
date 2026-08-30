@@ -84,10 +84,18 @@ export interface WorkflowControl {
   options?: WorkflowControlOption[];
 }
 
+export type WorkflowButtonVariant = 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost';
+export type WorkflowButtonsLayout = 'column' | 'grid' | 'row';
+
 export interface WorkflowActionButton {
   label: string;
   action: string;
   args?: Record<string, any>;
+  variant?: WorkflowButtonVariant;
+  icon?: string;
+  description?: string;
+  fullWidth?: boolean;
+  disabled?: boolean;
 }
 
 export interface WorkflowSimplifiedParamOption {
@@ -111,6 +119,8 @@ export interface WorkflowStep {
   title: string;
   description?: string;
   actionButton?: WorkflowActionButton;
+  actionButtons?: WorkflowActionButton[];
+  buttonsLayout?: WorkflowButtonsLayout;
   controls?: WorkflowControl[];
   pluginTarget?: string;
   simplifiedParams?: WorkflowSimplifiedParam[];

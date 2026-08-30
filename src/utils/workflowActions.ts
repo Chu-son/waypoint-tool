@@ -1,33 +1,32 @@
 import { AppState, useAppStore } from '../stores/appStore';
 import { DialogAPI, BackendAPI } from '../api';
-import { prepareLayersForExport } from './mapRasterize';
+import { AnnotationToolType } from '../stores/slices/annotationSlice';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;
-
-import { v4 as uuidv4 } from 'uuid';
 
 export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
   triggerFitToMaps: (store) => {
     store.triggerFitToMaps();
   },
 
-  ensureCustomLayer: (store, args) => {
-    const exists = store.customLayers.some((l) => l.type === 'manual');
-    if (!exists) {
-      store.addManualCustomLayer(args?.layerName || 'Custom Layer');
+  reset_project: (store) => {
+    store.resetProject();
+  },
+
+  open_project_dialog: async (store) => {
+    try {
+      await store.loadProject();
+    } catch (err) {
+      console.error('Failed to load project in workflow action:', err);
     }
   },
 
-  setRobotFootprintRadius: (store, args) => {
-    const radius = typeof args?.value === 'number' ? args.value : 0.3;
-    store.setRobotFootprint({
-      type: 'circular',
-      radius,
-    });
-  },
-
-  reset_project: (store) => {
-    store.resetProject();
+  save_project: async (store) => {
+    try {
+      await store.saveProject();
+    } catch (err) {
+      console.error('Failed to save project in workflow action:', err);
+    }
   },
 
   open_map_dialog: async (store) => {
@@ -62,6 +61,10 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     useAppStore.setState({ isExportModalOpen: true });
   },
 
+  open_export_maps_modal: () => {
+    useAppStore.setState({ isExportMapsModalOpen: true });
+  },
+
   open_import_modal: () => {
     useAppStore.setState({ isImportModalOpen: true });
   },
@@ -70,12 +73,107 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     store.setSettingsModalOpen(true, args?.tab);
   },
 
-  run_active_plugin: async (store) => {
-    const activePluginId = store.activePluginId;
-    const plugins = store.plugins || {};
-    const plugin = activePluginId ? plugins[activePluginId] : null;
+  ensureCustomLayer: (store, args) => {
+    const exists = store.customLayers.some((l) => l.type === 'manual');
+    if (!exists) {
+      store.addManualCustomLayer(args?.layerName || 'Custom Layer', args?.is_reference);
+    }
+  },
+
+  ensure_custom_layer: (store, args) => {
+    const exists = store.customLayers.some((l) => l.type === 'manual');
+    if (!exists) {
+      store.addManualCustomLayer(args?.layerName || 'Custom Layer', args?.is_reference);
+    }
+  },
+
+  setRobotFootprintRadius: (store, args) => {
+    const radius = typeof args?.value === 'number' ? args.value : (typeof args?.radius === 'number' ? args.radius : 0.3);
+    store.setRobotFootprint({
+      type: 'circular',
+      radius,
+    });
+  },
+
+  set_robot_footprint: (store, args) => {
+    if (!args) return;
+    const current = store.robotFootprint || { type: 'circular', radius: 0.3 };
+    store.setRobotFootprint({
+      ...current,
+      ...args,
+    });
+  },
+
+  set_annotation_tool: (store, args) => {
+    store.setAnnotationEditMode(true);
+    if (args?.tool) {
+      store.setActiveAnnotationSubTool(args.tool as AnnotationToolType);
+    }
+    if (args?.defaultColor) {
+      store.setDefaultAnnotationColor(args.defaultColor);
+    }
+    // Switch to select tool so that canvas annotation pointer events are active
+    store.setActiveTool('select');
+  },
+
+  start_map_edit: (store, args) => {
+    // 1. Ensure an active manual custom layer
+    let targetLayer = store.customLayers.find((l) => l.id === store.activeCustomLayerId && l.type === 'manual');
+    if (!targetLayer) {
+      targetLayer = store.customLayers.find((l) => l.type === 'manual');
+      if (targetLayer) {
+        store.setActiveCustomLayerId(targetLayer.id);
+      } else {
+        const created = store.addManualCustomLayer(args?.layerName || 'Edit Layer');
+        store.setActiveCustomLayerId(created.id);
+      }
+    }
+
+    // 2. Enable map edit mode and sub-tool
+    store.setMapEditMode(true);
+    if (args?.subTool) {
+      store.setMapEditSubTool(args.subTool);
+    }
+    if (typeof args?.fillValue === 'number') {
+      store.setMapEditFillValue(args.fillValue);
+    }
+    if (typeof args?.brushSize === 'number') {
+      store.setMapEditBrushSize(args.brushSize);
+    }
+  },
+
+  stop_map_edit: (store) => {
+    store.setMapEditMode(false);
+  },
+
+  set_active_plugin: (store, args) => {
+    if (args?.pluginId) {
+      store.setActivePlugin(args.pluginId);
+    }
+  },
+
+  run_plugin: async (store, args) => {
+    const pluginId = args?.pluginId || store.activePluginId;
+    let plugins = store.plugins || {};
+
+    // If plugins map is empty (e.g. initial launch timing), attempt reload
+    if (Object.keys(plugins).length === 0) {
+      try {
+        await store.reloadPlugins();
+        plugins = useAppStore.getState().plugins || {};
+      } catch (err) {
+        console.warn('[WorkflowAction] Failed to auto-reload plugins:', err);
+      }
+    }
+
+    const plugin = pluginId ? plugins[pluginId] : null;
     if (!plugin) {
-      console.warn('No active plugin to run');
+      const availableIds = Object.keys(plugins);
+      const availableMsg = availableIds.length > 0
+        ? `\n\n利用可能なプラグイン一覧:\n- ${availableIds.join('\n- ')}`
+        : '\n\n(利用可能なプラグインがロードされていません)';
+      console.warn(`[WorkflowAction] Plugin not found: ${pluginId}`, availableIds);
+      alert(`プラグインが見つかりません: ${pluginId || '(未指定)'}${availableMsg}`);
       return;
     }
 
@@ -87,57 +185,34 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
           blocking: true,
         },
         async () => {
-          const layersToPass = await prepareLayersForExport(store.mapLayers, store.customLayers);
-          const pythonPath = store.globalPythonPath;
-          const contextData = {
-            interactionData: store.pluginInteractionData,
-            properties: store.pluginActiveProperties,
+          const properties = {
+            ...store.pluginActiveProperties,
+            ...(args?.properties || {}),
+          };
+          const interactionData = {
+            ...store.pluginInteractionData,
+            ...(args?.interactionData || {}),
           };
 
-          const result = await BackendAPI.runPlugin(plugin, contextData, pythonPath, layersToPass);
-          if (result && Array.isArray(result)) {
-            const parentId = uuidv4();
-            store.runInHistoryTransaction(() => {
-              store.addNode({
-                id: parentId,
-                type: "generator",
-                plugin_id: plugin.id,
-                generator_params: contextData,
-                children_ids: [],
-              });
+          const result = await store.executeGeneratorPlugin({
+            plugin,
+            properties,
+            interactionData,
+          });
 
-              result.forEach((wp: any) => {
-                let qx = wp.qx ?? 0,
-                  qy = wp.qy ?? 0,
-                  qz = wp.qz ?? 0,
-                  qw = wp.qw ?? 1;
-                if (typeof wp.yaw === "number" && typeof wp.qw !== "number") {
-                  const halfYaw = wp.yaw / 2.0;
-                  qz = Math.sin(halfYaw);
-                  qw = Math.cos(halfYaw);
-                }
-
-                const id = uuidv4();
-                store.addNode(
-                  {
-                    id,
-                    type: "manual",
-                    transform: wp.transform || {
-                      position: { x: wp.x ?? 0, y: wp.y ?? 0, z: wp.z ?? 0 },
-                      orientation: { x: qx, y: qy, z: qz, w: qw },
-                    },
-                    options: wp.options || wp.properties || {},
-                  },
-                  parentId
-                );
-              });
-            });
+          if (!result.success && result.error) {
+            throw new Error(result.error);
           }
         }
       );
     } catch (err) {
       console.error('Failed to run plugin in workflow action:', err);
+      alert(`プラグイン実行に失敗しました:\n${String(err)}`);
     }
+  },
+
+  run_active_plugin: async (store, args) => {
+    await workflowActionRegistry.run_plugin(store, args);
   },
 };
 
@@ -149,3 +224,4 @@ export async function executeWorkflowAction(actionName: string, args?: any) {
     console.warn(`[WorkflowAction] Unknown action: ${actionName}`);
   }
 }
+
