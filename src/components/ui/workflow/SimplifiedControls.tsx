@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { WorkflowControl, WorkflowSimplifiedParam, WorkflowActionButton } from '../../../types/customUi';
+import { WorkflowControl, WorkflowSimplifiedParam, WorkflowActionButton, WorkflowButtonsLayout } from '../../../types/customUi';
 import { useAppStore } from '../../../stores/appStore';
 import { executeWorkflowAction } from '../../../utils/workflowActions';
 import { Button } from '../common/Button';
@@ -9,11 +9,16 @@ import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
 import { NumericInput } from '../NumericInput';
+import { DynamicIcon } from '../../common/DynamicIcon';
+import { Loader2 } from 'lucide-react';
+import { cn } from '../../../utils/cn';
 
 interface SimplifiedControlsProps {
   controls?: WorkflowControl[];
   simplifiedParams?: WorkflowSimplifiedParam[];
   actionButton?: WorkflowActionButton;
+  actionButtons?: WorkflowActionButton[];
+  buttonsLayout?: WorkflowButtonsLayout;
   pluginTarget?: string;
 }
 
@@ -21,6 +26,8 @@ export function SimplifiedControls({
   controls,
   simplifiedParams,
   actionButton,
+  actionButtons,
+  buttonsLayout = 'column',
   pluginTarget,
 }: SimplifiedControlsProps) {
   const [controlValues, setControlValues] = useState<Record<string, any>>(() => {
@@ -46,16 +53,23 @@ export function SimplifiedControls({
     });
   };
 
-  const [isExecuting, setIsExecuting] = useState(false);
-  const handleActionClick = async () => {
-    if (!actionButton) return;
-    setIsExecuting(true);
+  const [executingIndex, setExecutingIndex] = useState<number | null>(null);
+
+  const handleButtonClick = async (btn: WorkflowActionButton, index: number) => {
+    setExecutingIndex(index);
     try {
-      await executeWorkflowAction(actionButton.action, actionButton.args);
+      await executeWorkflowAction(btn.action, btn.args);
     } finally {
-      setIsExecuting(false);
+      setExecutingIndex(null);
     }
   };
+
+  // Resolve list of buttons
+  const buttons: WorkflowActionButton[] = actionButtons && actionButtons.length > 0
+    ? actionButtons
+    : actionButton
+    ? [actionButton]
+    : [];
 
   return (
     <div className="space-y-4 pt-2">
@@ -179,17 +193,52 @@ export function SimplifiedControls({
         </div>
       )}
 
-      {/* Primary Action Button */}
-      {actionButton && (
-        <div className="pt-2">
-          <Button
-            variant="primary"
-            className="w-full justify-center shadow-md py-2.5 font-bold"
-            disabled={isExecuting}
-            onClick={handleActionClick}
-          >
-            {isExecuting ? '実行中...' : actionButton.label}
-          </Button>
+      {/* Action Buttons */}
+      {buttons.length > 0 && (
+        <div
+          className={cn(
+            "pt-2",
+            buttonsLayout === 'grid' && "grid grid-cols-2 gap-2",
+            buttonsLayout === 'row' && "flex flex-row flex-wrap gap-2",
+            buttonsLayout === 'column' && "flex flex-col gap-2.5"
+          )}
+        >
+          {buttons.map((btn, idx) => {
+            const isExecuting = executingIndex === idx;
+            const isAnyExecuting = executingIndex !== null;
+            const variant = btn.variant || (actionButton && buttons.length === 1 ? 'primary' : 'secondary');
+
+            return (
+              <div key={idx} className={cn("flex flex-col", btn.fullWidth !== false && "w-full")}>
+                <Button
+                  variant={variant}
+                  className={cn(
+                    "w-full justify-center shadow-sm py-2.5 font-bold gap-2 text-xs",
+                    variant === 'primary' && "shadow-md py-3 text-sm"
+                  )}
+                  disabled={btn.disabled || isAnyExecuting}
+                  onClick={() => handleButtonClick(btn, idx)}
+                >
+                  {isExecuting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>実行中...</span>
+                    </>
+                  ) : (
+                    <>
+                      {btn.icon && <DynamicIcon name={btn.icon} size={15} />}
+                      <span>{btn.label}</span>
+                    </>
+                  )}
+                </Button>
+                {btn.description && (
+                  <span className="text-[11px] text-text-muted mt-1 px-1 leading-snug">
+                    {btn.description}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

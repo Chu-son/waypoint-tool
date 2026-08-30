@@ -84,11 +84,13 @@ export function WorkflowPanel() {
             )}
           </div>
 
-          {/* Simplified Controls & Action Button */}
+          {/* Simplified Controls & Action Button(s) */}
           <SimplifiedControls
             controls={currentStep.controls}
             simplifiedParams={currentStep.simplifiedParams}
             actionButton={currentStep.actionButton}
+            actionButtons={currentStep.actionButtons}
+            buttonsLayout={currentStep.buttonsLayout}
             pluginTarget={currentStep.pluginTarget}
           />
         </div>
