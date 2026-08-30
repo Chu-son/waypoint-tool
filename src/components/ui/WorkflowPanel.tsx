@@ -92,6 +92,8 @@ export function WorkflowPanel() {
             actionButtons={currentStep.actionButtons}
             buttonsLayout={currentStep.buttonsLayout}
             pluginTarget={currentStep.pluginTarget}
+            showPluginInputs={currentStep.showPluginInputs}
+            pluginInputsFilter={currentStep.pluginInputsFilter}
           />
         </div>
 

@@ -10,6 +10,7 @@ import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
 import { NumericInput } from '../NumericInput';
 import { DynamicIcon } from '../../common/DynamicIcon';
+import { PluginInputEditor } from '../PluginInputEditor';
 import { Loader2 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 
@@ -20,6 +21,8 @@ interface SimplifiedControlsProps {
   actionButtons?: WorkflowActionButton[];
   buttonsLayout?: WorkflowButtonsLayout;
   pluginTarget?: string;
+  showPluginInputs?: boolean;
+  pluginInputsFilter?: string[];
 }
 
 export function SimplifiedControls({
@@ -29,6 +32,8 @@ export function SimplifiedControls({
   actionButtons,
   buttonsLayout = 'column',
   pluginTarget,
+  showPluginInputs = false,
+  pluginInputsFilter,
 }: SimplifiedControlsProps) {
   const [controlValues, setControlValues] = useState<Record<string, any>>(() => {
     const init: Record<string, any> = {};
@@ -38,8 +43,15 @@ export function SimplifiedControls({
     return init;
   });
 
+  const plugins = useAppStore((state) => state.plugins) || {};
+  const activePluginId = useAppStore((state) => state.activePluginId);
   const pluginProperties = useAppStore((state) => state.pluginActiveProperties);
   const setPluginActiveProperties = useAppStore((state) => state.setPluginActiveProperties);
+  const interactionData = useAppStore((state) => state.pluginInteractionData) || {};
+  const updatePluginInteractionData = useAppStore((state) => state.updatePluginInteractionData);
+
+  const targetPluginId = pluginTarget || activePluginId;
+  const targetPlugin = targetPluginId ? plugins[targetPluginId] : null;
 
   const handleControlChange = (control: WorkflowControl, val: any) => {
     setControlValues((prev) => ({ ...prev, [control.label]: val }));
@@ -51,6 +63,10 @@ export function SimplifiedControls({
       ...pluginProperties,
       [paramKey]: val,
     });
+  };
+
+  const handleUpdateInteractionData = (key: string, data: any) => {
+    updatePluginInteractionData(key, data);
   };
 
   const [executingIndex, setExecutingIndex] = useState<number | null>(null);
@@ -140,6 +156,35 @@ export function SimplifiedControls({
 
             return null;
           })}
+        </div>
+      )}
+
+      {/* Plugin Inputs (e.g. sweep_rect, seed_points, annotation selection) */}
+      {showPluginInputs && targetPlugin?.manifest?.inputs && targetPlugin.manifest.inputs.length > 0 && (
+        <div className="space-y-3 bg-surface-panel/40 p-3 rounded-lg border border-border-base/40">
+          <FieldLabel>
+            {targetPlugin.manifest.name || targetPluginId} の領域・入力指定
+          </FieldLabel>
+          <div className="space-y-2.5">
+            {targetPlugin.manifest.inputs
+              .filter((inp) => !pluginInputsFilter || pluginInputsFilter.includes(inp.id || inp.name || ''))
+              .map((inp, idx) => {
+                const key = inp.name || inp.id;
+                return (
+                  <PluginInputEditor
+                    key={key || idx}
+                    input={inp}
+                    interactionData={interactionData[key]}
+                    onUpdate={(data) => handleUpdateInteractionData(key, data)}
+                    mode="creation"
+                    index={idx}
+                    totalSteps={targetPlugin.manifest.inputs.length}
+                    isActive={true}
+                    hasData={interactionData[key] !== undefined && interactionData[key] !== null}
+                  />
+                );
+              })}
+          </div>
         </div>
       )}
 

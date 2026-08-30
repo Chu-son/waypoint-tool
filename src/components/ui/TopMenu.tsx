@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useAppStore } from "../../stores/appStore";
-import { DialogAPI } from "../../api";
+import { DialogAPI, BackendAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
@@ -246,6 +246,22 @@ export function TopMenu() {
     invoke("force_exit");
   };
 
+  const handleLoadCustomUiConfigFile = async () => {
+    try {
+      const selected = await DialogAPI.open({
+        filters: [{ name: 'Custom UI Config (*.json)', extensions: ['json'] }],
+      });
+      if (selected && typeof selected === 'string') {
+        const content = await BackendAPI.readTextFile(selected);
+        const json = JSON.parse(content);
+        useAppStore.getState().applyCustomUiConfig(json);
+      }
+    } catch (err) {
+      console.error('Failed to load custom UI config file:', err);
+      alert('Custom UI 設定ファイルの読み込みに失敗しました。');
+    }
+  };
+
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const toggleCustomUiMode = useAppStore((state) => state.toggleCustomUiMode);
@@ -323,14 +339,25 @@ export function TopMenu() {
         options: [
           { id: "help_shortcuts", label: "Keyboard Shortcuts", action: () => setShortcutsModalOpen(true) },
           { id: "help_devtools", label: "Developer Tools", action: () => invoke("open_devtools") },
+          { divider: true, label: "" },
           ...(customUiConfig ? [
-            { divider: true, label: "" },
             {
               id: "help_custom_ui_toggle",
               label: isCustomUiMode ? "✓ Custom UI Mode (Switch to Standard)" : "  Standard Mode (Switch to Custom UI)",
               action: () => toggleCustomUiMode(),
+            },
+            {
+              id: "help_load_custom_ui",
+              label: "Load Custom UI Config...",
+              action: handleLoadCustomUiConfigFile,
             }
-          ] : []),
+          ] : [
+            {
+              id: "help_load_custom_ui",
+              label: "Load Custom UI Config...",
+              action: handleLoadCustomUiConfigFile,
+            }
+          ]),
           { divider: true, label: "" },
           {
             id: "help_about",

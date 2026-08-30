@@ -149,6 +149,46 @@ describe('workflowActions', () => {
     alertSpy.mockRestore();
   });
 
+  it('resolves explicit $fromAnnotation bindings in run_plugin', async () => {
+    const mockExecute = vi.fn().mockResolvedValue({ success: true });
+    const mockPlugin: any = {
+      id: 'drivable_area_layer_generator',
+      manifest: { name: 'Drivable Area Layer Generator', inputs: [] },
+    };
+
+    const mockRectAnno: any = {
+      id: 'anno-1',
+      name: '清掃範囲',
+      type: 'rect',
+      cx: 5.0,
+      cy: 6.0,
+      width: 4.0,
+      height: 3.0,
+    };
+
+    useAppStore.setState({
+      plugins: { drivable_area_layer_generator: mockPlugin },
+      annotationObjects: { 'anno-1': mockRectAnno },
+      annotationOrder: ['anno-1'],
+      executeGeneratorPlugin: mockExecute,
+    });
+
+    await executeWorkflowAction('run_plugin', {
+      pluginId: 'drivable_area_layer_generator',
+      interactionData: {
+        sweep_rect: { $fromAnnotation: { name: '清掃範囲', type: 'rect' } },
+      },
+    });
+
+    expect(mockExecute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interactionData: expect.objectContaining({
+          sweep_rect: mockRectAnno,
+        }),
+      })
+    );
+  });
+
   it('gracefully handles unknown actions', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await executeWorkflowAction('unknown_action_name');

@@ -4,6 +4,32 @@ import { AnnotationToolType } from '../stores/slices/annotationSlice';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;
 
+export function resolveExplicitAnnotationBindings(
+  rawInteractionData: Record<string, any>,
+  annotationObjects: Record<string, any>,
+  annotationOrder: string[]
+): Record<string, any> {
+  const resolved: Record<string, any> = { ...rawInteractionData };
+
+  for (const [key, val] of Object.entries(resolved)) {
+    if (val && typeof val === 'object' && val.$fromAnnotation) {
+      const { name, type } = val.$fromAnnotation;
+      const matchId = annotationOrder.find((id) => {
+        const obj = annotationObjects[id];
+        if (!obj) return false;
+        if (name && obj.name !== name) return false;
+        if (type && obj.type !== type) return false;
+        return true;
+      });
+      if (matchId && annotationObjects[matchId]) {
+        resolved[key] = annotationObjects[matchId];
+      }
+    }
+  }
+
+  return resolved;
+}
+
 export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
   triggerFitToMaps: (store) => {
     store.triggerFitToMaps();
@@ -189,10 +215,15 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
             ...store.pluginActiveProperties,
             ...(args?.properties || {}),
           };
-          const interactionData = {
+          const mergedInteractionData = {
             ...store.pluginInteractionData,
             ...(args?.interactionData || {}),
           };
+          const interactionData = resolveExplicitAnnotationBindings(
+            mergedInteractionData,
+            store.annotationObjects || {},
+            store.annotationOrder || []
+          );
 
           const result = await store.executeGeneratorPlugin({
             plugin,

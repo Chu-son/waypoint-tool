@@ -10,6 +10,8 @@ export type CustomUISlice = {
   setIsCustomUiMode: (enabled: boolean) => void;
   toggleCustomUiMode: () => void;
   loadCustomUiConfig: () => Promise<void>;
+  loadCustomUiConfigFile: (filePath?: string) => Promise<void>;
+  applyCustomUiConfig: (config: CustomUiConfig) => void;
   getEffectiveBrandName: () => string;
 };
 
@@ -26,63 +28,79 @@ export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> 
 
   toggleCustomUiMode: () => set((state) => ({ isCustomUiMode: !state.isCustomUiMode })),
 
+  applyCustomUiConfig: (config: CustomUiConfig) => {
+    set({
+      customUiConfig: config,
+      isCustomUiMode: true,
+    });
+
+    // Apply window layout settings from Custom UI config if present
+    const layout = config.layout;
+    if (layout) {
+      const updates: Partial<AppState> = {};
+
+      if (layout.leftPanel) {
+        if (typeof layout.leftPanel.defaultOpen === 'boolean') {
+          updates.isLeftPanelOpen = layout.leftPanel.defaultOpen;
+        }
+        if (typeof layout.leftPanel.defaultWidth === 'number') {
+          updates.leftPanelWidth = layout.leftPanel.defaultWidth;
+        }
+        if (layout.leftPanel.viewMode) {
+          updates.leftPanelViewMode = layout.leftPanel.viewMode;
+        }
+        if (layout.leftPanel.tabs && layout.leftPanel.tabs.length > 0) {
+          updates.leftPanelActiveTab = layout.leftPanel.tabs[0].id;
+        }
+      }
+
+      if (layout.rightPanel) {
+        if (typeof layout.rightPanel.defaultOpen === 'boolean') {
+          updates.isRightPanelOpen = layout.rightPanel.defaultOpen;
+        }
+        if (typeof layout.rightPanel.defaultWidth === 'number') {
+          updates.rightPanelWidth = layout.rightPanel.defaultWidth;
+        }
+        if (layout.rightPanel.viewMode) {
+          updates.rightPanelViewMode = layout.rightPanel.viewMode;
+        }
+        if (layout.rightPanel.tabs && layout.rightPanel.tabs.length > 0) {
+          updates.rightPanelActiveTab = layout.rightPanel.tabs[0].id;
+        }
+      }
+
+      // Welcome modal suppression
+      if (layout.showWelcomeModal === false) {
+        updates.isWelcomeModalOpen = false;
+        updates.isInitialLaunch = false;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        set(updates);
+      }
+    }
+  },
+
   loadCustomUiConfig: async () => {
     try {
       const config = await BackendAPI.loadCustomUiConfig();
       if (config) {
-        set({
-          customUiConfig: config as CustomUiConfig,
-          isCustomUiMode: true,
-        });
-
-        // Apply window layout settings from Custom UI config if present
-        const layout = (config as CustomUiConfig).layout;
-        if (layout) {
-          const updates: Partial<AppState> = {};
-
-          if (layout.leftPanel) {
-            if (typeof layout.leftPanel.defaultOpen === 'boolean') {
-              updates.isLeftPanelOpen = layout.leftPanel.defaultOpen;
-            }
-            if (typeof layout.leftPanel.defaultWidth === 'number') {
-              updates.leftPanelWidth = layout.leftPanel.defaultWidth;
-            }
-            if (layout.leftPanel.viewMode) {
-              updates.leftPanelViewMode = layout.leftPanel.viewMode;
-            }
-            if (layout.leftPanel.tabs && layout.leftPanel.tabs.length > 0) {
-              updates.leftPanelActiveTab = layout.leftPanel.tabs[0].id;
-            }
-          }
-
-          if (layout.rightPanel) {
-            if (typeof layout.rightPanel.defaultOpen === 'boolean') {
-              updates.isRightPanelOpen = layout.rightPanel.defaultOpen;
-            }
-            if (typeof layout.rightPanel.defaultWidth === 'number') {
-              updates.rightPanelWidth = layout.rightPanel.defaultWidth;
-            }
-            if (layout.rightPanel.viewMode) {
-              updates.rightPanelViewMode = layout.rightPanel.viewMode;
-            }
-            if (layout.rightPanel.tabs && layout.rightPanel.tabs.length > 0) {
-              updates.rightPanelActiveTab = layout.rightPanel.tabs[0].id;
-            }
-          }
-
-          // Welcome modal suppression
-          if (layout.showWelcomeModal === false) {
-            updates.isWelcomeModalOpen = false;
-            updates.isInitialLaunch = false;
-          }
-
-          if (Object.keys(updates).length > 0) {
-            set(updates);
-          }
-        }
+        get().applyCustomUiConfig(config as CustomUiConfig);
       }
     } catch (err) {
       console.warn('Failed to load Custom UI config:', err);
+    }
+  },
+
+  loadCustomUiConfigFile: async (filePath?: string) => {
+    try {
+      if (filePath) {
+        const content = await BackendAPI.readTextFile(filePath);
+        const json = JSON.parse(content);
+        get().applyCustomUiConfig(json as CustomUiConfig);
+      }
+    } catch (err) {
+      console.warn('Failed to load Custom UI config file:', err);
     }
   },
 

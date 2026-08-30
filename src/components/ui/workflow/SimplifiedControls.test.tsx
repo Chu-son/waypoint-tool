@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SimplifiedControls } from './SimplifiedControls';
+import { useAppStore } from '../../../stores/appStore';
 import * as workflowActions from '../../../utils/workflowActions';
 
 describe('SimplifiedControls', () => {
@@ -59,5 +60,31 @@ describe('SimplifiedControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Action Two/i }));
     expect(executeSpy).toHaveBeenCalledWith('open_project_dialog', undefined);
+  });
+
+  it('renders plugin inputs editor when showPluginInputs is true', () => {
+    const mockPlugin: any = {
+      id: 'drivable_area_layer_generator',
+      manifest: {
+        name: 'Drivable Area Layer Generator',
+        inputs: [
+          { id: 'sweep_rect', label: 'Cleaning Area (Rectangle)', type: 'rectangle' },
+        ],
+      },
+    };
+
+    useAppStore.setState({
+      plugins: { drivable_area_layer_generator: mockPlugin },
+      activePluginId: 'drivable_area_layer_generator',
+    });
+
+    render(
+      <SimplifiedControls
+        pluginTarget="drivable_area_layer_generator"
+        showPluginInputs={true}
+      />
+    );
+
+    expect(screen.getByText(/Cleaning Area \(Rectangle\)/i)).toBeInTheDocument();
   });
 });

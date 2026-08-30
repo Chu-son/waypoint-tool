@@ -123,6 +123,8 @@ export interface WorkflowStep {
   buttonsLayout?: WorkflowButtonsLayout;
   controls?: WorkflowControl[];
   pluginTarget?: string;
+  showPluginInputs?: boolean;
+  pluginInputsFilter?: string[];
   simplifiedParams?: WorkflowSimplifiedParam[];
   onEnter?: StepLifecycle;
   onLeave?: StepLifecycle;

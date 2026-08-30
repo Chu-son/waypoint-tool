@@ -125,6 +125,8 @@
               },
               "controls": { "type": "array" },
               "pluginTarget": { "type": "string" },
+              "showPluginInputs": { "type": "boolean" },
+              "pluginInputsFilter": { "type": "array", "items": { "type": "string" } },
               "simplifiedParams": { "type": "array" },
               "onEnter": { "type": "object" },
               "onLeave": { "type": "object" }
