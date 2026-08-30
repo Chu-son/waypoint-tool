@@ -126,6 +126,44 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 }
 ```
 
+### 3.1 ステップ定義と複数アクションボタン (`actionButtons`)
+各ステップでは、`actionButtons`（複数ボタン配置）または `actionButton`（単一ボタン）、および `controls`（パラメータ入力）を定義できます。
+
+```json
+{
+  "id": "step_environment",
+  "title": "4. 環境設定",
+  "description": "アノテーションのポイント配置、障害物のアノテーション矩形配置、ノイズ消去のレイヤー配置を設定します。",
+  "actionButtons": [
+    {
+      "label": "障害物ポイント配置",
+      "action": "set_annotation_tool",
+      "args": { "tool": "point", "defaultColor": "#ef4444", "defaultName": "障害物" },
+      "variant": "secondary",
+      "icon": "MapPin",
+      "description": "進入不可地点をポイントで配置"
+    },
+    {
+      "label": "障害物矩形エリア配置",
+      "action": "set_annotation_tool",
+      "args": { "tool": "rect", "defaultColor": "#ef4444", "defaultName": "進入禁止エリア" },
+      "variant": "secondary",
+      "icon": "Square",
+      "description": "進入禁止矩形エリアを配置"
+    },
+    {
+      "label": "ノイズ消去レイヤー配置",
+      "action": "start_map_edit",
+      "args": { "subTool": "circle", "fillValue": 0, "brushSize": 15, "layerName": "ノイズ消去" },
+      "variant": "secondary",
+      "icon": "Eraser",
+      "description": "マップ上のゴミや不要なピクセルを消去"
+    }
+  ],
+  "buttonsLayout": "column"
+}
+```
+
 ---
 
 ## 4. パネルタブの種類と指定方法
@@ -144,14 +182,23 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 
 ## 5. ワークフローアクション一覧 (Workflow Actions)
 
-| アクション名 | 説明 |
-|---|---|
-| `reset_project` | プロジェクトを新規初期化 |
-| `open_map_dialog` | ファイル選択ダイアログを開き、ROSマップ/画像マップを読み込み |
-| `triggerFitToMaps` | キャンバスのズーム/パンをロード済みマップ全体にフィット |
-| `ensureCustomLayer` | カスタムレイヤーが存在しない場合に新規作成 (`args: { layerName: "..." }`) |
-| `setRobotFootprintRadius` | ロボットの円形Footprint半径を変更 (`args: { value: 0.2 }`) |
-| `run_active_plugin` | アクティブなプラグインを実行してノードを生成 |
-| `open_export_modal` | ウェイポイントエクスポートモーダルを開く |
-| `open_import_modal` | ウェイポイントインポートモーダルを開く |
-| `open_settings_modal` | 設定モーダルを開く (`args: { tab: "general" }`) |
+| アクション名 | 説明 | 主な引数 (`args`) |
+|---|---|---|
+| `reset_project` | プロジェクトを新規初期化 | なし |
+| `open_project_dialog` | プロジェクトファイル（`.wptroj`）読み込みダイアログを開く | なし |
+| `save_project` | プロジェクトファイル（`.wptroj`）保存ダイアログを開く | なし |
+| `open_map_dialog` | ファイル選択ダイアログを開き、ROSマップ/画像マップを読み込み | なし |
+| `open_export_modal` | ウェイポイントエクスポートモーダルを開く | なし |
+| `open_export_maps_modal` | マップ画像一括出力モーダルを開く | なし |
+| `open_import_modal` | ウェイポイントインポートモーダルを開く | なし |
+| `open_settings_modal` | 設定モーダルを開く | `{ tab: "robot" \| "general" \| "options" \| "plugins" }` |
+| `set_annotation_tool` | アノテーション配置モードを開始しツールを選択 | `{ tool: "point" \| "oriented_point" \| "rect" \| "circle" \| "line", defaultColor?: string, defaultName?: string, groupId?: string }` |
+| `start_map_edit` | マップ編集モードを開始（手動レイヤー自動確保） | `{ subTool: "circle" \| "rect" \| "line" \| "freehand", fillValue: 0 \| 255, brushSize?: number, layerName?: string }` |
+| `stop_map_edit` | マップ編集モードを終了 | なし |
+| `set_robot_footprint` | ロボットのフットプリントパラメータを変更 | `{ type?, radius?, length?, width?, offset_x?, offset_y? }` |
+| `setRobotFootprintRadius` | ロボットの円形Footprint半径を変更 | `{ value: number }` |
+| `set_active_plugin` | 指定プラグインをアクティブに切り替え | `{ pluginId: string }` |
+| `run_plugin` | 指定プラグイン（またはアクティブプラグイン）を実行 | `{ pluginId?: string, properties?: object, interactionData?: object }` |
+| `run_active_plugin` | アクティブなプラグインを実行 | なし |
+| `ensureCustomLayer` / `ensure_custom_layer` | カスタムレイヤーが存在しない場合に新規作成 | `{ layerName: string, is_reference?: boolean }` |
+| `triggerFitToMaps` | キャンバスのズーム/パンをロード済みマップ全体にフィット | なし |

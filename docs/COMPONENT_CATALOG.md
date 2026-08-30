@@ -35,8 +35,11 @@
   - **概要**: 汎用モーダルダイアログコンテナ（アニメーション背景・ヘッダー・フッター標準化）。
   - **主要Props**: `isOpen`, `onClose`, `title`, `children`, `footer`
 - **`Button`** ([`src/components/ui/common/Button.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Button.tsx))
-  - **概要**: デザインシステムに準拠したボタン要素 (`variant`: primary / secondary / danger / ghost 等)。
+  - **概要**: デザインシステムに準拠したボタン要素 (`variant`: primary / secondary / outline / danger / ghost / icon 等)。
   - **主要Props**: `variant`, `size`, `isLoading`, `disabled`, `onClick`
+- **`DynamicIcon`** ([`src/components/common/DynamicIcon.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/common/DynamicIcon.tsx))
+  - **概要**: Lucide React のアイコン名文字列（例: `"FolderOpen"`, `"MapPin"`, `"Play"` 等）から安全に動的アイコンを描画する共通ヘルパーコンポーネント。
+  - **主要Props**: `name`, `size`, `className`, `fallback`
 - **`Input`** / **`Select`** / **`Slider`** / **`Checkbox`** / **`Label`** ([`src/components/ui/common/`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/))
   - **概要**: 統一されたダークテーマ適用済みの各種標準フォームコンポーネント。
 - **`EmptyState`** ([`src/components/ui/common/EmptyState.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/EmptyState.tsx))
