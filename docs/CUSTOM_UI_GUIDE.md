@@ -164,6 +164,27 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 }
 ```
 
+### 3.2 プラグイン入力スロットの直接埋め込み (`showPluginInputs`)
+`pluginTarget` を設定したステップで `"showPluginInputs": true` を指定すると、対象プラグインが必要とする入力操作（矩形領域ドラッグ、シード点配置、アノテーション選択など）をステップパネル内に直接埋め込んで表示・編集できます。
+
+```json
+{
+  "id": "step_cleaning_area",
+  "title": "5. 清掃エリアの指定と可能範囲計算",
+  "description": "マップ上で清掃を行いたい矩形領域を指定し、清掃可能範囲を計算します。",
+  "pluginTarget": "drivable_area_layer_generator",
+  "showPluginInputs": true,
+  "actionButtons": [
+    {
+      "label": "清掃可能範囲を計算 (カスタムレイヤー)",
+      "action": "run_active_plugin",
+      "variant": "primary",
+      "icon": "Layers"
+    }
+  ]
+}
+```
+
 ---
 
 ## 4. パネルタブの種類と指定方法

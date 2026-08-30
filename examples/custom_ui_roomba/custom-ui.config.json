@@ -148,33 +148,46 @@
       },
       {
         "id": "step_cleaning_area",
-        "title": "5. 清掃エリアの指定",
-        "description": "清掃範囲を矩形で囲み、清掃可能範囲の計算を実行します。",
-        "actionButtons": [
+        "title": "5. 清掃エリアの指定と可能範囲計算",
+        "description": "マップ上で清掃を行いたい矩形領域（またはシード点）を指定し、清掃可能範囲のレイヤーを計算します。",
+        "pluginTarget": "drivable_area_layer_generator",
+        "showPluginInputs": true,
+        "simplifiedParams": [
           {
-            "label": "清掃範囲矩形を配置",
-            "action": "set_annotation_tool",
-            "args": { "tool": "rect", "defaultColor": "#3b82f6", "defaultName": "清掃範囲" },
-            "variant": "secondary",
-            "icon": "SquareDashed",
-            "description": "掃除を行う対象領域を矩形で囲みます"
+            "paramKey": "max_radius",
+            "label": "最大展開距離 (m)",
+            "type": "slider",
+            "min": 5,
+            "max": 30,
+            "step": 1,
+            "default": 15
           },
           {
-            "label": "清掃可能範囲を計算 (カスタムレイヤー)",
-            "action": "run_plugin",
-            "args": { "pluginId": "drivable_area_layer_generator" },
-            "variant": "primary",
-            "icon": "Layers",
-            "description": "障害物や壁を考慮した進入可能マップレイヤーを生成"
+            "paramKey": "extra_margin",
+            "label": "安全クリアランスマージン (m)",
+            "type": "slider",
+            "min": 0,
+            "max": 0.3,
+            "step": 0.01,
+            "default": 0.05
           }
         ],
-        "buttonsLayout": "column"
+        "actionButtons": [
+          {
+            "label": "清掃可能範囲を計算 (カスタムレイヤー)",
+            "action": "run_active_plugin",
+            "variant": "primary",
+            "icon": "Layers",
+            "description": "指定した清掃範囲矩形内の走行可能エリアを計算してレイヤーを生成"
+          }
+        ]
       },
       {
         "id": "step_generate_path",
         "title": "6. 経路生成",
-        "description": "指定した清掃範囲に対してジグザグ走査経路を自動生成します。",
+        "description": "清掃範囲に対してジグザグ走査経路を自動生成します。",
         "pluginTarget": "rect_search_generator",
+        "showPluginInputs": true,
         "simplifiedParams": [
           {
             "paramKey": "num_lines",
@@ -193,7 +206,7 @@
             "action": "run_active_plugin",
             "variant": "primary",
             "icon": "Play",
-            "description": "ストライプ走査のウェイポイント列を一括生成します"
+            "description": "指定した領域内にストライプ走査のウェイポイント列を一括生成します"
           }
         ]
       },
