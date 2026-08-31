@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { OptionsSchema, ExportTemplate, DefaultExportFormat, WaypointNode, ProjectMapLayer, CustomLayer, AnnotationObject, AnnotationGroup, RobotFootprint, OccupancySettings, RecentProjectItem } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
+import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
 export const DEFAULT_ROBOT_FOOTPRINT: RobotFootprint = {
@@ -175,7 +176,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   globalPythonPath: 'python',
   robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
   occupancySettings: DEFAULT_OCCUPANCY_SETTINGS,
-  pathColor: '#10b981',
+  pathColor: DEFAULT_PATH_COLOR,
   pathWidth: 0.1,
   pathOpacity: 0.7,
   syncPathWidthWithFootprint: false,
@@ -299,7 +300,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         activePathCalculatorPluginId: data.active_path_calculator_plugin_id || data.activePathCalculatorPluginId || null,
         pathCalculatorParams: data.path_calculator_params || data.pathCalculatorParams || {},
         autoRecalculatePath: data.auto_recalculate_path ?? data.autoRecalculatePath ?? true,
-        pathColor: data.path_color || data.pathColor || '#10b981',
+        pathColor: data.path_color || data.pathColor || DEFAULT_PATH_COLOR,
         pathWidth: data.path_width ?? data.pathWidth ?? 0.1,
         pathOpacity: data.path_opacity ?? data.pathOpacity ?? 0.7,
         syncPathWidthWithFootprint: data.sync_path_width_with_footprint ?? data.syncPathWidthWithFootprint ?? false,
@@ -330,7 +331,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       activePathCalculatorPluginId: null,
       pathCalculatorParams: {},
       calculatedPathSegments: null,
-      pathColor: '#10b981',
+      pathColor: DEFAULT_PATH_COLOR,
       pathWidth: 0.1,
       pathOpacity: 0.7,
       syncPathWidthWithFootprint: false,

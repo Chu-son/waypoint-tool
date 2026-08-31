@@ -21,6 +21,17 @@
   --color-primary-hover: #2563eb;   /* メインカラーのホバー状態 */
   --color-danger-base: #b91c1c;     /* 危険アクション (bg-red-700相当) */
   --color-danger-hover: #dc2626;    /* 危険アクションのホバー */
+
+  /* ドメイン固有アクセント・ステータス */
+  --color-accent-anchor: #fbbf24;      /* アンカー / グループ (amber-400相当) */
+  --color-accent-generator: #34d399;   /* プラグイン / 生成ノード (emerald-400相当) */
+  --color-accent-reference: #c084fc;   /* リファレンスレイヤー (purple-400相当) */
+  --color-accent-automation: #22d3ee;  /* 自動化 / スクリプト (cyan-400相当) */
+  --color-status-success: #10b981;     /* 成功 / 完了 (emerald-500相当) */
+  --color-status-warning: #f59e0b;     /* 警告 (amber-500相当) */
+  --color-occupancy-free: #34d399;     /* 占有グリッド Free領域 */
+  --color-occupancy-obstacle: #fb7185; /* 占有グリッド Obstacle領域 */
+  --color-occupancy-unknown: #c084fc;  /* 占有グリッド Unknown領域 */
 }
 
 :root {
@@ -29,7 +40,7 @@
   --text-color: var(--color-text-base);
   --panel-bg: var(--color-surface-panel);
   --border-color: var(--color-border-base);
-  --highlight: #60a5fa;
+  --highlight: var(--color-primary-base);
 }
 
 @layer base {
@@ -39,8 +50,8 @@
 
   select option,
   datalist option {
-    background-color: rgb(15 23 42);
-    color: rgb(226 232 240);
+    background-color: var(--color-surface-base);
+    color: var(--color-text-base);
   }
 }
 

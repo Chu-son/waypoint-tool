@@ -11,7 +11,35 @@ export interface CustomUiBrand {
   };
 }
 
+export interface CustomUiThemeColors {
+  primaryBase?: string;
+  primaryHover?: string;
+  surfaceBase?: string;
+  surfacePanel?: string;
+  surfaceHover?: string;
+  borderBase?: string;
+  borderFocus?: string;
+  borderError?: string;
+  textBase?: string;
+  textMuted?: string;
+  textInverse?: string;
+  dangerBase?: string;
+  dangerHover?: string;
+  accentAnchor?: string;
+  accentGenerator?: string;
+  accentReference?: string;
+  accentAutomation?: string;
+  statusSuccess?: string;
+  statusWarning?: string;
+  occupancyFree?: string;
+  occupancyObstacle?: string;
+  occupancyUnknown?: string;
+}
+
 export interface CustomUiTheme {
+  preset?: 'default' | 'emerald' | 'roomba' | 'ocean' | 'amber' | 'purple' | 'midnight' | 'light' | (string & {});
+  colors?: CustomUiThemeColors;
+  colorScheme?: 'dark' | 'light';
   cssVariables?: Record<string, string>;
   customCssPath?: string;
 }

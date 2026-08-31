@@ -7,6 +7,7 @@ import {
   collectDescendantIds,
   getNextSequentialName,
 } from '../../utils/treeUtils';
+import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 
 export type AnnotationToolType = 'select' | 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
 
@@ -65,7 +66,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   activeAnnotationSubTool: 'select',
   allowedAnnotationSubTools: null,
   activeAnnotationGroupId: null,
-  defaultAnnotationColor: '#3B82F6',
+  defaultAnnotationColor: DEFAULT_ANNOTATION_COLOR,
   showAnnotations: true,
   showAnnotationLabels: true,
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
+import { resolveThemeVariables } from '../../utils/themePresets';
 
 export function ThemeInjector() {
   const customUiConfig = useAppStore((state) => state.customUiConfig);
@@ -15,14 +16,17 @@ export function ThemeInjector() {
     appliedVariablesRef.current.forEach((varName) => {
       root.style.removeProperty(varName);
     });
+    root.style.removeProperty('color-scheme');
     appliedVariablesRef.current = [];
 
-    if (isCustomUiMode && customUiConfig?.theme?.cssVariables) {
-      const vars = customUiConfig.theme.cssVariables;
-      Object.entries(vars).forEach(([key, val]) => {
+    if (isCustomUiMode && customUiConfig?.theme) {
+      const { variables, colorScheme } = resolveThemeVariables(customUiConfig.theme);
+      Object.entries(variables).forEach(([key, val]) => {
         root.style.setProperty(key, val);
         appliedVariablesRef.current.push(key);
       });
+      root.style.setProperty('color-scheme', colorScheme);
+      appliedVariablesRef.current.push('color-scheme');
     }
 
     // 2. Custom CSS Injection
@@ -31,25 +35,32 @@ export function ThemeInjector() {
       existingStyle.remove();
     }
 
+    let isCancelled = false;
+
     if (isCustomUiMode && customUiConfig?.theme?.customCssPath) {
       const loadCustomCss = async () => {
         try {
           const cssContent = await BackendAPI.readTextFile(customUiConfig.theme!.customCssPath!);
+          if (isCancelled) return;
           const styleEl = document.createElement('style');
           styleEl.id = 'custom-ui-style';
           styleEl.innerHTML = cssContent;
           document.head.appendChild(styleEl);
         } catch (err) {
-          console.warn('Failed to load Custom UI CSS:', err);
+          if (!isCancelled) {
+            console.warn('Failed to load Custom UI CSS:', err);
+          }
         }
       };
       loadCustomCss();
     }
 
     return () => {
+      isCancelled = true;
       appliedVariablesRef.current.forEach((varName) => {
         root.style.removeProperty(varName);
       });
+      root.style.removeProperty('color-scheme');
       appliedVariablesRef.current = [];
       const styleEl = document.getElementById('custom-ui-style');
       if (styleEl) {

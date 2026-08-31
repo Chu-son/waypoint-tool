@@ -3,6 +3,7 @@ import { AppState } from '../appStore';
 import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject } from '../../types/store';
 import { BackendAPI } from '../../api';
 import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
+import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
 export interface ExecutePluginParams {
@@ -420,7 +421,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               type: anno.type || 'point',
               visible: anno.visible ?? true,
               labelVisible: anno.labelVisible ?? true,
-              color: anno.color || existingGroup.color || '#3B82F6',
+              color: anno.color || existingGroup.color || DEFAULT_ANNOTATION_COLOR,
               group_id: groupId,
               source_execution_id: executionId,
               plugin_data: anno.plugin_data,
@@ -447,7 +448,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             name: annotationGroupName || `${plugin.manifest.name} Annotations`,
             type: 'generator',
             visible: true,
-            color: '#3B82F6',
+            color: DEFAULT_ANNOTATION_COLOR,
             children_ids: [],
             plugin_id: plugin.id,
             source_execution_id: executionId,
@@ -464,7 +465,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               type: anno.type || 'point',
               visible: anno.visible ?? true,
               labelVisible: anno.labelVisible ?? true,
-              color: anno.color || '#3B82F6',
+              color: anno.color || DEFAULT_ANNOTATION_COLOR,
               group_id: groupId,
               source_execution_id: executionId,
               plugin_data: anno.plugin_data,
