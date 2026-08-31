@@ -189,6 +189,87 @@ describe('workflowActions', () => {
     );
   });
 
+  it('handles set_annotation_tool with groupName, allowedTools, and saveToVariable', async () => {
+    await executeWorkflowAction('set_annotation_tool', {
+      tool: 'point',
+      groupName: '障害物ポイント',
+      allowedTools: ['point'],
+      saveToVariable: 'obstacle_group',
+    });
+
+    const state = useAppStore.getState();
+    expect(state.isAnnotationEditMode).toBe(true);
+    expect(state.activeAnnotationSubTool).toBe('point');
+    expect(state.allowedAnnotationSubTools).toEqual(['point']);
+    expect(state.activeAnnotationGroupId).toBeTruthy();
+    expect(state.workflowVariables['obstacle_group']).toMatchObject({
+      groupName: '障害物ポイント',
+      tool: 'point',
+    });
+  });
+
+  it('resolves $var and $fromAnnotationGroup bindings in run_plugin', async () => {
+    const mockExecute = vi.fn().mockResolvedValue({ success: true, source_execution_id: 'exec_regen_1' });
+    const mockPlugin: any = {
+      id: 'path_planner',
+      manifest: { name: 'Path Planner', inputs: [] },
+    };
+
+    const mockPoint1: any = { id: 'p1', name: 'pt1', type: 'point', x: 1.5, y: 2.5, group_id: 'grp-obs' };
+    const mockPoint2: any = { id: 'p2', name: 'pt2', type: 'point', x: 3.5, y: 4.5, group_id: 'grp-obs' };
+
+    useAppStore.setState({
+      plugins: { path_planner: mockPlugin },
+      annotationGroups: {
+        'grp-obs': { id: 'grp-obs', type: 'manual_group', name: '障害物グループ', children_ids: ['p1', 'p2'], visible: true },
+      },
+      annotationObjects: { p1: mockPoint1, p2: mockPoint2 },
+      workflowVariables: {
+        target_group: '障害物グループ',
+        custom_speed: 1.2,
+      },
+      executeGeneratorPlugin: mockExecute,
+    });
+
+    await executeWorkflowAction('run_plugin', {
+      pluginId: 'path_planner',
+      stepId: 'step_path',
+      properties: {
+        speed: { $var: 'custom_speed' },
+      },
+      interactionData: {
+        obstacles: { $fromAnnotationGroup: '$var:target_group' },
+      },
+    });
+
+    expect(mockExecute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        properties: expect.objectContaining({ speed: 1.2 }),
+        interactionData: expect.objectContaining({
+          obstacles: [
+            { x: 1.5, y: 2.5, name: 'pt1' },
+            { x: 3.5, y: 4.5, name: 'pt2' },
+          ],
+        }),
+      })
+    );
+
+    // Verify stepExecutionId was recorded for regeneration
+    expect(useAppStore.getState().stepExecutionIds['step_path']).toBe('exec_regen_1');
+
+    // Run again to verify existingExecutionId is passed for regeneration
+    await executeWorkflowAction('run_plugin', {
+      pluginId: 'path_planner',
+      stepId: 'step_path',
+    });
+
+    expect(mockExecute).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        existingExecutionId: 'exec_regen_1',
+      })
+    );
+  });
+
   it('gracefully handles unknown actions', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await executeWorkflowAction('unknown_action_name');

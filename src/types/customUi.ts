@@ -91,6 +91,9 @@ export interface WorkflowActionButton {
   label: string;
   action: string;
   args?: Record<string, any>;
+  saveToVariable?: string;
+  groupName?: string;
+  allowedAnnotationTools?: string[];
   variant?: WorkflowButtonVariant;
   icon?: string;
   description?: string;
@@ -114,6 +117,13 @@ export interface WorkflowSimplifiedParam {
   default?: any;
 }
 
+export interface WorkflowPluginInputConfig {
+  id: string;
+  label?: string;
+  description?: string;
+  defaultName?: string;
+}
+
 export interface WorkflowStep {
   id: string;
   title: string;
@@ -125,6 +135,8 @@ export interface WorkflowStep {
   pluginTarget?: string;
   showPluginInputs?: boolean;
   pluginInputsFilter?: string[];
+  pluginInputsConfig?: WorkflowPluginInputConfig[];
+  allowedAnnotationTools?: string[];
   simplifiedParams?: WorkflowSimplifiedParam[];
   onEnter?: StepLifecycle;
   onLeave?: StepLifecycle;

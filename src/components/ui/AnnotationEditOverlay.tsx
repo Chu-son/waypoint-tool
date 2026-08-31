@@ -20,6 +20,7 @@ export function AnnotationEditOverlay() {
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
   const setAnnotationEditMode = useAppStore((state) => state.setAnnotationEditMode);
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
+  const allowedAnnotationSubTools = useAppStore((state) => state.allowedAnnotationSubTools);
   const setActiveAnnotationSubTool = useAppStore((state) => state.setActiveAnnotationSubTool);
   const defaultAnnotationColor = useAppStore((state) => state.defaultAnnotationColor);
   const setDefaultAnnotationColor = useAppStore((state) => state.setDefaultAnnotationColor);
@@ -53,7 +54,7 @@ export function AnnotationEditOverlay() {
     }
   };
 
-  const subtools: { type: AnnotationToolType; label: string; shortLabel: string; icon: React.ReactNode }[] = [
+  const allSubtools: { type: AnnotationToolType; label: string; shortLabel: string; icon: React.ReactNode }[] = [
     { type: 'point', label: '丸 (Point)', shortLabel: 'Point', icon: <CircleDot size={14} /> },
     { type: 'oriented_point', label: '三角 (Oriented)', shortLabel: 'Oriented', icon: <Navigation size={14} /> },
     { type: 'line', label: '線分 (Line)', shortLabel: 'Line', icon: <Minus size={14} /> },
@@ -61,6 +62,10 @@ export function AnnotationEditOverlay() {
     { type: 'circle', label: '円形 (Circle)', shortLabel: 'Circle', icon: <Circle size={14} /> },
     { type: 'select', label: '選択', shortLabel: '選択', icon: <MousePointer size={14} /> },
   ];
+
+  const subtools = allowedAnnotationSubTools && allowedAnnotationSubTools.length > 0
+    ? allSubtools.filter((st) => st.type === 'select' || allowedAnnotationSubTools.includes(st.type))
+    : allSubtools;
 
   return (
     <FloatingActionBanner

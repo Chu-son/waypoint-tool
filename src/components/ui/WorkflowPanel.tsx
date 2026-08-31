@@ -10,6 +10,7 @@ export function WorkflowPanel() {
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const currentStepIndex = useAppStore((state) => state.currentStepIndex);
+  const maxReachedStepIndex = useAppStore((state) => state.maxReachedStepIndex);
   const goToStep = useAppStore((state) => state.goToStep);
   const nextStep = useAppStore((state) => state.nextStep);
   const prevStep = useAppStore((state) => state.prevStep);
@@ -46,7 +47,7 @@ export function WorkflowPanel() {
       <div className="px-3 py-2 border-b border-border-base/40 max-h-48 overflow-y-auto space-y-1 bg-surface-base/30">
         {steps.map((step, idx) => {
           const isActive = idx === currentStepIndex;
-          const isPassed = idx < currentStepIndex;
+          const isPassed = idx <= maxReachedStepIndex;
 
           return (
             <button
@@ -94,6 +95,8 @@ export function WorkflowPanel() {
             pluginTarget={currentStep.pluginTarget}
             showPluginInputs={currentStep.showPluginInputs}
             pluginInputsFilter={currentStep.pluginInputsFilter}
+            pluginInputsConfig={currentStep.pluginInputsConfig}
+            allowedAnnotationTools={currentStep.allowedAnnotationTools}
           />
         </div>
 

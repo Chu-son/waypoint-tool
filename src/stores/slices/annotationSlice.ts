@@ -18,12 +18,16 @@ export interface AnnotationSlice {
   selectedAnnotationIds: string[];
   isAnnotationEditMode: boolean;
   activeAnnotationSubTool: AnnotationToolType;
+  allowedAnnotationSubTools: AnnotationToolType[] | null;
+  activeAnnotationGroupId: string | null;
   defaultAnnotationColor: string;
   showAnnotations: boolean;
   showAnnotationLabels: boolean;
 
   setAnnotationEditMode: (enabled: boolean) => void;
   setActiveAnnotationSubTool: (tool: AnnotationToolType) => void;
+  setAllowedAnnotationSubTools: (tools: AnnotationToolType[] | null) => void;
+  setActiveAnnotationGroupId: (groupId: string | null) => void;
   setDefaultAnnotationColor: (color: string) => void;
   setShowAnnotations: (show: boolean) => void;
   setShowAnnotationLabels: (show: boolean) => void;
@@ -59,6 +63,8 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   selectedAnnotationIds: [],
   isAnnotationEditMode: false,
   activeAnnotationSubTool: 'select',
+  allowedAnnotationSubTools: null,
+  activeAnnotationGroupId: null,
   defaultAnnotationColor: '#3B82F6',
   showAnnotations: true,
   showAnnotationLabels: true,
@@ -72,6 +78,14 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
 
   setActiveAnnotationSubTool: (tool: AnnotationToolType) => {
     set({ activeAnnotationSubTool: tool });
+  },
+
+  setAllowedAnnotationSubTools: (tools: AnnotationToolType[] | null) => {
+    set({ allowedAnnotationSubTools: tools });
+  },
+
+  setActiveAnnotationGroupId: (groupId: string | null) => {
+    set({ activeAnnotationGroupId: groupId });
   },
 
   setDefaultAnnotationColor: (color: string) => {
@@ -89,13 +103,14 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   addAnnotationObject: (obj: AnnotationObject, groupId?: string) => {
     get().pushHistorySnapshot();
     set((state) => {
-      const newObjects = { ...state.annotationObjects, [obj.id]: { ...obj, group_id: groupId } };
+      const targetGroupId = groupId !== undefined ? groupId : (state.activeAnnotationGroupId || undefined);
+      const newObjects = { ...state.annotationObjects, [obj.id]: { ...obj, group_id: targetGroupId } };
       let newGroups = { ...state.annotationGroups };
       let newRootIds = [...state.rootAnnotationIds];
 
-      if (groupId && newGroups[groupId]) {
-        const group = newGroups[groupId];
-        newGroups[groupId] = {
+      if (targetGroupId && newGroups[targetGroupId]) {
+        const group = newGroups[targetGroupId];
+        newGroups[targetGroupId] = {
           ...group,
           children_ids: [...(group.children_ids || []), obj.id],
         };

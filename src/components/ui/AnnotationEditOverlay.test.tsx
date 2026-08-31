@@ -41,4 +41,18 @@ describe('AnnotationEditOverlay', () => {
     fireEvent.click(doneButton);
     expect(mockSetAnnotationEditMode).toHaveBeenCalledWith(false);
   });
+
+  it('filters tools when allowedAnnotationSubTools is provided', () => {
+    useAppStore.setState({
+      isAnnotationEditMode: true,
+      allowedAnnotationSubTools: ['point', 'rect'],
+    });
+    render(<AnnotationEditOverlay />);
+    expect(screen.getByText('丸 (Point)')).toBeInTheDocument();
+    expect(screen.getByText('矩形 (Rect)')).toBeInTheDocument();
+    expect(screen.getByText('選択')).toBeInTheDocument();
+    expect(screen.queryByText('三角 (Oriented)')).not.toBeInTheDocument();
+    expect(screen.queryByText('線分 (Line)')).not.toBeInTheDocument();
+    expect(screen.queryByText('円形 (Circle)')).not.toBeInTheDocument();
+  });
 });

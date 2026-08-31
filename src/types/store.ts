@@ -470,6 +470,7 @@ export interface ProjectData {
   active_path_calculator_plugin_id?: string | null;
   path_calculator_params?: Record<string, any>;
   auto_recalculate_path?: boolean;
+  workflow_state?: any;
 }
 export interface AppState {
   nodes: Record<string, ObjectNode>;

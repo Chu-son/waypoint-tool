@@ -114,6 +114,9 @@
                     "variant": { "type": "string", "enum": ["primary", "secondary", "outline", "danger", "ghost"] },
                     "icon": { "type": "string" },
                     "description": { "type": "string" },
+                    "saveToVariable": { "type": "string" },
+                    "groupName": { "type": "string" },
+                    "allowedAnnotationTools": { "type": "array", "items": { "type": "string" } },
                     "fullWidth": { "type": "boolean" },
                     "disabled": { "type": "boolean" }
                   }
@@ -127,6 +130,20 @@
               "pluginTarget": { "type": "string" },
               "showPluginInputs": { "type": "boolean" },
               "pluginInputsFilter": { "type": "array", "items": { "type": "string" } },
+              "pluginInputsConfig": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id"],
+                  "properties": {
+                    "id": { "type": "string" },
+                    "label": { "type": "string" },
+                    "description": { "type": "string" },
+                    "defaultName": { "type": "string" }
+                  }
+                }
+              },
+              "allowedAnnotationTools": { "type": "array", "items": { "type": "string" } },
               "simplifiedParams": { "type": "array" },
               "onEnter": { "type": "object" },
               "onLeave": { "type": "object" }

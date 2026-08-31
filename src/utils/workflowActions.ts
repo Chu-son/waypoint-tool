@@ -1,23 +1,93 @@
 import { AppState, useAppStore } from '../stores/appStore';
 import { DialogAPI, BackendAPI } from '../api';
 import { AnnotationToolType } from '../stores/slices/annotationSlice';
+import { v4 as uuidv4 } from 'uuid';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;
+
+export function resolveWorkflowVariables(
+  value: any,
+  variables: Record<string, any>,
+  store?: AppState
+): any {
+  if (value === null || value === undefined) return value;
+
+  if (typeof value === 'object') {
+    // $var reference object: { $var: "var_name" }
+    if (value.$var && typeof value.$var === 'string') {
+      const varVal = variables[value.$var];
+      return varVal !== undefined ? resolveWorkflowVariables(varVal, variables, store) : value;
+    }
+
+    // $fromAnnotationGroup: { $fromAnnotationGroup: "group_name" | { $var: "..." } }
+    if (value.$fromAnnotationGroup) {
+      const rawGroupName = resolveWorkflowVariables(value.$fromAnnotationGroup, variables, store);
+      const groupName = typeof rawGroupName === 'object' && rawGroupName.groupName
+        ? rawGroupName.groupName
+        : (typeof rawGroupName === 'object' && rawGroupName.name ? rawGroupName.name : String(rawGroupName));
+
+      if (store) {
+        const groups = store.annotationGroups || {};
+        const objects = store.annotationObjects || {};
+        const targetGroup = Object.values(groups).find((g) => g.name === groupName || g.id === groupName);
+        if (targetGroup) {
+          const childIds = targetGroup.children_ids || [];
+          const childObjects = childIds.map((id) => objects[id]).filter(Boolean);
+          // Return list of points / geometries
+          return childObjects.map((obj) => {
+            if (obj.type === 'point') {
+              return { x: obj.x ?? 0, y: obj.y ?? 0, name: obj.name };
+            }
+            return obj;
+          });
+        }
+      }
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => resolveWorkflowVariables(item, variables, store));
+    }
+
+    const result: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value)) {
+      result[k] = resolveWorkflowVariables(v, variables, store);
+    }
+    return result;
+  }
+
+  if (typeof value === 'string') {
+    if (value.startsWith('$var:')) {
+      const varName = value.substring(5);
+      const varVal = variables[varName];
+      return varVal !== undefined ? resolveWorkflowVariables(varVal, variables, store) : value;
+    }
+  }
+
+  return value;
+}
 
 export function resolveExplicitAnnotationBindings(
   rawInteractionData: Record<string, any>,
   annotationObjects: Record<string, any>,
-  annotationOrder: string[]
+  annotationOrder: string[],
+  variables?: Record<string, any>,
+  store?: AppState
 ): Record<string, any> {
-  const resolved: Record<string, any> = { ...rawInteractionData };
+  const vars = variables || {};
+  const resolvedWithVars = resolveWorkflowVariables(rawInteractionData, vars, store);
+  const resolved: Record<string, any> = { ...resolvedWithVars };
 
   for (const [key, val] of Object.entries(resolved)) {
     if (val && typeof val === 'object' && val.$fromAnnotation) {
-      const { name, type } = val.$fromAnnotation;
+      const rawName = val.$fromAnnotation.name;
+      const resolvedName = resolveWorkflowVariables(rawName, vars, store);
+      const type = val.$fromAnnotation.type;
+
       const matchId = annotationOrder.find((id) => {
         const obj = annotationObjects[id];
         if (!obj) return false;
-        if (name && obj.name !== name) return false;
+        if (resolvedName && obj.name !== resolvedName) return false;
         if (type && obj.type !== type) return false;
         return true;
       });
@@ -138,6 +208,38 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     if (args?.defaultColor) {
       store.setDefaultAnnotationColor(args.defaultColor);
     }
+    if (args?.allowedTools) {
+      store.setAllowedAnnotationSubTools(args.allowedTools);
+    }
+
+    let targetGroupId: string | null = null;
+    if (args?.groupName) {
+      const existing = Object.values(store.annotationGroups || {}).find(
+        (g) => g.name === args.groupName || g.id === args.groupName
+      );
+      if (existing) {
+        targetGroupId = existing.id;
+      } else {
+        targetGroupId = uuidv4();
+        store.addAnnotationGroup({
+          id: targetGroupId,
+          type: 'manual_group',
+          name: args.groupName,
+          children_ids: [],
+          visible: true,
+        });
+      }
+      store.setActiveAnnotationGroupId(targetGroupId);
+    }
+
+    if (args?.saveToVariable) {
+      store.setWorkflowVariable(args.saveToVariable, {
+        groupId: targetGroupId,
+        groupName: args?.groupName || 'Annotations',
+        tool: args?.tool,
+      });
+    }
+
     // Switch to select tool so that canvas annotation pointer events are active
     store.setActiveTool('select');
   },
@@ -211,10 +313,16 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
           blocking: true,
         },
         async () => {
-          const properties = {
+          const stepId = args?.stepId || store.currentStepIndex.toString();
+          const existingExecutionId = store.stepExecutionIds?.[stepId];
+
+          const variables = store.workflowVariables || {};
+          const rawProperties = {
             ...store.pluginActiveProperties,
             ...(args?.properties || {}),
           };
+          const properties = resolveWorkflowVariables(rawProperties, variables, store);
+
           const mergedInteractionData = {
             ...store.pluginInteractionData,
             ...(args?.interactionData || {}),
@@ -222,14 +330,26 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
           const interactionData = resolveExplicitAnnotationBindings(
             mergedInteractionData,
             store.annotationObjects || {},
-            store.annotationOrder || []
+            store.annotationOrder || [],
+            variables,
+            store
           );
 
           const result = await store.executeGeneratorPlugin({
             plugin,
             properties,
             interactionData,
+            existingExecutionId,
           });
+
+          const resultExecId = (result as any)?.source_execution_id || (result as any)?.executionId || (result as any)?.execution_id;
+          if (resultExecId) {
+            store.setStepExecutionId(stepId, resultExecId);
+          }
+
+          if (args?.saveToVariable && result) {
+            store.setWorkflowVariable(args.saveToVariable, result);
+          }
 
           if (!result.success && result.error) {
             throw new Error(result.error);

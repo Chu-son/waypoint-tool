@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { WorkflowControl, WorkflowSimplifiedParam, WorkflowActionButton, WorkflowButtonsLayout } from '../../../types/customUi';
+import { useState, useEffect } from 'react';
+import { WorkflowControl, WorkflowSimplifiedParam, WorkflowActionButton, WorkflowButtonsLayout, WorkflowPluginInputConfig } from '../../../types/customUi';
 import { useAppStore } from '../../../stores/appStore';
 import { executeWorkflowAction } from '../../../utils/workflowActions';
 import { Button } from '../common/Button';
@@ -23,6 +23,8 @@ interface SimplifiedControlsProps {
   pluginTarget?: string;
   showPluginInputs?: boolean;
   pluginInputsFilter?: string[];
+  pluginInputsConfig?: WorkflowPluginInputConfig[];
+  allowedAnnotationTools?: string[];
 }
 
 export function SimplifiedControls({
@@ -34,6 +36,8 @@ export function SimplifiedControls({
   pluginTarget,
   showPluginInputs = false,
   pluginInputsFilter,
+  pluginInputsConfig,
+  allowedAnnotationTools,
 }: SimplifiedControlsProps) {
   const [controlValues, setControlValues] = useState<Record<string, any>>(() => {
     const init: Record<string, any> = {};
@@ -49,6 +53,23 @@ export function SimplifiedControls({
   const setPluginActiveProperties = useAppStore((state) => state.setPluginActiveProperties);
   const interactionData = useAppStore((state) => state.pluginInteractionData) || {};
   const updatePluginInteractionData = useAppStore((state) => state.updatePluginInteractionData);
+  const setWorkflowVariable = useAppStore((state) => state.setWorkflowVariable);
+  const setAllowedAnnotationSubTools = useAppStore((state) => state.setAllowedAnnotationSubTools);
+
+  // Apply default values for controls immediately on mount
+  useEffect(() => {
+    controls?.forEach((c) => {
+      const def = c.default ?? (c.type === 'slider' || c.type === 'number' ? c.min ?? 0 : c.type === 'toggle' ? false : c.options?.[0]?.value);
+      if (def !== undefined) {
+        executeWorkflowAction(c.target.action, { value: def });
+        setWorkflowVariable(c.label, def);
+      }
+    });
+
+    if (allowedAnnotationTools) {
+      setAllowedAnnotationSubTools(allowedAnnotationTools as any);
+    }
+  }, [controls, allowedAnnotationTools, setWorkflowVariable, setAllowedAnnotationSubTools]);
 
   const targetPluginId = pluginTarget || activePluginId;
   const targetPlugin = targetPluginId ? plugins[targetPluginId] : null;
@@ -56,6 +77,7 @@ export function SimplifiedControls({
   const handleControlChange = (control: WorkflowControl, val: any) => {
     setControlValues((prev) => ({ ...prev, [control.label]: val }));
     executeWorkflowAction(control.target.action, { value: val });
+    setWorkflowVariable(control.label, val);
   };
 
   const handleParamChange = (paramKey: string, val: any) => {
@@ -63,10 +85,12 @@ export function SimplifiedControls({
       ...pluginProperties,
       [paramKey]: val,
     });
+    setWorkflowVariable(paramKey, val);
   };
 
   const handleUpdateInteractionData = (key: string, data: any) => {
     updatePluginInteractionData(key, data);
+    setWorkflowVariable(`input_${key}`, data);
   };
 
   const [executingIndex, setExecutingIndex] = useState<number | null>(null);
@@ -74,7 +98,21 @@ export function SimplifiedControls({
   const handleButtonClick = async (btn: WorkflowActionButton, index: number) => {
     setExecutingIndex(index);
     try {
-      await executeWorkflowAction(btn.action, btn.args);
+      const hasExtra =
+        btn.saveToVariable !== undefined ||
+        btn.groupName !== undefined ||
+        btn.allowedAnnotationTools !== undefined;
+
+      const args = hasExtra || btn.args
+        ? {
+            ...(btn.args || {}),
+            ...(btn.saveToVariable !== undefined && { saveToVariable: btn.saveToVariable }),
+            ...(btn.groupName !== undefined && { groupName: btn.groupName }),
+            ...(btn.allowedAnnotationTools !== undefined && { allowedTools: btn.allowedAnnotationTools }),
+          }
+        : undefined;
+
+      await executeWorkflowAction(btn.action, args);
     } finally {
       setExecutingIndex(null);
     }
@@ -170,10 +208,20 @@ export function SimplifiedControls({
               .filter((inp) => !pluginInputsFilter || pluginInputsFilter.includes(inp.id || inp.name || ''))
               .map((inp, idx) => {
                 const key = inp.name || inp.id;
+                const overrideConfig = pluginInputsConfig?.find((cfg) => cfg.id === key || cfg.id === inp.id || cfg.id === inp.name);
+                const effectiveInput = overrideConfig
+                  ? {
+                      ...inp,
+                      label: overrideConfig.label || inp.label,
+                      description: overrideConfig.description || inp.description,
+                      defaultName: overrideConfig.defaultName || (inp as any).defaultName,
+                    }
+                  : inp;
+
                 return (
                   <PluginInputEditor
                     key={key || idx}
-                    input={inp}
+                    input={effectiveInput}
                     interactionData={interactionData[key]}
                     onUpdate={(data) => handleUpdateInteractionData(key, data)}
                     mode="creation"
