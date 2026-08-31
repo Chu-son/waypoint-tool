@@ -85,6 +85,9 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   })),
   
   setActivePlugin: (pluginId) => set((state) => {
+    if (state.activePluginId === pluginId) {
+      return { isAnnotationEditMode: false };
+    }
     const plugin = pluginId && state.plugins ? state.plugins[pluginId] : null;
     const isMapLayerGen = plugin?.manifest?.category === 'map_layer_generator';
     return {
@@ -92,6 +95,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       pluginInteractionData: {},
       pluginActiveProperties: {},
       activeInputIndex: 0,
+      isAnnotationEditMode: false,
       ...(!isMapLayerGen ? { activeCustomLayerId: null, isMapEditMode: false } : {}),
     };
   }),

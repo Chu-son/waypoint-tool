@@ -217,7 +217,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   activeMapLayerId: null,
   selectedEditObjectId: null,
 
-  setMapEditMode: (enabled) => set({ isMapEditMode: enabled }),
+  setMapEditMode: (enabled) => set((state) => ({
+    isMapEditMode: enabled,
+    isAnnotationEditMode: enabled ? false : state.isAnnotationEditMode,
+  })),
   setMapEditSubTool: (tool) => set({ mapEditSubTool: tool }),
   setMapEditFillValue: (value) => set({ mapEditFillValue: value }),
   setMapEditBrushSize: (size) => set({ mapEditBrushSize: size }),
@@ -228,10 +231,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setDirty: (dirty: boolean) => set({ isDirty: dirty }),
   setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),
 
-  setActiveTool: (tool: AppState['activeTool']) => set(() => {
+  setActiveTool: (tool: AppState['activeTool']) => set((state) => {
     const updates: Partial<AppState> = { activeTool: tool };
     if (tool === 'add_generator') {
       updates.rightPanelActiveTab = 'inspector';
+    }
+    if (tool !== 'select' && state.isAnnotationEditMode) {
+      updates.isAnnotationEditMode = false;
     }
     return updates;
   }),

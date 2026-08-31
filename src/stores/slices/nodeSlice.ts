@@ -435,6 +435,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     if (nextIds.length > 0) {
       updates.rightPanelActiveTab = 'inspector';
       updates.activeCustomLayerId = null;
+      if (state.isAnnotationEditMode) {
+        updates.isAnnotationEditMode = false;
+      }
     }
     if (state.elementCopyState) {
       const targetId = nextIds.length === 1 ? nextIds[0] : null;

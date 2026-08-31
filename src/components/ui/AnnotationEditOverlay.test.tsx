@@ -55,4 +55,24 @@ describe('AnnotationEditOverlay', () => {
     expect(screen.queryByText('線分 (Line)')).not.toBeInTheDocument();
     expect(screen.queryByText('円形 (Circle)')).not.toBeInTheDocument();
   });
+
+  it('automatically exits annotation edit mode when activeTool is switched to non-select tool', () => {
+    useAppStore.setState({ isAnnotationEditMode: true });
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(true);
+
+    useAppStore.getState().setActiveTool('add_point');
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(false);
+
+    useAppStore.setState({ isAnnotationEditMode: true });
+    useAppStore.getState().setActiveTool('add_generator');
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(false);
+  });
+
+  it('automatically exits annotation edit mode when map edit mode is enabled', () => {
+    useAppStore.setState({ isAnnotationEditMode: true });
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(true);
+
+    useAppStore.getState().setMapEditMode(true);
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(false);
+  });
 });

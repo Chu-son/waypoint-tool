@@ -36,6 +36,7 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
     set({
       currentStepIndex: target,
       maxReachedStepIndex: Math.max(maxReachedStepIndex, target),
+      isAnnotationEditMode: false,
     });
   },
 
@@ -47,6 +48,7 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       set({
         currentStepIndex: nextIdx,
         maxReachedStepIndex: Math.max(maxReachedStepIndex, nextIdx),
+        isAnnotationEditMode: false,
       });
     }
   },
@@ -54,7 +56,10 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
   prevStep: () => {
     const { currentStepIndex } = get();
     if (currentStepIndex > 0) {
-      set({ currentStepIndex: currentStepIndex - 1 });
+      set({
+        currentStepIndex: currentStepIndex - 1,
+        isAnnotationEditMode: false,
+      });
     }
   },
 
@@ -63,6 +68,7 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
     maxReachedStepIndex: 0,
     workflowVariables: {},
     stepExecutionIds: {},
+    isAnnotationEditMode: false,
   }),
 
   setWorkflowVariable: (key: string, value: any) => set((state) => ({
