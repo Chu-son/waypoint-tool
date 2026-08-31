@@ -22,6 +22,8 @@ import { useMapEditLine } from './hooks/useMapEditLine';
 import { useAnnotationEdit } from './hooks/useAnnotationEdit';
 import { prepareLayersForExport } from '../../utils/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
+import { resolveThemeVariables } from '../../utils/themePresets';
+import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
 
 import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
 
@@ -37,10 +39,20 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
   const [imgSize, setImgSize] = useState({ w: overrideTexture ? overrideTexture.width : 0, h: overrideTexture ? overrideTexture.height : 0 });
   const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
   const occupancyHighlightAlpha = useAppStore((state) => state.occupancyHighlightAlpha);
+  const customUiConfig = useAppStore((state) => state.customUiConfig);
+  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
 
   const occThresh = layer.info?.occupied_thresh ?? 0.65;
   const freeThresh = layer.info?.free_thresh ?? 0.25;
   const negate = layer.info?.negate ?? 0;
+
+  const resolvedTheme = useMemo(() => {
+    return resolveThemeVariables(isCustomUiMode && customUiConfig ? customUiConfig.theme : undefined);
+  }, [isCustomUiMode, customUiConfig]);
+
+  const freeColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-free'], [0.0627, 0.7255, 0.5059]), [resolvedTheme]);
+  const obstacleColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-obstacle'], [0.9373, 0.2667, 0.2667]), [resolvedTheme]);
+  const unknownColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-unknown'], [0.6588, 0.3333, 0.9686]), [resolvedTheme]);
 
   const highlightFilter = useMemo(() => {
     if (!showOccupancyHighlight) return null;
@@ -50,11 +62,14 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
         freeThresh: freeThresh,
         negate: negate,
         alpha: occupancyHighlightAlpha,
+        freeColor: freeColorVec,
+        obstacleColor: obstacleColorVec,
+        unknownColor: unknownColorVec,
       });
     } catch {
       return null;
     }
-  }, [showOccupancyHighlight]);
+  }, [showOccupancyHighlight, freeColorVec, obstacleColorVec, unknownColorVec]);
 
   useEffect(() => {
     if (highlightFilter) {
@@ -63,9 +78,12 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
         freeThresh: freeThresh,
         negate: negate,
         alpha: occupancyHighlightAlpha,
+        freeColor: freeColorVec,
+        obstacleColor: obstacleColorVec,
+        unknownColor: unknownColorVec,
       });
     }
-  }, [highlightFilter, occThresh, freeThresh, negate, occupancyHighlightAlpha]);
+  }, [highlightFilter, occThresh, freeThresh, negate, occupancyHighlightAlpha, freeColorVec, obstacleColorVec, unknownColorVec]);
 
   useEffect(() => {
     return () => {
@@ -220,6 +238,18 @@ export function MapCanvas() {
   const occupancySettings = useAppStore((state) => state.occupancySettings);
   const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
   const shouldShowBlendedPreview = isExportPreview || showOccupancyHighlight;
+
+  const customUiConfig = useAppStore((state) => state.customUiConfig);
+  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+
+  const resolvedTheme = useMemo(() => {
+    return resolveThemeVariables(isCustomUiMode && customUiConfig ? customUiConfig.theme : undefined);
+  }, [isCustomUiMode, customUiConfig]);
+
+  const canvasBackgroundColor = useMemo(() => {
+    const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || '#0f172a';
+    return hexStringToNumber(surfaceBaseHex, 0x0f172a);
+  }, [resolvedTheme]);
 
   // blend_mode, z_index, visible, image_base64, customLayers, occupancySettings の変更キーを生成
   const previewSyncKey = useMemo(() => {
@@ -537,19 +567,23 @@ export function MapCanvas() {
     canvas.height = 1000;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.fillStyle = '#1e293b';
+      const bg = resolvedTheme.variables['--color-surface-panel'] || '#1e293b';
+      const grid = resolvedTheme.variables['--color-border-base'] || '#334155';
+      const text = resolvedTheme.variables['--color-text-muted'] || '#94a3b8';
+
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, 1000, 1000);
-      ctx.strokeStyle = '#334155';
+      ctx.strokeStyle = grid;
       for (let i = 0; i < 100; i += 50) {
         ctx.beginPath(); ctx.moveTo(i * 10, 0); ctx.lineTo(i * 10, 1000); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(0, i * 10); ctx.lineTo(1000, i * 10); ctx.stroke();
       }
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = text;
       ctx.font = '24px Arial';
       ctx.fillText('No Map Loaded. Use Load Map button.', 50, 50);
     }
     return Texture.from(canvas);
-  }, []);
+  }, [resolvedTheme]);
 
   const fitToMaps = useCallback(() => {
     if (!containerRef.current) return;
@@ -1678,7 +1712,7 @@ export function MapCanvas() {
       onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <Application preserveDrawingBuffer={true} background="#0f172a" resolution={1} resizeTo={window}>
+      <Application preserveDrawingBuffer={true} background={canvasBackgroundColor} resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
           {/* 1. Base Map Layers Group */}

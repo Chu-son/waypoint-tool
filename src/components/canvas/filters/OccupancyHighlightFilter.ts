@@ -40,13 +40,16 @@ uniform float uOccThresh;
 uniform float uFreeThresh;
 uniform float uNegate;
 uniform float uHighlightAlpha;
+uniform vec3 uFreeColor;
+uniform vec3 uObstacleColor;
+uniform vec3 uUnknownColor;
 
 void main(void) {
     vec4 color = texture(uTexture, vTextureCoord);
     
-    // 1. Transparent or background area -> Unknown Space (Purple)
+    // 1. Transparent or background area -> Unknown Space
     if (color.a < 0.1) {
-        finalColor = vec4(0.66 * uHighlightAlpha, 0.33 * uHighlightAlpha, 0.97 * uHighlightAlpha, 0.5 * uHighlightAlpha);
+        finalColor = vec4(uUnknownColor * uHighlightAlpha, 0.5 * uHighlightAlpha);
         return;
     }
     
@@ -67,17 +70,17 @@ void main(void) {
     
     vec3 highlightRgb;
     if (isRosCanonicalUnknown) {
-        // Unknown / Unexplored Space (Purple #a855f7)
-        highlightRgb = vec3(0.66, 0.33, 0.97);
+        // Unknown / Unexplored Space
+        highlightRgb = uUnknownColor;
     } else if (occ >= uOccThresh) {
-        // Obstacle / Occupied (Red #ef4444)
-        highlightRgb = vec3(0.94, 0.27, 0.27);
+        // Obstacle / Occupied
+        highlightRgb = uObstacleColor;
     } else if (occ <= uFreeThresh) {
-        // Free Space (Green #10b981)
-        highlightRgb = vec3(0.06, 0.73, 0.51);
+        // Free Space
+        highlightRgb = uFreeColor;
     } else {
-        // Unknown / Between thresholds (Purple #a855f7)
-        highlightRgb = vec3(0.66, 0.33, 0.97);
+        // Unknown / Between thresholds
+        highlightRgb = uUnknownColor;
     }
     
     // Blend original texture RGB with highlight RGB based on highlightAlpha
@@ -93,6 +96,9 @@ export interface OccupancyHighlightFilterOptions {
   freeThresh?: number;
   negate?: number;
   alpha?: number;
+  freeColor?: [number, number, number];
+  obstacleColor?: [number, number, number];
+  unknownColor?: [number, number, number];
 }
 
 export class OccupancyHighlightFilter extends Filter {
@@ -103,6 +109,9 @@ export class OccupancyHighlightFilter extends Filter {
     const freeThresh = options?.freeThresh ?? 0.196;
     const negate = options?.negate ?? 0;
     const alpha = options?.alpha ?? 0.6;
+    const freeColor = options?.freeColor ?? [0.0627, 0.7255, 0.5059]; // #10b981
+    const obstacleColor = options?.obstacleColor ?? [0.9373, 0.2667, 0.2667]; // #ef4444
+    const unknownColor = options?.unknownColor ?? [0.6588, 0.3333, 0.9686]; // #a855f7
 
     let glProgram: GlProgram | undefined;
     try {
@@ -122,6 +131,9 @@ export class OccupancyHighlightFilter extends Filter {
         uFreeThresh: { value: freeThresh, type: 'f32' },
         uNegate: { value: negate, type: 'f32' },
         uHighlightAlpha: { value: alpha, type: 'f32' },
+        uFreeColor: { value: new Float32Array(freeColor), type: 'vec3<f32>' },
+        uObstacleColor: { value: new Float32Array(obstacleColor), type: 'vec3<f32>' },
+        uUnknownColor: { value: new Float32Array(unknownColor), type: 'vec3<f32>' },
       });
     } catch {
       highlightUniforms = {
@@ -130,6 +142,9 @@ export class OccupancyHighlightFilter extends Filter {
           uFreeThresh: freeThresh,
           uNegate: negate,
           uHighlightAlpha: alpha,
+          uFreeColor: freeColor,
+          uObstacleColor: obstacleColor,
+          uUnknownColor: unknownColor,
         },
       };
     }
@@ -157,6 +172,27 @@ export class OccupancyHighlightFilter extends Filter {
     }
     if (typeof options.alpha === 'number') {
       uniforms.uHighlightAlpha = options.alpha;
+    }
+    if (options.freeColor) {
+      if (uniforms.uFreeColor instanceof Float32Array) {
+        uniforms.uFreeColor.set(options.freeColor);
+      } else {
+        uniforms.uFreeColor = options.freeColor;
+      }
+    }
+    if (options.obstacleColor) {
+      if (uniforms.uObstacleColor instanceof Float32Array) {
+        uniforms.uObstacleColor.set(options.obstacleColor);
+      } else {
+        uniforms.uObstacleColor = options.obstacleColor;
+      }
+    }
+    if (options.unknownColor) {
+      if (uniforms.uUnknownColor instanceof Float32Array) {
+        uniforms.uUnknownColor.set(options.unknownColor);
+      } else {
+        uniforms.uUnknownColor = options.unknownColor;
+      }
     }
   }
 

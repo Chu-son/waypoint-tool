@@ -9,6 +9,7 @@ import {
   CircleAnnotation,
 } from '../../../types/store';
 import { getNextSequentialName } from '../../../utils/treeUtils';
+import { DEFAULT_ANNOTATION_COLOR } from '../../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
 export function useAnnotationEdit() {
@@ -42,7 +43,7 @@ export function useAnnotationEdit() {
   const handleAnnotationDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       setDrawStartPos(worldPos);
-      const color = defaultAnnotationColor || '#3B82F6';
+      const color = defaultAnnotationColor || DEFAULT_ANNOTATION_COLOR;
 
       switch (activeAnnotationSubTool) {
         case 'point': {
@@ -127,7 +128,7 @@ export function useAnnotationEdit() {
     (worldPos: { x: number; y: number }) => {
       if (!drawStartPos) return;
 
-      const color = defaultAnnotationColor || '#3B82F6';
+      const color = defaultAnnotationColor || DEFAULT_ANNOTATION_COLOR;
 
       switch (activeAnnotationSubTool) {
         case 'point': {
@@ -227,7 +228,7 @@ export function useAnnotationEdit() {
       }
 
       const existingNames = Object.values(useAppStore.getState().annotationObjects || {}).map((o) => o.name);
-      const color = defaultAnnotationColor || '#3B82F6';
+      const color = defaultAnnotationColor || DEFAULT_ANNOTATION_COLOR;
 
       let newObj: AnnotationObject | null = null;
 

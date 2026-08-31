@@ -38,14 +38,14 @@ export function MapCanvasPlaceholder() {
         ${activeTool === 'add_point' ? 'cursor-crosshair' : 'cursor-default'}`}
       onClick={handleCanvasClick}
     >
-      <div className="text-slate-500 border-2 border-dashed border-slate-700 rounded-xl p-8 max-w-md text-center pointer-events-none bg-slate-900/50 backdrop-blur-sm">
-        <p className="mb-4 text-white font-medium">Map Viewport Placeholder</p>
-        <p className="text-sm text-slate-400 mb-2">PixiJS / WebGL canvas will be mounted here.</p>
-        <div className="text-xs text-amber-500 font-mono bg-slate-950 p-2 rounded">
+      <div className="text-text-muted border-2 border-dashed border-border-base rounded-xl p-8 max-w-md text-center pointer-events-none bg-surface-panel/50 backdrop-blur-sm">
+        <p className="mb-4 text-text-base font-medium">Map Viewport Placeholder</p>
+        <p className="text-sm text-text-muted mb-2">PixiJS / WebGL canvas will be mounted here.</p>
+        <div className="text-xs text-accent-anchor font-mono bg-surface-base p-2 rounded">
           Active Tool: {activeTool}
         </div>
         {activeTool === 'add_point' && (
-          <p className="mt-4 text-sm text-primary animate-pulse">
+          <p className="mt-4 text-sm text-primary-base animate-pulse">
             Click anywhere in the black area to add a dummy waypoint!
           </p>
         )}

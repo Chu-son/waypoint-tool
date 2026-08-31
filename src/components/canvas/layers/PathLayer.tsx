@@ -1,13 +1,14 @@
 import { useAppStore } from '../../../stores/appStore';
 import * as PIXI from 'pixi.js';
 import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 
 export function PathLayer({ scale }: { scale: number }) {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const nodes = useAppStore(state => state.nodes);
   const calculatedPathSegments = useAppStore(state => state.calculatedPathSegments);
   const activePathCalculatorPluginId = useAppStore(state => state.activePathCalculatorPluginId);
-  const pathColor = useAppStore(state => state.pathColor) || '#10b981';
+  const pathColor = useAppStore(state => state.pathColor) || DEFAULT_PATH_COLOR;
   const pathWidth = useAppStore(state => state.pathWidth) ?? 0.1;
   const pathOpacity = useAppStore(state => state.pathOpacity) ?? 0.7;
   const syncPathWidthWithFootprint = useAppStore(state => state.syncPathWidthWithFootprint);
@@ -32,7 +33,8 @@ export function PathLayer({ scale }: { scale: number }) {
         }
 
         const hex = pathColor.replace('#', '');
-        const colorNum = parseInt(hex, 16) || 0x10b981;
+        const defaultHexNum = parseInt(DEFAULT_PATH_COLOR.replace('#', ''), 16);
+        const colorNum = parseInt(hex, 16) || defaultHexNum;
         const baseAlpha = Math.max(0, Math.min(1, pathOpacity));
 
         // Gather all path segments: List of Point arrays
