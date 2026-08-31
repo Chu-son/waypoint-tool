@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schema/custom-ui-config.schema.json",
+  "$schema": "./schema/custom-ui-config.schema.json",
   "brand": {
     "appName": "Roomba Route Creator",
     "windowTitle": "Roomba Route Creator - お掃除経路エディタ",
@@ -11,10 +11,7 @@
     }
   },
   "theme": {
-    "cssVariables": {
-      "--color-primary-base": "#10b981",
-      "--color-primary-hover": "#059669"
-    }
+    "preset": "roomba"
   },
   "layout": {
     "showWelcomeModal": false,

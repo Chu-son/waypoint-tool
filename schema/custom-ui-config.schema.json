@@ -24,6 +24,41 @@
     "theme": {
       "type": "object",
       "properties": {
+        "preset": {
+          "type": "string",
+          "enum": ["default", "emerald", "roomba", "ocean", "amber", "purple", "midnight", "light"]
+        },
+        "colors": {
+          "type": "object",
+          "properties": {
+            "primaryBase": { "type": "string" },
+            "primaryHover": { "type": "string" },
+            "surfaceBase": { "type": "string" },
+            "surfacePanel": { "type": "string" },
+            "surfaceHover": { "type": "string" },
+            "borderBase": { "type": "string" },
+            "borderFocus": { "type": "string" },
+            "borderError": { "type": "string" },
+            "textBase": { "type": "string" },
+            "textMuted": { "type": "string" },
+            "textInverse": { "type": "string" },
+            "dangerBase": { "type": "string" },
+            "dangerHover": { "type": "string" },
+            "accentAnchor": { "type": "string" },
+            "accentGenerator": { "type": "string" },
+            "accentReference": { "type": "string" },
+            "accentAutomation": { "type": "string" },
+            "statusSuccess": { "type": "string" },
+            "statusWarning": { "type": "string" },
+            "occupancyFree": { "type": "string" },
+            "occupancyObstacle": { "type": "string" },
+            "occupancyUnknown": { "type": "string" }
+          }
+        },
+        "colorScheme": {
+          "type": "string",
+          "enum": ["dark", "light"]
+        },
         "cssVariables": {
           "type": "object",
           "additionalProperties": { "type": "string" }
@@ -60,7 +95,22 @@
             "defaultOpen": { "type": "boolean" },
             "defaultWidth": { "type": "number" },
             "viewMode": { "type": "string", "enum": ["tabs", "split"] },
-            "tabs": { "type": "array" }
+            "tabs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "id", "title"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["builtin", "workflow", "html_file", "html_inline", "url"] },
+                  "id": { "type": "string" },
+                  "title": { "type": "string" },
+                  "src": { "type": "string" },
+                  "html": { "type": "string" },
+                  "css": { "type": "string" },
+                  "url": { "type": "string" }
+                }
+              }
+            }
           }
         },
         "rightPanel": {
@@ -69,7 +119,22 @@
             "defaultOpen": { "type": "boolean" },
             "defaultWidth": { "type": "number" },
             "viewMode": { "type": "string", "enum": ["tabs", "split"] },
-            "tabs": { "type": "array" }
+            "tabs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["type", "id", "title"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["builtin", "workflow", "html_file", "html_inline", "url"] },
+                  "id": { "type": "string" },
+                  "title": { "type": "string" },
+                  "src": { "type": "string" },
+                  "html": { "type": "string" },
+                  "css": { "type": "string" },
+                  "url": { "type": "string" }
+                }
+              }
+            }
           }
         }
       }
@@ -126,7 +191,40 @@
                 "type": "string",
                 "enum": ["column", "grid", "row"]
               },
-              "controls": { "type": "array" },
+              "controls": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["type", "target", "label"],
+                  "properties": {
+                    "type": { "type": "string", "enum": ["slider", "number", "boolean", "select"] },
+                    "target": {
+                      "type": "object",
+                      "required": ["action"],
+                      "properties": {
+                        "action": { "type": "string" },
+                        "args": { "type": "object" }
+                      }
+                    },
+                    "label": { "type": "string" },
+                    "min": { "type": "number" },
+                    "max": { "type": "number" },
+                    "step": { "type": "number" },
+                    "default": {},
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["label", "value"],
+                        "properties": {
+                          "label": { "type": "string" },
+                          "value": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              },
               "pluginTarget": { "type": "string" },
               "showPluginInputs": { "type": "boolean" },
               "pluginInputsFilter": { "type": "array", "items": { "type": "string" } },
@@ -144,9 +242,47 @@
                 }
               },
               "allowedAnnotationTools": { "type": "array", "items": { "type": "string" } },
-              "simplifiedParams": { "type": "array" },
-              "onEnter": { "type": "object" },
-              "onLeave": { "type": "object" }
+              "simplifiedParams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["paramKey", "type"],
+                  "properties": {
+                    "paramKey": { "type": "string" },
+                    "label": { "type": "string" },
+                    "type": { "type": "string", "enum": ["slider", "select", "number", "boolean"] },
+                    "min": { "type": "number" },
+                    "max": { "type": "number" },
+                    "step": { "type": "number" },
+                    "default": {},
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["label", "value"],
+                        "properties": {
+                          "label": { "type": "string" },
+                          "value": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "onEnter": {
+                "type": "object",
+                "properties": {
+                  "actions": { "type": "array", "items": { "type": "string" } },
+                  "state": { "type": "object" }
+                }
+              },
+              "onLeave": {
+                "type": "object",
+                "properties": {
+                  "actions": { "type": "array", "items": { "type": "string" } },
+                  "state": { "type": "object" }
+                }
+              }
             }
           }
         }

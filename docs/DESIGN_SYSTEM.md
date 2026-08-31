@@ -58,16 +58,25 @@ Tailwind CSSのクラス文字列を直接JSXに長く書くことは、可読�
 |---|---|---|
 | 基本テキスト | `text-text-base` | `text-slate-200`, `text-white` |
 | サブテキスト・ラベル | `text-text-muted` | `text-slate-400`, `text-gray-400` |
+| 反転テキスト (ボタン等) | `text-text-inverse` | `text-white`, `text-black` |
 | 背景（パネル） | `bg-surface-panel` | `bg-slate-800`, `bg-gray-800` |
 | 背景（ベース） | `bg-surface-base` | `bg-slate-900` |
 | ホバー背景 | `bg-surface-hover` | `bg-slate-700` |
 | ボーダー | `border-border-base` | `border-slate-700`, `border-slate-800` |
+| フォーカス枠線 | `border-border-focus` | `border-blue-500` |
 | プライマリカラー | `text-primary-base`, `bg-primary-base` | `text-blue-500`, `bg-blue-600` |
 | プライマリホバー | `bg-primary-hover` | `bg-blue-700` |
 | プライマリ半透明 | `bg-primary-base/10`, `bg-primary-base/20` | `bg-blue-900/50` |
 | 危険操作（削除等） | `text-danger-base`, `bg-danger-base` | `text-red-500` |
-| アンバー（アンカー関連） | `text-amber-400`, `bg-amber-950/20` | （アンカー状態の表現のみ使われる場合） |
-| エメラルド（プラグイン・生成関連） | `text-emerald-400`, `bg-emerald-500/20` | （生成ノードの表現のみ使われる場合） |
+| アンカー・グループ | `text-accent-anchor`, `bg-accent-anchor` | `text-amber-400`, `bg-amber-950/20` |
+| プラグイン・生成ノード | `text-accent-generator`, `bg-accent-generator` | `text-emerald-400`, `bg-emerald-500/20` |
+| リファレンスレイヤー | `text-accent-reference`, `bg-accent-reference` | `text-purple-400`, `bg-purple-500/20` |
+| 自動化・スクリプト | `text-accent-automation`, `bg-accent-automation` | `text-cyan-400`, `bg-cyan-500/20` |
+| 成功ステータス | `text-status-success`, `bg-status-success` | `text-emerald-500` |
+| 警告ステータス | `text-status-warning`, `bg-status-warning` | `text-amber-500` |
+| 占有グリッド (Free) | `text-occupancy-free`, `bg-occupancy-free` | `text-emerald-400` |
+| 占有グリッド (Obstacle) | `text-occupancy-obstacle`, `bg-occupancy-obstacle` | `text-rose-400` |
+| 占有グリッド (Unknown) | `text-occupancy-unknown`, `bg-occupancy-unknown` | `text-purple-400` |
 
 ---
 
