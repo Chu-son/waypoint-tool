@@ -17,17 +17,32 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 
 ---
 
-## 2. 設定ファイルの配置と自動検出 (Config File Placement)
+## 2. 設定ファイルの配置と切り替え (Config File Placement & Presets)
 
-アプリケーション起動時、以下の優先順位で **`custom-ui.config.json`** を探索し、見つかった場合に自動適用されます。
+### 2.1 設定ファイルの種類と役割
+| ファイル名 | 役割 | 起動時の挙動 | Git管理 |
+|---|---|---|---|
+| **`custom-ui.config.json`** | 本番配布用設定 | 起動時に自動適用 | 必要に応じて管理 |
+| **`custom-ui.dev.json`** | ローカル開発用設定 | 起動時は標準モード（メニューで手動切替） | **無視 (`.gitignore`)** |
+| **`custom-ui.sample.json`** | 公式サンプル設定 | 起動時は標準モード（メニューで手動切替） | `examples/`へのシンボリックリンク |
 
-1. ユーザー設定ディレクトリ (`~/.config/waypoint-tool/custom-ui.config.json` 等)
-2. アプリケーション実行ファイルと同階層 (ポータブル配布・AppImage・macOS bundle)
-3. カレントワーキングディレクトリ / ソースツリー直下 (開発環境)
+### 2.2 起動時とメニューからの切り替え
+- **本番自動適用 (`custom-ui.config.json`)**:
+  起動時、以下の優先順位で探索され、見つかった場合に自動適用されます。
+  1. ユーザー設定ディレクトリ (`~/.config/waypoint-tool/custom-ui.config.json` 等)
+  2. アプリケーション実行ファイルと同階層 (ポータブル配布・AppImage・macOS bundle)
+  3. カレントワーキングディレクトリ / ソースツリー直下 (開発環境)
+
+- **開発・サンプルプリセットの切り替え (Helpメニュー)**:
+  `custom-ui.dev.json` または `custom-ui.sample.json` が配置されている場合、起動直後はスタンダードUI（標準モード）で立ち上がります。
+  上部メニューの **「Help」➔「Switch to Custom UI (dev / sample)」** をクリックすることで、即座に該当設定を読み込んで Custom UI モードに切り替えられます。
+  - `custom-ui.dev.json` が存在する場合は `dev` が最優先で切り替え対象になります。
+  - `custom-ui.dev.json` が存在しない場合は `custom-ui.sample.json` が切り替え対象になります。
+  - 任意の外部設定ファイルを読み込みたい場合は **「Help」➔「Load Custom UI Config...」** からファイルダイアログで開くことができます。
 
 > [!TIP]
-> **管理者向けモード切替**:
-> Custom UIモードが適用されている場合でも、TopMenuの **「Help」→「✓ Custom UI Mode (Switch to Standard)」** をクリックすることで、即座にフル機能の通常モードと行き来が可能です。
+> **モード切替**:
+> Custom UIモードが適用されている場合でも、TopMenuの **「Help」→「✓ Custom UI Mode (Switch to Standard)」** をクリックすることで、即座にフル機能の通常モードと相互に行き来が可能です。
 
 ---
 

@@ -51,3 +51,7 @@ Thumbs.db
 *.bak
 *.tmp
 .antigravity*
+
+# --- Custom UI Local Dev ---
+custom-ui.dev.json
+custom-ui*.dev.json
