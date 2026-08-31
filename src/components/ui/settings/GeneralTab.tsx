@@ -6,6 +6,7 @@ import { FormField } from "../common/FormField";
 import { Slider } from "../common/Slider";
 import { BrowseInput } from "../common/BrowseInput";
 import { SectionDivider } from "../common/SectionDivider";
+import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 import { NumericInput } from "../NumericInput";
 
 export function GeneralTab() {
@@ -110,12 +111,12 @@ export function GeneralTab() {
           <div className="flex items-center gap-3">
             <input
               type="color"
-              value={pathColor || '#10b981'}
+              value={pathColor || DEFAULT_PATH_COLOR}
               onChange={(e) => setPathColor(e.target.value)}
               className="w-9 h-9 rounded border border-border-base cursor-pointer bg-transparent p-0 shrink-0"
             />
             <Input
-              value={pathColor || '#10b981'}
+              value={pathColor || DEFAULT_PATH_COLOR}
               onChange={(e) => setPathColor(e.target.value)}
               className="h-9 px-3 py-1.5 text-xs font-mono w-32"
             />
@@ -170,24 +171,24 @@ export function GeneralTab() {
         {/* Visual Threshold Bar */}
         <div className="p-3 bg-surface-base/60 border border-border-base/40 rounded-xl space-y-2">
           <div className="flex justify-between text-[11px] font-semibold text-text-muted">
-            <span className="text-emerald-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            <span className="text-occupancy-free flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-occupancy-free inline-block" />
               Free Space (&lt;= {occupancySettings.defaultFreeThresh.toFixed(2)})
             </span>
-            <span className="text-purple-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-purple-500 inline-block" />
+            <span className="text-occupancy-unknown flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-occupancy-unknown inline-block" />
               Unknown
             </span>
-            <span className="text-rose-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+            <span className="text-occupancy-obstacle flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-occupancy-obstacle inline-block" />
               Obstacle (&gt;= {occupancySettings.defaultOccupiedThresh.toFixed(2)})
             </span>
           </div>
 
-          <div className="h-4 w-full rounded-md overflow-hidden flex border border-border-base/40 text-[9px] font-bold text-white text-center leading-4">
+          <div className="h-4 w-full rounded-md overflow-hidden flex border border-border-base/40 text-[9px] font-bold text-text-inverse text-center leading-4">
             <div
               style={{ width: `${Math.min(100, Math.max(0, occupancySettings.defaultFreeThresh * 100))}%` }}
-              className="bg-emerald-600/80 transition-all"
+              className="bg-occupancy-free/80 transition-all"
               title={`Free Space: 0.00 ~ ${occupancySettings.defaultFreeThresh.toFixed(2)}`}
             >
               Free
@@ -201,7 +202,7 @@ export function GeneralTab() {
                     100
                 )}%`,
               }}
-              className="bg-purple-600/80 transition-all"
+              className="bg-occupancy-unknown/80 transition-all"
               title={`Unknown: ${occupancySettings.defaultFreeThresh.toFixed(2)} ~ ${occupancySettings.defaultOccupiedThresh.toFixed(2)}`}
             >
               Unknown
@@ -213,7 +214,7 @@ export function GeneralTab() {
                   (1.0 - occupancySettings.defaultOccupiedThresh) * 100
                 )}%`,
               }}
-              className="bg-rose-600/80 transition-all"
+              className="bg-occupancy-obstacle/80 transition-all"
               title={`Obstacle: ${occupancySettings.defaultOccupiedThresh.toFixed(2)} ~ 1.00`}
             >
               Obstacle

@@ -61,14 +61,14 @@ export function AnchorTransformGroup({
   };
 
   return (
-    <div className="space-y-2 pt-4 border-t border-amber-500/30 relative">
+    <div className="space-y-2 pt-4 border-t border-accent-anchor/30 relative">
       <PropertySectionHeader
         title={
           <>
             <span>⚓</span> Transform (From Anchor)
           </>
         }
-        className="text-amber-400"
+        className="text-accent-anchor"
       />
 
       <div className="grid grid-cols-3 gap-2">

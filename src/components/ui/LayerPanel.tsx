@@ -167,9 +167,9 @@ export function LayerPanel() {
         <Button
           onClick={handleLoadMap}
           variant="secondary"
-          className="w-full h-9 shadow-sm border-border-base/50 group hover:border-emerald-500/30 transition-all font-bold"
+          className="w-full h-9 shadow-sm border-border-base/50 group hover:border-accent-generator/30 transition-all font-bold"
         >
-          <FolderOpen size={16} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+          <FolderOpen size={16} className="text-accent-generator group-hover:scale-110 transition-transform" />
           <span>Load Map</span>
         </Button>
 
@@ -199,7 +199,7 @@ export function LayerPanel() {
                 className={cn(
                   "h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all",
                   showOccupancyHighlight
-                    ? 'text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40 shadow-sm'
+                    ? 'text-accent-reference bg-accent-reference/20 hover:bg-accent-reference/30 border border-accent-reference/40 shadow-sm'
                     : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
                 )}
                 onClick={() => setShowOccupancyHighlight(!showOccupancyHighlight)}
@@ -215,7 +215,7 @@ export function LayerPanel() {
                 className={cn(
                   "h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all",
                   isExportPreview
-                    ? 'text-emerald-300 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 shadow-sm'
+                    ? 'text-accent-generator bg-accent-generator/20 hover:bg-accent-generator/30 border border-accent-generator/40 shadow-sm'
                     : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
                 )}
                 onClick={() => setIsExportPreview(!isExportPreview)}
@@ -426,7 +426,7 @@ export function LayerPanel() {
                       }}
                       className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                     >
-                      <Code2 size={13} className="text-cyan-400" />
+                      <Code2 size={13} className="text-accent-automation" />
                       <span>内部プロパティを表示</span>
                     </button>
 
@@ -469,7 +469,7 @@ export function LayerPanel() {
                   }}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Bookmark size={13} className={layer.is_reference ? "fill-purple-300 text-purple-300" : "text-text-muted"} />
+                  <Bookmark size={13} className={layer.is_reference ? "fill-accent-reference text-accent-reference" : "text-text-muted"} />
                   <span>{layer.is_reference ? "参照レイヤー解除" : "参照レイヤーに設定"}</span>
                 </button>
 
@@ -643,7 +643,7 @@ function CustomLayerCard({
               {isManual ? (
                 <Pencil size={14} className="text-primary-base" />
               ) : (
-                <Sparkles size={14} className="text-cyan-400" />
+                <Sparkles size={14} className="text-accent-automation" />
               )}
               <Input
                 value={layer.name}
@@ -655,12 +655,12 @@ function CustomLayerCard({
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className={cn(
                 "text-[9px] font-bold uppercase px-1 py-0.2 rounded",
-                isManual ? "bg-primary-base/15 text-primary-base" : "bg-cyan-500/20 text-cyan-400"
+                isManual ? "bg-primary-base/15 text-primary-base" : "bg-accent-automation/20 text-accent-automation"
               )}>
                 {isManual ? "Manual" : "Plugin"}
               </span>
               {layer.is_reference && (
-                <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30" title="Reference Layer (Excluded from Merge/Export)">
+                <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-accent-reference/20 text-accent-reference border border-accent-reference/30" title="Reference Layer (Excluded from Merge/Export)">
                   REF
                 </span>
               )}
@@ -678,8 +678,8 @@ function CustomLayerCard({
             className={cn(
               "h-7 w-7 transition-all",
               layer.is_reference
-                ? "text-purple-300 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/40"
-                : "text-text-muted hover:text-purple-400 hover:bg-purple-500/10"
+                ? "text-accent-reference bg-accent-reference/20 hover:bg-accent-reference/30 border border-accent-reference/40"
+                : "text-text-muted hover:text-accent-reference hover:bg-accent-reference/10"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -687,7 +687,7 @@ function CustomLayerCard({
             }}
             title={layer.is_reference ? "Reference Layer: ON (マージ除外・オーバーレイ参照用)" : "Reference Layer: OFF (通常レイヤー)"}
           >
-            <Bookmark size={14} className={layer.is_reference ? "fill-purple-300" : ""} />
+            <Bookmark size={14} className={layer.is_reference ? "fill-accent-reference" : ""} />
           </Button>
 
           {isManual ? (
@@ -707,7 +707,7 @@ function CustomLayerCard({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-text-muted hover:text-cyan-400 hover:bg-cyan-500/10"
+              className="h-7 w-7 text-text-muted hover:text-accent-automation hover:bg-accent-automation/10"
               onClick={(e) => {
                 e.stopPropagation();
                 onOpenInspector();
@@ -776,7 +776,7 @@ function CustomLayerCard({
             </Select>
           </div>
           {layer.is_reference && (
-            <p className="text-[9px] text-purple-300/80 text-right">
+            <p className="text-[9px] text-accent-reference/80 text-right">
               ※ 参照レイヤーのため合成されません
             </p>
           )}
@@ -879,7 +879,7 @@ function LayerCard({
                 {layer.name}
               </span>
               {isMapEditMode && isActiveTargetMap && (
-                <span className="text-[9px] font-bold uppercase bg-emerald-500/20 text-emerald-400 px-1 py-0.5 rounded">
+                <span className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded">
                   🎯 Target Map
                 </span>
               )}
@@ -896,7 +896,7 @@ function LayerCard({
             size="icon"
             className={cn(
               "h-8 w-8 text-text-muted hover:text-text-base transition-all",
-              showThresholds && "text-purple-400 bg-purple-500/10 border border-purple-500/20"
+              showThresholds && "text-accent-reference bg-accent-reference/10 border border-accent-reference/20"
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -959,7 +959,7 @@ function LayerCard({
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-text-base flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-purple-400 inline-block" />
+                <span className="w-2 h-2 rounded-full bg-occupancy-unknown inline-block" />
                 Occupancy Thresholds
               </span>
               <Button
@@ -978,21 +978,21 @@ function LayerCard({
             <div className="h-2 w-full rounded overflow-hidden flex border border-border-base/40">
               <div
                 style={{ width: `${Math.min(100, Math.max(0, freeThresh * 100))}%` }}
-                className="bg-emerald-500/80"
+                className="bg-occupancy-free/80"
                 title={`Free: 0.00 ~ ${freeThresh.toFixed(2)}`}
               />
               <div
                 style={{
                   width: `${Math.max(0, (occThresh - freeThresh) * 100)}%`,
                 }}
-                className="bg-purple-500/80"
+                className="bg-occupancy-unknown/80"
                 title={`Unknown: ${freeThresh.toFixed(2)} ~ ${occThresh.toFixed(2)}`}
               />
               <div
                 style={{
                   width: `${Math.max(0, (1.0 - occThresh) * 100)}%`,
                 }}
-                className="bg-rose-500/80"
+                className="bg-occupancy-obstacle/80"
                 title={`Obstacle: ${occThresh.toFixed(2)} ~ 1.00`}
               />
             </div>
@@ -1060,7 +1060,7 @@ function RegionCard({
     <CardFrame visible={region.visible}>
       <div className="flex items-center justify-between mb-2 relative z-10">
         <div className="flex items-center gap-2">
-          <Crop size={16} className="text-emerald-400" />
+          <Crop size={16} className="text-accent-generator" />
           <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
             Region {index + 1}
           </span>
@@ -1093,7 +1093,7 @@ function RegionCard({
           value={region.name}
           onChange={(e) => onUpdateRegion({ name: e.target.value })}
           placeholder="Region Name"
-          className="h-8 text-sm bg-surface-base border-border-base/50 focus:border-emerald-500/50"
+          className="h-8 text-sm bg-surface-base border-border-base/50 focus:border-primary-base/50"
         />
         <div className="mt-2 flex gap-2">
           <CoordField

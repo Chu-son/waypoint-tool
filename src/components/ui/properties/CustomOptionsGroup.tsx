@@ -176,7 +176,7 @@ export function CustomOptionsGroup({
                     className={cn(
                       String(nodeOptVal).trim() === "" &&
                         !isMultiSelection &&
-                        "border-amber-500/50",
+                        "border-status-warning/50",
                     )}
                   />
                 )}

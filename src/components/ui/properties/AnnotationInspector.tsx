@@ -35,16 +35,7 @@ import {
   Maximize2,
 } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState';
-
-const COLOR_PRESETS = [
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Green', hex: '#10B981' },
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Purple', hex: '#8B5CF6' },
-  { name: 'Pink', hex: '#EC4899' },
-  { name: 'White', hex: '#FFFFFF' },
-];
+import { ANNOTATION_COLOR_PRESETS, DEFAULT_ANNOTATION_COLOR } from '../../../utils/colorPresets';
 
 function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
   const plugins = useAppStore((state) => state.plugins);
@@ -207,7 +198,7 @@ function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
       <div className="space-y-2 pt-3 border-t border-border-base/40">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Code2 size={13} className="text-cyan-400" />
+            <Code2 size={13} className="text-accent-automation" />
             <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
           </div>
           <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
@@ -228,7 +219,7 @@ function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
                   `プラグイン: ${group.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`
                 )
               }
-              className="w-full text-[10px] text-cyan-400 hover:bg-cyan-500/10 gap-1 h-6"
+              className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
             >
               <Maximize2 size={11} />
               <span>全画面ダイアログで開く</span>
@@ -248,7 +239,7 @@ function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
           onClick={() => explodeAnnotationGroup(group.id)}
           className="w-full gap-2 text-xs"
         >
-          <Unlink size={13} className="text-amber-400" />
+          <Unlink size={13} className="text-accent-anchor" />
           <span>グループ解除 (Explode)</span>
         </Button>
       </div>
@@ -320,18 +311,18 @@ export function AnnotationInspector() {
     removeAnnotationObjects([obj.id]);
   };
 
-  const currentColor = obj.color || '#3B82F6';
+  const currentColor = obj.color || DEFAULT_ANNOTATION_COLOR;
 
   return (
     <div className="flex-1 overflow-y-auto w-full p-4 space-y-6">
       {/* Header Info */}
       <div className="flex items-center justify-between pb-3 border-b border-border-base/40">
         <div className="flex items-center gap-2">
-          {obj.type === 'point' && <CircleDot size={18} className="text-blue-400" />}
-          {obj.type === 'oriented_point' && <Navigation size={18} className="text-emerald-400" />}
-          {obj.type === 'line' && <Minus size={18} className="text-amber-400" />}
-          {obj.type === 'rect' && <Square size={18} className="text-purple-400" />}
-          {obj.type === 'circle' && <Circle size={18} className="text-pink-400" />}
+          {obj.type === 'point' && <CircleDot size={18} className="text-primary-base" />}
+          {obj.type === 'oriented_point' && <Navigation size={18} className="text-accent-generator" />}
+          {obj.type === 'line' && <Minus size={18} className="text-accent-anchor" />}
+          {obj.type === 'rect' && <Square size={18} className="text-accent-reference" />}
+          {obj.type === 'circle' && <Circle size={18} className="text-accent-reference" />}
           <div>
             <span className="text-xs font-bold text-text-base block">Annotation Inspector</span>
             <span className="text-[10px] text-text-muted font-mono uppercase">{obj.type}</span>
@@ -393,22 +384,22 @@ export function AnnotationInspector() {
             <span>カラー (Color)</span>
           </Label>
           <div className="flex items-center gap-1.5">
-            {COLOR_PRESETS.map((preset) => (
+            {ANNOTATION_COLOR_PRESETS.map((preset) => (
               <button
                 key={preset.hex}
                 type="button"
                 onClick={() => handleColorChange(preset.hex)}
                 className={`w-6 h-6 rounded-full border transition-all ${
                   currentColor.toUpperCase() === preset.hex.toUpperCase()
-                    ? 'ring-2 ring-blue-500 scale-110 border-white shadow-sm'
-                    : 'border-slate-600 hover:scale-105 opacity-80 hover:opacity-100'
+                    ? 'ring-2 ring-border-focus scale-110 border-text-inverse shadow-sm'
+                    : 'border-border-base hover:scale-105 opacity-80 hover:opacity-100'
                 }`}
                 style={{ backgroundColor: preset.hex }}
                 title={preset.name}
               />
             ))}
             <label
-              className="w-6 h-6 rounded-full border border-slate-600 cursor-pointer overflow-hidden relative flex items-center justify-center bg-surface-panel hover:scale-105 transition-all"
+              className="w-6 h-6 rounded-full border border-border-base cursor-pointer overflow-hidden relative flex items-center justify-center bg-surface-panel hover:scale-105 transition-all"
               title="カスタムカラー"
             >
               <input
@@ -619,7 +610,7 @@ export function AnnotationInspector() {
           <div className="space-y-2 pt-3 border-t border-border-base/40">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <Code2 size={13} className="text-cyan-400" />
+                <Code2 size={13} className="text-accent-automation" />
                 <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
               </div>
               <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
@@ -638,7 +629,7 @@ export function AnnotationInspector() {
                     `タイプ: ${obj.type} • 内部メタデータ (Read-only)`
                   )
                 }
-                className="w-full text-[10px] text-cyan-400 hover:bg-cyan-500/10 gap-1 h-6"
+                className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
               >
                 <Maximize2 size={11} />
                 <span>全画面ダイアログで開く</span>

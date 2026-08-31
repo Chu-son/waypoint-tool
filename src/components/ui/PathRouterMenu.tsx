@@ -10,6 +10,7 @@ import { Checkbox } from "./common/Checkbox";
 import { NumericInput } from "./NumericInput";
 import { Route, RefreshCcw, ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { PATH_COLOR_PRESETS, DEFAULT_PATH_COLOR } from "../../utils/colorPresets";
 
 export function PathRouterMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,7 +26,7 @@ export function PathRouterMenu() {
   const isCalculatingPath = useAppStore((state) => state.isCalculatingPath);
   const recalculatePath = useAppStore((state) => state.recalculatePath);
 
-  const pathColor = useAppStore((state) => state.pathColor) || '#10b981';
+  const pathColor = useAppStore((state) => state.pathColor) || DEFAULT_PATH_COLOR;
   const setPathColor = useAppStore((state) => state.setPathColor);
   const pathWidth = useAppStore((state) => state.pathWidth) ?? 0.1;
   const setPathWidth = useAppStore((state) => state.setPathWidth);
@@ -34,8 +35,6 @@ export function PathRouterMenu() {
   const syncPathWidthWithFootprint = useAppStore((state) => state.syncPathWidthWithFootprint);
   const setSyncPathWidthWithFootprint = useAppStore((state) => state.setSyncPathWidthWithFootprint);
   const robotFootprint = useAppStore((state) => state.robotFootprint);
-
-  const PRESET_COLORS = ['#10b981', '#0ea5e9', '#8b5cf6', '#f59e0b', '#f43f5e', '#ffffff'];
 
   let currentFootprintWidth = 0.5;
   if (robotFootprint) {
@@ -90,13 +89,13 @@ export function PathRouterMenu() {
         className={cn(
           "px-2.5 py-1 text-[12px] font-medium transition-all rounded-md flex items-center gap-1.5 border",
           activePlugin
-            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+            ? "bg-accent-generator/10 text-accent-generator border-accent-generator/30 hover:bg-accent-generator/20"
             : "text-text-muted border-border-base/50 hover:bg-surface-hover hover:text-text-base",
           isOpen && "ring-1 ring-primary-base"
         )}
         title="Path Routing Settings"
       >
-        <Route size={14} className={activePlugin ? "text-emerald-400" : "text-text-muted"} />
+        <Route size={14} className={activePlugin ? "text-accent-generator" : "text-text-muted"} />
         <span className="truncate max-w-[140px]">
           {activePlugin ? activePlugin.manifest.name : "Route: Straight"}
         </span>
@@ -107,11 +106,11 @@ export function PathRouterMenu() {
         <div className="absolute left-0 top-full mt-1.5 w-80 bg-surface-panel/95 backdrop-blur-md border border-border-base shadow-2xl rounded-2xl p-4 z-50 animate-in fade-in slide-in-from-top-1 duration-100 space-y-4 max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-border-base/40 pb-2">
             <div className="flex items-center gap-2">
-              <Route size={16} className="text-emerald-400" />
+              <Route size={16} className="text-accent-generator" />
               <h3 className="text-xs font-bold text-text-base">Path Routing</h3>
             </div>
             {isCalculatingPath && (
-              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+              <span className="text-[10px] text-accent-generator font-mono flex items-center gap-1">
                 <RefreshCcw size={10} className="animate-spin" /> Calculating
               </span>
             )}
@@ -147,14 +146,14 @@ export function PathRouterMenu() {
               <div className="flex items-center justify-between">
                 <Label className="text-[11px] text-text-muted">Color</Label>
                 <div className="flex items-center gap-1">
-                  {PRESET_COLORS.map(c => (
+                  {PATH_COLOR_PRESETS.map(c => (
                     <button
                       key={c}
                       type="button"
                       onClick={() => setPathColor(c)}
                       className={cn(
                         "w-3.5 h-3.5 rounded-full border transition-transform hover:scale-110",
-                        pathColor.toLowerCase() === c.toLowerCase() ? "ring-2 ring-primary-base ring-offset-1 border-white" : "border-border-base/60"
+                        pathColor.toLowerCase() === c.toLowerCase() ? "ring-2 ring-primary-base ring-offset-1 border-text-inverse" : "border-border-base/60"
                       )}
                       style={{ backgroundColor: c }}
                       title={c}
@@ -173,7 +172,7 @@ export function PathRouterMenu() {
                   value={pathColor}
                   onChange={(e) => setPathColor(e.target.value)}
                   className="flex-1 h-7 px-2 py-1 text-xs font-mono"
-                  placeholder="#10b981"
+                  placeholder={DEFAULT_PATH_COLOR}
                 />
               </div>
             </div>
@@ -213,7 +212,7 @@ export function PathRouterMenu() {
                   {syncPathWidthWithFootprint ? "Footprint Width" : "Path Width"}
                 </Label>
                 {syncPathWidthWithFootprint && (
-                  <span className="text-[10px] text-emerald-400 font-mono">
+                  <span className="text-[10px] text-accent-generator font-mono">
                     (Footprint: {currentFootprintWidth.toFixed(2)}m)
                   </span>
                 )}

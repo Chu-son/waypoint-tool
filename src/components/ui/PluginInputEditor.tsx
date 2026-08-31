@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Label } from "./common/Label";
 import { cn } from "../../utils/cn";
 import { useAppStore } from "../../stores/appStore";
+import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { Select } from "./common/Select";
 import { Input } from "./common/Input";
 import { Button } from "./common/Button";
@@ -74,7 +75,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
             <span
               className={cn(
                 "w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0",
-                isActive ? "bg-primary-base text-white shadow-sm" : hasData ? "bg-emerald-600 text-white" : "bg-surface-hover text-text-muted"
+                isActive ? "bg-primary-base text-text-inverse shadow-sm" : hasData ? "bg-status-success text-text-inverse" : "bg-surface-hover text-text-muted"
               )}
             >
               {index + 1}
@@ -555,7 +556,7 @@ function PointsListForm({
       </div>
 
       {minPoints > 0 && points.length < minPoints && (
-        <p className="text-[10px] text-amber-500/90 font-medium">
+        <p className="text-[10px] text-status-warning/90 font-medium">
           At least {minPoints} {minPoints === 1 ? "point is" : "points are"} required.
         </p>
       )}
@@ -685,7 +686,7 @@ function AnnotationSelectForm({ input, value, onChange }: AnnotationSelectFormPr
             />
             <span
               className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: obj.color || '#3B82F6' }}
+              style={{ backgroundColor: obj.color || DEFAULT_ANNOTATION_COLOR }}
             />
             <span className="truncate flex-1 font-medium">{obj.name}</span>
             <span className="text-[10px] text-text-muted uppercase font-mono">{obj.type}</span>
@@ -783,7 +784,7 @@ function CustomLayerSelectForm({ input, value, onChange }: CustomLayerSelectForm
                   <button
                     type="button"
                     onClick={() => handleRemove(layerId)}
-                    className="text-text-muted hover:text-red-400 p-0.5 rounded transition-colors"
+                    className="text-text-muted hover:text-danger-base p-0.5 rounded transition-colors"
                     title="削除"
                   >
                     <X size={12} />

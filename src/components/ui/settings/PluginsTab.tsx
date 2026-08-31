@@ -423,19 +423,19 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                       <div className="mt-1 flex items-center gap-3">
                         <div className="flex items-center gap-2">
                           {plugin.is_builtin ? (
-                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent-blue-400/10 text-accent-blue-400 border border-accent-blue-400/20 text-[10px] font-bold">
+                            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent-automation/10 text-accent-automation border border-accent-automation/20 text-[10px] font-bold">
                               <Check size={10} />
                               <span>SDK Bundled {bundledSdkVersion ? `v${bundledSdkVersion}` : ""}</span>
                             </div>
                           ) : plugin.sdk_version ? (
                             plugin.sdk_version === bundledSdkVersion ? (
-                              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent-green-400/10 text-accent-green-400 border border-accent-green-400/20 text-[10px] font-bold">
+                              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-success/10 text-status-success border border-status-success/20 text-[10px] font-bold">
                                 <Check size={10} />
                                 <span>SDK v{plugin.sdk_version} (Up to date)</span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent-orange-400/10 text-accent-orange-400 border border-accent-orange-400/20 text-[10px] font-bold">
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-warning/10 text-status-warning border border-status-warning/20 text-[10px] font-bold">
                                   <AlertCircle size={10} />
                                   <span>SDK v{plugin.sdk_version} (v{bundledSdkVersion} available)</span>
                                 </div>
@@ -461,7 +461,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                                       alert(`SDK 更新に失敗しました: ${String(err)}`);
                                     }
                                   }}
-                                  className="text-[10px] font-bold text-accent-orange-400 hover:text-accent-orange-300 flex items-center gap-1 bg-accent-orange-400/5 hover:bg-accent-orange-400/10 px-2 py-0.5 rounded-md transition-colors"
+                                  className="text-[10px] font-bold text-status-warning hover:text-status-warning/80 flex items-center gap-1 bg-status-warning/5 hover:bg-status-warning/10 px-2 py-0.5 rounded-md transition-colors"
                                 >
                                   <RefreshCw size={10} /> Update SDK
                                 </button>

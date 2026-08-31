@@ -88,7 +88,7 @@ export function GeneratorNodePanel({
   return (
     <div className="flex-1 overflow-y-auto w-full p-4 flex flex-col h-full">
       <div className="mb-4 pb-3 border-b border-border-base/50">
-        <h2 className="text-sm font-bold text-emerald-400 mb-1 flex items-center gap-2">
+        <h2 className="text-sm font-bold text-accent-generator mb-1 flex items-center gap-2">
           <Settings2 size={16} /> Generator Node
         </h2>
         <p className="text-[11px] text-text-muted font-mono break-all">
@@ -140,7 +140,7 @@ export function GeneratorNodePanel({
           <div className="space-y-2 pt-3 border-t border-border-base/40">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <Code2 size={13} className="text-cyan-400" />
+                <Code2 size={13} className="text-accent-automation" />
                 <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
               </div>
               <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
@@ -161,7 +161,7 @@ export function GeneratorNodePanel({
                       `ノードID: ${node.id} • 内部メタデータ (Read-only)`
                     )
                   }
-                  className="w-full text-[10px] text-cyan-400 hover:bg-cyan-500/10 gap-1 h-6"
+                  className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
                 >
                   <Maximize2 size={11} />
                   <span>全画面ダイアログで開く</span>

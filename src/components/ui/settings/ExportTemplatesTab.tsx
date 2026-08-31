@@ -529,7 +529,7 @@ export function ExportTemplatesTab() {
                               `{{options.${o.name}}}`,
                             )
                           }
-                          className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-cyan-400 border border-border-base/50 transition-all font-bold shadow-sm"
+                          className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
                         >
                           {`{{options.${o.name}}}`}
                         </button>

@@ -230,7 +230,7 @@ export function CustomLayerInspector() {
             <div className={cn(
               "p-1.5 rounded-lg",
               isNewPluginLayer || existingLayer?.type === "plugin"
-                ? "bg-cyan-500/10 text-cyan-400"
+                ? "bg-accent-automation/10 text-accent-automation"
                 : "bg-primary-base/10 text-primary-base"
             )}>
               {isNewPluginLayer || existingLayer?.type === "plugin" ? <Sparkles size={16} /> : <Pencil size={16} />}
@@ -298,7 +298,7 @@ export function CustomLayerInspector() {
                   className={cn(
                     "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
                     isMapEditMode && mapEditSubTool === "line"
-                      ? "bg-primary-base text-white shadow-sm"
+                      ? "bg-primary-base text-text-inverse shadow-sm"
                       : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
                   )}
                 >
@@ -315,7 +315,7 @@ export function CustomLayerInspector() {
                   className={cn(
                     "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
                     isMapEditMode && mapEditSubTool === "rect"
-                      ? "bg-primary-base text-white shadow-sm"
+                      ? "bg-primary-base text-text-inverse shadow-sm"
                       : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
                   )}
                 >
@@ -332,7 +332,7 @@ export function CustomLayerInspector() {
                   className={cn(
                     "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
                     isMapEditMode && mapEditSubTool === "circle"
-                      ? "bg-primary-base text-white shadow-sm"
+                      ? "bg-primary-base text-text-inverse shadow-sm"
                       : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
                   )}
                 >
@@ -349,7 +349,7 @@ export function CustomLayerInspector() {
                   className={cn(
                     "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
                     isMapEditMode && mapEditSubTool === "freehand"
-                      ? "bg-primary-base text-white shadow-sm"
+                      ? "bg-primary-base text-text-inverse shadow-sm"
                       : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
                   )}
                 >
@@ -369,11 +369,11 @@ export function CustomLayerInspector() {
                   className={cn(
                     "flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all",
                     mapEditFillValue === 0
-                      ? "bg-neutral-900 border-neutral-700 text-white shadow-sm"
-                      : "bg-surface-base border-border-base/40 text-text-muted hover:text-text-base"
+                      ? "bg-surface-base border-border-base text-text-inverse shadow-sm"
+                      : "bg-surface-panel border-border-base/40 text-text-muted hover:text-text-base"
                   )}
                 >
-                  <div className="w-2.5 h-2.5 rounded-full bg-black border border-neutral-600" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-surface-base border border-border-base" />
                   <span>Obstacle (0)</span>
                 </button>
                 <button
@@ -382,11 +382,11 @@ export function CustomLayerInspector() {
                   className={cn(
                     "flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all",
                     mapEditFillValue === 255
-                      ? "bg-white border-neutral-300 text-black shadow-sm"
-                      : "bg-surface-base border-border-base/40 text-text-muted hover:text-text-base"
+                      ? "bg-text-inverse border-border-base text-surface-base shadow-sm"
+                      : "bg-surface-panel border-border-base/40 text-text-muted hover:text-text-base"
                   )}
                 >
-                  <div className="w-2.5 h-2.5 rounded-full bg-white border border-neutral-400" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-text-inverse border border-border-base" />
                   <span>Free (255)</span>
                 </button>
               </div>
@@ -543,7 +543,7 @@ export function CustomLayerInspector() {
               <div className="space-y-2 pt-3 border-t border-border-base/40">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Code2 size={13} className="text-cyan-400" />
+                    <Code2 size={13} className="text-accent-automation" />
                     <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
                   </div>
                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
@@ -568,7 +568,7 @@ export function CustomLayerInspector() {
                           `プラグイン: ${(existingLayer as any).plugin_id} • 内部メタデータ (Read-only)`
                         )
                       }
-                      className="w-full text-[10px] text-cyan-400 hover:bg-cyan-500/10 gap-1 h-6"
+                      className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
                     >
                       <Maximize2 size={11} />
                       <span>全画面ダイアログで開く</span>
@@ -592,7 +592,7 @@ export function CustomLayerInspector() {
           <div className="p-3 rounded-xl bg-surface-base/50 border border-border-base/40 space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bookmark size={15} className={isReference ? "text-purple-400 fill-purple-400" : "text-text-muted"} />
+                <Bookmark size={15} className={isReference ? "text-accent-reference fill-accent-reference" : "text-text-muted"} />
                 <span className="text-xs font-bold text-text-base">Reference Layer</span>
               </div>
               <Checkbox
@@ -655,7 +655,7 @@ export function CustomLayerInspector() {
               </Select>
             </div>
             {isReference && (
-              <p className="text-[9px] text-purple-300/80 text-right">
+              <p className="text-[9px] text-accent-reference/80 text-right">
                 ※ 参照レイヤーのため合成されません
               </p>
             )}
@@ -677,7 +677,7 @@ export function CustomLayerInspector() {
               variant="primary"
               onClick={handleExecutePlugin}
               disabled={isExecuting || !activePlugin}
-              className="w-full h-9 text-xs font-bold gap-2 bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 text-white shadow-md shadow-cyan-500/20"
+              className="w-full h-9 text-xs font-bold gap-2 text-text-inverse shadow-md"
             >
               {isExecuting ? (
                 <>

@@ -56,16 +56,16 @@ export function WorkflowPanel() {
               className={cn(
                 "w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2 transition-all cursor-pointer",
                 isActive
-                  ? "bg-primary-base text-white font-bold shadow-sm"
+                  ? "bg-primary-base text-text-inverse font-bold shadow-sm"
                   : isPassed
                   ? "text-text-base hover:bg-surface-hover/80"
                   : "text-text-muted hover:bg-surface-hover/50"
               )}
             >
               {isPassed ? (
-                <CheckCircle2 size={14} className={isActive ? "text-white" : "text-primary-base shrink-0"} />
+                <CheckCircle2 size={14} className={isActive ? "text-text-inverse" : "text-primary-base shrink-0"} />
               ) : (
-                <Circle size={14} className={isActive ? "text-white" : "text-text-muted/60 shrink-0"} />
+                <Circle size={14} className={isActive ? "text-text-inverse" : "text-text-muted/60 shrink-0"} />
               )}
               <span className="truncate flex-1">{step.title}</span>
             </button>

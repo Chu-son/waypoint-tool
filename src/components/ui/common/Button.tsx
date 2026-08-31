@@ -8,7 +8,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary: "bg-primary-base text-text-inverse hover:bg-primary-hover focus:ring-primary-base/50",
-        secondary: "bg-surface-hover text-text-base hover:bg-slate-600 focus:ring-border-focus/50",
+        secondary: "bg-surface-hover text-text-base hover:bg-surface-hover/80 focus:ring-border-focus/50",
         outline: "border border-border-base bg-transparent text-text-base hover:bg-surface-hover focus:ring-border-focus/50",
         ghost: "bg-transparent text-text-muted hover:bg-surface-hover hover:text-text-base",
         danger: "bg-danger-base text-text-inverse hover:bg-danger-hover",

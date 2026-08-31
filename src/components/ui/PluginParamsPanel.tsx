@@ -262,7 +262,7 @@ export function PluginParamsPanel() {
                     className={cn(
                       "flex-1 py-1 px-1 h-auto text-[10px]",
                       isActive && "bg-primary-base/20 border-primary-base text-primary-base",
-                      hasData && !isActive && "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+                      hasData && !isActive && "bg-status-success/10 border-status-success/30 text-status-success",
                       !isActive && !hasData && "bg-surface-panel/50 border-border-base/50 text-text-muted hover:border-border-base"
                     )}
                     title={inp.label || key}
@@ -271,7 +271,7 @@ export function PluginParamsPanel() {
                       <span
                         className={cn(
                           "w-4 h-4 rounded-full text-[9px] flex items-center justify-center font-bold",
-                          isActive ? "bg-primary-base text-white" : hasData ? "bg-emerald-600 text-white" : "bg-surface-hover text-text-muted"
+                          isActive ? "bg-primary-base text-text-inverse" : hasData ? "bg-status-success text-text-inverse" : "bg-surface-hover text-text-muted"
                         )}
                       >
                         {idx + 1}
@@ -363,7 +363,8 @@ export function PluginParamsPanel() {
             isExecuting || (needsSelection && selectedNodeIds.length === 0)
           }
           onClick={handleExecute}
-          className="h-9 w-full bg-primary-base hover:bg-primary-hover text-white"
+          variant="primary"
+          className="h-9 w-full"
         >
           {isExecuting ? (
             <RefreshCcw size={14} className="animate-spin mr-2" />

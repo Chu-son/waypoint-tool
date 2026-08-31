@@ -43,7 +43,7 @@ export function TransformField({
           "block text-xs mb-1 cursor-context-menu select-none",
           isCopying
             ? isAnchor
-              ? "text-amber-400 font-bold"
+              ? "text-accent-anchor font-bold"
               : "text-primary-base font-bold"
             : "text-text-muted hover:text-text-base"
         )}
@@ -63,7 +63,7 @@ export function TransformField({
         step={step}
         className={cn(
           isCopying &&
-            (isAnchor ? "border-amber-400 bg-amber-950/20" : "border-primary-base bg-primary-base/10")
+            (isAnchor ? "border-accent-anchor bg-accent-anchor/20" : "border-primary-base bg-primary-base/10")
         )}
         onEditStart={onEditStart}
         onEditEnd={onEditEnd}

@@ -412,7 +412,7 @@ function PolygonEditor({
               setTimeout(() => setIsCopied(false), 2000);
             }}
           >
-            {isCopied ? <Check size={11} className="mr-1 text-emerald-400" /> : <Copy size={11} className="mr-1" />}
+            {isCopied ? <Check size={11} className="mr-1 text-status-success" /> : <Copy size={11} className="mr-1" />}
             {isCopied ? "Copied" : "Copy"}
           </Button>
         </div>
@@ -479,7 +479,7 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
       {/* Grid lines */}
       <defs>
         <pattern id="footprint-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--color-border-base)" strokeOpacity="0.3" strokeWidth="1" />
         </pattern>
       </defs>
       <rect width={size} height={size} fill="url(#footprint-grid)" />
@@ -497,7 +497,7 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
       <line x1={cx} y1={cy} x2={cx} y2={cy - 30} stroke="#22c55e" strokeWidth="2" />
       <polygon points={`${cx},${cy - 35} ${cx - 4},${cy - 27} ${cx + 4},${cy - 27}`} fill="#22c55e" />
 
-      <circle cx={cx} cy={cy} r="3" fill="#38bdf8" />
+      <circle cx={cx} cy={cy} r="3" fill="var(--color-primary-base)" />
 
       {/* Shape Rendering */}
       {footprint.type === "circular" && (
@@ -505,8 +505,9 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
           cx={cx}
           cy={cy}
           r={footprint.radius * scale}
-          fill="rgba(56, 189, 248, 0.15)"
-          stroke="#38bdf8"
+          fill="var(--color-primary-base)"
+          fillOpacity="0.15"
+          stroke="var(--color-primary-base)"
           strokeWidth="2"
         />
       )}
@@ -517,8 +518,9 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
           y={toSvgY((footprint.offset_y || 0) + footprint.width / 2)}
           width={footprint.length * scale}
           height={footprint.width * scale}
-          fill="rgba(56, 189, 248, 0.15)"
-          stroke="#38bdf8"
+          fill="var(--color-primary-base)"
+          fillOpacity="0.15"
+          stroke="var(--color-primary-base)"
           strokeWidth="2"
           rx="2"
         />
@@ -527,8 +529,9 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
       {footprint.type === "polygon" && footprint.points.length >= 3 && (
         <polygon
           points={footprint.points.map((p) => `${toSvgX(p[0])},${toSvgY(p[1])}`).join(" ")}
-          fill="rgba(56, 189, 248, 0.15)"
-          stroke="#38bdf8"
+          fill="var(--color-primary-base)"
+          fillOpacity="0.15"
+          stroke="var(--color-primary-base)"
           strokeWidth="2"
         />
       )}

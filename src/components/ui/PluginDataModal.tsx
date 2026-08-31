@@ -26,12 +26,12 @@ export function PluginDataModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-surface-base/80 backdrop-blur-xs">
       <div className="bg-surface-panel border border-border-base rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="px-5 py-4 border-b border-border-base/40 flex items-center justify-between bg-surface-panel/80">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <div className="p-2 rounded-xl bg-accent-automation/10 text-accent-automation border border-accent-automation/20">
               <Code2 size={20} />
             </div>
             <div>
@@ -55,8 +55,8 @@ export function PluginDataModal() {
         </div>
 
         {/* Info Banner */}
-        <div className="px-5 py-2.5 bg-cyan-500/5 border-b border-cyan-500/15 flex items-center gap-2 text-xs text-cyan-300">
-          <Info size={14} className="shrink-0 text-cyan-400" />
+        <div className="px-5 py-2.5 bg-accent-automation/5 border-b border-accent-automation/15 flex items-center gap-2 text-xs text-accent-automation">
+          <Info size={14} className="shrink-0 text-accent-automation" />
           <span>
             プラグインが内部計算結果として出力した読み取り専用のメタデータです。他のプラグインへの入力パイプライン等でも参照されます。
           </span>
@@ -93,7 +93,7 @@ export function PluginDataModal() {
                 onClick={handleCopyAll}
                 className="gap-1.5 text-xs shadow-xs"
               >
-                {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                {copied ? <Check size={13} className="text-status-success" /> : <Copy size={13} />}
                 <span>{copied ? 'コピー完了' : 'JSON をコピー'}</span>
               </Button>
             )}

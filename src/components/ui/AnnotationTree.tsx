@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Button } from './common/Button';
 import { cn } from '../../utils/cn';
+import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import {
   DndContext,
   closestCenter,
@@ -48,15 +49,15 @@ import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
 function getAnnotationIcon(type: AnnotationType) {
   switch (type) {
     case 'point':
-      return <CircleDot size={13} className="text-blue-400" />;
+      return <CircleDot size={13} className="text-primary-base" />;
     case 'oriented_point':
-      return <Navigation size={13} className="text-emerald-400" />;
+      return <Navigation size={13} className="text-accent-generator" />;
     case 'line':
-      return <Minus size={13} className="text-amber-400" />;
+      return <Minus size={13} className="text-accent-anchor" />;
     case 'rect':
-      return <Square size={13} className="text-purple-400" />;
+      return <Square size={13} className="text-accent-reference" />;
     case 'circle':
-      return <Circle size={13} className="text-pink-400" />;
+      return <Circle size={13} className="text-accent-reference" />;
     default:
       return <CircleDot size={13} />;
   }
@@ -189,13 +190,13 @@ function SortableAnnotationTreeNode({
           {/* Group / Annotation Icon */}
           <div className="shrink-0 flex items-center gap-1">
             {isGroup ? (
-              isGenerator ? <Wand2 size={13} className="text-primary-base" /> : <Folder size={13} className="text-amber-400" />
+              isGenerator ? <Wand2 size={13} className="text-primary-base" /> : <Folder size={13} className="text-accent-anchor" />
             ) : obj ? (
               <>
                 <span
-                  className="w-2 h-2 rounded-full border border-slate-600 shadow-xs shrink-0"
-                  style={{ backgroundColor: obj.color || '#3B82F6' }}
-                  title={`Color: ${obj.color || '#3B82F6'}`}
+                  className="w-2 h-2 rounded-full border border-border-base shadow-xs shrink-0"
+                  style={{ backgroundColor: obj.color || DEFAULT_ANNOTATION_COLOR }}
+                  title={`Color: ${obj.color || DEFAULT_ANNOTATION_COLOR}`}
                 />
                 {getAnnotationIcon(obj.type)}
               </>
@@ -560,7 +561,7 @@ export function AnnotationTree() {
                   onClick={handleCreateGroup}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
                 >
-                  <FolderPlus size={13} className="text-amber-400" />
+                  <FolderPlus size={13} className="text-accent-anchor" />
                   <span>
                     {targetIds.length > 1
                       ? `選択項目をグループ化 (${targetIds.length})`
@@ -576,7 +577,7 @@ export function AnnotationTree() {
                   }}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Edit2 size={13} className="text-blue-400" />
+                  <Edit2 size={13} className="text-primary-base" />
                   <span>名前を変更 (Rename)</span>
                 </button>
 
@@ -589,7 +590,7 @@ export function AnnotationTree() {
                     }}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Unlink size={13} className="text-amber-400" />
+                    <Unlink size={13} className="text-accent-anchor" />
                     <span>グループ解除 (Ungroup)</span>
                   </button>
                 )}
@@ -604,7 +605,7 @@ export function AnnotationTree() {
                   }}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Copy size={13} className="text-cyan-400" />
+                  <Copy size={13} className="text-accent-automation" />
                   <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
                 </button>
 
@@ -628,7 +629,7 @@ export function AnnotationTree() {
                   }}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Code2 size={13} className="text-cyan-400" />
+                  <Code2 size={13} className="text-accent-automation" />
                   <span>内部プロパティを表示</span>
                 </button>
 

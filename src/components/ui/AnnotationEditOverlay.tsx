@@ -6,15 +6,7 @@ import { CircleDot, Navigation, Minus, Square, Circle, MousePointer, Check, Tras
 import { AnnotationToolType } from '../../stores/slices/annotationSlice';
 import { useResponsiveContainer } from '../../hooks/useResponsiveContainer';
 
-const COLOR_PRESETS = [
-  { name: 'Blue', hex: '#3B82F6' },
-  { name: 'Green', hex: '#10B981' },
-  { name: 'Amber', hex: '#F59E0B' },
-  { name: 'Red', hex: '#EF4444' },
-  { name: 'Purple', hex: '#8B5CF6' },
-  { name: 'Pink', hex: '#EC4899' },
-  { name: 'White', hex: '#FFFFFF' },
-];
+import { ANNOTATION_COLOR_PRESETS } from '../../utils/colorPresets';
 
 export function AnnotationEditOverlay() {
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
@@ -70,7 +62,7 @@ export function AnnotationEditOverlay() {
   return (
     <FloatingActionBanner
       ref={containerRef}
-      icon={<Palette size={16} className="animate-pulse text-blue-400" />}
+      icon={<Palette size={16} className="animate-pulse text-primary-base" />}
       title={isCompact ? 'アノテーション' : 'アノテーション配置・編集モード'}
       subtitle={selectedObj ? `選択中: ${selectedObj.name} (${selectedObj.type})` : (isCompact ? undefined : 'ドラッグまたはクリックで配置')}
       statusText={
@@ -100,22 +92,22 @@ export function AnnotationEditOverlay() {
               <span className="text-[11px] font-semibold text-text-muted">カラー:</span>
             )}
             <div className="flex items-center gap-0.5">
-              {COLOR_PRESETS.map((preset) => (
+              {ANNOTATION_COLOR_PRESETS.map((preset) => (
                 <button
                   key={preset.hex}
                   type="button"
                   onClick={() => handleColorChange(preset.hex)}
                   className={`w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full border transition-all ${
                     currentColor.toUpperCase() === preset.hex.toUpperCase()
-                      ? 'ring-2 ring-blue-500 scale-110 border-white'
-                      : 'border-slate-600 hover:scale-105 opacity-80 hover:opacity-100'
+                      ? 'ring-2 ring-border-focus scale-110 border-text-inverse'
+                      : 'border-border-base hover:scale-105 opacity-80 hover:opacity-100'
                   }`}
                   style={{ backgroundColor: preset.hex }}
                   title={preset.name}
                 />
               ))}
               <label
-                className="w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full border border-slate-600 cursor-pointer overflow-hidden relative flex items-center justify-center bg-surface-panel hover:scale-105 transition-all"
+                className="w-4 h-4 sm:w-4.5 sm:h-4.5 rounded-full border border-border-base cursor-pointer overflow-hidden relative flex items-center justify-center bg-surface-panel hover:scale-105 transition-all"
                 title="カスタムカラー"
               >
                 <input

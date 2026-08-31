@@ -57,7 +57,7 @@ function PluginCard({
       <div
         className={cn(
           "p-2 rounded-lg shrink-0",
-          isActive ? "bg-primary-base text-white" : "bg-surface-hover text-text-muted"
+          isActive ? "bg-primary-base text-text-inverse" : "bg-surface-hover text-text-muted"
         )}
       >
         <PluginIcon iconStr={iconStr} size={18} />
@@ -188,7 +188,7 @@ export function PluginListPanel() {
             className={cn(
               "px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap transition-colors",
               filterCategory === tab.id
-                ? "bg-primary-base text-white shadow-xs"
+                ? "bg-primary-base text-text-inverse shadow-xs"
                 : "bg-surface-panel/60 text-text-muted hover:text-text-base hover:bg-surface-hover"
             )}
           >

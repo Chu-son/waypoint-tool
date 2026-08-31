@@ -38,14 +38,14 @@ export const FloatingActionBanner = React.forwardRef<HTMLDivElement, FloatingAct
       <div
         ref={ref}
         className={cn(
-          "absolute top-4 left-16 max-w-[calc(100%-5rem)] z-20 flex items-center gap-2 sm:gap-3 bg-surface-panel/95 backdrop-blur-md border border-amber-500/50 shadow-2xl rounded-xl px-3 sm:px-4 py-2 text-xs text-text-base animate-in fade-in slide-in-from-top-2 duration-200 overflow-x-auto scrollbar-thin flex-nowrap",
+          "absolute top-4 left-16 max-w-[calc(100%-5rem)] z-20 flex items-center gap-2 sm:gap-3 bg-surface-panel/95 backdrop-blur-md border border-accent-anchor/50 shadow-2xl rounded-xl px-3 sm:px-4 py-2 text-xs text-text-base animate-in fade-in slide-in-from-top-2 duration-200 overflow-x-auto scrollbar-thin flex-nowrap",
           className
         )}
       >
         <div className="flex items-center gap-2 pr-2 border-r border-border-base/50 flex-shrink-0">
-          {icon && <div className="text-amber-400 flex-shrink-0">{icon}</div>}
+          {icon && <div className="text-accent-anchor flex-shrink-0">{icon}</div>}
           <div className="min-w-0 max-w-[120px] sm:max-w-[180px]">
-            <div className="font-semibold text-amber-300 truncate" title={title}>
+            <div className="font-semibold text-accent-anchor truncate" title={title}>
               {title}
             </div>
             {subtitle && (
@@ -78,8 +78,8 @@ export const FloatingActionBanner = React.forwardRef<HTMLDivElement, FloatingAct
               title={act.title}
               className={
                 act.variant === 'primary'
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white font-medium gap-1 shadow disabled:opacity-50 flex-shrink-0 h-7 text-xs px-2.5'
-                  : 'hover:bg-rose-900/40 hover:text-rose-300 gap-1 flex-shrink-0 h-7 text-xs px-2.5'
+                  ? 'bg-status-success hover:bg-status-success/80 text-text-inverse font-medium gap-1 shadow disabled:opacity-50 flex-shrink-0 h-7 text-xs px-2.5'
+                  : 'hover:bg-danger-base/20 hover:text-danger-base gap-1 flex-shrink-0 h-7 text-xs px-2.5'
               }
             >
               {act.icon}

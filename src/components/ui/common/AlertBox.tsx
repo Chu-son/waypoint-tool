@@ -15,8 +15,8 @@ const variantStyles = {
   primary: "bg-primary-base/10 border-primary-base/30 text-primary-base",
   info: "bg-primary-base/10 border-primary-base/30 text-primary-base",
   danger: "bg-danger-base/10 border-danger-base/30 text-danger-base",
-  warning: "bg-amber-500/10 border-amber-500/30 text-amber-500",
-  success: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+  warning: "bg-status-warning/10 border-status-warning/30 text-status-warning",
+  success: "bg-status-success/10 border-status-success/30 text-status-success",
 };
 
 export function AlertBox({

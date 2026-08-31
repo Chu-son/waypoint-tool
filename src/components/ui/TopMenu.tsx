@@ -79,14 +79,14 @@ function DropdownMenu({
                   "w-full text-left px-4 py-1.5 text-[13px] flex justify-between items-center transition-colors group",
                   opt.disabled
                     ? "text-text-muted/40 cursor-not-allowed hover:bg-transparent hover:text-text-muted/40"
-                    : opt.danger ? "text-danger-base hover:bg-danger-base/10" : "text-text-muted hover:bg-primary-base hover:text-white"
+                    : opt.danger ? "text-danger-base hover:bg-danger-base/10" : "text-text-muted hover:bg-primary-base hover:text-text-inverse"
                 )}
               >
                 <span>{opt.label}</span>
                 {opt.shortcut && (
                   <span className={cn(
                     "text-[10px] text-text-muted font-mono tracking-tighter truncate ml-2",
-                    !opt.danger && "group-hover:text-white/80"
+                    !opt.danger && "group-hover:text-text-inverse/80"
                   )}>
                     {opt.shortcut}
                   </span>
@@ -148,7 +148,7 @@ function WindowControls({ onExit }: { onExit: () => void }) {
       </button>
       <button
         onClick={onExit}
-        className="p-1 hover:bg-danger-base hover:text-white text-text-muted transition-colors rounded-md"
+        className="p-1 hover:bg-danger-base hover:text-text-inverse text-text-muted transition-colors rounded-md"
       >
         <X size={16} />
       </button>

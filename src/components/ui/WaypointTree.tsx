@@ -119,10 +119,10 @@ function SortableTreeNodeItem({
           'group relative flex items-center justify-between gap-1 py-1.5 pr-1.5 rounded-lg text-xs transition-all cursor-pointer border overflow-hidden',
           isSelected
             ? isGenerator
-              ? 'bg-emerald-500/20 border-emerald-500 text-text-base shadow-sm ring-1 ring-emerald-500/30'
+              ? 'bg-accent-generator/20 border-accent-generator text-text-base shadow-sm ring-1 ring-accent-generator/30'
               : 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30'
             : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
-          isAnchor && 'border-amber-400/60 bg-amber-950/20'
+          isAnchor && 'border-accent-anchor/60 bg-accent-anchor/20'
         )}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
@@ -156,9 +156,9 @@ function SortableTreeNodeItem({
           {/* Node Icon */}
           <div className="shrink-0 flex items-center">
             {isGenerator ? (
-              <Layers size={13} className="text-emerald-400" />
+              <Layers size={13} className="text-accent-generator" />
             ) : isGroup ? (
-              <Folder size={13} className="text-amber-400" />
+              <Folder size={13} className="text-accent-anchor" />
             ) : (
               <span className="text-xs">🎯</span>
             )}
@@ -193,7 +193,7 @@ function SortableTreeNodeItem({
                 {isContainer ? (node.name || defaultDisplayName) : defaultDisplayName}
               </span>
               {isAnchor && (
-                <span className="text-amber-400 text-xs font-bold shrink-0" title="Anchor Point">
+                <span className="text-accent-anchor text-xs font-bold shrink-0" title="Anchor Point">
                   ⚓
                 </span>
               )}
@@ -351,7 +351,7 @@ export function WaypointTree() {
       </div>
 
       {rootNodeIds.length === 0 ? (
-        <div className="text-sm text-slate-500 italic p-4 text-center">
+        <div className="text-sm text-text-muted/60 italic p-4 text-center">
           No items yet. Drag to create points on the map.
         </div>
       ) : (
@@ -407,7 +407,7 @@ export function WaypointTree() {
                 <GripVertical size={13} className="text-primary-base" />
                 <span className="font-semibold">{activeDragNode.name || 'Waypoint'}</span>
                 {selectedNodeIds.length > 1 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-primary-base text-surface-base font-bold text-[10px]">
+                  <span className="px-1.5 py-0.2 rounded-full bg-primary-base text-text-inverse font-bold text-[10px]">
                     +{selectedNodeIds.length}
                   </span>
                 )}
@@ -437,7 +437,7 @@ export function WaypointTree() {
                   onClick={handleCreateGroup}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
                 >
-                  <FolderPlus size={13} className="text-amber-400" />
+                  <FolderPlus size={13} className="text-accent-anchor" />
                   <span>
                     {targetIds.length > 1
                       ? `選択項目をグループ化 (${targetIds.length})`
@@ -453,7 +453,7 @@ export function WaypointTree() {
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Edit2 size={13} className="text-blue-400" />
+                  <Edit2 size={13} className="text-primary-base" />
                   <span>名前を変更 (Rename)</span>
                 </button>
 
@@ -466,7 +466,7 @@ export function WaypointTree() {
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Unlink size={13} className="text-amber-400" />
+                    <Unlink size={13} className="text-accent-anchor" />
                     <span>グループ解除 (Ungroup)</span>
                   </button>
                 )}
@@ -481,7 +481,7 @@ export function WaypointTree() {
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Copy size={13} className="text-cyan-400" />
+                  <Copy size={13} className="text-accent-automation" />
                   <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
                 </button>
 
@@ -498,7 +498,7 @@ export function WaypointTree() {
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                 >
-                  <Code2 size={13} className="text-cyan-400" />
+                  <Code2 size={13} className="text-accent-automation" />
                   <span>内部プロパティを表示</span>
                 </button>
 
@@ -529,7 +529,7 @@ export function WaypointTree() {
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Anchor size={13} className="text-amber-400" />
+                    <Anchor size={13} className="text-accent-anchor" />
                     <span>{anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
                   </button>
                 )}

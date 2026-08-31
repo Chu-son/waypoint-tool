@@ -95,7 +95,7 @@ export function MapEditOverlay() {
                 size="sm"
                 onClick={() => handleFillValueChange(0)}
                 className={`h-6 text-[10px] px-1 font-bold ${
-                  currentFillValue === 0 ? 'bg-slate-900 text-white border border-slate-700' : ''
+                  currentFillValue === 0 ? 'bg-surface-base text-text-inverse border border-border-base' : ''
                 }`}
                 title="障害物 (黒: 0)"
               >
@@ -106,7 +106,7 @@ export function MapEditOverlay() {
                 size="sm"
                 onClick={() => handleFillValueChange(255)}
                 className={`h-6 text-[10px] px-1 font-bold ${
-                  currentFillValue === 255 ? 'bg-slate-100 text-slate-900 border border-slate-300' : ''
+                  currentFillValue === 255 ? 'bg-text-inverse text-surface-base border border-border-base' : ''
                 }`}
                 title="自由領域 (白: 255)"
               >

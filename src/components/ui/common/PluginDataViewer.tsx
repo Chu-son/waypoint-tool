@@ -77,14 +77,14 @@ function JsonNode({
   }
 
   // Primitive leaf node
-  let valueColor = 'text-emerald-400'; // String
+  let valueColor = 'text-status-success'; // String
   let formattedValue = JSON.stringify(value);
 
   if (typeof value === 'number') {
-    valueColor = 'text-cyan-400';
+    valueColor = 'text-accent-automation';
     formattedValue = String(value);
   } else if (typeof value === 'boolean') {
-    valueColor = 'text-purple-400';
+    valueColor = 'text-accent-reference';
     formattedValue = value ? 'true' : 'false';
   } else if (value === null) {
     valueColor = 'text-text-muted/60';
@@ -146,7 +146,7 @@ export function PluginDataViewer({
             className="h-6 px-1.5 text-[11px] gap-1 text-text-muted hover:text-text-base"
             title="JSONをクリップボードにコピー"
           >
-            {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            {copied ? <Check size={12} className="text-status-success" /> : <Copy size={12} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </Button>
 

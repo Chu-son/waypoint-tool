@@ -33,7 +33,7 @@ export function CustomHtmlPanel({ tabDef }: CustomHtmlPanelProps) {
         })
         .catch((err) => {
           console.error(`Failed to load custom HTML from ${tabDef.src}:`, err);
-          setSrcDoc(`<div style="color:red;padding:1rem;">Failed to load HTML file: ${err}</div>`);
+          setSrcDoc(`<div style="color:var(--color-danger-base, #ef4444);font-family:sans-serif;font-size:12px;padding:1rem;">Failed to load HTML file: ${err}</div>`);
         });
     }
   }, [tabDef.type, tabDef.src, tabDef.html, tabDef.css]);

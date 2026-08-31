@@ -33,7 +33,7 @@ function ToolIconButton({
       size="icon"
       className={cn(
         "rounded-xl transition-all flex-shrink-0 group",
-        isActive && "shadow-[0_0_15px_rgba(59,130,246,0.5)] border-2 border-primary-base/50"
+        isActive && "shadow-[0_0_15px_var(--color-primary-base)] border-2 border-primary-base/50"
       )}
     >
       {children}
@@ -82,7 +82,7 @@ export function ToolPanel() {
 
   return (
     <Panel
-      className="flex flex-col items-center py-4 px-2 gap-3 z-10 transition-all duration-300 relative border-r"
+      className="flex flex-col items-center py-4 px-2 gap-3 z-10 transition-all duration-300 relative border-r border-border-base"
       style={{ minWidth: "4rem", width: "auto" }}
     >
       <FieldLabel className="mb-1">Tools</FieldLabel>

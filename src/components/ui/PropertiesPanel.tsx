@@ -160,7 +160,7 @@ export function PropertiesPanel() {
           <p className="text-xs text-text-muted font-mono break-all flex items-center gap-1">
             {node?.id}
             {anchorNodeId === node?.id && (
-              <span className="text-amber-400 font-sans text-xs bg-amber-950/40 border border-amber-500/40 px-1.5 py-0.5 rounded">
+              <span className="text-accent-anchor font-sans text-xs bg-accent-anchor/20 border border-accent-anchor/40 px-1.5 py-0.5 rounded">
                 ⚓ Anchor
               </span>
             )}

@@ -91,7 +91,7 @@ export function ExportMapsModal() {
     <Modal isOpen={isOpen} onClose={onClose} size="md">
       <ModalHeader
         onClose={onClose}
-        icon={<Download size={20} className="text-emerald-400" />}
+        icon={<Download size={20} className="text-accent-generator" />}
         title="Export Maps"
       />
 
@@ -105,7 +105,7 @@ export function ExportMapsModal() {
                   type="radio" 
                   checked={exportFormat === 'ros_standard'} 
                   onChange={() => setExportFormat('ros_standard')}
-                  className="accent-emerald-500"
+                  className="accent-primary-base"
                 />
                 ROS Standard (.pgm + .yaml)
               </label>
@@ -114,7 +114,7 @@ export function ExportMapsModal() {
                   type="radio" 
                   checked={exportFormat === 'png_only'} 
                   onChange={() => setExportFormat('png_only')}
-                  className="accent-emerald-500"
+                  className="accent-primary-base"
                 />
                 Image Only (.png)
               </label>

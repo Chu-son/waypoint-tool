@@ -107,7 +107,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                 onChange={(e) => setIsReferenceManual(e.target.checked)}
               />
               <span className="flex items-center gap-1.5">
-                <Bookmark size={13} className={isReferenceManual ? "text-purple-400 fill-purple-400" : ""} />
+                <Bookmark size={13} className={isReferenceManual ? "text-accent-reference fill-accent-reference" : ""} />
                 参照用レイヤーとして作成（マップ合成・エクスポートから除外）
               </span>
             </label>
@@ -129,16 +129,16 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                   onClick={() => handleSelectPlugin(plugin.id)}
                   className={cn(
                     "p-3.5 rounded-2xl border border-border-base/40 bg-surface-panel/30",
-                    "hover:border-cyan-500/50 hover:bg-cyan-500/5 transition-all cursor-pointer",
+                    "hover:border-accent-automation/50 hover:bg-accent-automation/5 transition-all cursor-pointer",
                     "flex items-center justify-between gap-3 group"
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+                    <div className="p-2 rounded-xl bg-accent-automation/10 text-accent-automation group-hover:scale-110 transition-transform">
                       <Sparkles size={18} />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-text-base group-hover:text-cyan-400 transition-colors">
+                      <h4 className="text-xs font-bold text-text-base group-hover:text-accent-automation transition-colors">
                         {plugin.manifest.name}
                       </h4>
                       {plugin.manifest.description && (
@@ -152,7 +152,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="h-7 text-xs font-semibold group-hover:border-cyan-500/40 text-cyan-400 shrink-0"
+                    className="h-7 text-xs font-semibold group-hover:border-accent-automation/40 text-accent-automation shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSelectPlugin(plugin.id);

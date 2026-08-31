@@ -38,7 +38,7 @@ export function ElementCopyOverlay() {
       statusText={
         <div className="truncate min-w-0">
           {targetNode ? (
-            <span className="text-emerald-400 font-medium flex items-center gap-1 truncate">
+            <span className="text-accent-generator font-medium flex items-center gap-1 truncate">
               <span>🎯</span> Waypoint [{targetIndex >= 0 ? targetIndex + indexStartIndex : '?'}] に適用中
             </span>
           ) : (

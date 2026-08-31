@@ -31,11 +31,11 @@ function CopyMenuItem({
       onClick={onClick}
       className={cn(
         "w-full text-left justify-between px-3 py-2 hover:bg-surface-hover transition-colors",
-        isAnchor ? "text-amber-300" : "text-text-base"
+        isAnchor ? "text-accent-anchor" : "text-text-base"
       )}
     >
       <span>{label}</span>
-      <span className={cn("font-mono ml-2", isAnchor ? "text-amber-400/80" : "text-text-muted")}>
+      <span className={cn("font-mono ml-2", isAnchor ? "text-accent-anchor/80" : "text-text-muted")}>
         {value.toFixed(4)}
       </span>
     </Button>
