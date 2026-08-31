@@ -373,6 +373,7 @@ mod tests {
             path_width: Some(0.2),
             path_opacity: Some(0.8),
             sync_path_width_with_footprint: Some(true),
+            workflow_state: None,
         };
 
         // Save

@@ -130,6 +130,7 @@ pub struct ProjectData {
     pub path_width: Option<f64>,
     pub path_opacity: Option<f64>,
     pub sync_path_width_with_footprint: Option<bool>,
+    pub workflow_state: Option<serde_json::Value>,
 }
 
 #[cfg(test)]

@@ -359,6 +359,41 @@ describe('AppStore Zustand Store', () => {
     expect(state.rightPanelViewMode).toBe('tabs');
   });
 
+  it('should prioritize Custom UI layout settings over project file and restore workflow_state', () => {
+    const { setProjectData } = useAppStore.getState();
+
+    useAppStore.setState({
+      isCustomUiMode: true,
+      customUiConfig: {
+        layout: {
+          leftPanel: { viewMode: 'split' },
+          rightPanel: { viewMode: 'tabs' },
+        },
+      },
+    });
+
+    setProjectData({
+      root_node_ids: [],
+      nodes: {},
+      left_panel_view_mode: 'tabs', // Should be ignored because Custom UI is 'split'
+      right_panel_view_mode: 'split', // Should be ignored because Custom UI is 'tabs'
+      workflow_state: {
+        current_step_index: 3,
+        max_reached_step_index: 4,
+        workflow_variables: { restoredKey: 'hello' },
+        step_execution_ids: { step_1: 'exec_abc' },
+      },
+    });
+
+    const state = useAppStore.getState();
+    expect(state.leftPanelViewMode).toBe('split');
+    expect(state.rightPanelViewMode).toBe('tabs');
+    expect(state.currentStepIndex).toBe(3);
+    expect(state.maxReachedStepIndex).toBe(4);
+    expect(state.workflowVariables['restoredKey']).toBe('hello');
+    expect(state.stepExecutionIds['step_1']).toBe('exec_abc');
+  });
+
   // --- マップレイヤーの透過度 (OPACITY) および defaultMapOpacity ---
 
   it('should manage defaultMapOpacity and preserve individual map opacities', () => {

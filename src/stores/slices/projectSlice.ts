@@ -153,6 +153,8 @@ export type ProjectSlice = {
     pathOpacity?: number;
     sync_path_width_with_footprint?: boolean;
     syncPathWidthWithFootprint?: boolean;
+    workflow_state?: any;
+    workflowState?: any;
   }) => void;
   
   loadProject: () => Promise<boolean>;
@@ -258,6 +260,21 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           : annotationOrder
       );
 
+      // Restore workflow state if available
+      const rawWorkflow = data.workflow_state || data.workflowState;
+      if (rawWorkflow && typeof rawWorkflow === 'object') {
+        state.setWorkflowState({
+          currentStepIndex: rawWorkflow.current_step_index ?? rawWorkflow.currentStepIndex,
+          maxReachedStepIndex: rawWorkflow.max_reached_step_index ?? rawWorkflow.maxReachedStepIndex,
+          workflowVariables: rawWorkflow.workflow_variables ?? rawWorkflow.workflowVariables,
+          stepExecutionIds: rawWorkflow.step_execution_ids ?? rawWorkflow.stepExecutionIds,
+        });
+      }
+
+      const customUiLayout = state.isCustomUiMode && state.customUiConfig ? state.customUiConfig.layout : null;
+      const effectiveLeftViewMode = customUiLayout?.leftPanel?.viewMode ?? (data.left_panel_view_mode || data.leftPanelViewMode || state.leftPanelViewMode);
+      const effectiveRightViewMode = customUiLayout?.rightPanel?.viewMode ?? (data.right_panel_view_mode || data.rightPanelViewMode || state.rightPanelViewMode);
+
       return {
         rootNodeIds: data.root_node_ids || data.rootNodeIds || [],
         nodes: data.nodes || {},
@@ -277,8 +294,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         robotFootprint: data.robot_footprint || data.robotFootprint || DEFAULT_ROBOT_FOOTPRINT,
         occupancySettings: data.occupancy_settings || data.occupancySettings || DEFAULT_OCCUPANCY_SETTINGS,
         defaultMapOpacity: typeof data.default_map_opacity === 'number' ? data.default_map_opacity : (typeof data.defaultMapOpacity === 'number' ? data.defaultMapOpacity : state.defaultMapOpacity),
-        leftPanelViewMode: data.left_panel_view_mode || data.leftPanelViewMode || state.leftPanelViewMode,
-        rightPanelViewMode: data.right_panel_view_mode || data.rightPanelViewMode || state.rightPanelViewMode,
+        leftPanelViewMode: effectiveLeftViewMode,
+        rightPanelViewMode: effectiveRightViewMode,
         activePathCalculatorPluginId: data.active_path_calculator_plugin_id || data.activePathCalculatorPluginId || null,
         pathCalculatorParams: data.path_calculator_params || data.pathCalculatorParams || {},
         autoRecalculatePath: data.auto_recalculate_path ?? data.autoRecalculatePath ?? true,
@@ -506,6 +523,12 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           path_width: pathWidth,
           path_opacity: pathOpacity,
           sync_path_width_with_footprint: syncPathWidthWithFootprint,
+          workflow_state: {
+            current_step_index: get().currentStepIndex,
+            max_reached_step_index: get().maxReachedStepIndex,
+            workflow_variables: get().workflowVariables,
+            step_execution_ids: get().stepExecutionIds,
+          },
         };
         await BackendAPI.saveProject(finalPath, projectData);
         setIsDirty(false);
