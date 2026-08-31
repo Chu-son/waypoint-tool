@@ -6,10 +6,14 @@ import { BackendAPI } from '../../api';
 export type CustomUISlice = {
   customUiConfig: CustomUiConfig | null;
   isCustomUiMode: boolean;
+  customUiPresetType: 'dev' | 'sample' | null;
+  customUiPresetPath: string | null;
   setCustomUiConfig: (config: CustomUiConfig | null) => void;
   setIsCustomUiMode: (enabled: boolean) => void;
   toggleCustomUiMode: () => void;
   loadCustomUiConfig: () => Promise<void>;
+  checkCustomUiPreset: () => Promise<void>;
+  switchToPresetCustomUi: () => Promise<void>;
   loadCustomUiConfigFile: (filePath?: string) => Promise<void>;
   applyCustomUiConfig: (config: CustomUiConfig) => void;
   getEffectiveBrandName: () => string;
@@ -18,6 +22,8 @@ export type CustomUISlice = {
 export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> = (set, get) => ({
   customUiConfig: null,
   isCustomUiMode: false,
+  customUiPresetType: null,
+  customUiPresetPath: null,
 
   setCustomUiConfig: (config) => set({
     customUiConfig: config,
@@ -89,6 +95,42 @@ export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> 
       }
     } catch (err) {
       console.warn('Failed to load Custom UI config:', err);
+    }
+  },
+
+  checkCustomUiPreset: async () => {
+    try {
+      const preset = await BackendAPI.loadCustomUiPreset();
+      if (preset && (preset.type === 'dev' || preset.type === 'sample')) {
+        set({
+          customUiPresetType: preset.type,
+          customUiPresetPath: preset.path || null,
+        });
+      } else {
+        set({
+          customUiPresetType: null,
+          customUiPresetPath: null,
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to check Custom UI preset:', err);
+    }
+  },
+
+  switchToPresetCustomUi: async () => {
+    try {
+      const preset = await BackendAPI.loadCustomUiPreset();
+      if (preset && preset.config) {
+        set({
+          customUiPresetType: preset.type,
+          customUiPresetPath: preset.path || null,
+        });
+        get().applyCustomUiConfig(preset.config as CustomUiConfig);
+      } else {
+        console.warn('No custom UI preset found (custom-ui.dev.json / custom-ui.sample.json).');
+      }
+    } catch (err) {
+      console.error('Failed to switch to preset Custom UI:', err);
     }
   },
 

@@ -92,4 +92,8 @@ export class TauriBackendAPI implements IBackendAPI {
   async loadCustomUiConfig(): Promise<any> {
     return invoke('load_custom_ui_config');
   }
+
+  async loadCustomUiPreset(): Promise<any> {
+    return invoke('load_custom_ui_preset');
+  }
 }

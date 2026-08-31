@@ -77,6 +77,7 @@ export interface IBackendAPI {
   exportMaps(options: ExportMapsOptions): Promise<void>;
   blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult>;
   loadCustomUiConfig(): Promise<any>;
+  loadCustomUiPreset(): Promise<{ type: 'dev' | 'sample'; path: string; config: any } | null>;
 }
 
 export interface OpenDialogOptions {

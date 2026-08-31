@@ -69,4 +69,23 @@ describe('customUiSlice', () => {
     expect(state.leftPanelWidth).toBe(400);
     expect(state.leftPanelViewMode).toBe('split');
   });
+
+  it('should detect custom UI preset and switch to it', async () => {
+    const mockBackend = BackendAPI as unknown as MockBackendAPI;
+    mockBackend.setMockCustomUiPreset({
+      type: 'dev',
+      path: '/path/to/custom-ui.dev.json',
+      config: {
+        brand: { appName: 'Dev UI Planner' },
+      },
+    });
+
+    await useAppStore.getState().checkCustomUiPreset();
+    expect(useAppStore.getState().customUiPresetType).toBe('dev');
+    expect(useAppStore.getState().isCustomUiMode).toBe(false); // Does not switch automatically on check
+
+    await useAppStore.getState().switchToPresetCustomUi();
+    expect(useAppStore.getState().isCustomUiMode).toBe(true);
+    expect(useAppStore.getState().getEffectiveBrandName()).toBe('Dev UI Planner');
+  });
 });

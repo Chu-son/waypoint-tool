@@ -138,13 +138,23 @@ export class MockBackendAPI implements IBackendAPI {
   }
 
   private mockCustomUiConfig: any = null;
+  private mockCustomUiPreset: any = null;
 
   setMockCustomUiConfig(config: any) {
     this.mockCustomUiConfig = config;
   }
 
+  setMockCustomUiPreset(preset: any) {
+    this.mockCustomUiPreset = preset;
+  }
+
   async loadCustomUiConfig(): Promise<any> {
     console.log('[Mock Backend] loadCustomUiConfig called');
     return this.mockCustomUiConfig;
+  }
+
+  async loadCustomUiPreset(): Promise<any> {
+    console.log('[Mock Backend] loadCustomUiPreset called');
+    return this.mockCustomUiPreset;
   }
 }

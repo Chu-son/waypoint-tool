@@ -3,10 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use serde_json::Value;
 
-pub fn find_custom_ui_config_path(app: &AppHandle) -> Option<PathBuf> {
-    let filename = "custom-ui.config.json";
-
-    // 1. Check user config dir (~/.config/waypoint-tool/custom-ui.config.json)
+pub fn find_file_in_search_paths(app: &AppHandle, filename: &str) -> Option<PathBuf> {
+    // 1. Check user config dir (~/.config/waypoint-tool/<filename>)
     if let Ok(config_dir) = app.path().app_config_dir() {
         let p = config_dir.join(filename);
         if p.exists() && p.is_file() {
@@ -66,6 +64,10 @@ pub fn find_custom_ui_config_path(app: &AppHandle) -> Option<PathBuf> {
     None
 }
 
+pub fn find_custom_ui_config_path(app: &AppHandle) -> Option<PathBuf> {
+    find_file_in_search_paths(app, "custom-ui.config.json")
+}
+
 #[command]
 pub fn load_custom_ui_config(app: AppHandle) -> Result<Option<Value>, String> {
     if let Some(path) = find_custom_ui_config_path(&app) {
@@ -77,6 +79,37 @@ pub fn load_custom_ui_config(app: AppHandle) -> Result<Option<Value>, String> {
     } else {
         Ok(None)
     }
+}
+
+#[command]
+pub fn load_custom_ui_preset(app: AppHandle) -> Result<Option<Value>, String> {
+    // 1. Try dev config first: custom-ui.dev.json
+    if let Some(dev_path) = find_file_in_search_paths(&app, "custom-ui.dev.json") {
+        if let Ok(content) = fs::read_to_string(&dev_path) {
+            if let Ok(config) = serde_json::from_str::<Value>(&content) {
+                return Ok(Some(serde_json::json!({
+                    "type": "dev",
+                    "path": dev_path.to_string_lossy(),
+                    "config": config,
+                })));
+            }
+        }
+    }
+
+    // 2. Fallback to sample config: custom-ui.sample.json
+    if let Some(sample_path) = find_file_in_search_paths(&app, "custom-ui.sample.json") {
+        if let Ok(content) = fs::read_to_string(&sample_path) {
+            if let Ok(config) = serde_json::from_str::<Value>(&content) {
+                return Ok(Some(serde_json::json!({
+                    "type": "sample",
+                    "path": sample_path.to_string_lossy(),
+                    "config": config,
+                })));
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]

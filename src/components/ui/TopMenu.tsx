@@ -265,6 +265,8 @@ export function TopMenu() {
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const toggleCustomUiMode = useAppStore((state) => state.toggleCustomUiMode);
+  const customUiPresetType = useAppStore((state) => state.customUiPresetType);
+  const switchToPresetCustomUi = useAppStore((state) => state.switchToPresetCustomUi);
 
   const menuSections = useMemo(() => {
     const sections: { label: string; options: MenuOption[] }[] = [
@@ -284,10 +286,11 @@ export function TopMenu() {
           { id: "file_open", label: "Open Project...", action: handleOpenProject, shortcut: "Ctrl+O" },
           { id: "file_save", label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
           { divider: true, label: "" },
-          { id: "file_export_waypoints", label: "Export Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
-          { id: "file_import_waypoints", label: "Import Waypoints...", action: () => setImportModalOpen(true) },
-          { id: "file_export_maps", label: "Export Maps...", action: () => setExportMapsModalOpen(true) },
-          { id: "file_settings", label: "Settings...", action: () => setSettingsModalOpen(true, "general") },
+          { id: "file_import_waypoints", label: "Import Maps / Waypoints...", action: () => setImportModalOpen(true), shortcut: "Ctrl+I" },
+          { id: "file_export_waypoints", label: "Export Project / Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
+          { id: "file_export_maps", label: "Export Maps & Custom Layers...", action: () => setExportMapsModalOpen(true) },
+          { divider: true, label: "" },
+          { id: "file_settings", label: "Settings...", action: () => setSettingsModalOpen(true, "general"), shortcut: "Ctrl+," },
           { divider: true, label: "" },
           { id: "file_exit", label: "Exit", action: handleExit, danger: true, shortcut: "Alt+F4" },
         ],
@@ -340,10 +343,10 @@ export function TopMenu() {
           { id: "help_shortcuts", label: "Keyboard Shortcuts", action: () => setShortcutsModalOpen(true) },
           { id: "help_devtools", label: "Developer Tools", action: () => invoke("open_devtools") },
           { divider: true, label: "" },
-          ...(customUiConfig ? [
+          ...(isCustomUiMode ? [
             {
               id: "help_custom_ui_toggle",
-              label: isCustomUiMode ? "✓ Custom UI Mode (Switch to Standard)" : "  Standard Mode (Switch to Custom UI)",
+              label: "✓ Custom UI Mode (Switch to Standard)",
               action: () => toggleCustomUiMode(),
             },
             {
@@ -352,6 +355,19 @@ export function TopMenu() {
               action: handleLoadCustomUiConfigFile,
             }
           ] : [
+            ...(customUiConfig ? [
+              {
+                id: "help_custom_ui_toggle",
+                label: "  Standard Mode (Switch to Custom UI)",
+                action: () => toggleCustomUiMode(),
+              }
+            ] : customUiPresetType ? [
+              {
+                id: "help_custom_ui_preset",
+                label: `Switch to Custom UI (${customUiPresetType})`,
+                action: () => switchToPresetCustomUi(),
+              }
+            ] : []),
             {
               id: "help_load_custom_ui",
               label: "Load Custom UI Config...",
@@ -408,7 +424,7 @@ export function TopMenu() {
   }, [
     canUndo, canRedo, selectedNodeIds, showProperties, showPaths, showGrid,
     showFootprints, enableSnapping, isLeftPanelOpen, isRightPanelOpen,
-    customUiConfig, isCustomUiMode, toggleCustomUiMode, undo, redo, selectAllNodes,
+    customUiConfig, isCustomUiMode, customUiPresetType, toggleCustomUiMode, switchToPresetCustomUi, undo, redo, selectAllNodes,
     removeNodes, setShowProperties, setShowPaths, setShowGrid, setShowFootprints,
     setEnableSnapping, triggerFitToMaps, setLeftPanelOpen, setRightPanelOpen,
     resetWindowLayout, setShortcutsModalOpen, setIsInitialLaunch, setWelcomeModalOpen,

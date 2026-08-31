@@ -74,8 +74,9 @@ function App() {
 
   useEffect(() => {
     const initApp = async () => {
-      // 1. Load Custom UI configuration first
+      // 1. Load Custom UI configuration and check preset
       await useAppStore.getState().loadCustomUiConfig();
+      await useAppStore.getState().checkCustomUiPreset();
 
       try {
         const installedPlugins = await BackendAPI.fetchInstalledPlugins();

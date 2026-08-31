@@ -121,7 +121,8 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         plugins::update_plugin_sdk,
         read_image_base64,
         open_devtools,
-        load_custom_ui_config
+        load_custom_ui_config,
+        load_custom_ui_preset
     ]
 }
 
