@@ -87,4 +87,44 @@ describe('SimplifiedControls', () => {
 
     expect(screen.getByText(/Cleaning Area \(Rectangle\)/i)).toBeInTheDocument();
   });
+
+  it('selects plugin input slot on click and activates add_generator tool', () => {
+    const mockPlugin: any = {
+      id: 'drivable_area_layer_generator',
+      manifest: {
+        name: 'Drivable Area Layer Generator',
+        inputs: [
+          { id: 'sweep_rect', label: 'Cleaning Area', type: 'rectangle' },
+          { id: 'seed_points', label: 'Seed Points', type: 'points' },
+        ],
+      },
+    };
+
+    useAppStore.setState({
+      plugins: { drivable_area_layer_generator: mockPlugin },
+      activePluginId: 'drivable_area_layer_generator',
+      activeInputIndex: 0,
+      activeTool: 'select',
+      isAnnotationEditMode: true,
+    });
+
+    render(
+      <SimplifiedControls
+        pluginTarget="drivable_area_layer_generator"
+        showPluginInputs={true}
+      />
+    );
+
+    // Initial mount with showPluginInputs should auto-activate add_generator and exit annotation edit mode
+    expect(useAppStore.getState().activeTool).toBe('add_generator');
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(false);
+
+    // Click second input slot (Seed Points)
+    const seedSlot = screen.getByText('Seed Points');
+    fireEvent.click(seedSlot);
+
+    expect(useAppStore.getState().activeInputIndex).toBe(1);
+    expect(useAppStore.getState().activeTool).toBe('add_generator');
+    expect(useAppStore.getState().isAnnotationEditMode).toBe(false);
+  });
 });

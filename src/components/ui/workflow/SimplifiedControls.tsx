@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WorkflowControl, WorkflowSimplifiedParam, WorkflowActionButton, WorkflowButtonsLayout, WorkflowPluginInputConfig } from '../../../types/customUi';
 import { useAppStore } from '../../../stores/appStore';
 import { executeWorkflowAction } from '../../../utils/workflowActions';
@@ -49,12 +49,21 @@ export function SimplifiedControls({
 
   const plugins = useAppStore((state) => state.plugins) || {};
   const activePluginId = useAppStore((state) => state.activePluginId);
+  const setActivePlugin = useAppStore((state) => state.setActivePlugin);
+  const activeInputIndex = useAppStore((state) => state.activeInputIndex);
+  const setActiveInputIndex = useAppStore((state) => state.setActiveInputIndex);
+  const setActiveTool = useAppStore((state) => state.setActiveTool);
+  const setAnnotationEditMode = useAppStore((state) => state.setAnnotationEditMode);
   const pluginProperties = useAppStore((state) => state.pluginActiveProperties);
   const setPluginActiveProperties = useAppStore((state) => state.setPluginActiveProperties);
   const interactionData = useAppStore((state) => state.pluginInteractionData) || {};
   const updatePluginInteractionData = useAppStore((state) => state.updatePluginInteractionData);
   const setWorkflowVariable = useAppStore((state) => state.setWorkflowVariable);
   const setAllowedAnnotationSubTools = useAppStore((state) => state.setAllowedAnnotationSubTools);
+
+  const targetPluginId = pluginTarget || activePluginId;
+  const targetPlugin = targetPluginId ? plugins[targetPluginId] : null;
+  const initializedPluginRef = useRef<string | null>(null);
 
   // Apply default values for controls immediately on mount
   useEffect(() => {
@@ -71,8 +80,24 @@ export function SimplifiedControls({
     }
   }, [controls, allowedAnnotationTools, setWorkflowVariable, setAllowedAnnotationSubTools]);
 
-  const targetPluginId = pluginTarget || activePluginId;
-  const targetPlugin = targetPluginId ? plugins[targetPluginId] : null;
+  useEffect(() => {
+    if (showPluginInputs && targetPluginId && initializedPluginRef.current !== targetPluginId) {
+      initializedPluginRef.current = targetPluginId;
+      setActivePlugin(targetPluginId);
+      setActiveTool('add_generator');
+      setActiveInputIndex(0);
+      setAnnotationEditMode(false);
+    }
+  }, [showPluginInputs, targetPluginId, setActivePlugin, setActiveTool, setActiveInputIndex, setAnnotationEditMode]);
+
+  const handleSelectInput = (idx: number) => {
+    if (targetPluginId && activePluginId !== targetPluginId) {
+      setActivePlugin(targetPluginId);
+    }
+    setActiveInputIndex(idx);
+    setActiveTool('add_generator');
+    setAnnotationEditMode(false);
+  };
 
   const handleControlChange = (control: WorkflowControl, val: any) => {
     setControlValues((prev) => ({ ...prev, [control.label]: val }));
@@ -227,8 +252,9 @@ export function SimplifiedControls({
                     mode="creation"
                     index={idx}
                     totalSteps={targetPlugin.manifest.inputs.length}
-                    isActive={true}
+                    isActive={idx === activeInputIndex}
                     hasData={interactionData[key] !== undefined && interactionData[key] !== null}
+                    onSelect={() => handleSelectInput(idx)}
                   />
                 );
               })}

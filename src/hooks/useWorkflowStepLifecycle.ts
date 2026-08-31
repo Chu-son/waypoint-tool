@@ -34,12 +34,17 @@ export function useWorkflowStepLifecycle(step: WorkflowStep | undefined) {
 
     // Apply onEnter of current step
     if (step) {
-      // Auto-set target plugin if specified
-      if (step.pluginTarget) {
-        const store = useAppStore.getState();
-        if (store.activePluginId !== step.pluginTarget) {
+      const store = useAppStore.getState();
+      // Auto-exit annotation edit mode when moving between steps
+      store.setAnnotationEditMode(false);
+
+      // Auto-set target plugin and add_generator tool if specified
+      if (step.pluginTarget || step.showPluginInputs) {
+        if (step.pluginTarget && store.activePluginId !== step.pluginTarget) {
           store.setActivePlugin(step.pluginTarget);
         }
+        store.setActiveTool('add_generator');
+        store.setActiveInputIndex(0);
       }
 
       if (step.onEnter) {

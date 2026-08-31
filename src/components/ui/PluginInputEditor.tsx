@@ -34,6 +34,7 @@ interface PluginInputEditorProps {
   isActive?: boolean;
   hasData?: boolean;
   decimalPrecision?: number;
+  onSelect?: () => void;
 }
 
 export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
@@ -46,6 +47,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
   isActive = false,
   hasData = false,
   decimalPrecision = 2,
+  onSelect,
 }) => {
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
   const nodes = useAppStore((state) => state.nodes);
@@ -58,17 +60,21 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
   if (mode === "creation") {
     return (
       <div
+        onClick={onSelect}
         className={cn(
-          "space-y-2 rounded-lg p-2 transition-all border border-transparent",
-          isActive ? "bg-primary-base/5 border-primary-base/20 ring-1 ring-primary-base/20" : ""
+          "space-y-2 rounded-lg p-2.5 transition-all border",
+          onSelect && "cursor-pointer",
+          isActive
+            ? "bg-primary-base/10 border-primary-base ring-2 ring-primary-base/30 shadow-sm"
+            : "bg-surface-base/40 border-border-base/40 hover:bg-surface-hover/60"
         )}
       >
-        <Label className="text-[13px] font-semibold text-text-base flex items-center gap-2">
+        <Label className="text-[13px] font-semibold text-text-base flex items-center gap-2 cursor-pointer">
           {totalSteps > 1 && (
             <span
               className={cn(
                 "w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0",
-                isActive ? "bg-primary-base text-white" : hasData ? "bg-emerald-600 text-white" : "bg-surface-hover text-text-muted"
+                isActive ? "bg-primary-base text-white shadow-sm" : hasData ? "bg-emerald-600 text-white" : "bg-surface-hover text-text-muted"
               )}
             >
               {index + 1}
