@@ -123,14 +123,20 @@
             "label": "障害物ポイント配置",
             "action": "set_annotation_tool",
             "args": { "tool": "point", "defaultColor": "#ef4444", "defaultName": "障害物" },
+            "groupName": "障害物ポイント",
+            "allowedAnnotationTools": ["point"],
+            "saveToVariable": "obstacle_points_group",
             "variant": "secondary",
             "icon": "MapPin",
-            "description": "進入不可地点をポイントで配置"
+            "description": "進入不可地点をポイントで配置（専用グループに格納）"
           },
           {
             "label": "障害物矩形エリア配置",
             "action": "set_annotation_tool",
             "args": { "tool": "rect", "defaultColor": "#ef4444", "defaultName": "進入禁止エリア" },
+            "groupName": "障害物エリア",
+            "allowedAnnotationTools": ["rect"],
+            "saveToVariable": "obstacle_rects_group",
             "variant": "secondary",
             "icon": "Square",
             "description": "進入禁止矩形エリアを配置"
@@ -152,6 +158,13 @@
         "description": "マップ上で清掃を行いたい矩形領域（またはシード点）を指定し、清掃可能範囲のレイヤーを計算します。",
         "pluginTarget": "drivable_area_layer_generator",
         "showPluginInputs": true,
+        "pluginInputsConfig": [
+          {
+            "id": "sweep_rect",
+            "label": "清掃対象エリア (矩形)",
+            "description": "マップ上で掃除を行いたい範囲をドラッグして囲んでください"
+          }
+        ],
         "simplifiedParams": [
           {
             "paramKey": "max_radius",
@@ -178,7 +191,7 @@
             "action": "run_active_plugin",
             "variant": "primary",
             "icon": "Layers",
-            "description": "指定した清掃範囲矩形内の走行可能エリアを計算してレイヤーを生成"
+            "description": "指定した清掃範囲矩形内の走行可能エリアを計算してレイヤーを生成（何度でも再生成可能）"
           }
         ]
       },
@@ -188,6 +201,13 @@
         "description": "清掃範囲に対してジグザグ走査経路を自動生成します。",
         "pluginTarget": "rect_search_generator",
         "showPluginInputs": true,
+        "pluginInputsConfig": [
+          {
+            "id": "sweep_rect",
+            "label": "走査走査範囲 (矩形)",
+            "description": "経路を生成する対象矩形を指定します"
+          }
+        ],
         "simplifiedParams": [
           {
             "paramKey": "num_lines",
@@ -204,9 +224,14 @@
           {
             "label": "清掃経路を自動生成する",
             "action": "run_active_plugin",
+            "args": {
+              "interactionData": {
+                "obstacles": { "$fromAnnotationGroup": "$var:obstacle_points_group" }
+              }
+            },
             "variant": "primary",
             "icon": "Play",
-            "description": "指定した領域内にストライプ走査のウェイポイント列を一括生成します"
+            "description": "指定した領域内にストライプ走査のウェイポイント列を一括生成します（再実行時は上書き再生成）"
           }
         ]
       },

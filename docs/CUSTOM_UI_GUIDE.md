@@ -179,8 +179,28 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 }
 ```
 
-### 3.2 プラグイン入力スロットの直接埋め込み (`showPluginInputs`)
-`pluginTarget` を設定したステップで `"showPluginInputs": true` を指定すると、対象プラグインが必要とする入力操作（矩形領域ドラッグ、シード点配置、アノテーション選択など）をステップパネル内に直接埋め込んで表示・編集できます。
+### 3.2 アノテーションツールの制限とグループ連携 (`allowedAnnotationTools` / `groupName` / `saveToVariable`)
+アノテーション配置アクションでは、利用可能な描画ツールの制限や、専用のアノテーショングループ作成・変数保持が可能です。
+
+```json
+{
+  "label": "障害物ポイント配置",
+  "action": "set_annotation_tool",
+  "args": { "tool": "point", "defaultColor": "#ef4444", "defaultName": "障害物" },
+  "groupName": "障害物ポイント",
+  "allowedAnnotationTools": ["point"],
+  "saveToVariable": "obstacle_points_group",
+  "variant": "secondary",
+  "icon": "MapPin",
+  "description": "進入不可地点をポイントで配置（専用グループに格納）"
+}
+```
+* **`allowedAnnotationTools`**: `["point", "rect"]` 等を指定すると、キャンバス上部のアノテーションツールバーに指定されたツールのみが表示されます。
+* **`groupName`**: 指定した名称のアノテーショングループを自動生成・アクティブ化し、配置したオブジェクトを所属させます。
+* **`saveToVariable`**: 作成されたグループや実行結果を変数ストレージに保存し、後続ステップから参照できるようにします。
+
+### 3.3 プラグイン入力スロットの埋め込みとラベル上書き (`showPluginInputs` / `pluginInputsConfig`)
+`pluginTarget` を設定したステップで `"showPluginInputs": true` を指定すると、対象プラグインの入力スロットをステップパネル内に直接埋め込めます。また、`pluginInputsConfig` を使用してスロットの表示名や説明文を直感的な文言に上書きできます。
 
 ```json
 {
@@ -189,6 +209,13 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
   "description": "マップ上で清掃を行いたい矩形領域を指定し、清掃可能範囲を計算します。",
   "pluginTarget": "drivable_area_layer_generator",
   "showPluginInputs": true,
+  "pluginInputsConfig": [
+    {
+      "id": "sweep_rect",
+      "label": "清掃対象エリア (矩形ドラッグ)",
+      "description": "マップ上で掃除を行いたい範囲をドラッグして囲んでください"
+    }
+  ],
   "actionButtons": [
     {
       "label": "清掃可能範囲を計算 (カスタムレイヤー)",
@@ -199,6 +226,16 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
   ]
 }
 ```
+
+### 3.4 ワークフロー変数の参照とプラグイン再生成 (Regeneration)
+* **ワークフロー変数参照 (`$var` / `$fromAnnotationGroup`)**:
+  後続ステップの `interactionData` や `properties` で `{ "$var": "変数名" }` や `{ "$fromAnnotationGroup": "$var:obstacle_points_group" }` を指定することで、前のステップで設定・配置されたグループ内の最新ポイント群や数値を自動解決してプラグインに渡せます。
+* **プラグインの再生成 (Regeneration)**:
+  パラメータを変更して再実行したり、前後のステップを行き来してやり直した場合でも、同一ステップによる生成物（レイヤーやウェイポイント列）は二重生成されずに既存のものが上書き更新（再生成）されます。
+* **進捗MAX保持とプロジェクト永続化**:
+  前のステップに戻っても、一度到達したステップのチェックマークは維持されます。また、プロジェクト保存（`.wptroj`）時にはワークフロー進捗と変数が完全保存・復元されます。
+* **Custom UI レイアウトの優先適用**:
+  Custom UI モード時は、プロジェクトファイルに記録されたレイアウト設定よりも `custom-ui.config.json` の `layout`（`viewMode` 等）が最優先で適用されます。
 
 ---
 
@@ -218,7 +255,7 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 
 ## 5. ワークフローアクション一覧 (Workflow Actions)
 
-| アクション名 | 説明 | 主な引数 (`args`) |
+| アクション名 | 説明 | 主な引数 (`args` / ボタンプロパティ) |
 |---|---|---|
 | `reset_project` | プロジェクトを新規初期化 | なし |
 | `open_project_dialog` | プロジェクトファイル（`.wptroj`）読み込みダイアログを開く | なし |
@@ -228,13 +265,13 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
 | `open_export_maps_modal` | マップ画像一括出力モーダルを開く | なし |
 | `open_import_modal` | ウェイポイントインポートモーダルを開く | なし |
 | `open_settings_modal` | 設定モーダルを開く | `{ tab: "robot" \| "general" \| "options" \| "plugins" }` |
-| `set_annotation_tool` | アノテーション配置モードを開始しツールを選択 | `{ tool: "point" \| "oriented_point" \| "rect" \| "circle" \| "line", defaultColor?: string, defaultName?: string, groupId?: string }` |
+| `set_annotation_tool` | アノテーション配置モードを開始（ツール制限・グループ指定・変数保存対応） | `{ tool?, defaultColor?, defaultName?, allowedTools?, groupName?, saveToVariable? }` |
 | `start_map_edit` | マップ編集モードを開始（手動レイヤー自動確保） | `{ subTool: "circle" \| "rect" \| "line" \| "freehand", fillValue: 0 \| 255, brushSize?: number, layerName?: string }` |
 | `stop_map_edit` | マップ編集モードを終了 | なし |
 | `set_robot_footprint` | ロボットのフットプリントパラメータを変更 | `{ type?, radius?, length?, width?, offset_x?, offset_y? }` |
 | `setRobotFootprintRadius` | ロボットの円形Footprint半径を変更 | `{ value: number }` |
 | `set_active_plugin` | 指定プラグインをアクティブに切り替え | `{ pluginId: string }` |
-| `run_plugin` | 指定プラグイン（またはアクティブプラグイン）を実行 | `{ pluginId?: string, properties?: object, interactionData?: object }` |
-| `run_active_plugin` | アクティブなプラグインを実行 | なし |
+| `run_plugin` | 指定プラグイン（またはアクティブプラグイン）を実行（変数解決・再生成対応） | `{ pluginId?: string, properties?: object, interactionData?: object, stepId?: string, saveToVariable?: string }` |
+| `run_active_plugin` | アクティブなプラグインを実行 | `run_plugin` と同様 |
 | `ensureCustomLayer` / `ensure_custom_layer` | カスタムレイヤーが存在しない場合に新規作成 | `{ layerName: string, is_reference?: boolean }` |
 | `triggerFitToMaps` | キャンバスのズーム/パンをロード済みマップ全体にフィット | なし |
