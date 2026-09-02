@@ -1,8 +1,9 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject } from '../../types/store';
+import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject, WaypointBaselineItem, GeneratorStash, Transform } from '../../types/store';
 import { BackendAPI } from '../../api';
 import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
+import { applyGeneratorStash } from '../../utils/generatorStashUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -16,6 +17,7 @@ export interface ExecutePluginParams {
   targetAnnotationGroupId?: string;
   idsToConsume?: string[];
   insertIndex?: number;
+  stashToApply?: GeneratorStash;
 }
 
 export type PluginSlice = {
@@ -129,6 +131,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       targetAnnotationGroupId,
       idsToConsume = [],
       insertIndex = -1,
+      stashToApply,
     } = params;
 
     const {
@@ -237,6 +240,34 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       }
 
       if (waypointItems && waypointItems.length > 0) {
+        const baselineWaypoints: WaypointBaselineItem[] = waypointItems.map((wp) => {
+          let qx = wp.qx ?? 0,
+            qy = wp.qy ?? 0,
+            qz = wp.qz ?? 0,
+            qw = wp.qw ?? 1;
+          if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
+            const halfYaw = wp.yaw / 2.0;
+            qz = Math.sin(halfYaw);
+            qw = Math.cos(halfYaw);
+          }
+          const transform: Transform = wp.transform
+            ? { ...wp.transform }
+            : {
+                x: wp.x ?? 0,
+                y: wp.y ?? 0,
+                z: wp.z ?? 0,
+                qx,
+                qy,
+                qz,
+                qw,
+              };
+          return {
+            transform,
+            options: wp.options ? { ...wp.options } : undefined,
+            name: wp.name,
+          };
+        });
+
         let parentId = targetParentWaypointId;
         if (!parentId && existingExecutionId) {
           // Find parent node with matching execution_id
@@ -256,6 +287,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             generator_params: finalContextData,
             plugin_data: waypointPluginData || rawResult.plugin_data || existingParent.plugin_data,
             name: waypointGroupName || existingParent.name,
+            baseline_waypoints: baselineWaypoints,
           });
           resultingParentWaypointId = parentId;
         } else {
@@ -273,6 +305,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             generator_params: finalContextData,
             plugin_data: waypointPluginData || rawResult.plugin_data,
             children_ids: [],
+            baseline_waypoints: baselineWaypoints,
           });
 
           if (insertIndex !== -1) {
@@ -285,8 +318,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           resultingParentWaypointId = parentId;
         }
 
+        // Apply stash if provided
+        const waypointsToInstantiate = stashToApply
+          ? applyGeneratorStash(waypointItems, stashToApply)
+          : waypointItems;
+
         // Add child waypoint nodes
-        waypointItems.forEach((wp) => {
+        waypointsToInstantiate.forEach((wp) => {
           let qx = wp.qx ?? 0,
             qy = wp.qy ?? 0,
             qz = wp.qz ?? 0,
@@ -302,9 +340,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             {
               id: childId,
               type: 'manual',
+              name: wp.name,
               transform: wp.transform || {
                 x: wp.x ?? 0,
                 y: wp.y ?? 0,
+                z: wp.z ?? 0,
                 qx,
                 qy,
                 qz,

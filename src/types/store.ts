@@ -82,6 +82,34 @@ export interface GeneratorMetadata {
   plugin_data?: Record<string, any>;
 }
 
+export interface WaypointBaselineItem {
+  transform: Transform;
+  options?: WaypointOptions;
+  name?: string;
+}
+
+export interface WaypointDiffItem {
+  index: number;
+  hasTransformDiff: boolean;
+  deltaX: number;
+  deltaY: number;
+  deltaZ: number;
+  deltaYaw: number;
+  modifiedOptions?: WaypointOptions;
+  customName?: string;
+}
+
+export type GeneratorStash = Record<number, WaypointDiffItem>;
+
+export interface GeneratorModificationSummary {
+  hasModifications: boolean;
+  modifiedCount: number;
+  totalCurrent: number;
+  totalBaseline: number;
+  diffs: WaypointDiffItem[];
+  hasCountChanged: boolean;
+}
+
 export type WaypointNode = {
   id: string;
   type: 'manual' | 'generator' | 'manual_group' | 'group';
@@ -93,6 +121,7 @@ export type WaypointNode = {
   plugin_id?: string; // Add plugin reference for generator nodes
   source_execution_id?: string;
   plugin_data?: Record<string, any>;
+  baseline_waypoints?: WaypointBaselineItem[];
 };
 
 // --- Robot Footprint Types ---
