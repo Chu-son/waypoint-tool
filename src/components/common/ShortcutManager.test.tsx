@@ -14,6 +14,7 @@ describe('ShortcutManager', () => {
   const mockSetExportModalOpen = vi.fn();
   const mockLoadProject = vi.fn();
   const mockSaveProject = vi.fn();
+  const mockSaveProjectAs = vi.fn();
   const mockSetRightPanelActiveTab = vi.fn();
 
   beforeEach(() => {
@@ -26,6 +27,7 @@ describe('ShortcutManager', () => {
       setExportModalOpen: mockSetExportModalOpen,
       loadProject: mockLoadProject,
       saveProject: mockSaveProject,
+      saveProjectAs: mockSaveProjectAs,
       setRightPanelActiveTab: mockSetRightPanelActiveTab,
     });
     // Add a setState mock to the function itself as ShortcutManager uses useAppStore.setState
@@ -53,8 +55,17 @@ describe('ShortcutManager', () => {
   it('triggers saveProject on Ctrl+S', () => {
     render(<ShortcutManager />);
     
-    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: false });
     expect(mockSaveProject).toHaveBeenCalled();
+    expect(mockSaveProjectAs).not.toHaveBeenCalled();
+  });
+
+  it('triggers saveProjectAs on Ctrl+Shift+S', () => {
+    render(<ShortcutManager />);
+    
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: true });
+    expect(mockSaveProjectAs).toHaveBeenCalled();
+    expect(mockSaveProject).not.toHaveBeenCalled();
   });
 
   it('triggers loadProject on Ctrl+O', () => {

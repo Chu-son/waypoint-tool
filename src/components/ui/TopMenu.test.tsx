@@ -51,6 +51,7 @@ describe('TopMenu', () => {
   const mockRemoveNodes = vi.fn();
   const mockUndo = vi.fn();
   const mockRedo = vi.fn();
+  const mockSaveProjectAs = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,6 +69,7 @@ describe('TopMenu', () => {
       redo: mockRedo,
       loadProject: mockLoadProject,
       saveProject: mockSaveProject,
+      saveProjectAs: mockSaveProjectAs,
       setExportModalOpen: mockSetExportModalOpen,
       setSettingsModalOpen: mockSetSettingsModalOpen,
       setShortcutsModalOpen: vi.fn(),
@@ -117,6 +119,34 @@ describe('TopMenu', () => {
 
     await waitFor(() => {
       expect(mockLoadProject).toHaveBeenCalled();
+    });
+  });
+
+  it('opens "File" menu and handles "Save Project"', async () => {
+    render(<TopMenu />);
+    const fileBtn = screen.getByText('File');
+    fireEvent.click(fileBtn);
+
+    const saveBtn = screen.getByText(/^Save Project$/i);
+    expect(saveBtn).toBeInTheDocument();
+    fireEvent.click(saveBtn);
+
+    await waitFor(() => {
+      expect(mockSaveProject).toHaveBeenCalled();
+    });
+  });
+
+  it('opens "File" menu and handles "Save Project As..."', async () => {
+    render(<TopMenu />);
+    const fileBtn = screen.getByText('File');
+    fireEvent.click(fileBtn);
+
+    const saveAsBtn = screen.getByText(/Save Project As\.\.\./i);
+    expect(saveAsBtn).toBeInTheDocument();
+    fireEvent.click(saveAsBtn);
+
+    await waitFor(() => {
+      expect(mockSaveProjectAs).toHaveBeenCalled();
     });
   });
 

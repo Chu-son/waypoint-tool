@@ -12,6 +12,7 @@ const shortcuts = [
   { action: "New Project", keys: ["Ctrl", "N"] },
   { action: "Open Project", keys: ["Ctrl", "O"] },
   { action: "Save Project", keys: ["Ctrl", "S"] },
+  { action: "Save Project As", keys: ["Ctrl", "Shift", "S"] },
   { action: "Export Waypoints", keys: ["Ctrl", "E"] },
   { action: "Toggle Occupancy Highlight", keys: ["Ctrl", "H"] },
   { action: "Select All Nodes", keys: ["Ctrl", "A"] },

@@ -22,7 +22,36 @@ export const DEFAULT_OCCUPANCY_SETTINGS: OccupancySettings = {
  */
 export function normalizeProjectData(data: any): {
   customLayers: CustomLayer[];
+  workflowState: {
+    currentStepIndex?: number;
+    maxReachedStepIndex?: number;
+    workflowVariables?: Record<string, any>;
+    stepExecutionIds?: Record<string, string>;
+  } | null;
 } {
+  // --- カスタムUIデータのフォールバック解決 ---
+  // 優先順位: custom_ui_data.workflow_state > トップレベル workflow_state > null
+  let workflowState = null;
+  const customUiData = data.custom_ui_data || data.customUiData;
+  const legacyWorkflow = data.workflow_state || data.workflowState;
+
+  if (customUiData?.workflow_state && typeof customUiData.workflow_state === 'object') {
+    const ws = customUiData.workflow_state;
+    workflowState = {
+      currentStepIndex: ws.current_step_index ?? ws.currentStepIndex,
+      maxReachedStepIndex: ws.max_reached_step_index ?? ws.maxReachedStepIndex,
+      workflowVariables: ws.workflow_variables ?? ws.workflowVariables,
+      stepExecutionIds: ws.step_execution_ids ?? ws.stepExecutionIds,
+    };
+  } else if (legacyWorkflow && typeof legacyWorkflow === 'object') {
+    workflowState = {
+      currentStepIndex: legacyWorkflow.current_step_index ?? legacyWorkflow.currentStepIndex,
+      maxReachedStepIndex: legacyWorkflow.max_reached_step_index ?? legacyWorkflow.maxReachedStepIndex,
+      workflowVariables: legacyWorkflow.workflow_variables ?? legacyWorkflow.workflowVariables,
+      stepExecutionIds: legacyWorkflow.step_execution_ids ?? legacyWorkflow.stepExecutionIds,
+    };
+  }
+
   if (data.custom_layers || data.customLayers) {
     const raw = data.custom_layers || data.customLayers;
     const layers: CustomLayer[] = raw.map((l: any, i: number) => ({
@@ -32,7 +61,7 @@ export function normalizeProjectData(data: any): {
       z_index: typeof l.z_index === 'number' ? l.z_index : i,
       editObjects: l.type === 'manual' ? (l.editObjects || l.edit_objects || []).map((o: any) => ({ ...o, id: o.id || uuidv4() })) : undefined,
     }));
-    return { customLayers: layers };
+    return { customLayers: layers, workflowState };
   }
 
   // Legacy ingress migration
@@ -76,7 +105,7 @@ export function normalizeProjectData(data: any): {
   });
 
   migrated.sort((a, b) => a.z_index - b.z_index);
-  return { customLayers: migrated.map((l, i) => ({ ...l, z_index: i })) };
+  return { customLayers: migrated.map((l, i) => ({ ...l, z_index: i })), workflowState };
 }
 
 export type ProjectSlice = {
@@ -93,6 +122,8 @@ export type ProjectSlice = {
   pathOpacity: number;
   syncPathWidthWithFootprint: boolean;
 
+  currentProjectPath: string | null;
+  setCurrentProjectPath: (path: string | null) => void;
   setLastDirectory: (dir: string | null) => void;
   addRecentProject: (pathStr: string) => void;
   setGlobalPythonPath: (path: string) => void;
@@ -156,15 +187,88 @@ export type ProjectSlice = {
     syncPathWidthWithFootprint?: boolean;
     workflow_state?: any;
     workflowState?: any;
+    custom_ui_data?: any;
+    customUiData?: any;
   }) => void;
   
   loadProject: () => Promise<boolean>;
   loadProjectFromPath: (pathStr: string) => Promise<boolean>;
   saveProject: () => Promise<void>;
+  saveProjectAs: () => Promise<void>;
   resetProject: () => void;
 };
 
-export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => ({
+export function buildProjectData(state: AppState) {
+  const mapLayersToSave = state.mapLayers.map((layer) => ({
+    id: layer.id,
+    name: layer.name,
+    info: layer.info,
+    image_base64: layer.image_base64,
+    width: layer.width,
+    height: layer.height,
+    visible: layer.visible,
+    opacity: layer.opacity,
+    z_index: layer.z_index,
+    blend_mode: layer.blend_mode,
+  }));
+
+  const annotationObjectsToSave = Object.values(state.annotationObjects || {});
+
+  return {
+    root_node_ids: state.rootNodeIds,
+    nodes: state.nodes,
+    map_layers: mapLayersToSave,
+    custom_layers: state.customLayers,
+    annotation_objects: annotationObjectsToSave,
+    annotation_groups: state.annotationGroups || {},
+    root_annotation_ids: state.rootAnnotationIds || [],
+    export_regions: state.exportRegions,
+    options_schema: state.optionsSchema,
+    export_templates: state.exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
+    default_export_formats: state.defaultExportFormats,
+    robot_footprint: state.robotFootprint,
+    occupancy_settings: state.occupancySettings,
+    default_map_opacity: state.defaultMapOpacity,
+    left_panel_view_mode: state.leftPanelViewMode,
+    right_panel_view_mode: state.rightPanelViewMode,
+    active_path_calculator_plugin_id: state.activePathCalculatorPluginId,
+    path_calculator_params: state.pathCalculatorParams,
+    auto_recalculate_path: state.autoRecalculatePath,
+    path_color: state.pathColor,
+    path_width: state.pathWidth,
+    path_opacity: state.pathOpacity,
+    sync_path_width_with_footprint: state.syncPathWidthWithFootprint,
+    // カスタムUIアディショナル領域（ネスト構造）
+    custom_ui_data: {
+      workflow_state: {
+        current_step_index: state.currentStepIndex,
+        max_reached_step_index: state.maxReachedStepIndex,
+        workflow_variables: state.workflowVariables,
+        step_execution_ids: state.stepExecutionIds,
+      },
+    },
+  };
+}
+
+export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => {
+  const executeSaveProject = async (finalPath: string) => {
+    const getDirName = (path: string) => {
+      const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+      return lastSlash > -1 ? path.substring(0, lastSlash) : path;
+    };
+
+    const { setLastDirectory, setIsDirty, addRecentProject } = get();
+    setLastDirectory(getDirName(finalPath));
+
+    const projectData = buildProjectData(get());
+    await BackendAPI.saveProject(finalPath, projectData);
+    setIsDirty(false);
+    addRecentProject(finalPath);
+    set({ currentProjectPath: finalPath });
+    alert("プロジェクトを保存しました。");
+  };
+
+  return {
   lastDirectory: null,
   recentProjects: [],
   optionsSchema: null,
@@ -180,7 +284,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   pathWidth: 0.1,
   pathOpacity: 0.7,
   syncPathWidthWithFootprint: false,
+  currentProjectPath: null,
 
+  setCurrentProjectPath: (path: string | null) => set({ currentProjectPath: path }),
   setLastDirectory: (dir: string | null) => set({ lastDirectory: dir }),
   addRecentProject: (pathStr: string) => set((state) => {
     const normalizedPath = pathStr.trim();
@@ -239,7 +345,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
       state.clearHistory();
 
-      const { customLayers } = normalizeProjectData(data);
+      const { customLayers, workflowState: normalizedWorkflow } = normalizeProjectData(data);
 
       const rawAnnotations: AnnotationObject[] = data.annotation_objects || data.annotationObjects || [];
       const annotationMap: Record<string, AnnotationObject> = {};
@@ -261,15 +367,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           : annotationOrder
       );
 
-      // Restore workflow state if available
-      const rawWorkflow = data.workflow_state || data.workflowState;
-      if (rawWorkflow && typeof rawWorkflow === 'object') {
-        state.setWorkflowState({
-          currentStepIndex: rawWorkflow.current_step_index ?? rawWorkflow.currentStepIndex,
-          maxReachedStepIndex: rawWorkflow.max_reached_step_index ?? rawWorkflow.maxReachedStepIndex,
-          workflowVariables: rawWorkflow.workflow_variables ?? rawWorkflow.workflowVariables,
-          stepExecutionIds: rawWorkflow.step_execution_ids ?? rawWorkflow.stepExecutionIds,
-        });
+      // Restore workflow state (resolved centrally in normalizeProjectData)
+      if (normalizedWorkflow) {
+        state.setWorkflowState(normalizedWorkflow);
       }
 
       const customUiLayout = state.isCustomUiMode && state.customUiConfig ? state.customUiConfig.layout : null;
@@ -342,6 +442,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       leftPanelViewMode: 'tabs',
       rightPanelViewMode: 'tabs',
       exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'),
+      currentProjectPath: null,
       isDirty: false
     };
   }),
@@ -370,7 +471,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             nodes: projectData.nodes,
             rootNodeIds: projectData.root_node_ids,
             mapLayers: projectData.map_layers?.map((layer: any) => ({
-              id: uuidv4(),
+              id: layer.id || uuidv4(),
               name: layer.name || "Restored Map",
               info: layer.info || {},
               image_base64: layer.image_base64 || "",
@@ -390,6 +491,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             export_regions: projectData.export_regions,
             options_schema: projectData.options_schema,
             export_templates: projectData.export_templates,
+            default_export_formats: projectData.default_export_formats,
             robot_footprint: projectData.robot_footprint,
             occupancy_settings: projectData.occupancy_settings,
             default_map_opacity: projectData.default_map_opacity,
@@ -402,7 +504,10 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             path_width: projectData.path_width,
             path_opacity: projectData.path_opacity,
             sync_path_width_with_footprint: projectData.sync_path_width_with_footprint,
+            workflow_state: projectData.workflow_state,
+            custom_ui_data: projectData.custom_ui_data,
           });
+          set({ currentProjectPath: pathStr });
           setIsDirty(false);
           addRecentProject(pathStr);
 
@@ -442,29 +547,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     }
   },
 
-  saveProject: async () => {
-    const {
-      lastDirectory,
-      setLastDirectory,
-      rootNodeIds,
-      nodes,
-      mapLayers,
-      customLayers,
-      robotFootprint,
-      occupancySettings,
-      defaultMapOpacity,
-      leftPanelViewMode,
-      rightPanelViewMode,
-      activePathCalculatorPluginId,
-      pathCalculatorParams,
-      autoRecalculatePath,
-      pathColor,
-      pathWidth,
-      pathOpacity,
-      syncPathWidthWithFootprint,
-      setIsDirty,
-      addRecentProject,
-    } = get();
+  saveProjectAs: async () => {
+    const { lastDirectory } = get();
     try {
       const savePath = await DialogAPI.save({
         defaultPath: lastDirectory || undefined,
@@ -476,69 +560,39 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         if (!finalPath.toLowerCase().endsWith(".wptroj")) {
           finalPath += ".wptroj";
         }
-
-        const getDirName = (path: string) => {
-          const lastSlash = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
-          return lastSlash > -1 ? path.substring(0, lastSlash) : path;
-        };
-
-        setLastDirectory(getDirName(finalPath));
-
-        const mapLayersToSave = mapLayers.map((layer) => ({
-          id: layer.id,
-          name: layer.name,
-          info: layer.info,
-          image_base64: layer.image_base64,
-          width: layer.width,
-          height: layer.height,
-          visible: layer.visible,
-          opacity: layer.opacity,
-          z_index: layer.z_index,
-          blend_mode: layer.blend_mode,
-        }));
-
-        const annotationObjectsToSave = (get().annotationOrder || [])
-          .map((id) => get().annotationObjects[id])
-          .filter(Boolean);
-
-        const projectData = {
-          root_node_ids: rootNodeIds,
-          nodes,
-          map_layers: mapLayersToSave,
-          custom_layers: customLayers,
-          annotation_objects: annotationObjectsToSave,
-          annotation_groups: get().annotationGroups || {},
-          root_annotation_ids: get().rootAnnotationIds || [],
-          export_regions: get().exportRegions,
-          options_schema: get().optionsSchema,
-          export_templates: get().exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
-          robot_footprint: robotFootprint,
-          occupancy_settings: occupancySettings,
-          default_map_opacity: defaultMapOpacity,
-          left_panel_view_mode: leftPanelViewMode,
-          right_panel_view_mode: rightPanelViewMode,
-          active_path_calculator_plugin_id: activePathCalculatorPluginId,
-          path_calculator_params: pathCalculatorParams,
-          auto_recalculate_path: autoRecalculatePath,
-          path_color: pathColor,
-          path_width: pathWidth,
-          path_opacity: pathOpacity,
-          sync_path_width_with_footprint: syncPathWidthWithFootprint,
-          workflow_state: {
-            current_step_index: get().currentStepIndex,
-            max_reached_step_index: get().maxReachedStepIndex,
-            workflow_variables: get().workflowVariables,
-            step_execution_ids: get().stepExecutionIds,
-          },
-        };
-        await BackendAPI.saveProject(finalPath, projectData);
-        setIsDirty(false);
-        addRecentProject(finalPath);
-        alert("プロジェクトを保存しました。");
+        await executeSaveProject(finalPath);
       }
     } catch (err) {
-      console.error("Failed to save project:", err);
+      console.error("Failed to save project as:", err);
       alert(`プロジェクトの保存に失敗しました。\nエラー詳細: ${String(err)}`);
     }
   },
-});
+
+  saveProject: async () => {
+    const { currentProjectPath, saveProjectAs } = get();
+    try {
+      if (!currentProjectPath) {
+        await saveProjectAs();
+        return;
+      }
+
+      const confirmed = await DialogAPI.ask(
+        `現在のプロジェクトを上書き保存しますか？\n保存先: ${currentProjectPath}`,
+        {
+          title: "上書き保存の確認",
+          kind: "info",
+        }
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      await executeSaveProject(currentProjectPath);
+    } catch (err) {
+      console.error("Failed to overwrite save project:", err);
+      alert(`プロジェクトの上書き保存に失敗しました。\nエラー詳細: ${String(err)}`);
+    }
+  },
+  };
+};

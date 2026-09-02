@@ -10,6 +10,7 @@ export function ShortcutManager() {
     setExportModalOpen,
     loadProject,
     saveProject,
+    saveProjectAs,
     resetProject,
     setRightPanelActiveTab,
     undo,
@@ -93,7 +94,11 @@ export function ShortcutManager() {
             break;
           case "s":
             e.preventDefault();
-            saveProject();
+            if (e.shiftKey) {
+              saveProjectAs();
+            } else {
+              saveProject();
+            }
             break;
           case "o":
             e.preventDefault();
@@ -129,6 +134,7 @@ export function ShortcutManager() {
     setExportModalOpen,
     loadProject,
     saveProject,
+    saveProjectAs,
     resetProject,
     setRightPanelActiveTab,
     undo,

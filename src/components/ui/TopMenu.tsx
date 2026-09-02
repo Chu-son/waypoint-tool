@@ -190,6 +190,7 @@ export function TopMenu() {
   const triggerFitToMaps = useAppStore((state) => state.triggerFitToMaps);
   const loadProject = useAppStore((state) => state.loadProject);
   const saveProject = useAppStore((state) => state.saveProject);
+  const saveProjectAs = useAppStore((state) => state.saveProjectAs);
   const undo = useAppStore((state) => state.undo);
   const redo = useAppStore((state) => state.redo);
   const canUndo = useAppStore((state) => state.historyPast.length > 0);
@@ -285,6 +286,7 @@ export function TopMenu() {
           { id: "file_new", label: "New Project...", action: handleNewProject, shortcut: "Ctrl+N" },
           { id: "file_open", label: "Open Project...", action: handleOpenProject, shortcut: "Ctrl+O" },
           { id: "file_save", label: "Save Project", action: saveProject, shortcut: "Ctrl+S" },
+          { id: "file_save_as", label: "Save Project As...", action: saveProjectAs, shortcut: "Ctrl+Shift+S" },
           { divider: true, label: "" },
           { id: "file_import_waypoints", label: "Import Maps / Waypoints...", action: () => setImportModalOpen(true), shortcut: "Ctrl+I" },
           { id: "file_export_waypoints", label: "Export Project / Waypoints...", action: () => setExportModalOpen(true), shortcut: "Ctrl+E" },
@@ -428,7 +430,7 @@ export function TopMenu() {
     removeNodes, setShowProperties, setShowPaths, setShowGrid, setShowFootprints,
     setEnableSnapping, triggerFitToMaps, setLeftPanelOpen, setRightPanelOpen,
     resetWindowLayout, setShortcutsModalOpen, setIsInitialLaunch, setWelcomeModalOpen,
-    handleNewProject, handleOpenProject, saveProject, setExportModalOpen,
+    handleNewProject, handleOpenProject, saveProject, saveProjectAs, setExportModalOpen,
     setImportModalOpen, setExportMapsModalOpen, setSettingsModalOpen, handleExit
   ]);
 
