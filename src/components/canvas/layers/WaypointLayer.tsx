@@ -1,5 +1,6 @@
 import { useAppStore } from '../../../stores/appStore';
 import { TextStyle, FederatedPointerEvent } from 'pixi.js';
+import { computeLabelOffsets, LabelCandidate } from '../../../utils/labelLayout';
 
 interface WaypointLayerProps {
   scale: number;
@@ -38,31 +39,65 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
 
   rootNodeIds.forEach(id => traverse(id, false));
 
+  // 選択状態・座標・属性ラベル行など、描画とラベル重なり判定の両方で使う値をまとめて1回だけ計算する
+  const items = renderableNodes.map(({ node, parentIsGenerator, globalIndex }) => {
+    const isSelected = selectedNodeIds.includes(node.id);
+
+    let isReferenced = false;
+    const rootIdx = rootNodeIds.indexOf(node.id);
+    if (rootIdx !== -1) {
+      const activePlugin = activePluginId ? plugins[activePluginId] : null;
+      const waypointInputKeys = activePlugin?.manifest?.inputs
+        ?.filter(inp => inp.type === 'waypoint')
+        ?.map(inp => inp.name || inp.id) || [];
+
+      isReferenced = waypointInputKeys.some(key => pluginInteractionData[key] === rootIdx);
+    }
+
+    const transform = node.transform!;
+    const qx = transform.qx ?? 0;
+    const qy = transform.qy ?? 0;
+    const qz = transform.qz ?? 0;
+    const qw = transform.qw ?? 1;
+    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+    if (!isFinite(yaw)) yaw = 0;
+    const px = isFinite(transform.x) ? transform.x : 0;
+    const py = isFinite(transform.y) ? transform.y : 0;
+
+    const lines: string[] = [];
+    if (showProperties && visibleAttributes.length > 0) {
+      if (visibleAttributes.includes('index')) {
+        lines.push(`Index: [${globalIndex + indexStartIndex}]`);
+      }
+      if (visibleAttributes.includes('transform')) {
+        lines.push(`Transform:\n  x: ${transform.x.toFixed(3)}, y: ${transform.y.toFixed(3)}, z: ${(transform.z ?? 0).toFixed(3)}\n  yaw: ${yaw.toFixed(3)}\n  qx: ${qx.toFixed(3)}, qy: ${qy.toFixed(3)}, qz: ${qz.toFixed(3)}, qw: ${qw.toFixed(3)}`);
+      }
+      const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
+      optionKeys.forEach(attr => {
+        const key = attr.split('.')[1];
+        const optDef = optionsSchema?.options?.find(o => o.name === key);
+        let val = node.options?.[key];
+        if (val === undefined && optDef && optDef.default !== undefined) {
+          val = optDef.default;
+        }
+        if (val !== undefined && val !== '') {
+          const displayLabel = optDef?.label || key;
+          lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
+        }
+      });
+    }
+
+    return { node, parentIsGenerator, isSelected, isReferenced, transform, yaw, px, py, lines };
+  });
+
+  const labelCandidates: LabelCandidate[] = items
+    .filter(item => item.lines.length > 0)
+    .map(item => ({ id: item.node.id, worldX: item.px, worldY: item.py, lines: item.lines }));
+  const labelLayoutMap = computeLabelOffsets(labelCandidates, scale, textStyle);
+
   return (
     <>
-      {renderableNodes.map(({ node, parentIsGenerator, globalIndex }) => {
-        const isSelected = selectedNodeIds.includes(node.id);
-        
-        let isReferenced = false;
-        const rootIdx = rootNodeIds.indexOf(node.id);
-        if (rootIdx !== -1) {
-          const activePlugin = activePluginId ? plugins[activePluginId] : null;
-          const waypointInputKeys = activePlugin?.manifest?.inputs
-            ?.filter(inp => inp.type === 'waypoint')
-            ?.map(inp => inp.name || inp.id) || [];
-          
-          isReferenced = waypointInputKeys.some(key => pluginInteractionData[key] === rootIdx);
-        }
-
-        const transform = node.transform!;
-        const qx = transform.qx ?? 0;
-        const qy = transform.qy ?? 0;
-        const qz = transform.qz ?? 0;
-        const qw = transform.qw ?? 1;
-        let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-        if (!isFinite(yaw)) yaw = 0;
-        const px = isFinite(transform.x) ? transform.x : 0;
-        const py = isFinite(transform.y) ? transform.y : 0;
+      {items.map(({ node, parentIsGenerator, isSelected, isReferenced, yaw, px, py, lines }) => {
         const safeScale = Math.max(scale, 0.001);
 
         const isLocked = lockedWaypointId === node.id;
@@ -70,6 +105,12 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
         const selectedColor = 0x3b82f6;
         const normalFill = isLocked ? 0x34d399 : (isReferenced ? 0xfef08a : (parentIsGenerator ? 0x4ade80 : 0xffd700));
         const selectedFill = 0x60a5fa;
+
+        const labelLayout = labelLayoutMap.get(node.id);
+        const labelOffsetX = labelLayout ? labelLayout.x : 15 / safeScale;
+        const labelOffsetY = labelLayout ? labelLayout.y : -15 / safeScale;
+        const labelWidth = labelLayout?.width ?? 0;
+        const labelHeight = labelLayout?.height ?? 0;
 
         return (
           <pixiContainer
@@ -123,32 +164,28 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
               />
             )}
 
-            {showProperties && visibleAttributes.length > 0 && (
-              <pixiContainer rotation={-yaw} scale={{ x: 1 / safeScale, y: -1 / safeScale }} x={15 / safeScale} y={-15 / safeScale}>
-                {(() => {
-                  const lines: string[] = [];
-                  if (visibleAttributes.includes('index')) {
-                    lines.push(`Index: [${globalIndex + indexStartIndex}]`);
-                  }
-                  if (visibleAttributes.includes('transform')) {
-                    lines.push(`Transform:\n  x: ${transform.x.toFixed(3)}, y: ${transform.y.toFixed(3)}, z: ${(transform.z ?? 0).toFixed(3)}\n  yaw: ${yaw.toFixed(3)}\n  qx: ${qx.toFixed(3)}, qy: ${qy.toFixed(3)}, qz: ${qz.toFixed(3)}, qw: ${qw.toFixed(3)}`);
-                  }
-                  const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
-                  optionKeys.forEach(attr => {
-                    const key = attr.split('.')[1];
-                    const optDef = optionsSchema?.options?.find(o => o.name === key);
-                    let val = node.options?.[key];
-                    if (val === undefined && optDef && optDef.default !== undefined) {
-                      val = optDef.default;
+            {lines.length > 0 && (
+              <pixiContainer rotation={-yaw} scale={{ x: 1 / safeScale, y: -1 / safeScale }} x={labelOffsetX} y={labelOffsetY}>
+                <pixiGraphics
+                  eventMode="dynamic"
+                  cursor={activeTool === 'select' ? 'pointer' : 'default'}
+                  onPointerDown={(e: FederatedPointerEvent) => onNodePointerDown(e, node.id)}
+                  draw={(g) => {
+                    g.clear();
+                    if (isSelected) {
+                      g.fillStyle = { color: selectedFill, alpha: 0.25 };
+                      g.strokeStyle = { width: 1.5, color: selectedColor };
+                    } else {
+                      g.fillStyle = { color: 0xffffff, alpha: 0.001 };
                     }
-                    if (val !== undefined && val !== '') {
-                      const displayLabel = optDef?.label || key;
-                      lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
+                    g.rect(0, -labelHeight, labelWidth, labelHeight);
+                    g.fill();
+                    if (isSelected) {
+                      g.stroke();
                     }
-                  });
-                  if (lines.length === 0) return null;
-                  return <pixiText text={lines.join('\n')} style={textStyle} anchor={{ x: 0, y: 1 }} />;
-                })()}
+                  }}
+                />
+                <pixiText text={lines.join('\n')} style={textStyle} anchor={{ x: 0, y: 1 }} />
               </pixiContainer>
             )}
           </pixiContainer>
