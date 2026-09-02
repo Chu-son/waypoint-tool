@@ -1,7 +1,9 @@
+import { RotateCcw, FlipHorizontal2, RotateCw } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
-import { WaypointNode } from "../../../types/store";
-import { quaternionToYaw } from "../../../utils/transformUtils";
+import { WaypointNode, Transform } from "../../../types/store";
+import { quaternionToYaw, yawToQuaternion } from "../../../utils/transformUtils";
 import { ElementCopyField } from "../../../stores/slices/uiSlice";
+import { Button } from "../common/Button";
 import { TransformField } from "./TransformField";
 import { PropertySectionHeader } from "./PropertySectionHeader";
 
@@ -67,6 +69,40 @@ export function TransformGroup({
         handleUpdate(node!.id, {
           transform: { ...node!.transform!, qx: 0, qy: 0, qz, qw },
         });
+      }
+    });
+  };
+
+  const handleRotateRelative = (deltaDeg: number) => {
+    const deltaRad = deltaDeg * (Math.PI / 180.0);
+
+    useAppStore.getState().runInHistoryTransaction(() => {
+      const rotateTransform = (tf: Transform): Partial<Transform> => {
+        const curYaw = quaternionToYaw(tf);
+        let newYaw = curYaw + deltaRad;
+        // Normalize to [-pi, pi]
+        newYaw = Math.atan2(Math.sin(newYaw), Math.cos(newYaw));
+
+        // Snap near exact multiples of 90 degrees to eliminate floating point rounding error
+        const deg = newYaw * (180.0 / Math.PI);
+        const roundedDeg = Math.round(deg);
+        if (Math.abs(deg - roundedDeg) < 1e-4) {
+          newYaw = roundedDeg * (Math.PI / 180.0);
+        }
+
+        const q = yawToQuaternion(newYaw);
+        return { ...tf, ...q };
+      };
+
+      if (isMultiSelection) {
+        selectedNodeIds.forEach((id) => {
+          const n = nodes[id];
+          if (n && n.transform) {
+            handleUpdate(id, { transform: rotateTransform(n.transform) });
+          }
+        });
+      } else if (node && node.transform) {
+        handleUpdate(node.id, { transform: rotateTransform(node.transform) });
       }
     });
   };
@@ -144,6 +180,46 @@ export function TransformGroup({
             onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => handleYawChange(val, true)}
           />
+        </div>
+        <div className="col-span-3 pt-1">
+          <div className="text-[11px] font-medium text-text-muted mb-1.5 select-none">
+            Quick Rotate
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
+              onClick={() => handleRotateRelative(90)}
+              title="Rotate 90° Left (+90°)"
+              aria-label="Rotate 90° Left"
+            >
+              <RotateCcw size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
+              onClick={() => handleRotateRelative(180)}
+              title="Rotate 180° (Mirror Reverse)"
+              aria-label="Rotate 180°"
+            >
+              <FlipHorizontal2 size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
+              onClick={() => handleRotateRelative(-90)}
+              title="Rotate 90° Right (-90°)"
+              aria-label="Rotate 90° Right"
+            >
+              <RotateCw size={15} />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

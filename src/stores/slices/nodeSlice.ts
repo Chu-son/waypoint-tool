@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { WaypointNode } from '../../types/store';
+import { WaypointNode, InsertionTarget } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 import {
   findHighestLevelParent,
@@ -14,7 +14,8 @@ export type NodeSlice = {
   nodes: Record<string, WaypointNode>;
   rootNodeIds: string[];
   selectedNodeIds: string[];
-  insertionIndex: number;
+  insertionTarget: InsertionTarget | null;
+  insertionIndex: number; // For backward compatibility
   
   anchorNodeId: string | null;
   setAnchorNode: (id: string | null) => void;
@@ -33,6 +34,7 @@ export type NodeSlice = {
   deselectAllNodes: () => void;
   explodeGenerator: (id: string) => void;
   duplicateNodes: (ids: string[]) => string[];
+  setInsertionTarget: (target: InsertionTarget | null) => void;
   setInsertionIndex: (index: number) => void;
 };
 
@@ -40,35 +42,76 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
   nodes: {},
   rootNodeIds: [],
   selectedNodeIds: [],
+  insertionTarget: null,
   insertionIndex: -1,
   anchorNodeId: null,
 
   setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
 
-  setInsertionIndex: (index: number) => set({ insertionIndex: index }),
+  setInsertionTarget: (target: InsertionTarget | null) => set({
+    insertionTarget: target,
+    insertionIndex: (target && target.parentId === null) ? target.index : -1,
+  }),
+
+  setInsertionIndex: (index: number) => set({
+    insertionIndex: index,
+    insertionTarget: index >= 0 ? { parentId: null, index } : null,
+  }),
 
   addNode: (node: WaypointNode, parentId?: string, options?: { skipRecalculate?: boolean }) => {
     get().pushHistorySnapshot();
     set((state) => {
       const newNodes = { ...state.nodes, [node.id]: node };
       let newRootIds = [...state.rootNodeIds];
-      
-      if (parentId && newNodes[parentId]) {
-        const parent = newNodes[parentId];
-        parent.children_ids = [...(parent.children_ids || []), node.id];
+
+      const effectiveParentId = parentId !== undefined
+        ? parentId
+        : state.insertionTarget?.parentId ?? undefined;
+
+      let nextInsertionTarget = state.insertionTarget;
+
+      if (effectiveParentId && newNodes[effectiveParentId]) {
+        const parent = newNodes[effectiveParentId];
+        const children = [...(parent.children_ids || [])];
+        const insIdx = (state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0)
+          ? Math.min(state.insertionTarget.index, children.length)
+          : children.length;
+
+        children.splice(insIdx, 0, node.id);
+        newNodes[effectiveParentId] = {
+          ...parent,
+          children_ids: children,
+        };
+
+        if (state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+          nextInsertionTarget = { parentId: effectiveParentId, index: insIdx + 1 };
+        }
       } else {
-        if (state.insertionIndex !== -1 && state.insertionIndex <= newRootIds.length) {
-          newRootIds.splice(state.insertionIndex, 0, node.id);
-        } else {
-          newRootIds.push(node.id);
+        const insIdx = (state.insertionTarget?.parentId === null && state.insertionTarget !== null && state.insertionTarget.index >= 0)
+          ? Math.min(state.insertionTarget.index, newRootIds.length)
+          : (state.insertionIndex !== -1 && state.insertionIndex <= newRootIds.length)
+            ? state.insertionIndex
+            : newRootIds.length;
+
+        newRootIds.splice(insIdx, 0, node.id);
+
+        if (state.insertionTarget?.parentId === null && state.insertionTarget.index >= 0) {
+          nextInsertionTarget = { parentId: null, index: insIdx + 1 };
+        } else if (state.insertionIndex !== -1) {
+          nextInsertionTarget = { parentId: null, index: insIdx + 1 };
         }
       }
-      
-      return { 
-        nodes: newNodes, 
-        rootNodeIds: newRootIds, 
-        insertionIndex: state.insertionIndex !== -1 ? state.insertionIndex + 1 : -1,
-        isDirty: true 
+
+      const nextInsertionIndex = (nextInsertionTarget && nextInsertionTarget.parentId === null)
+        ? nextInsertionTarget.index
+        : -1;
+
+      return {
+        nodes: newNodes,
+        rootNodeIds: newRootIds,
+        insertionTarget: nextInsertionTarget,
+        insertionIndex: nextInsertionIndex,
+        isDirty: true,
       };
     });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
@@ -422,14 +465,25 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
   },
 
   selectNodes: (ids: string[], multi = false) => set((state) => {
+    // グループが含まれる場合、その全子孫ノードIDを自動収集して展開
+    const expandedTargetIds = new Set<string>();
+    ids.forEach((id) => {
+      expandedTargetIds.add(id);
+      const node = state.nodes[id];
+      if (node && (node.type === 'manual_group' || node.type === 'group' || node.type === 'generator')) {
+        collectDescendantIds(id, state.nodes).forEach((dId) => expandedTargetIds.add(dId));
+      }
+    });
+    const targetIds = Array.from(expandedTargetIds);
+
     const nextIds = multi ? (() => {
       const current = new Set(state.selectedNodeIds);
-      ids.forEach(id => {
+      targetIds.forEach(id => {
         if (current.has(id)) current.delete(id);
         else current.add(id);
       });
       return Array.from(current);
-    })() : ids;
+    })() : targetIds;
 
     const updates: Partial<AppState> = { selectedNodeIds: nextIds };
     if (nextIds.length > 0) {

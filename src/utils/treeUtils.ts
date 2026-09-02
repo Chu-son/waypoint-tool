@@ -1,4 +1,4 @@
-import { WaypointNode, AnnotationGroup, AnnotationObject } from '../types/store';
+import { WaypointNode, AnnotationGroup, AnnotationObject, InsertionTarget } from '../types/store';
 
 /**
  * ウェイポイントツリーを深さ優先探索 (DFS) で走査し、すべてのマニュアルウェイポイントIDを順序通りに抽出する。
@@ -344,4 +344,42 @@ export function getNextSequentialName(
   }
 
   return `${prefix} ${num}`;
+}
+
+/**
+ * insertionTarget より後方にあるノードIDの Set を返す。
+ * insertionTarget が null の場合（末尾挿入）は空の Set を返す。
+ */
+export function getNodesAfterInsertionTarget(
+  rootNodeIds: string[],
+  nodes: Record<string, WaypointNode>,
+  insertionTarget: InsertionTarget | null
+): Set<string> {
+  const result = new Set<string>();
+  if (!insertionTarget) return result;
+
+  const target = insertionTarget;
+  let passedInsertion = false;
+
+  function traverseList(parentId: string | null, list: string[]) {
+    list.forEach((id, idx) => {
+      if (!passedInsertion && target.parentId === parentId && target.index === idx) {
+        passedInsertion = true;
+      }
+      if (passedInsertion) {
+        result.add(id);
+      }
+      const node = nodes[id];
+      if (node && node.children_ids && node.children_ids.length > 0) {
+        traverseList(id, node.children_ids);
+      }
+    });
+
+    if (!passedInsertion && target.parentId === parentId && target.index >= list.length) {
+      passedInsertion = true;
+    }
+  }
+
+  traverseList(null, rootNodeIds);
+  return result;
 }

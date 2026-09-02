@@ -209,9 +209,37 @@ export function GeneratorNodePanel({
           </div>
         </div>
       ) : (
-        <AlertBox variant="danger" title="Plugin Not Loaded">
-          Plugin "{pluginId}" is no longer available or loaded. Cannot edit parameters.
-        </AlertBox>
+        <div className="space-y-4 flex-1">
+          <AlertBox variant="warning" title="プラグイン未ロード">
+            プラグイン "{pluginId || '(未指定)'}" が見つからないか、読み込まれていません。
+            パラメータの再編集・再生成はできませんが、独立したWaypointへの展開 (Explode) は可能です。
+          </AlertBox>
+
+          {node.plugin_data && Object.keys(node.plugin_data).length > 0 && (
+            <PluginDataViewer data={node.plugin_data} title="保存された内部データ" defaultExpanded={true} />
+          )}
+
+          <div className="pt-4 border-t border-border-base">
+            <Button
+              variant="danger"
+              onClick={async () => {
+                const { DialogAPI } = await import("../../../api");
+                const confirmed = await DialogAPI.ask(
+                  "このジェネレーターを個別ウェイポイントに展開しますか？元に戻すことはできません。",
+                  { title: "Explode Generator", kind: "warning" }
+                );
+                if (confirmed) {
+                  explodeGenerator(node.id);
+                }
+              }}
+              className="w-full h-9 gap-2"
+              title="個別ウェイポイントに展開"
+            >
+              <BoxSelect size={14} />
+              個別ウェイポイントに展開 (Explode to Waypoints)
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

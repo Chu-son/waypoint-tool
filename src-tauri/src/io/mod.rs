@@ -340,9 +340,13 @@ mod tests {
             WaypointNode {
                 id: "node1".to_string(),
                 node_type: "manual".to_string(),
+                name: Some("WP 1".to_string()),
                 transform: Some(Transform { x: 1.0, y: 2.0, z: None, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0 }),
                 options: None,
+                plugin_id: None,
+                source_execution_id: None,
                 generator_params: None,
+                plugin_data: None,
                 children_ids: None,
             },
         );
@@ -352,10 +356,14 @@ mod tests {
             nodes,
             map_layers: None,
             custom_layers: None,
+            annotation_objects: None,
+            annotation_groups: None,
+            root_annotation_ids: None,
             edit_layers: None,
             generated_layers: None,
             options_schema: None,
             export_templates: None,
+            default_export_formats: None,
             export_regions: None,
             robot_footprint: None,
             occupancy_settings: Some(serde_json::json!({
@@ -374,6 +382,7 @@ mod tests {
             path_opacity: Some(0.8),
             sync_path_width_with_footprint: Some(true),
             workflow_state: None,
+            custom_ui_data: None,
         };
 
         // Save

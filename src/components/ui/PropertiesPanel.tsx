@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { GeneratorNodePanel } from "./properties/GeneratorNodePanel";
+import { GroupNodePanel } from "./properties/GroupNodePanel";
 import { IndexGroup } from "./properties/IndexGroup";
 import { TransformGroup } from "./properties/TransformGroup";
 import { RelativeTransformGroup } from "./properties/RelativeTransformGroup";
@@ -10,6 +11,7 @@ import { ElementCopyContextMenu } from "./properties/ElementCopyContextMenu";
 import { ElementCopyField } from "../../stores/slices/uiSlice";
 import { EmptyState } from "./common/EmptyState";
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from "../../utils/transformUtils";
+import { collectDescendantIds } from "../../utils/treeUtils";
 import { WaypointNode } from "../../types/store";
 
 export function PropertiesPanel() {
@@ -26,8 +28,39 @@ export function PropertiesPanel() {
     position: { x: number; y: number };
   } | null>(null);
 
-  const isMultiSelection = selectedNodeIds.length > 1;
-  const rawNode = isMultiSelection ? null : nodes[selectedNodeIds[0]];
+  // グループまたはジェネレーターノードとその子孫が一括選択されているかを判定
+  const selectedGroupNode = useMemo(() => {
+    if (selectedNodeIds.length === 0) return null;
+    if (selectedNodeIds.length === 1) {
+      const n = nodes[selectedNodeIds[0]];
+      return (n && (n.type === "manual_group" || n.type === "group")) ? n : null;
+    }
+    const firstNode = nodes[selectedNodeIds[0]];
+    if (firstNode && (firstNode.type === "manual_group" || firstNode.type === "group")) {
+      const descendants = new Set(collectDescendantIds(firstNode.id, nodes));
+      const allAreDescendants = selectedNodeIds.slice(1).every((id) => descendants.has(id));
+      if (allAreDescendants) return firstNode;
+    }
+    return null;
+  }, [selectedNodeIds, nodes]);
+
+  const selectedGeneratorNode = useMemo(() => {
+    if (selectedNodeIds.length === 0) return null;
+    if (selectedNodeIds.length === 1) {
+      const n = nodes[selectedNodeIds[0]];
+      return n?.type === "generator" ? n : null;
+    }
+    const firstNode = nodes[selectedNodeIds[0]];
+    if (firstNode?.type === "generator") {
+      const descendants = new Set(collectDescendantIds(firstNode.id, nodes));
+      const allAreDescendants = selectedNodeIds.slice(1).every((id) => descendants.has(id));
+      if (allAreDescendants) return firstNode;
+    }
+    return null;
+  }, [selectedNodeIds, nodes]);
+
+  const isMultiSelection = !selectedGroupNode && !selectedGeneratorNode && selectedNodeIds.length > 1;
+  const rawNode = isMultiSelection ? null : (selectedGroupNode || selectedGeneratorNode || nodes[selectedNodeIds[0]]);
   const anchorNode = anchorNodeId ? nodes[anchorNodeId] : null;
 
   // プレビュー状態のノードを計算（Element Copy Preview 中）
@@ -136,6 +169,13 @@ export function PropertiesPanel() {
       else if (copyMenuState.field === "z") anchorRelValForContextMenu = rel.relZ;
       else if (copyMenuState.field === "yaw") anchorRelValForContextMenu = rel.relYaw;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // GROUP NODE UI
+  // --------------------------------------------------------------------------
+  if (!isMultiSelection && node && (node.type === "manual_group" || node.type === "group")) {
+    return <GroupNodePanel node={node} />;
   }
 
   // --------------------------------------------------------------------------

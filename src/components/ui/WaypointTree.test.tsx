@@ -16,6 +16,8 @@ vi.mock('lucide-react', () => ({
   Folder: () => <div data-testid="folder-icon" />,
   FolderPlus: () => <div data-testid="folder-plus-icon" />,
   Edit2: () => <div data-testid="edit-icon" />,
+  ArrowDownToLine: () => <div data-testid="arrow-down-to-line-icon" />,
+  X: () => <div data-testid="x-icon" />,
 }));
 
 // Mock Store
@@ -168,5 +170,41 @@ describe('WaypointTree', () => {
 
     fireEvent.click(groupOption);
     expect(mockGroupNodes).toHaveBeenCalledWith(['wp-1', 'wp-2']);
+  });
+
+  it('renders insertion bar and allows reset when insertionTarget is active', () => {
+    const mockSetInsertionTarget = vi.fn();
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
+      nodes: mockNodes,
+      plugins: mockPlugins,
+      selectedNodeIds: [],
+      indexStartIndex: 0,
+      insertionTarget: { parentId: null, index: 1 },
+      setInsertionTarget: mockSetInsertionTarget,
+      selectNodes: mockSelectNodes,
+      duplicateNodes: mockDuplicateNodes,
+      removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
+    }));
+
+    render(<WaypointTree />);
+
+    // X icon should be visible on the insertion bar
+    const xIcon = screen.getByTestId('x-icon');
+    expect(xIcon).toBeInTheDocument();
+
+    // Click reset button
+    fireEvent.click(xIcon);
+    expect(mockSetInsertionTarget).toHaveBeenCalledWith(null);
+
+    // Node wp-2 (index 1) and wp-3 (index 2) are after insertion target (index 1), so their container should be greyed out
+    const wp2Text = screen.getByText('[1]');
+    const wp2Row = wp2Text.closest('.group');
+    expect(wp2Row?.className).toContain('opacity-40');
   });
 });

@@ -431,3 +431,87 @@ describe('NodeSlice - moveNodesInTree', () => {
     expect(state.nodes['grp-1'].children_ids).toEqual(['wp-1']);
   });
 });
+
+describe('NodeSlice - insertionTarget & group selection', () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      nodes: {},
+      rootNodeIds: [],
+      selectedNodeIds: [],
+      insertionTarget: null,
+      insertionIndex: -1,
+      historyPast: [],
+      historyFuture: [],
+    });
+  });
+
+  it('inserts node at root index specified by insertionTarget and advances index', () => {
+    const nodeA: WaypointNode = { id: 'wp-a', type: 'manual' };
+    const nodeB: WaypointNode = { id: 'wp-b', type: 'manual' };
+
+    useAppStore.setState({
+      nodes: { 'wp-a': nodeA, 'wp-b': nodeB },
+      rootNodeIds: ['wp-a', 'wp-b'],
+    });
+
+    useAppStore.getState().setInsertionTarget({ parentId: null, index: 1 });
+
+    useAppStore.getState().addNode({
+      id: 'wp-new',
+      type: 'manual',
+      transform: { x: 5, y: 5, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    });
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-a', 'wp-new', 'wp-b']);
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 2 });
+  });
+
+  it('inserts node inside a group specified by insertionTarget and advances index', () => {
+    const child1: WaypointNode = { id: 'c-1', type: 'manual' };
+    const group: WaypointNode = { id: 'grp-1', type: 'manual_group', children_ids: ['c-1'] };
+
+    useAppStore.setState({
+      nodes: { 'c-1': child1, 'grp-1': group },
+      rootNodeIds: ['grp-1'],
+    });
+
+    useAppStore.getState().setInsertionTarget({ parentId: 'grp-1', index: 0 });
+
+    useAppStore.getState().addNode({
+      id: 'wp-child-new',
+      type: 'manual',
+      transform: { x: 3, y: 3, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    });
+
+    const state = useAppStore.getState();
+    expect(state.nodes['grp-1'].children_ids).toEqual(['wp-child-new', 'c-1']);
+    expect(state.insertionTarget).toEqual({ parentId: 'grp-1', index: 1 });
+  });
+
+  it('automatically selects all descendant nodes when a group is selected', () => {
+    const leaf1: WaypointNode = { id: 'leaf-1', type: 'manual' };
+    const leaf2: WaypointNode = { id: 'leaf-2', type: 'manual' };
+    const subGrp: WaypointNode = { id: 'sub-grp', type: 'manual_group', children_ids: ['leaf-2'] };
+    const parentGrp: WaypointNode = { id: 'parent-grp', type: 'manual_group', children_ids: ['leaf-1', 'sub-grp'] };
+
+    useAppStore.setState({
+      nodes: {
+        'leaf-1': leaf1,
+        'leaf-2': leaf2,
+        'sub-grp': subGrp,
+        'parent-grp': parentGrp,
+      },
+      rootNodeIds: ['parent-grp'],
+      selectedNodeIds: [],
+    });
+
+    useAppStore.getState().selectNodes(['parent-grp']);
+
+    const state = useAppStore.getState();
+    expect(state.selectedNodeIds).toContain('parent-grp');
+    expect(state.selectedNodeIds).toContain('leaf-1');
+    expect(state.selectedNodeIds).toContain('sub-grp');
+    expect(state.selectedNodeIds).toContain('leaf-2');
+  });
+});

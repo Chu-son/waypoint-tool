@@ -8,11 +8,25 @@ export const StatusBar: React.FC = () => {
   const mapScale = useAppStore(state => state.mapScale);
   const nodes = useAppStore(state => state.nodes);
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
+  const insertionTarget = useAppStore(state => state.insertionTarget);
   const insertionIndex = useAppStore(state => state.insertionIndex);
   const elementCopyState = useAppStore(state => state.elementCopyState);
 
   // Calculate the latest waypoint (the point immediately before the insertion point or at the very end)
   const getLatestWaypoint = () => {
+    if (insertionTarget) {
+      const list = insertionTarget.parentId
+        ? (nodes[insertionTarget.parentId]?.children_ids || [])
+        : rootNodeIds;
+      const targetIndex = insertionTarget.index - 1;
+      if (targetIndex >= 0 && targetIndex < list.length) {
+        return nodes[list[targetIndex]];
+      }
+      if (insertionTarget.parentId && targetIndex < 0) {
+        return nodes[insertionTarget.parentId];
+      }
+      return null;
+    }
     const targetIndex = insertionIndex !== -1 ? insertionIndex - 1 : rootNodeIds.length - 1;
     if (targetIndex >= 0 && targetIndex < rootNodeIds.length) {
       const nodeId = rootNodeIds[targetIndex];
@@ -125,6 +139,15 @@ export const StatusBar: React.FC = () => {
 
       {/* Right Section: Zoom & Extensions */}
       <div className="flex-1 flex justify-end items-center space-x-4">
+        {insertionTarget && (
+          <span
+            onClick={() => useAppStore.getState().setInsertionTarget(null)}
+            className="cursor-pointer font-sans text-[11px] px-1.5 py-0.5 rounded bg-primary-base/20 border border-primary-base/40 text-primary-base hover:bg-primary-base/30 transition-colors flex items-center gap-1"
+            title="クリックで挿入位置指定を解除"
+          >
+            📍 挿入: {insertionTarget.parentId ? (nodes[insertionTarget.parentId]?.name || 'Group') : 'ルート'} [{insertionTarget.index}] ✕
+          </span>
+        )}
         <span className="font-mono">Zoom: {(mapScale * 100).toFixed(1)}%</span>
       </div>
     </div>

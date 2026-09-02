@@ -9,6 +9,7 @@ import {
   computeRangeSelection,
   computeDragDropPosition,
   getNextSequentialName,
+  getNodesAfterInsertionTarget,
 } from './treeUtils';
 import { WaypointNode } from '../types/store';
 
@@ -141,6 +142,34 @@ describe('treeUtils', () => {
     it('handles Group prefix correctly', () => {
       const names = ['Group 1', 'Group 3'];
       expect(getNextSequentialName('Group', names)).toBe('Group 2');
+    });
+  });
+
+  describe('getNodesAfterInsertionTarget', () => {
+    it('returns empty set when insertionTarget is null', () => {
+      const res = getNodesAfterInsertionTarget(rootIds, nodes, null);
+      expect(res.size).toBe(0);
+    });
+
+    it('returns all nodes after a root insertion index', () => {
+      // rootIds = ['wp-1', 'group-1', 'wp-5']
+      // Insert at root index 1 (between wp-1 and group-1)
+      const res = getNodesAfterInsertionTarget(rootIds, nodes, { parentId: null, index: 1 });
+      // group-1 and all its descendants, plus wp-5, should be in the set
+      expect(Array.from(res)).toEqual(['group-1', 'wp-2', 'subgroup-1', 'wp-3', 'wp-4', 'wp-5']);
+    });
+
+    it('returns empty set when insertion target is at the end of root', () => {
+      const res = getNodesAfterInsertionTarget(rootIds, nodes, { parentId: null, index: 3 });
+      expect(res.size).toBe(0);
+    });
+
+    it('returns nodes after an insertion inside a nested group', () => {
+      // subgroup-1 children: ['wp-3', 'wp-4']
+      // Insert inside subgroup-1 at index 1 (between wp-3 and wp-4)
+      const res = getNodesAfterInsertionTarget(rootIds, nodes, { parentId: 'subgroup-1', index: 1 });
+      // wp-4 and subsequent nodes in the tree (wp-5) should be in the set
+      expect(Array.from(res)).toEqual(['wp-4', 'wp-5']);
     });
   });
 });

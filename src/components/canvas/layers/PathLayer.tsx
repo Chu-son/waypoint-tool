@@ -1,11 +1,13 @@
+import { useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import * as PIXI from 'pixi.js';
-import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { getFlattenedWaypointIds, getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 
 export function PathLayer({ scale }: { scale: number }) {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const nodes = useAppStore(state => state.nodes);
+  const insertionTarget = useAppStore(state => state.insertionTarget);
   const calculatedPathSegments = useAppStore(state => state.calculatedPathSegments);
   const activePathCalculatorPluginId = useAppStore(state => state.activePathCalculatorPluginId);
   const pathColor = useAppStore(state => state.pathColor) || DEFAULT_PATH_COLOR;
@@ -13,6 +15,10 @@ export function PathLayer({ scale }: { scale: number }) {
   const pathOpacity = useAppStore(state => state.pathOpacity) ?? 0.7;
   const syncPathWidthWithFootprint = useAppStore(state => state.syncPathWidthWithFootprint);
   const robotFootprint = useAppStore(state => state.robotFootprint);
+
+  const afterNodeIds = useMemo(() => {
+    return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
+  }, [rootNodeIds, nodes, insertionTarget]);
 
   return (
     <pixiGraphics
@@ -37,59 +43,74 @@ export function PathLayer({ scale }: { scale: number }) {
         const colorNum = parseInt(hex, 16) || defaultHexNum;
         const baseAlpha = Math.max(0, Math.min(1, pathOpacity));
 
-        // Gather all path segments: List of Point arrays
-        let segmentsToDraw: { x: number; y: number }[][] = [];
+        // Gather line segments: list of individual segments with isAfter flag
+        interface LineSegment {
+          p1: { x: number; y: number };
+          p2: { x: number; y: number };
+          isAfter: boolean;
+        }
+
+        let lineSegments: LineSegment[] = [];
 
         if (activePathCalculatorPluginId && calculatedPathSegments && calculatedPathSegments.length > 0) {
-          segmentsToDraw = calculatedPathSegments.filter(seg => seg && seg.length >= 2);
+          calculatedPathSegments.forEach(seg => {
+            if (seg && seg.length >= 2) {
+              for (let j = 0; j < seg.length - 1; j++) {
+                lineSegments.push({ p1: seg[j], p2: seg[j + 1], isAfter: false });
+              }
+            }
+          });
         } else {
           // Default straight line path from waypoints tree
-          type PathPoint = { x: number; y: number };
           const flatWaypointIds = getFlattenedWaypointIds(rootNodeIds, nodes);
-          const allPoints: PathPoint[] = flatWaypointIds
-            .map(id => nodes[id]?.transform ? { x: nodes[id].transform!.x, y: nodes[id].transform!.y } : null)
-            .filter((p): p is PathPoint => p !== null);
+          const validWaypoints: { id: string; p: { x: number; y: number } }[] = [];
+          flatWaypointIds.forEach(id => {
+            const transform = nodes[id]?.transform;
+            if (transform && isFinite(transform.x) && isFinite(transform.y)) {
+              validWaypoints.push({ id, p: { x: transform.x, y: transform.y } });
+            }
+          });
 
-          if (allPoints.length >= 2) {
-            segmentsToDraw = [allPoints];
+          for (let i = 0; i < validWaypoints.length - 1; i++) {
+            const curr = validWaypoints[i];
+            const next = validWaypoints[i + 1];
+            // 次のポイントが afterNodeIds に含まれていれば、この線分は挿入位置以降（後方）
+            const isAfter = afterNodeIds.has(next.id);
+            lineSegments.push({ p1: curr.p, p2: next.p, isAfter });
           }
         }
 
-        if (segmentsToDraw.length === 0) return;
+        if (lineSegments.length === 0) return;
 
         const isWideCorridor = effectiveWidth * scale >= 3.0;
 
         // Pass 1: Semi-transparent Corridor Ribbon (if width is wide enough)
         if (isWideCorridor) {
-          segmentsToDraw.forEach(segment => {
+          lineSegments.forEach(({ p1, p2, isAfter }) => {
             g.strokeStyle = {
               width: effectiveWidth,
-              color: colorNum,
-              alpha: baseAlpha * 0.35,
+              color: isAfter ? 0x94a3b8 : colorNum,
+              alpha: isAfter ? baseAlpha * 0.1 : baseAlpha * 0.35,
               cap: 'round',
               join: 'round',
             };
-            g.moveTo(segment[0].x, segment[0].y);
-            for (let j = 1; j < segment.length; j++) {
-              g.lineTo(segment[j].x, segment[j].y);
-            }
+            g.moveTo(p1.x, p1.y);
+            g.lineTo(p2.x, p2.y);
             g.stroke();
           });
         }
 
         // Pass 2: Center Guide Line
-        segmentsToDraw.forEach(segment => {
+        lineSegments.forEach(({ p1, p2, isAfter }) => {
           g.strokeStyle = {
             width: isWideCorridor ? Math.max(1.5 / scale, 0.02) : Math.max(effectiveWidth, 1.5 / scale),
-            color: colorNum,
-            alpha: baseAlpha,
+            color: isAfter ? 0x94a3b8 : colorNum,
+            alpha: isAfter ? baseAlpha * 0.25 : baseAlpha,
             cap: 'round',
             join: 'round',
           };
-          g.moveTo(segment[0].x, segment[0].y);
-          for (let j = 1; j < segment.length; j++) {
-            g.lineTo(segment[j].x, segment[j].y);
-          }
+          g.moveTo(p1.x, p1.y);
+          g.lineTo(p2.x, p2.y);
           g.stroke();
         });
       }}

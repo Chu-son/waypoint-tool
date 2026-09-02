@@ -486,7 +486,10 @@ export async function preCompositeEditLayers(
     if (!targetMapId) continue;
 
     const targetIdx = result.findIndex((l) => l.id === targetMapId);
-    if (targetIdx < 0) continue;
+    if (targetIdx < 0) {
+      console.warn(`[mapRasterize] Target map layer "${targetMapId}" not found for edit layer "${editLayer.name || editLayer.id}". Skipping compositing.`);
+      continue;
+    }
 
     const compositedBase64 = await compositeManualCustomLayerOntoMap(editLayer, result[targetIdx]);
     result[targetIdx] = {

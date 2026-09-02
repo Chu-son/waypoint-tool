@@ -452,6 +452,13 @@ export interface OccupancySettings {
 }
 // --------------------------------
 
+// --- Insertion Target Type ---
+export interface InsertionTarget {
+  parentId: string | null;
+  index: number;
+}
+// --------------------------------
+
 export interface ProjectData {
   root_node_ids: string[];
   nodes: Record<string, ObjectNode>;
@@ -462,6 +469,10 @@ export interface ProjectData {
   root_annotation_ids?: string[];
   edit_layers?: any[]; // Legacy
   generated_layers?: any[]; // Legacy
+  options_schema?: any;
+  export_templates?: any;
+  default_export_formats?: DefaultExportFormat[] | string[];
+  export_regions?: any[];
   robot_footprint?: RobotFootprint;
   occupancy_settings?: OccupancySettings;
   default_map_opacity?: number;
@@ -470,7 +481,12 @@ export interface ProjectData {
   active_path_calculator_plugin_id?: string | null;
   path_calculator_params?: Record<string, any>;
   auto_recalculate_path?: boolean;
+  path_color?: string;
+  path_width?: number;
+  path_opacity?: number;
+  sync_path_width_with_footprint?: boolean;
   workflow_state?: any;
+  custom_ui_data?: any;
 }
 export interface AppState {
   nodes: Record<string, ObjectNode>;

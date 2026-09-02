@@ -12,6 +12,8 @@ import {
   Folder,
   FolderPlus,
   Edit2,
+  ArrowDownToLine,
+  X,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
@@ -33,8 +35,83 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { WaypointNode } from '../../types/store';
-import { getFlattenedWaypointIds, getVisibleTreeNodes, computeDragDropPosition } from '../../utils/treeUtils';
+import {
+  getFlattenedWaypointIds,
+  getVisibleTreeNodes,
+  computeDragDropPosition,
+  findNodeParentId,
+  getNodesAfterInsertionTarget,
+} from '../../utils/treeUtils';
 import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
+
+export const INSERTION_BAR_ID = '__insertion_bar__';
+
+interface InsertionBarItemProps {
+  depth?: number;
+  isAtEnd?: boolean;
+  onReset: () => void;
+}
+
+function InsertionBarItem({ depth = 0, isAtEnd = false, onReset }: InsertionBarItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: INSERTION_BAR_ID,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    position: 'relative' as const,
+    zIndex: isDragging ? 60 : 20,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="list-none select-none my-1"
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onReset();
+      }}
+    >
+      <div
+        style={{ marginLeft: `${depth * 16}px` }}
+        className="group relative flex items-center gap-1.5 py-1 px-1 rounded transition-all"
+      >
+        {/* Grip Handle for Dragging */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-primary-base hover:text-primary-base/80 p-0.5 rounded hover:bg-primary-base/10 shrink-0 touch-none transition-colors"
+          title="ドラッグして挿入位置を移動"
+        >
+          <GripVertical size={13} />
+        </div>
+
+        {/* Accent Insertion Line Bar */}
+        <div className="flex-1 flex items-center">
+          <div className="h-1.5 w-full bg-primary-base rounded-full shadow-sm ring-1 ring-primary-base/40 group-hover:ring-primary-base transition-all" />
+        </div>
+
+        {/* Reset (✕) Button if not at end */}
+        {!isAtEnd && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReset();
+            }}
+            className="shrink-0 p-0.5 rounded text-text-muted hover:text-text-base hover:bg-surface-hover transition-colors"
+            title="末尾に戻す"
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
 
 interface TreeItemRowProps {
   id: string;
@@ -44,6 +121,7 @@ interface TreeItemRowProps {
   isAnchor?: boolean;
   isExpanded?: boolean;
   isEditing?: boolean;
+  isAfterInsertion?: boolean;
   globalIndex?: number;
   indexStartIndex: number;
   onToggleExpand?: () => void;
@@ -61,6 +139,7 @@ function SortableTreeNodeItem({
   isAnchor,
   isExpanded,
   isEditing,
+  isAfterInsertion,
   globalIndex,
   indexStartIndex,
   onToggleExpand,
@@ -122,7 +201,8 @@ function SortableTreeNodeItem({
               ? 'bg-accent-generator/20 border-accent-generator text-text-base shadow-sm ring-1 ring-accent-generator/30'
               : 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30'
             : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
-          isAnchor && 'border-accent-anchor/60 bg-accent-anchor/20'
+          isAnchor && 'border-accent-anchor/60 bg-accent-anchor/20',
+          isAfterInsertion && 'opacity-40 grayscale-[35%] hover:opacity-75'
         )}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
@@ -231,6 +311,8 @@ export function WaypointTree() {
   const setAnchorNode = useAppStore((state) => state.setAnchorNode);
   const elementCopyState = useAppStore((state) => state.elementCopyState);
   const setElementCopyState = useAppStore((state) => state.setElementCopyState);
+  const insertionTarget = useAppStore((state) => state.insertionTarget);
+  const setInsertionTarget = useAppStore((state) => state.setInsertionTarget);
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -270,7 +352,73 @@ export function WaypointTree() {
     return getVisibleTreeNodes(rootNodeIds, nodes, expandedNodes);
   }, [rootNodeIds, nodes, expandedNodes]);
 
-  const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
+  // insertionTarget より後方のノードIDを算出（グレーアウト判定用）
+  const afterNodeIds = useMemo(() => {
+    return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
+  }, [rootNodeIds, nodes, insertionTarget]);
+
+  interface DisplayTreeItem {
+    id: string;
+    isInsertionBar?: boolean;
+    depth: number;
+    node?: WaypointNode;
+    isAtEnd?: boolean;
+  }
+
+  // ドラッグ可能な挿入バーを含めた表示用リストを構築
+  const displayItems = useMemo<DisplayTreeItem[]>(() => {
+    if (rootNodeIds.length === 0) return [];
+
+    const result: DisplayTreeItem[] = [];
+    let barInserted = false;
+
+    // 挿入位置がルート先頭 (null, 0) の場合
+    if (insertionTarget && insertionTarget.parentId === null && insertionTarget.index === 0) {
+      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: false });
+      barInserted = true;
+    }
+
+    for (let i = 0; i < visibleNodes.length; i++) {
+      const item = visibleNodes[i];
+      const node = nodes[item.id];
+      result.push({ id: item.id, depth: item.depth, node });
+
+      if (insertionTarget && !barInserted) {
+        // ケースA: 空グループまたはグループ先頭 (index 0) に挿入
+        if (insertionTarget.parentId === item.id && insertionTarget.index === 0) {
+          result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: item.depth + 1, isAtEnd: false });
+          barInserted = true;
+          continue;
+        }
+
+        // ケースB: このアイテムの直後に挿入
+        const itemParentId = findNodeParentId(item.id, rootNodeIds, nodes);
+        if (itemParentId === insertionTarget.parentId) {
+          const siblings = itemParentId ? (nodes[itemParentId]?.children_ids || []) : rootNodeIds;
+          const idxInSiblings = siblings.indexOf(item.id);
+          if (idxInSiblings === insertionTarget.index - 1) {
+            // このアイテム自身が展開されたグループで子を持つ場合は、子ノード群の後に挿入バーを出す
+            const hasExpandedChildren = (node?.type === 'manual_group' || node?.type === 'group' || node?.type === 'generator') &&
+                                        expandedNodes.has(item.id) &&
+                                        (node.children_ids?.length ?? 0) > 0;
+            if (!hasExpandedChildren) {
+              result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: item.depth, isAtEnd: false });
+              barInserted = true;
+            }
+          }
+        }
+      }
+    }
+
+    // まだ挿入されていない場合（末尾または insertionTarget === null のデフォルト時）
+    if (!barInserted) {
+      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: insertionTarget === null });
+    }
+
+    return result;
+  }, [visibleNodes, insertionTarget, rootNodeIds, nodes, expandedNodes]);
+
+  const visibleIds = useMemo(() => displayItems.map((n) => n.id), [displayItems]);
 
   const { handleItemClick, handleItemContextMenu } = useTreeItemSelection({
     selectedIds: selectedNodeIds,
@@ -325,6 +473,44 @@ export function WaypointTree() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
+    // 挿入バーがドラッグされた場合
+    if (activeId === INSERTION_BAR_ID) {
+      const parentId = findNodeParentId(overId, rootNodeIds, nodes);
+      const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+      const idx = siblings.indexOf(overId);
+
+      const position = computeDragDropPosition(activeId, overId, visibleIds);
+      if (position === 'before') {
+        setInsertionTarget({ parentId, index: Math.max(0, idx) });
+      } else {
+        // after
+        const isRootLast = parentId === null && idx === rootNodeIds.length - 1;
+        if (isRootLast) {
+          setInsertionTarget(null); // 末尾復帰
+        } else {
+          setInsertionTarget({ parentId, index: idx + 1 });
+        }
+      }
+      return;
+    }
+
+    // 通常のノードがドラッグされ、挿入バーの上にドロップされた場合
+    if (overId === INSERTION_BAR_ID) {
+      const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1
+        ? selectedNodeIds
+        : [activeId];
+      if (insertionTarget) {
+        const { parentId, index } = insertionTarget;
+        const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+        const targetNodeId = siblings[index] || siblings[siblings.length - 1];
+        if (targetNodeId && !movingIds.includes(targetNodeId)) {
+          moveNodesInTree(movingIds, targetNodeId, index < siblings.length ? 'before' : 'after');
+        }
+      }
+      return;
+    }
+
+    // 通常のノード同士のドラッグ移動
     const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1
       ? selectedNodeIds
       : [activeId];
@@ -364,33 +550,46 @@ export function WaypointTree() {
           <div className="p-1">
             <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
               <ul className="space-y-1">
-                {visibleNodes.map(({ id, depth }) => {
-                  const node = nodes[id];
+                {displayItems.map((item) => {
+                  if (item.isInsertionBar) {
+                    return (
+                      <InsertionBarItem
+                        key={INSERTION_BAR_ID}
+                        depth={item.depth}
+                        isAtEnd={item.isAtEnd}
+                        onReset={() => setInsertionTarget(null)}
+                      />
+                    );
+                  }
+
+                  const node = item.node;
                   if (!node) return null;
 
-                  const isSelected = selectedNodeIds.includes(id);
-                  const isAnchor = anchorNodeId === id;
-                  const isExpanded = expandedNodes.has(id);
-                  const isEditing = editingNodeId === id;
-                  const globalIdx = waypointIndexMap.get(id);
+                  const isSelected = selectedNodeIds.includes(item.id);
+                  const isAnchor = anchorNodeId === item.id;
+                  const isExpanded = expandedNodes.has(item.id);
+                  const isEditing = editingNodeId === item.id;
+                  const globalIdx = waypointIndexMap.get(item.id);
+                  const isAfter = afterNodeIds.has(item.id);
 
                   return (
                     <SortableTreeNodeItem
-                      key={id}
-                      id={id}
+                      key={item.id}
+                      id={item.id}
                       node={node}
-                      depth={depth}
+                      depth={item.depth}
                       isSelected={isSelected}
                       isAnchor={isAnchor}
                       isExpanded={isExpanded}
                       isEditing={isEditing}
+                      isAfterInsertion={isAfter}
                       globalIndex={globalIdx}
                       indexStartIndex={indexStartIndex}
-                      onToggleExpand={() => toggleExpand(id)}
-                      onClick={(e) => handleItemClick(id, e)}
-                      onContextMenu={(e) => handleContextMenu(e, id)}
+                      onToggleExpand={() => toggleExpand(item.id)}
+                      onClick={(e) => handleItemClick(item.id, e)}
+                      onContextMenu={(e) => handleContextMenu(e, item.id)}
                       onRename={(newName) => {
-                        renameNode(id, newName);
+                        renameNode(item.id, newName);
                         setEditingNodeId(null);
                       }}
                       onCancelRename={() => setEditingNodeId(null)}
@@ -402,7 +601,12 @@ export function WaypointTree() {
           </div>
 
           <DragOverlay>
-            {activeDragNode && (
+            {activeDragId === INSERTION_BAR_ID ? (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-panel/95 border border-primary-base shadow-xl text-primary-base w-48">
+                <GripVertical size={13} />
+                <div className="h-1.5 w-full bg-primary-base rounded-full" />
+              </div>
+            ) : activeDragNode ? (
               <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-panel/90 border border-primary-base shadow-xl text-xs text-text-base">
                 <GripVertical size={13} className="text-primary-base" />
                 <span className="font-semibold">{activeDragNode.name || 'Waypoint'}</span>
@@ -412,7 +616,7 @@ export function WaypointTree() {
                   </span>
                 )}
               </div>
-            )}
+            ) : null}
           </DragOverlay>
         </DndContext>
       )}
@@ -468,6 +672,34 @@ export function WaypointTree() {
                   >
                     <Unlink size={13} className="text-accent-anchor" />
                     <span>グループ解除 (Ungroup)</span>
+                  </button>
+                )}
+
+                {/* 挿入位置に設定 */}
+                <button
+                  onClick={() => {
+                    const parentId = findNodeParentId(contextMenu.nodeId, rootNodeIds, nodes);
+                    const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+                    const idx = siblings.indexOf(contextMenu.nodeId);
+                    setInsertionTarget({ parentId, index: idx + 1 });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <ArrowDownToLine size={13} className="text-primary-base" />
+                  <span>この直後に挿入を設定</span>
+                </button>
+                {isContainer && (
+                  <button
+                    onClick={() => {
+                      setInsertionTarget({ parentId: contextMenu.nodeId, index: 0 });
+                      setExpandedNodes((prev) => new Set([...prev, contextMenu.nodeId]));
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <ArrowDownToLine size={13} className="text-accent-anchor" />
+                    <span>グループ内の先頭に挿入を設定</span>
                   </button>
                 )}
 

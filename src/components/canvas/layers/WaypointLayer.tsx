@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../../../utils/labelLayout';
+import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 
 interface WaypointLayerProps {
   scale: number;
@@ -13,6 +15,7 @@ interface WaypointLayerProps {
 export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointerDown, onNodeHandlePointerDown }: WaypointLayerProps) {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const nodes = useAppStore(state => state.nodes);
+  const insertionTarget = useAppStore(state => state.insertionTarget);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const activeTool = useAppStore(state => state.activeTool);
   const plugins = useAppStore(state => state.plugins);
@@ -22,6 +25,10 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
   const optionsSchema = useAppStore(state => state.optionsSchema);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
   const showProperties = useAppStore(state => state.showProperties);
+
+  const afterNodeIds = useMemo(() => {
+    return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
+  }, [rootNodeIds, nodes, insertionTarget]);
 
   const renderableNodes: { node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
   let globalIdx = 0;
@@ -87,7 +94,8 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
       });
     }
 
-    return { node, parentIsGenerator, isSelected, isReferenced, transform, yaw, px, py, lines };
+    const isAfter = afterNodeIds.has(node.id);
+    return { node, parentIsGenerator, isSelected, isReferenced, isAfter, transform, yaw, px, py, lines };
   });
 
   const labelCandidates: LabelCandidate[] = items
@@ -97,13 +105,29 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
 
   return (
     <>
-      {items.map(({ node, parentIsGenerator, isSelected, isReferenced, yaw, px, py, lines }) => {
+      {items.map(({ node, parentIsGenerator, isSelected, isReferenced, isAfter, yaw, px, py, lines }) => {
         const safeScale = Math.max(scale, 0.001);
 
         const isLocked = lockedWaypointId === node.id;
-        const normalColor = isLocked ? 0x10b981 : (isReferenced ? 0xfacc15 : (parentIsGenerator ? 0x22c55e : 0xffa500));
+        const normalColor = isLocked
+          ? 0x10b981
+          : isReferenced
+          ? 0xfacc15
+          : isAfter
+          ? 0x94a3b8
+          : parentIsGenerator
+          ? 0x22c55e
+          : 0xffa500;
         const selectedColor = 0x3b82f6;
-        const normalFill = isLocked ? 0x34d399 : (isReferenced ? 0xfef08a : (parentIsGenerator ? 0x4ade80 : 0xffd700));
+        const normalFill = isLocked
+          ? 0x34d399
+          : isReferenced
+          ? 0xfef08a
+          : isAfter
+          ? 0xcbd5e1
+          : parentIsGenerator
+          ? 0x4ade80
+          : 0xffd700;
         const selectedFill = 0x60a5fa;
 
         const labelLayout = labelLayoutMap.get(node.id);
@@ -118,6 +142,7 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
             x={px}
             y={py}
             rotation={yaw}
+            alpha={isAfter ? 0.35 : 1.0}
           >
             <pixiGraphics
               eventMode="dynamic"

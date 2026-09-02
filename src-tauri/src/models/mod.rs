@@ -60,10 +60,14 @@ impl<'de> Deserialize<'de> for Transform {
 pub struct WaypointNode {
     pub id: String,
     #[serde(rename = "type")]
-    pub node_type: String, // "manual" or "generator"
+    pub node_type: String, // "manual", "generator", "manual_group", "group"
+    pub name: Option<String>,
     pub transform: Option<Transform>,
     pub options: Option<HashMap<String, serde_json::Value>>,
+    pub plugin_id: Option<String>,
+    pub source_execution_id: Option<String>,
     pub generator_params: Option<HashMap<String, serde_json::Value>>,
+    pub plugin_data: Option<serde_json::Value>,
     pub children_ids: Option<Vec<String>>,
 }
 
@@ -83,6 +87,8 @@ pub struct ProjectMapLayer {
     pub name: String,
     pub info: Option<serde_json::Value>,
     pub image_base64: String,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
     pub visible: bool,
     pub opacity: f64,
     pub z_index: usize,
@@ -113,10 +119,14 @@ pub struct ProjectData {
     pub nodes: HashMap<String, WaypointNode>,
     pub map_layers: Option<Vec<ProjectMapLayer>>,
     pub custom_layers: Option<serde_json::Value>,
+    pub annotation_objects: Option<serde_json::Value>,
+    pub annotation_groups: Option<serde_json::Value>,
+    pub root_annotation_ids: Option<Vec<String>>,
     pub edit_layers: Option<serde_json::Value>,
     pub generated_layers: Option<serde_json::Value>,
     pub options_schema: Option<serde_json::Value>,
     pub export_templates: Option<serde_json::Value>,
+    pub default_export_formats: Option<serde_json::Value>,
     pub export_regions: Option<Vec<ExportRegion>>,
     pub robot_footprint: Option<serde_json::Value>,
     pub occupancy_settings: Option<serde_json::Value>,
@@ -131,6 +141,7 @@ pub struct ProjectData {
     pub path_opacity: Option<f64>,
     pub sync_path_width_with_footprint: Option<bool>,
     pub workflow_state: Option<serde_json::Value>,
+    pub custom_ui_data: Option<serde_json::Value>,
 }
 
 #[cfg(test)]
@@ -171,19 +182,78 @@ mod tests {
     fn test_waypoint_node_serialize_deserialize_roundtrip() {
         let node = WaypointNode {
             id: "wp-001".to_string(),
-            node_type: "manual".to_string(),
+            node_type: "generator".to_string(),
+            name: Some("Path Generator 1".to_string()),
             transform: Some(Transform { x: 10.0, y: 20.0, z: Some(0.5), qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0 }),
             options: None,
+            plugin_id: Some("plugin-grid-gen".to_string()),
+            source_execution_id: Some("exec-12345".to_string()),
             generator_params: None,
+            plugin_data: Some(serde_json::json!({"waypoints_count": 42})),
             children_ids: Some(vec!["child-1".to_string()]),
         };
         let json = serde_json::to_string(&node).unwrap();
         let restored: WaypointNode = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.id, "wp-001");
-        assert_eq!(restored.node_type, "manual");
+        assert_eq!(restored.node_type, "generator");
+        assert_eq!(restored.name, Some("Path Generator 1".to_string()));
+        assert_eq!(restored.plugin_id, Some("plugin-grid-gen".to_string()));
+        assert_eq!(restored.source_execution_id, Some("exec-12345".to_string()));
+        assert!(restored.plugin_data.is_some());
+        assert_eq!(restored.plugin_data.as_ref().unwrap()["waypoints_count"], 42);
         assert!(restored.transform.is_some());
         assert_eq!(restored.transform.as_ref().unwrap().x, 10.0);
         assert_eq!(restored.children_ids.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_project_data_with_annotations_and_custom_ui() {
+        let json = r#"{
+            "root_node_ids": ["g-1"],
+            "nodes": {
+                "g-1": {
+                    "id": "g-1",
+                    "type": "manual_group",
+                    "name": "Group 1",
+                    "children_ids": []
+                }
+            },
+            "map_layers": [
+                {
+                    "id": "layer-1",
+                    "name": "Map",
+                    "image_base64": "data:...",
+                    "width": 1280,
+                    "height": 720,
+                    "visible": true,
+                    "opacity": 1.0,
+                    "z_index": 0
+                }
+            ],
+            "annotation_objects": {
+                "ann-1": {"id": "ann-1", "type": "point", "name": "Point 1"}
+            },
+            "annotation_groups": {
+                "ann-g1": {"id": "ann-g1", "name": "Ann Group 1", "children_ids": ["ann-1"]}
+            },
+            "root_annotation_ids": ["ann-g1"],
+            "default_export_formats": ["yaml", "json"],
+            "custom_ui_data": {
+                "workflow_state": {
+                    "current_step_index": 2
+                }
+            }
+        }"#;
+        let project: ProjectData = serde_json::from_str(json).unwrap();
+        assert_eq!(project.nodes.get("g-1").unwrap().name, Some("Group 1".to_string()));
+        assert_eq!(project.map_layers.as_ref().unwrap()[0].width, Some(1280));
+        assert_eq!(project.map_layers.as_ref().unwrap()[0].height, Some(720));
+        assert!(project.annotation_objects.is_some());
+        assert!(project.annotation_groups.is_some());
+        assert_eq!(project.root_annotation_ids.as_ref().unwrap(), &vec!["ann-g1".to_string()]);
+        assert!(project.default_export_formats.is_some());
+        assert!(project.custom_ui_data.is_some());
+        assert_eq!(project.custom_ui_data.as_ref().unwrap()["workflow_state"]["current_step_index"], 2);
     }
 
     #[test]
