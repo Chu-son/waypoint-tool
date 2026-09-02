@@ -60,8 +60,6 @@ describe('TransformGroup - Quick Rotate', () => {
       />
     );
 
-    expect(screen.getByText('Quick Rotate')).toBeInTheDocument();
-
     const leftBtn = screen.getByRole('button', { name: 'Rotate 90° Left' });
     const flipBtn = screen.getByRole('button', { name: 'Rotate 180°' });
     const rightBtn = screen.getByRole('button', { name: 'Rotate 90° Right' });

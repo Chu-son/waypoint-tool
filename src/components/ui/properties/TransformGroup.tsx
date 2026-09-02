@@ -109,6 +109,42 @@ export function TransformGroup({
 
   return (
     <div className="space-y-2 relative pt-2">
+      <div className="grid grid-cols-3 gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
+          onClick={() => handleRotateRelative(90)}
+          title="Rotate 90° Left (+90°)"
+          aria-label="Rotate 90° Left"
+        >
+          <RotateCcw size={15} />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
+          onClick={() => handleRotateRelative(180)}
+          title="Rotate 180° (Mirror Reverse)"
+          aria-label="Rotate 180°"
+        >
+          <FlipHorizontal2 size={15} />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
+          onClick={() => handleRotateRelative(-90)}
+          title="Rotate 90° Right (-90°)"
+          aria-label="Rotate 90° Right"
+        >
+          <RotateCw size={15} />
+        </Button>
+      </div>
+
       <PropertySectionHeader
         title="Transform (World)"
         isVisible={visibleAttributes.includes("transform")}
@@ -180,46 +216,6 @@ export function TransformGroup({
             onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => handleYawChange(val, true)}
           />
-        </div>
-        <div className="col-span-3 pt-1">
-          <div className="text-[11px] font-medium text-text-muted mb-1.5 select-none">
-            Quick Rotate
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
-              onClick={() => handleRotateRelative(90)}
-              title="Rotate 90° Left (+90°)"
-              aria-label="Rotate 90° Left"
-            >
-              <RotateCcw size={15} />
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
-              onClick={() => handleRotateRelative(180)}
-              title="Rotate 180° (Mirror Reverse)"
-              aria-label="Rotate 180°"
-            >
-              <FlipHorizontal2 size={15} />
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="w-full flex items-center justify-center h-8 text-text-muted hover:text-text-base"
-              onClick={() => handleRotateRelative(-90)}
-              title="Rotate 90° Right (-90°)"
-              aria-label="Rotate 90° Right"
-            >
-              <RotateCw size={15} />
-            </Button>
-          </div>
         </div>
       </div>
     </div>
