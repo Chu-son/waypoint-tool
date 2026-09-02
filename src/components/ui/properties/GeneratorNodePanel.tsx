@@ -5,8 +5,10 @@ import { AlertBox } from "../common/AlertBox";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
 import { PluginDataViewer } from "../common/PluginDataViewer";
+import { GeneratorRegenerateConflictModal } from "../modals/GeneratorRegenerateConflictModal";
+import { detectGeneratorModifications, computeGeneratorStash } from "../../../utils/generatorStashUtils";
 import { Play, Settings2, RefreshCcw, BoxSelect, Code2, Maximize2 } from "lucide-react";
-import { WaypointNode } from "../../../types/store";
+import { WaypointNode, GeneratorModificationSummary, GeneratorStash } from "../../../types/store";
 
 interface GeneratorNodePanelProps {
   node: WaypointNode;
@@ -25,11 +27,14 @@ export function GeneratorNodePanel({
   const pluginInteractionData = useAppStore(
     (state) => state.pluginInteractionData,
   );
+  const nodes = useAppStore((state) => state.nodes);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [genParams, setGenParams] = useState<Record<string, any>>({});
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [modificationSummary, setModificationSummary] = useState<GeneratorModificationSummary | null>(null);
 
   const pluginId = node.plugin_id || "";
   const plugin = plugins[pluginId];
@@ -50,7 +55,7 @@ export function GeneratorNodePanel({
     useAppStore.getState().setPluginActiveProperties(genParams);
   }, [genParams, node.id]);
 
-  const handleRegenerate = async () => {
+  const doRegenerate = async (stashToApply?: GeneratorStash) => {
     if (!plugin) return;
     setIsExecuting(true);
     try {
@@ -75,6 +80,7 @@ export function GeneratorNodePanel({
             interactionData: filteredInteractionData,
             existingExecutionId: node.source_execution_id,
             targetParentWaypointId: node.id,
+            stashToApply,
           });
         }
       );
@@ -82,6 +88,17 @@ export function GeneratorNodePanel({
       console.error("Generator regeneration failed:", err);
     } finally {
       setIsExecuting(false);
+    }
+  };
+
+  const handleRegenerateClick = () => {
+    if (!plugin) return;
+    const summary = detectGeneratorModifications(node, nodes);
+    if (summary.hasModifications) {
+      setModificationSummary(summary);
+      setIsConflictModalOpen(true);
+    } else {
+      doRegenerate();
     }
   };
 
@@ -178,7 +195,7 @@ export function GeneratorNodePanel({
             <Button
               variant="primary"
               disabled={isExecuting}
-              onClick={handleRegenerate}
+              onClick={handleRegenerateClick}
               className="w-full h-9 gap-2"
             >
               {isExecuting ? (
@@ -240,6 +257,24 @@ export function GeneratorNodePanel({
             </Button>
           </div>
         </div>
+      )}
+
+      {modificationSummary && (
+        <GeneratorRegenerateConflictModal
+          isOpen={isConflictModalOpen}
+          onClose={() => setIsConflictModalOpen(false)}
+          summary={modificationSummary}
+          generatorName={node.name || plugin?.manifest?.name}
+          onDiscardAndRegenerate={() => {
+            setIsConflictModalOpen(false);
+            doRegenerate(undefined);
+          }}
+          onStashAndRegenerate={() => {
+            setIsConflictModalOpen(false);
+            const stash = computeGeneratorStash(node, nodes);
+            doRegenerate(stash);
+          }}
+        />
       )}
     </div>
   );
