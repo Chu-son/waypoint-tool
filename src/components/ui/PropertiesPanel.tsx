@@ -11,7 +11,7 @@ import { ElementCopyContextMenu } from "./properties/ElementCopyContextMenu";
 import { ElementCopyField } from "../../stores/slices/uiSlice";
 import { EmptyState } from "./common/EmptyState";
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from "../../utils/transformUtils";
-import { collectDescendantIds } from "../../utils/treeUtils";
+import { collectDescendantIds, getFlattenedWaypointIds } from "../../utils/treeUtils";
 import { WaypointNode } from "../../types/store";
 
 export function PropertiesPanel() {
@@ -142,7 +142,11 @@ export function PropertiesPanel() {
 
   if (!isMultiSelection && !node) return null;
 
-  const nodeIndex = node ? rootNodeIds.indexOf(node.id) : -1;
+  const flatWaypointIds = useMemo(
+    () => getFlattenedWaypointIds(rootNodeIds, nodes),
+    [rootNodeIds, nodes]
+  );
+  const nodeIndex = node ? flatWaypointIds.indexOf(node.id) : -1;
 
   const handleContextMenuLabel = (field: ElementCopyField, e: React.MouseEvent) => {
     setCopyMenuState({
@@ -236,6 +240,7 @@ export function PropertiesPanel() {
           <RelativeTransformGroup 
             node={node} 
             nodeIndex={nodeIndex} 
+            prevNode={nodes[flatWaypointIds[nodeIndex - 1]]}
             handleUpdate={handleUpdate} 
           />
         )}

@@ -231,4 +231,57 @@ describe('PropertiesPanel', () => {
     render(<PropertiesPanel />);
     expect(screen.getByText(/multiple selected \(2\)/i)).toBeInTheDocument();
   });
+
+  it('renders RelativeTransformGroup for a waypoint inside a group based on serial order', () => {
+    const wp1 = {
+      id: 'wp-1',
+      type: 'manual' as const,
+      transform: { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    };
+    const wp2 = {
+      id: 'wp-2',
+      type: 'manual' as const,
+      transform: { x: 5, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    };
+    const groupNode = {
+      id: 'grp-1',
+      type: 'manual_group' as const,
+      children_ids: ['wp-2'],
+    };
+
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      selectedNodeIds: ['wp-2'],
+      nodes: {
+        'wp-1': wp1,
+        'grp-1': groupNode,
+        'wp-2': wp2,
+      },
+      rootNodeIds: ['wp-1', 'grp-1'],
+      visibleAttributes: ['transform'],
+      indexStartIndex: 0,
+      decimalPrecision: 2,
+      updateNode: mockUpdateNode,
+      toggleAttributeVisibility: vi.fn(),
+    }));
+
+    (useAppStore.getState as any).mockReturnValue({
+      nodes: {
+        'wp-1': wp1,
+        'grp-1': groupNode,
+        'wp-2': wp2,
+      },
+      rootNodeIds: ['wp-1', 'grp-1'],
+      clearPluginInteractionData: vi.fn(),
+      runInHistoryTransaction: (fn: () => void) => fn(),
+      beginHistoryTransaction: vi.fn(),
+      endHistoryTransaction: vi.fn(),
+    });
+
+    render(<PropertiesPanel />);
+
+    // Serial index is 1, so header shows Waypoint [1]
+    expect(screen.getByText('Waypoint [1]')).toBeInTheDocument();
+    // RelativeTransformGroup should be rendered for wp-2 because it is the 2nd waypoint in serial order
+    expect(screen.getByText('Transform (Relative to Prev)')).toBeInTheDocument();
+  });
 });

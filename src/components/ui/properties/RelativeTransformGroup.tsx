@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { WaypointNode } from "../../../types/store";
 import { quaternionToYaw } from "../../../utils/transformUtils";
+import { getFlattenedWaypointIds } from "../../../utils/treeUtils";
 import { TransformField } from "./TransformField";
 import { PropertySectionHeader } from "./PropertySectionHeader";
 
@@ -8,19 +10,26 @@ interface RelativeTransformGroupProps {
   node: WaypointNode;
   nodeIndex: number;
   handleUpdate: (id: string, updates: any) => void;
+  prevNode?: WaypointNode;
 }
 
 export function RelativeTransformGroup({
   node,
   nodeIndex,
   handleUpdate,
+  prevNode: propPrevNode,
 }: RelativeTransformGroupProps) {
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
   const nodes = useAppStore((state) => state.nodes);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
 
-  const prevNodeId = rootNodeIds[nodeIndex - 1];
-  const prevNode = nodes[prevNodeId];
+  const flatWaypointIds = useMemo(
+    () => getFlattenedWaypointIds(rootNodeIds, nodes),
+    [rootNodeIds, nodes]
+  );
+
+  const prevNodeId = flatWaypointIds[nodeIndex - 1];
+  const prevNode = propPrevNode || (prevNodeId ? nodes[prevNodeId] : undefined);
   if (!prevNode || !prevNode.transform || !node.transform) return null;
 
   const px = prevNode.transform.x ?? 0;
