@@ -47,7 +47,7 @@ export function CustomOptionsGroup({
                 if (isMultiSelection) {
                   selectedNodeIds.forEach((id) => {
                     const n = currentState.nodes[id];
-                    if (n) {
+                    if (n && n.type === 'manual') {
                       handleUpdate(id, {
                         options: { ...(n.options || {}), [opt.name]: val },
                       });

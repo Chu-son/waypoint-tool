@@ -16,7 +16,6 @@ export interface ExecutePluginParams {
   targetCustomLayerId?: string;
   targetAnnotationGroupId?: string;
   idsToConsume?: string[];
-  insertIndex?: number;
   stashToApply?: GeneratorStash;
 }
 
@@ -130,7 +129,6 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       targetCustomLayerId,
       targetAnnotationGroupId,
       idsToConsume = [],
-      insertIndex = -1,
       stashToApply,
     } = params;
 
@@ -308,13 +306,6 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             baseline_waypoints: baselineWaypoints,
           });
 
-          if (insertIndex !== -1) {
-            const currentRootIds = store.rootNodeIds;
-            const newIdx = currentRootIds.indexOf(parentId);
-            if (newIdx !== -1 && newIdx !== insertIndex) {
-              store.reorderNodes(newIdx, insertIndex);
-            }
-          }
           resultingParentWaypointId = parentId;
         }
 

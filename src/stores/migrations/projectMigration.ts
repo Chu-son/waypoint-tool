@@ -81,9 +81,32 @@ export function normalizeV1(raw: any): StrictProjectData {
   // 1. ノード・ID
   const rawRootNodeIds = data.root_node_ids ?? data.rootNodeIds;
   const rootNodeIds: string[] = Array.isArray(rawRootNodeIds) ? rawRootNodeIds : [];
-  const nodes = (data.nodes && typeof data.nodes === 'object' && !Array.isArray(data.nodes))
+  const rawNodes = (data.nodes && typeof data.nodes === 'object' && !Array.isArray(data.nodes))
     ? data.nodes
     : {};
+  const nodes: Record<string, any> = { ...rawNodes };
+
+  Object.keys(nodes).forEach((id) => {
+    const node = nodes[id];
+    if (node && node.type === 'generator' && !node.plugin_id) {
+      let inferredPluginId: string | undefined;
+      if (Array.isArray(node.children_ids)) {
+        for (const childId of node.children_ids) {
+          const child = nodes[childId];
+          if (child?.options?.generated_by && typeof child.options.generated_by === 'string') {
+            inferredPluginId = child.options.generated_by;
+            break;
+          }
+        }
+      }
+      if (inferredPluginId) {
+        nodes[id] = {
+          ...node,
+          plugin_id: inferredPluginId,
+        };
+      }
+    }
+  });
 
   // 2. デフォルトマップ透過度
   const defaultMapOpacity = typeof data.default_map_opacity === 'number'

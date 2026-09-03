@@ -75,8 +75,8 @@ describe('NodeSlice - duplicateNodes', () => {
     const [dup1, dup2] = createdIds;
 
     const state = useAppStore.getState();
-    // node-1 should be followed by dup1, and node-2 by dup2, then node-3
-    expect(state.rootNodeIds).toEqual(['node-1', dup1, 'node-2', dup2, 'node-3']);
+    // with insertionTarget === null, cloned nodes are appended to root maintaining relative order
+    expect(state.rootNodeIds).toEqual(['node-1', 'node-2', 'node-3', dup1, dup2]);
     expect(state.selectedNodeIds).toEqual([dup1, dup2]);
     expect(state.nodes[dup1].transform?.x).toBe(1.5);
     expect(state.nodes[dup2].transform?.x).toBe(2.5);
@@ -439,7 +439,6 @@ describe('NodeSlice - insertionTarget & group selection', () => {
       rootNodeIds: [],
       selectedNodeIds: [],
       insertionTarget: null,
-      insertionIndex: -1,
       historyPast: [],
       historyFuture: [],
     });
@@ -513,5 +512,127 @@ describe('NodeSlice - insertionTarget & group selection', () => {
     expect(state.selectedNodeIds).toContain('leaf-1');
     expect(state.selectedNodeIds).toContain('sub-grp');
     expect(state.selectedNodeIds).toContain('leaf-2');
+  });
+
+  it('does NOT expand generator nodes when selecting a generator', () => {
+    const genChild: WaypointNode = { id: 'gen-child-1', type: 'manual' };
+    const genNode: WaypointNode = { id: 'gen-node-1', type: 'generator', children_ids: ['gen-child-1'] };
+
+    useAppStore.setState({
+      nodes: {
+        'gen-child-1': genChild,
+        'gen-node-1': genNode,
+      },
+      rootNodeIds: ['gen-node-1'],
+      selectedNodeIds: [],
+    });
+
+    useAppStore.getState().selectNodes(['gen-node-1']);
+
+    const state = useAppStore.getState();
+    expect(state.selectedNodeIds).toEqual(['gen-node-1']);
+    expect(state.selectedNodeIds).not.toContain('gen-child-1');
+  });
+
+  it('atomically toggles group selection when multi is true (Ctrl/Meta)', () => {
+    const child1: WaypointNode = { id: 'c1', type: 'manual' };
+    const child2: WaypointNode = { id: 'c2', type: 'manual' };
+    const group: WaypointNode = { id: 'grp', type: 'manual_group', children_ids: ['c1', 'c2'] };
+
+    useAppStore.setState({
+      nodes: { c1: child1, c2: child2, grp: group },
+      rootNodeIds: ['grp'],
+      // Partial selection: only c1 is selected
+      selectedNodeIds: ['c1'],
+    });
+
+    // Ctrl-clicking group: since not all are selected, all should become selected
+    useAppStore.getState().selectNodes(['grp'], true);
+    expect(useAppStore.getState().selectedNodeIds).toContain('grp');
+    expect(useAppStore.getState().selectedNodeIds).toContain('c1');
+    expect(useAppStore.getState().selectedNodeIds).toContain('c2');
+
+    // Ctrl-clicking group again: now that all are selected, all should be deselected
+    useAppStore.getState().selectNodes(['grp'], true);
+    expect(useAppStore.getState().selectedNodeIds).toEqual([]);
+  });
+
+  it('prevents duplicate cloning of parent and descendant, and inserts at insertionTarget', () => {
+    const child1: WaypointNode = { id: 'c1', type: 'manual', transform: { x: 1, y: 1, qx: 0, qy: 0, qz: 0, qw: 1 } };
+    const group: WaypointNode = { id: 'grp', type: 'manual_group', children_ids: ['c1'] };
+    const rootWp: WaypointNode = { id: 'root-wp', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } };
+
+    useAppStore.setState({
+      nodes: { c1: child1, grp: group, 'root-wp': rootWp },
+      rootNodeIds: ['grp', 'root-wp'],
+      insertionTarget: { parentId: null, index: 1 },
+      selectedNodeIds: ['grp', 'c1'], // Both parent and child selected!
+    });
+
+    const clonedIds = useAppStore.getState().duplicateNodes(['grp', 'c1']);
+    const state = useAppStore.getState();
+
+    // Only one top-level clone should be created
+    expect(clonedIds).toHaveLength(1);
+    const clonedGrpId = clonedIds[0];
+    const clonedGrp = state.nodes[clonedGrpId];
+    expect(clonedGrp).toBeDefined();
+    expect(clonedGrp.children_ids).toHaveLength(1);
+
+    // The cloned child should be inside the cloned group, NOT in rootNodeIds
+    const clonedChildId = clonedGrp.children_ids![0];
+    expect(state.nodes[clonedChildId]).toBeDefined();
+    expect(state.rootNodeIds).not.toContain(clonedChildId);
+
+    // rootNodeIds should have ['grp', clonedGrpId, 'root-wp'] (inserted at index 1)
+    expect(state.rootNodeIds).toEqual(['grp', clonedGrpId, 'root-wp']);
+
+    // insertionTarget should be advanced to index 2
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 2 });
+  });
+
+  it('removeNodes immutably spreads parent nodes and corrects insertionTarget when parent is deleted', () => {
+    const child: WaypointNode = { id: 'c1', type: 'manual' };
+    const group: WaypointNode = { id: 'grp', type: 'manual_group', children_ids: ['c1'] };
+
+    const initialNodes = { c1: child, grp: group };
+    useAppStore.setState({
+      nodes: initialNodes,
+      rootNodeIds: ['grp'],
+      insertionTarget: { parentId: 'grp', index: 1 },
+      selectedNodeIds: ['grp'],
+    });
+
+    useAppStore.getState().removeNodes(['grp']);
+    const state = useAppStore.getState();
+
+    expect(state.nodes['grp']).toBeUndefined();
+    expect(state.nodes['c1']).toBeUndefined();
+    expect(state.rootNodeIds).toEqual([]);
+
+    // insertionTarget was pointing to deleted 'grp', should safely fallback to root
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 0 });
+
+    // Initial group node reference was not mutated
+    expect(group.children_ids).toEqual(['c1']);
+  });
+
+  it('ungroupNode and moveNodesInTree apply validateAndCorrectInsertionTarget', () => {
+    const child1: WaypointNode = { id: 'c1', type: 'manual' };
+    const child2: WaypointNode = { id: 'c2', type: 'manual' };
+    const group: WaypointNode = { id: 'grp', type: 'manual_group', children_ids: ['c1', 'c2'] };
+
+    useAppStore.setState({
+      nodes: { c1: child1, c2: child2, grp: group },
+      rootNodeIds: ['grp'],
+      insertionTarget: { parentId: 'grp', index: 2 },
+    });
+
+    // Ungroup the group
+    useAppStore.getState().ungroupNode('grp');
+    const state = useAppStore.getState();
+
+    // Group is deleted, insertionTarget should fallback to root index 2
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 2 });
   });
 });

@@ -373,4 +373,34 @@ describe('projectMigration', () => {
     expect(Array.isArray(normalized.export_templates)).toBe(true);
     expect(Array.isArray(normalized.default_export_formats)).toBe(true);
   });
+
+  it('infers plugin_id for generator nodes from child options.generated_by if missing', () => {
+    const rawData = {
+      root_node_ids: ['gen-1'],
+      nodes: {
+        'gen-1': {
+          id: 'gen-1',
+          type: 'generator',
+          children_ids: ['child-1', 'child-2'],
+        },
+        'child-1': {
+          id: 'child-1',
+          type: 'manual',
+          options: {
+            generated_by: 'my-custom-plugin',
+          },
+        },
+        'child-2': {
+          id: 'child-2',
+          type: 'manual',
+          options: {
+            generated_by: 'my-custom-plugin',
+          },
+        },
+      },
+    };
+
+    const normalized = migrateAndNormalizeProjectData(rawData);
+    expect(normalized.nodes['gen-1'].plugin_id).toBe('my-custom-plugin');
+  });
 });

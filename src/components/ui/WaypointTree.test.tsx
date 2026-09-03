@@ -56,8 +56,8 @@ describe('WaypointTree', () => {
       plugins: {},
       selectedNodeIds: [],
       indexStartIndex: 0,
-      insertionIndex: -1,
-      setInsertionIndex: vi.fn(),
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
@@ -81,8 +81,8 @@ describe('WaypointTree', () => {
       plugins: mockPlugins,
       selectedNodeIds: [],
       indexStartIndex: 10, // Offset
-      insertionIndex: -1,
-      setInsertionIndex: vi.fn(),
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
@@ -113,8 +113,8 @@ describe('WaypointTree', () => {
       plugins: mockPlugins,
       selectedNodeIds: [],
       indexStartIndex: 0,
-      insertionIndex: -1,
-      setInsertionIndex: vi.fn(),
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
@@ -146,8 +146,8 @@ describe('WaypointTree', () => {
       plugins: mockPlugins,
       selectedNodeIds: ['wp-1', 'wp-2'],
       indexStartIndex: 0,
-      insertionIndex: -1,
-      setInsertionIndex: vi.fn(),
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
       selectNodes: mockSelectNodes,
       duplicateNodes: mockDuplicateNodes,
       removeNodes: mockRemoveNodes,
@@ -206,5 +206,67 @@ describe('WaypointTree', () => {
     const wp2Text = screen.getByText('[1]');
     const wp2Row = wp2Text.closest('.group');
     expect(wp2Row?.className).toContain('opacity-40');
+  });
+
+  it('renders insertion bar in empty tree state', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: [],
+      nodes: {},
+      plugins: {},
+      selectedNodeIds: [],
+      indexStartIndex: 0,
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
+      selectNodes: mockSelectNodes,
+      duplicateNodes: mockDuplicateNodes,
+      removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
+    }));
+
+    render(<WaypointTree />);
+    expect(screen.getByText(/no items yet/i)).toBeInTheDocument();
+    // Grip vertical icon from InsertionBarItem should be present
+    expect(screen.getByTestId('grip-vertical-icon')).toBeInTheDocument();
+  });
+
+  it('does NOT include insertion bar pseudo ID during shift range selection', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
+      nodes: mockNodes,
+      plugins: mockPlugins,
+      selectedNodeIds: ['wp-1'],
+      indexStartIndex: 0,
+      insertionTarget: { parentId: null, index: 1 }, // Insertion bar between wp-1 and wp-2
+      setInsertionTarget: vi.fn(),
+      selectNodes: mockSelectNodes,
+      duplicateNodes: mockDuplicateNodes,
+      removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
+      setRightPanelActiveTab: vi.fn(),
+      setRightPanelOpen: vi.fn(),
+    }));
+
+    render(<WaypointTree />);
+
+    // First click wp-1 to establish lastSelectedId anchor
+    const wp1Item = screen.getByText('[0]');
+    fireEvent.click(wp1Item);
+
+    // Click wp-3 with Shift key held
+    const wp3Item = screen.getByText('[2]');
+    fireEvent.click(wp3Item, { shiftKey: true });
+
+    expect(mockSelectNodes).toHaveBeenLastCalledWith(['wp-1', 'wp-2', 'wp-3'], false);
+    // Ensure pseudo bar ID was NEVER selected
+    const calledWith = mockSelectNodes.mock.calls[mockSelectNodes.mock.calls.length - 1][0];
+    expect(calledWith).not.toContain('__insertion_bar__');
   });
 });

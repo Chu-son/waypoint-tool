@@ -119,4 +119,27 @@ describe('HistorySlice (Undo/Redo)', () => {
     expect(state.historyFuture).toEqual([]);
     expect(state.historyTransactionDepth).toBe(0);
   });
+
+  it('captures and restores insertionTarget on undo and redo, sanitized via validateAndCorrectInsertionTarget', () => {
+    const store = useAppStore.getState();
+    store.setInsertionTarget({ parentId: null, index: 0 });
+
+    store.addNode({ id: 'wp-1', type: 'manual' });
+    // After adding node, insertionTarget advances to index: 1
+    expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
+
+    // Mutate insertion target
+    useAppStore.getState().setInsertionTarget({ parentId: null, index: 0 });
+    // Add another node
+    useAppStore.getState().addNode({ id: 'wp-2', type: 'manual' });
+    expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
+
+    // Undo should restore insertionTarget before wp-2 was added
+    useAppStore.getState().undo();
+    expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 0 });
+
+    // Redo should restore insertionTarget after wp-2 was added
+    useAppStore.getState().redo();
+    expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
+  });
 });

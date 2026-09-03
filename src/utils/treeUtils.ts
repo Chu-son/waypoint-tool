@@ -383,3 +383,80 @@ export function getNodesAfterInsertionTarget(
   traverseList(null, rootNodeIds);
   return result;
 }
+
+/**
+ * 深さ優先探索 (DFS) 順で走査し、insertionTarget の直前にある有効なマニュアルウェイポイント（transform を保持）を返す。
+ * insertionTarget が null の場合は、ツリー全体の最後のマニュアルウェイポイントを返す。
+ */
+export function getPrecedingManualWaypoint(
+  rootNodeIds: string[],
+  nodes: Record<string, WaypointNode>,
+  insertionTarget: InsertionTarget | null
+): WaypointNode | null {
+  let lastManual: WaypointNode | null = null;
+  let targetFound = false;
+  let result: WaypointNode | null = null;
+
+  function traverse(parentId: string | null, list: string[]) {
+    for (let i = 0; i < list.length; i++) {
+      if (insertionTarget && !targetFound && insertionTarget.parentId === parentId && insertionTarget.index === i) {
+        targetFound = true;
+        result = lastManual;
+        return;
+      }
+      const id = list[i];
+      const node = nodes[id];
+      if (!node) continue;
+
+      if (node.type === 'manual' && node.transform) {
+        lastManual = node;
+      }
+
+      if (node.children_ids && node.children_ids.length > 0) {
+        traverse(id, node.children_ids);
+        if (targetFound) return;
+      }
+    }
+
+    if (insertionTarget && !targetFound && insertionTarget.parentId === parentId && insertionTarget.index >= list.length) {
+      targetFound = true;
+      result = lastManual;
+      return;
+    }
+  }
+
+  traverse(null, rootNodeIds);
+  return insertionTarget ? (targetFound ? result : lastManual) : lastManual;
+}
+
+/**
+ * insertionTarget の親ノード存在チェックおよびインデックス範囲の安全クランプを行う。
+ * 親が存在しない場合はルートへフォールバックし、インデックスを有効範囲 [0, length] にクランプする。
+ */
+export function validateAndCorrectInsertionTarget(
+  target: InsertionTarget | null,
+  rootNodeIds: string[],
+  nodes: Record<string, WaypointNode>
+): InsertionTarget | null {
+  if (!target) return null;
+
+  let effectiveParentId = target.parentId;
+  let maxLen = rootNodeIds.length;
+
+  if (effectiveParentId !== null) {
+    const parentNode = nodes[effectiveParentId];
+    if (!parentNode) {
+      effectiveParentId = null;
+      maxLen = rootNodeIds.length;
+    } else {
+      maxLen = (parentNode.children_ids || []).length;
+    }
+  }
+
+  const safeIndex = Math.max(0, Math.min(target.index, maxLen));
+  return {
+    parentId: effectiveParentId,
+    index: safeIndex,
+  };
+}
+

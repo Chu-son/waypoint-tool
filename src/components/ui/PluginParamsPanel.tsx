@@ -145,7 +145,6 @@ export function PluginParamsPanel() {
 
           // Collect waypoint range if waypoint inputs are used
           let idsToConsume: string[] = [];
-          let insertIndex = -1;
           const waypointInputs = inputs.filter((inp) => inp.type === "waypoint");
           if (waypointInputs.length > 0) {
             const waypointIndices = waypointInputs
@@ -156,8 +155,8 @@ export function PluginParamsPanel() {
               const rootNodeIds = useAppStore.getState().rootNodeIds;
               const minIdx = Math.min(...waypointIndices);
               const maxIdx = Math.max(...waypointIndices);
-              insertIndex = minIdx;
               idsToConsume = rootNodeIds.slice(minIdx, maxIdx + 1);
+              useAppStore.getState().setInsertionTarget({ parentId: null, index: minIdx });
             }
           }
 
@@ -166,7 +165,6 @@ export function PluginParamsPanel() {
             properties: params,
             interactionData: pluginInteractionData,
             idsToConsume,
-            insertIndex,
           });
 
           if (result.success) {

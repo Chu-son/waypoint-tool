@@ -24,6 +24,7 @@ import { prepareLayersForExport } from '../../utils/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
 import { resolveThemeVariables } from '../../utils/themePresets';
 import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
+import { getPrecedingManualWaypoint } from '../../utils/treeUtils';
 
 import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
 
@@ -193,6 +194,7 @@ export function MapCanvas() {
   const selectNodes = useAppStore(state => state.selectNodes);
   const nodes = useAppStore(state => state.nodes);
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
+  const insertionTarget = useAppStore(state => state.insertionTarget);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
   const updateNodes = useAppStore(state => state.updateNodes);
@@ -1044,7 +1046,8 @@ export function MapCanvas() {
     let currentLockedId = snapState.lockedWaypointId;
 
     if (activeTool === 'add_point' && !currentLockedId && interactionMode.current === 'none') {
-       if (list.length > 0) currentLockedId = list[list.length - 1].id;
+       const precedingNode = getPrecedingManualWaypoint(rootNodeIds, nodes, insertionTarget);
+       if (precedingNode) currentLockedId = precedingNode.id;
     }
 
     const hoverRadius = 30 / scale;

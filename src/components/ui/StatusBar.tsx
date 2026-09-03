@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { Copy, Loader2 } from 'lucide-react';
 import { Slider } from './common/Slider';
+import { getPrecedingManualWaypoint } from '../../utils/treeUtils';
 
 export const StatusBar: React.FC = () => {
   const cursorPosition = useAppStore(state => state.cursorPosition);
@@ -9,33 +10,10 @@ export const StatusBar: React.FC = () => {
   const nodes = useAppStore(state => state.nodes);
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const insertionTarget = useAppStore(state => state.insertionTarget);
-  const insertionIndex = useAppStore(state => state.insertionIndex);
   const elementCopyState = useAppStore(state => state.elementCopyState);
 
-  // Calculate the latest waypoint (the point immediately before the insertion point or at the very end)
-  const getLatestWaypoint = () => {
-    if (insertionTarget) {
-      const list = insertionTarget.parentId
-        ? (nodes[insertionTarget.parentId]?.children_ids || [])
-        : rootNodeIds;
-      const targetIndex = insertionTarget.index - 1;
-      if (targetIndex >= 0 && targetIndex < list.length) {
-        return nodes[list[targetIndex]];
-      }
-      if (insertionTarget.parentId && targetIndex < 0) {
-        return nodes[insertionTarget.parentId];
-      }
-      return null;
-    }
-    const targetIndex = insertionIndex !== -1 ? insertionIndex - 1 : rootNodeIds.length - 1;
-    if (targetIndex >= 0 && targetIndex < rootNodeIds.length) {
-      const nodeId = rootNodeIds[targetIndex];
-      return nodes[nodeId];
-    }
-    return null;
-  };
-
-  const latestNode = getLatestWaypoint();
+  // 直前のマニュアルウェイポイント（相対座標計算用）
+  const latestNode = getPrecedingManualWaypoint(rootNodeIds, nodes, insertionTarget);
 
   let relativeText = "";
   if (latestNode && latestNode.transform && cursorPosition) {

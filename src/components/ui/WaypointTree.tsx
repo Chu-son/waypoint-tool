@@ -367,7 +367,9 @@ export function WaypointTree() {
 
   // ドラッグ可能な挿入バーを含めた表示用リストを構築
   const displayItems = useMemo<DisplayTreeItem[]>(() => {
-    if (rootNodeIds.length === 0) return [];
+    if (rootNodeIds.length === 0) {
+      return [{ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: true }];
+    }
 
     const result: DisplayTreeItem[] = [];
     let barInserted = false;
@@ -419,11 +421,12 @@ export function WaypointTree() {
   }, [visibleNodes, insertionTarget, rootNodeIds, nodes, expandedNodes]);
 
   const visibleIds = useMemo(() => displayItems.map((n) => n.id), [displayItems]);
+  const selectableIds = useMemo(() => displayItems.filter((n) => !n.isInsertionBar).map((n) => n.id), [displayItems]);
 
   const { handleItemClick, handleItemContextMenu } = useTreeItemSelection({
     selectedIds: selectedNodeIds,
     selectFn: selectNodes,
-    visibleIds,
+    visibleIds: selectableIds,
     onInspect: () => {
       setRightPanelActiveTab('inspector');
       setRightPanelOpen(true);
@@ -468,7 +471,7 @@ export function WaypointTree() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveDragId(null);
-    if (!over || active.id === over.id) return;
+    if (!over || active.id === over.id || rootNodeIds.length === 0) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -536,90 +539,89 @@ export function WaypointTree() {
         </div>
       </div>
 
-      {rootNodeIds.length === 0 ? (
-        <div className="text-sm text-text-muted/60 italic p-4 text-center">
-          No items yet. Drag to create points on the map.
-        </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="p-1">
-            <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
-              <ul className="space-y-1">
-                {displayItems.map((item) => {
-                  if (item.isInsertionBar) {
-                    return (
-                      <InsertionBarItem
-                        key={INSERTION_BAR_ID}
-                        depth={item.depth}
-                        isAtEnd={item.isAtEnd}
-                        onReset={() => setInsertionTarget(null)}
-                      />
-                    );
-                  }
-
-                  const node = item.node;
-                  if (!node) return null;
-
-                  const isSelected = selectedNodeIds.includes(item.id);
-                  const isAnchor = anchorNodeId === item.id;
-                  const isExpanded = expandedNodes.has(item.id);
-                  const isEditing = editingNodeId === item.id;
-                  const globalIdx = waypointIndexMap.get(item.id);
-                  const isAfter = afterNodeIds.has(item.id);
-
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="p-1">
+          <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-1">
+              {displayItems.map((item) => {
+                if (item.isInsertionBar) {
                   return (
-                    <SortableTreeNodeItem
-                      key={item.id}
-                      id={item.id}
-                      node={node}
+                    <InsertionBarItem
+                      key={INSERTION_BAR_ID}
                       depth={item.depth}
-                      isSelected={isSelected}
-                      isAnchor={isAnchor}
-                      isExpanded={isExpanded}
-                      isEditing={isEditing}
-                      isAfterInsertion={isAfter}
-                      globalIndex={globalIdx}
-                      indexStartIndex={indexStartIndex}
-                      onToggleExpand={() => toggleExpand(item.id)}
-                      onClick={(e) => handleItemClick(item.id, e)}
-                      onContextMenu={(e) => handleContextMenu(e, item.id)}
-                      onRename={(newName) => {
-                        renameNode(item.id, newName);
-                        setEditingNodeId(null);
-                      }}
-                      onCancelRename={() => setEditingNodeId(null)}
+                      isAtEnd={item.isAtEnd}
+                      onReset={() => setInsertionTarget(null)}
                     />
                   );
-                })}
-              </ul>
-            </SortableContext>
-          </div>
+                }
 
-          <DragOverlay>
-            {activeDragId === INSERTION_BAR_ID ? (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-panel/95 border border-primary-base shadow-xl text-primary-base w-48">
-                <GripVertical size={13} />
-                <div className="h-1.5 w-full bg-primary-base rounded-full" />
-              </div>
-            ) : activeDragNode ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-panel/90 border border-primary-base shadow-xl text-xs text-text-base">
-                <GripVertical size={13} className="text-primary-base" />
-                <span className="font-semibold">{activeDragNode.name || 'Waypoint'}</span>
-                {selectedNodeIds.length > 1 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-primary-base text-text-inverse font-bold text-[10px]">
-                    +{selectedNodeIds.length}
-                  </span>
-                )}
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      )}
+                const node = item.node;
+                if (!node) return null;
+
+                const isSelected = selectedNodeIds.includes(item.id);
+                const isAnchor = anchorNodeId === item.id;
+                const isExpanded = expandedNodes.has(item.id);
+                const isEditing = editingNodeId === item.id;
+                const globalIdx = waypointIndexMap.get(item.id);
+                const isAfter = afterNodeIds.has(item.id);
+
+                return (
+                  <SortableTreeNodeItem
+                    key={item.id}
+                    id={item.id}
+                    node={node}
+                    depth={item.depth}
+                    isSelected={isSelected}
+                    isAnchor={isAnchor}
+                    isExpanded={isExpanded}
+                    isEditing={isEditing}
+                    isAfterInsertion={isAfter}
+                    globalIndex={globalIdx}
+                    indexStartIndex={indexStartIndex}
+                    onToggleExpand={() => toggleExpand(item.id)}
+                    onClick={(e) => handleItemClick(item.id, e)}
+                    onContextMenu={(e) => handleContextMenu(e, item.id)}
+                    onRename={(newName) => {
+                      renameNode(item.id, newName);
+                      setEditingNodeId(null);
+                    }}
+                    onCancelRename={() => setEditingNodeId(null)}
+                  />
+                );
+              })}
+            </ul>
+          </SortableContext>
+          {rootNodeIds.length === 0 && (
+            <div className="text-sm text-text-muted/60 italic p-4 text-center">
+              No items yet. Drag to create points on the map.
+            </div>
+          )}
+        </div>
+
+        <DragOverlay>
+          {activeDragId === INSERTION_BAR_ID ? (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface-panel/95 border border-primary-base shadow-xl text-primary-base w-48">
+              <GripVertical size={13} />
+              <div className="h-1.5 w-full bg-primary-base rounded-full" />
+            </div>
+          ) : activeDragNode ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-panel/90 border border-primary-base shadow-xl text-xs text-text-base">
+              <GripVertical size={13} className="text-primary-base" />
+              <span className="font-semibold">{activeDragNode.name || 'Waypoint'}</span>
+              {selectedNodeIds.length > 1 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-primary-base text-text-inverse font-bold text-[10px]">
+                  +{selectedNodeIds.length}
+                </span>
+              )}
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       {/* Context Menu */}
       {contextMenu && (

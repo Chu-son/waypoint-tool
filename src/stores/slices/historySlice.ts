@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { WaypointNode, CustomLayer, AnnotationObject } from '../../types/store';
+import { WaypointNode, CustomLayer, AnnotationObject, InsertionTarget } from '../../types/store';
+import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -12,6 +13,7 @@ export type HistorySnapshot = {
   customLayers: CustomLayer[];
   annotationObjects: Record<string, AnnotationObject>;
   annotationOrder: string[];
+  insertionTarget: InsertionTarget | null;
 };
 
 export type HistorySlice = {
@@ -36,6 +38,7 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   customLayers: structuredClone(state.customLayers ?? []),
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
   annotationOrder: [...(state.annotationOrder ?? [])],
+  insertionTarget: state.insertionTarget ? { ...state.insertionTarget } : null,
 });
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => ({
@@ -83,6 +86,11 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     const nextPast = [...state.historyPast];
     const snapshot = nextPast.pop()!;
     const nextFuture = [...state.historyFuture, captureSnapshot(state)];
+    const restoredTarget = validateAndCorrectInsertionTarget(
+      snapshot.insertionTarget ?? null,
+      snapshot.rootNodeIds,
+      snapshot.nodes
+    );
 
     return {
       historyPast: nextPast,
@@ -94,6 +102,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       customLayers: snapshot.customLayers,
       annotationObjects: snapshot.annotationObjects ?? {},
       annotationOrder: snapshot.annotationOrder ?? [],
+      insertionTarget: restoredTarget,
       isDirty: true,
     };
   }),
@@ -103,6 +112,11 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     const nextFuture = [...state.historyFuture];
     const snapshot = nextFuture.pop()!;
     const nextPast = [...state.historyPast, captureSnapshot(state)];
+    const restoredTarget = validateAndCorrectInsertionTarget(
+      snapshot.insertionTarget ?? null,
+      snapshot.rootNodeIds,
+      snapshot.nodes
+    );
 
     return {
       historyPast: nextPast,
@@ -114,6 +128,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       customLayers: snapshot.customLayers,
       annotationObjects: snapshot.annotationObjects ?? {},
       annotationOrder: snapshot.annotationOrder ?? [],
+      insertionTarget: restoredTarget,
       isDirty: true,
     };
   }),

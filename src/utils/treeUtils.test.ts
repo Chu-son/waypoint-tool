@@ -10,6 +10,8 @@ import {
   computeDragDropPosition,
   getNextSequentialName,
   getNodesAfterInsertionTarget,
+  getPrecedingManualWaypoint,
+  validateAndCorrectInsertionTarget,
 } from './treeUtils';
 import { WaypointNode } from '../types/store';
 
@@ -172,4 +174,136 @@ describe('treeUtils', () => {
       expect(Array.from(res)).toEqual(['wp-4', 'wp-5']);
     });
   });
+
+  describe('getPrecedingManualWaypoint', () => {
+    const dummyTransform = { x: 1, y: 2, qx: 0, qy: 0, qz: 0, qw: 1 };
+    const testNodes: Record<string, WaypointNode> = {
+      'wp-1': { id: 'wp-1', type: 'manual', transform: { ...dummyTransform, x: 1 } },
+      'group-1': { id: 'group-1', type: 'manual_group', children_ids: ['wp-2', 'gen-1', 'subgroup-1'] },
+      'wp-2': { id: 'wp-2', type: 'manual', transform: { ...dummyTransform, x: 2 } },
+      'gen-1': { id: 'gen-1', type: 'generator', children_ids: [] },
+      'subgroup-1': { id: 'subgroup-1', type: 'manual_group', children_ids: ['wp-3', 'wp-no-tf', 'wp-4'] },
+      'wp-3': { id: 'wp-3', type: 'manual', transform: { ...dummyTransform, x: 3 } },
+      'wp-no-tf': { id: 'wp-no-tf', type: 'manual' }, // no transform
+      'wp-4': { id: 'wp-4', type: 'manual', transform: { ...dummyTransform, x: 4 } },
+      'wp-5': { id: 'wp-5', type: 'manual', transform: { ...dummyTransform, x: 5 } },
+    };
+    const testRootIds = ['wp-1', 'group-1', 'wp-5'];
+
+    it('returns null for empty tree', () => {
+      expect(getPrecedingManualWaypoint([], {}, null)).toBeNull();
+      expect(getPrecedingManualWaypoint([], {}, { parentId: null, index: 0 })).toBeNull();
+    });
+
+    it('returns null when insertionTarget is at the very beginning of root (index 0)', () => {
+      const res = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: null, index: 0 });
+      expect(res).toBeNull();
+    });
+
+    it('returns the preceding manual node at root index 1', () => {
+      const res = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: null, index: 1 });
+      expect(res?.id).toBe('wp-1');
+    });
+
+    it('returns the preceding manual node when target is at the start of a group (DFS precedes)', () => {
+      const res = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'group-1', index: 0 });
+      expect(res?.id).toBe('wp-1');
+    });
+
+    it('returns the preceding child when target is inside a group', () => {
+      const res = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'group-1', index: 1 });
+      expect(res?.id).toBe('wp-2');
+    });
+
+    it('skips generator node and returns wp-2 when inserting after generator in group-1', () => {
+      // index 2 is after gen-1, before subgroup-1
+      const res = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'group-1', index: 2 });
+      expect(res?.id).toBe('wp-2');
+    });
+
+    it('resolves inside nested subgroup correctly', () => {
+      // At index 0 of subgroup-1, preceding manual node in DFS is wp-2
+      const res0 = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'subgroup-1', index: 0 });
+      expect(res0?.id).toBe('wp-2');
+
+      // At index 1 of subgroup-1 (after wp-3)
+      const res1 = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'subgroup-1', index: 1 });
+      expect(res1?.id).toBe('wp-3');
+
+      // At index 2 of subgroup-1 (after wp-no-tf which lacks transform -> should resolve to wp-3)
+      const res2 = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'subgroup-1', index: 2 });
+      expect(res2?.id).toBe('wp-3');
+
+      // At index 3 of subgroup-1 (after wp-4)
+      const res3 = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: 'subgroup-1', index: 3 });
+      expect(res3?.id).toBe('wp-4');
+    });
+
+    it('returns the last manual node when insertionTarget is at root end or null', () => {
+      const resEnd = getPrecedingManualWaypoint(testRootIds, testNodes, { parentId: null, index: 3 });
+      expect(resEnd?.id).toBe('wp-5');
+
+      const resNull = getPrecedingManualWaypoint(testRootIds, testNodes, null);
+      expect(resNull?.id).toBe('wp-5');
+    });
+  });
+
+  describe('validateAndCorrectInsertionTarget', () => {
+    const testNodes: Record<string, WaypointNode> = {
+      'group-1': { id: 'group-1', type: 'manual_group', children_ids: ['c1', 'c2'] },
+    };
+    const testRootIds = ['w1', 'group-1', 'w2'];
+
+    it('returns null when target is null', () => {
+      expect(validateAndCorrectInsertionTarget(null, testRootIds, testNodes)).toBeNull();
+    });
+
+    it('preserves valid target at root', () => {
+      expect(validateAndCorrectInsertionTarget({ parentId: null, index: 1 }, testRootIds, testNodes)).toEqual({
+        parentId: null,
+        index: 1,
+      });
+    });
+
+    it('clamps negative index to 0', () => {
+      expect(validateAndCorrectInsertionTarget({ parentId: null, index: -5 }, testRootIds, testNodes)).toEqual({
+        parentId: null,
+        index: 0,
+      });
+    });
+
+    it('clamps index exceeding root length to root length', () => {
+      expect(validateAndCorrectInsertionTarget({ parentId: null, index: 10 }, testRootIds, testNodes)).toEqual({
+        parentId: null,
+        index: 3,
+      });
+    });
+
+    it('preserves valid target inside parent group', () => {
+      expect(validateAndCorrectInsertionTarget({ parentId: 'group-1', index: 2 }, testRootIds, testNodes)).toEqual({
+        parentId: 'group-1',
+        index: 2,
+      });
+    });
+
+    it('clamps index exceeding parent children length', () => {
+      expect(validateAndCorrectInsertionTarget({ parentId: 'group-1', index: 99 }, testRootIds, testNodes)).toEqual({
+        parentId: 'group-1',
+        index: 2,
+      });
+    });
+
+    it('falls back to root and clamps index when parent is deleted/missing', () => {
+      expect(validateAndCorrectInsertionTarget({ parentId: 'deleted-group', index: 2 }, testRootIds, testNodes)).toEqual({
+        parentId: null,
+        index: 2,
+      });
+
+      expect(validateAndCorrectInsertionTarget({ parentId: 'deleted-group', index: 99 }, testRootIds, testNodes)).toEqual({
+        parentId: null,
+        index: 3,
+      });
+    });
+  });
 });
+
