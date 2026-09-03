@@ -92,4 +92,11 @@ describe('PluginListPanel', () => {
 
     expect(mockSetSettingsModalOpen).toHaveBeenCalledWith(true, 'plugins');
   });
+
+  it('renders safely without throwing when pluginSettings is malformed (e.g. object or null)', () => {
+    useAppStore.setState({
+      pluginSettings: { corrupted: true } as any,
+    });
+    expect(() => render(<PluginListPanel />)).not.toThrow();
+  });
 });

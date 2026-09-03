@@ -12,7 +12,8 @@ describe('storageMigration', () => {
     expect(migrateStorage(undefined, 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage('corrupt', 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage(12345, 0)).toEqual(DEFAULT_STORAGE_STATE);
-    expect(STORAGE_VERSION).toBe(1);
+    expect(STORAGE_VERSION).toBe(2);
+    expect(DEFAULT_STORAGE_STATE.pluginSettings).toEqual([]);
   });
 
   it('promotes defaultExportFormats string array to object array on v0 migration', () => {
@@ -40,6 +41,7 @@ describe('storageMigration', () => {
     expect(migrated.defaultMapOpacity).toBe(0.8);
     expect(migrated.indexStartIndex).toBe(0);
     expect(migrated.decimalPrecision).toBe(6);
+    expect(migrated.pluginSettings).toEqual([]);
   });
 
   it('normalizes indexStartIndex and decimalPrecision safely', () => {
@@ -60,26 +62,39 @@ describe('storageMigration', () => {
       lastDirectory: '/home/user/maps',
       enableSnapping: false,
     };
-    const migrated = migrateStorage(partialState, 1);
+    const migrated = migrateStorage(partialState, 2);
     expect(migrated.lastDirectory).toBe('/home/user/maps');
     expect(migrated.enableSnapping).toBe(false);
     expect(migrated.defaultMapOpacity).toBe(DEFAULT_MAP_OPACITY);
     expect(migrated.defaultExportFormats).toEqual(DEFAULT_EXPORT_FORMATS);
     expect(migrated.recentProjects).toEqual([]);
-    expect(migrated.pluginSettings).toEqual({});
+    expect(migrated.pluginSettings).toEqual([]);
   });
 
-  it('safely guards non-array values for array properties', () => {
+  it('safely guards non-array values for array properties and recovers corrupted pluginSettings', () => {
     const corruptState = {
       recentProjects: 'not an array',
       exportTemplates: 123,
       defaultExportFormats: null,
-      pluginSettings: 'invalid string',
+      pluginSettings: { corrupt: true }, // 過去にオブジェクトとして保存されてしまった不正状態
     };
     const migrated = migrateStorage(corruptState, 1);
     expect(Array.isArray(migrated.recentProjects)).toBe(true);
     expect(Array.isArray(migrated.exportTemplates)).toBe(true);
     expect(Array.isArray(migrated.defaultExportFormats)).toBe(true);
-    expect(migrated.pluginSettings).toEqual({});
+    expect(Array.isArray(migrated.pluginSettings)).toBe(true);
+    expect(migrated.pluginSettings).toEqual([]);
+  });
+
+  it('preserves valid pluginSettings array on migration', () => {
+    const validSettings = [
+      { id: 'plugin-1', enabled: true, order: 0, isBuiltin: true },
+      { id: 'plugin-2', enabled: false, order: 1, isBuiltin: false },
+    ];
+    const state = {
+      pluginSettings: validSettings,
+    };
+    const migrated = migrateStorage(state, 2);
+    expect(migrated.pluginSettings).toEqual(validSettings);
   });
 });

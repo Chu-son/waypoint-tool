@@ -80,10 +80,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
   setPlugins: (plugins) => set({ plugins }),
   
-  setPluginSettings: (settings) => set({ pluginSettings: settings, isDirty: true }),
+  setPluginSettings: (settings) => set({ pluginSettings: Array.isArray(settings) ? settings : [], isDirty: true }),
   
   updatePluginSetting: (id, updates) => set((state) => ({
-    pluginSettings: state.pluginSettings.map(p => p.id === id ? { ...p, ...updates } : p),
+    pluginSettings: (Array.isArray(state.pluginSettings) ? state.pluginSettings : []).map(p => p.id === id ? { ...p, ...updates } : p),
     isDirty: true
   })),
   

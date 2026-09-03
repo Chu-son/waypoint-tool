@@ -1,7 +1,7 @@
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
-import { DefaultExportFormat } from '../../types/store';
+import { DefaultExportFormat, PluginSetting } from '../../types/store';
 
-export const STORAGE_VERSION = 1;
+export const STORAGE_VERSION = 2;
 
 export interface PersistedStorageState {
   defaultMapOpacity?: number;
@@ -14,7 +14,7 @@ export interface PersistedStorageState {
   showPaths?: boolean;
   showGrid?: boolean;
   showFootprints?: boolean;
-  pluginSettings?: Record<string, any>;
+  pluginSettings?: PluginSetting[];
   globalPythonPath?: string | null;
   decimalPrecision?: number;
   leftPanelViewMode?: 'tabs' | 'split';
@@ -39,7 +39,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   showPaths: true,
   showGrid: true,
   showFootprints: true,
-  pluginSettings: {},
+  pluginSettings: [],
   globalPythonPath: null,
   decimalPrecision: 6,
   leftPanelViewMode: 'tabs',
@@ -93,6 +93,13 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     }
   }
 
+  // v2 へのマイグレーション: 過去に pluginSettings が非配列（オブジェクト {} 等）に汚染された場合の自己修復
+  if (version < 2 || !Array.isArray(state.pluginSettings)) {
+    if (!Array.isArray(state.pluginSettings)) {
+      state.pluginSettings = [];
+    }
+  }
+
   // 欠落プロパティのデフォルト値補完（浅いマージ + 安全なフォールバック）
   return {
     ...DEFAULT_STORAGE_STATE,
@@ -101,9 +108,7 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     recentProjects: Array.isArray(state.recentProjects) ? state.recentProjects : DEFAULT_STORAGE_STATE.recentProjects,
     exportTemplates: Array.isArray(state.exportTemplates) ? state.exportTemplates : DEFAULT_STORAGE_STATE.exportTemplates,
     defaultExportFormats: Array.isArray(state.defaultExportFormats) ? state.defaultExportFormats : DEFAULT_STORAGE_STATE.defaultExportFormats,
-    pluginSettings: (state.pluginSettings && typeof state.pluginSettings === 'object' && !Array.isArray(state.pluginSettings))
-      ? state.pluginSettings
-      : DEFAULT_STORAGE_STATE.pluginSettings,
+    pluginSettings: Array.isArray(state.pluginSettings) ? state.pluginSettings : DEFAULT_STORAGE_STATE.pluginSettings,
     indexStartIndex: state.indexStartIndex === 1 ? 1 : 0,
     decimalPrecision: typeof state.decimalPrecision === 'number' ? Math.max(0, Math.floor(state.decimalPrecision)) : 6,
     defaultMapOpacity: typeof state.defaultMapOpacity === 'number' ? state.defaultMapOpacity : DEFAULT_MAP_OPACITY,

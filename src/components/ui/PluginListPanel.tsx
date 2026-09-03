@@ -100,8 +100,9 @@ function PluginCard({
 }
 
 export function PluginListPanel() {
-  const plugins = useAppStore((state) => state.plugins);
-  const pluginSettings = useAppStore((state) => state.pluginSettings);
+  const plugins = useAppStore((state) => state.plugins) || {};
+  const rawPluginSettings = useAppStore((state) => state.pluginSettings);
+  const pluginSettings = Array.isArray(rawPluginSettings) ? rawPluginSettings : [];
   const setActiveTool = useAppStore((state) => state.setActiveTool);
   const setActivePlugin = useAppStore((state) => state.setActivePlugin);
   const activePluginId = useAppStore((state) => state.activePluginId);

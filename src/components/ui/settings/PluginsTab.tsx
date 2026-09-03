@@ -16,8 +16,9 @@ interface PluginsTabProps {
 }
 
 export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabProps) {
-  const plugins = useAppStore((state) => state.plugins);
-  const pluginSettings = useAppStore((state) => state.pluginSettings);
+  const plugins = useAppStore((state) => state.plugins) || {};
+  const rawPluginSettings = useAppStore((state) => state.pluginSettings);
+  const pluginSettings = Array.isArray(rawPluginSettings) ? rawPluginSettings : [];
   const setPluginSettings = useAppStore((state) => state.setPluginSettings);
   const setPlugins = useAppStore((state) => state.setPlugins);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
