@@ -19,6 +19,7 @@ import { AnnotationEditOverlay } from "./components/ui/AnnotationEditOverlay";
 import { LoadingOverlay } from "./components/ui/common/LoadingOverlay";
 import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoadingBadge";
 import { ShortcutManager } from "./components/common/ShortcutManager";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { ThemeInjector } from "./components/ui/ThemeInjector";
 import { resolvePanelTabs, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
 import { useAppStore } from "./stores/appStore";
@@ -319,15 +320,17 @@ function App() {
               style={{ width: leftWidth }}
               className="bg-surface-panel border-r border-border-base flex flex-col z-20 shadow-lg relative flex-shrink-0"
             >
-              <PanelContainer
-                panels={leftPanels}
-                activeTabId={leftPanelActiveTab}
-                onTabChange={setLeftPanelActiveTab}
-                viewMode={leftPanelViewMode}
-                onViewModeChange={setLeftPanelViewMode}
-                onClose={() => setLeftPanelOpen(false)}
-                closeIcon={<ChevronLeft size={16} />}
-              />
+              <ErrorBoundary fallbackTitle="左サイドバーの表示中にエラーが発生しました">
+                <PanelContainer
+                  panels={leftPanels}
+                  activeTabId={leftPanelActiveTab}
+                  onTabChange={setLeftPanelActiveTab}
+                  viewMode={leftPanelViewMode}
+                  onViewModeChange={setLeftPanelViewMode}
+                  onClose={() => setLeftPanelOpen(false)}
+                  closeIcon={<ChevronLeft size={16} />}
+                />
+              </ErrorBoundary>
             </div>
             {/* Dragger */}
             <div
@@ -389,24 +392,28 @@ function App() {
               style={{ width: rightWidth }}
               className="bg-surface-panel border-l border-border-base flex flex-col z-20 shadow-lg relative flex-shrink-0"
             >
-              <PanelContainer
-                panels={rightPanels}
-                activeTabId={rightPanelActiveTab}
-                onTabChange={setRightPanelActiveTab}
-                viewMode={rightPanelViewMode}
-                onViewModeChange={setRightPanelViewMode}
-                onClose={() => setRightPanelOpen(false)}
-                closeIcon={<ChevronRight size={16} />}
-              />
+              <ErrorBoundary fallbackTitle="右サイドバーの表示中にエラーが発生しました">
+                <PanelContainer
+                  panels={rightPanels}
+                  activeTabId={rightPanelActiveTab}
+                  onTabChange={setRightPanelActiveTab}
+                  viewMode={rightPanelViewMode}
+                  onViewModeChange={setRightPanelViewMode}
+                  onClose={() => setRightPanelOpen(false)}
+                  closeIcon={<ChevronRight size={16} />}
+                />
+              </ErrorBoundary>
             </div>
           </>
         )}
       </div>
       <StatusBar />
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setSettingsModalOpen(false)}
-      />
+      <ErrorBoundary fallbackTitle="設定画面の表示中にエラーが発生しました">
+        <SettingsModal
+          isOpen={isSettingsModalOpen}
+          onClose={() => setSettingsModalOpen(false)}
+        />
+      </ErrorBoundary>
       <ExportMapsModal />
       <KeyboardShortcutsModal
         isOpen={isShortcutsModalOpen}
