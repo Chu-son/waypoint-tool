@@ -47,3 +47,63 @@
 新しい機能を追加する際は、可能な限り上記の基本分類に収めてください。
 ただし、**大きく独立した機能**（例: 高度なエクスポート機能、特殊なインポート機能など）を追加する場合は、特例として**新規ディレクトリ（例：`export/`）の作成を許容**します。
 無闇にトップレベルのディレクトリを増やすことは避けてください。
+
+---
+
+## 3. プロジェクト全体の後方互換性（Backward Compatibility）に関するルール
+
+本プロジェクトでは、将来的な機能拡張や仕様変更に伴うデータ破壊・ランタイムクラッシュ、および「後方互換コードが各所に散乱して見通しを下げる」事態を防ぐため、以下のルールを厳格に遵守してください。
+
+### 3.1 境界隔離の原則（Anti-Corruption Layer / Ingress Pipeline）
+
+- **ドメインコア（内部ロジック）純粋化の原則**:
+  外部から入力されるすべてのデータ（プロジェクトファイル、LocalStorage、プラグイン通信、外部インポートファイル、IPCメッセージ）は、**必ず各エントリポイントの境界（Migration / Adapter 層）で最新の正規化スキーマへ変換してからドメインコアへ渡さなければなりません。**
+- **内部コードでの互換フォールバック記述の禁止**:
+  各 Zustand スライス（`projectSlice`, `mapSlice` 等）、React コンポーネント、Canvas レイヤーの内部で、過去バージョンの互換性維持を目的としたフォールバック処理（例: `data.foo || data.legacy_foo || defaultValue` や `data.bar ?? defaultBar`）を直接記述してはなりません。
+  内部コードは常に「最新かつ完全に正規化されたデータ型（Strict型）」が渡されている前提で簡潔に記述してください。
+
+### 3.2 領域別の後方互換実装ルール＆チェックリスト
+
+| 領域 | 対象 | 境界アダプタ / マイグレータ | 遵守ルール |
+|---|---|---|---|
+| **プロジェクトファイル** | `.wptroj` | `src/stores/migrations/projectMigration.ts` | ・`migrateAndNormalizeProjectData` で v0 から v1 への昇格と全必須フィールドのデフォルト補完。<br>・Rust側は `serde_json::Value` で完全透過。<br>・保存時は `buildProjectData` により常に最新形式（StrictProjectData / version: 1）で書き出し。 |
+| **ユーザー設定永続化** | LocalStorage / Zustand persist | `src/stores/migrations/storageMigration.ts` | ・`persist` ミドルウェアに `version: STORAGE_VERSION` および `migrateStorage` を設定。<br>・設定項目の追加・変更時は旧ストレージデータの自動補完・型正規化を実装。 |
+| **プラグイン通信** | `manifest.json`, IPC stdio JSON | `src/stores/slices/pluginSlice.ts` / Rust `plugins` | ・**追加のみ（Additive Only）の原則**: プラグインへ送る `context` は既存キーを変更せず、新情報は新キーとして追加。<br>・旧マニフェスト（`category` 等）は読み込み時に新仕様（`primary_output`）へ自動マッピング。<br>・出力結果は旧仕様（単一ウェイポイント配列）と新仕様（`PluginResult`）の両方を境界で判別・正規化。 |
+| **外部入出力** | ROS Map, Waypoint Import, Handlebars Template | `src/utils/importUtils.ts`, `src/utils/exportUtils.ts` | ・インポート時はカラム名・キー名揺れを推論アダプタで吸収。<br>・エクスポート用 Handlebars コンテキストには旧テンプレート互換用エイリアス（例: `node.name` と `node.label`）を維持・提供。 |
+| **ストアアクション** | `src/stores/slices/*.ts` | アクション定義部 | ・引数の拡張は**オプション引数オブジェクト化（`options?: { ... }`）**を推奨。<br>・シグネチャ変更時は旧関数を即時削除せず、`@deprecated` を付与したラッパーとして一時維持。 |
+| **操作体系・ショートカット** | `ShortcutManager.tsx` | キーイベントディスパッチャ | ・既存ショートカットの破壊的変更時はエイリアスキーを提供。<br>・ショートカット変更時は本ガイド 1.2 項に従い `KeyboardShortcutsModal.tsx` を必ず同期更新。 |
+
+### 3.3 プロジェクト設定・永続化対象の新機能を追加する際の手順
+
+プロジェクトファイルに保存すべき新規プロパティや設定を追加する場合は、以下の順序で実装を行ってください。
+
+1. **具象型定義の更新 (`src/types/store.ts`)**:
+   - `ProjectData`（外部受取用・オプショナル）に新プロパティを追加。
+   - `StrictProjectData`（内部標準・保存用）に新プロパティを必須（具象型）として追加。
+2. **保存処理への追加 (`src/stores/slices/projectSlice.ts`)**:
+   - `buildProjectData(state: AppState): StrictProjectData` 内に新プロパティの書き出しを追加。TypeScript のコンパイルチェックにより、未保存プロパティが存在する場合は型エラーで検知されます。
+3. **マイグレーション・デフォルト値の定義 (`src/stores/migrations/projectMigration.ts`)**:
+   - デフォルト値定数を定義・エクスポート。
+   - `migrateV0ToV1`（または必要に応じて新バージョンマイグレータ）で、旧データに対するフォールバック・デフォルト値補完を実装。
+   - falsy な値（数値 `0` や `false`）を `||` でデフォルト値に上書きしてしまわないよう、`??` または型チェックを用いて厳密にハンドリングすること。
+4. **ストア初期化・リセット処理の更新 (`src/stores/slices/projectSlice.ts`)**:
+   - `resetProject()` に新プロパティのリセット処理を追加。
+5. **テストの追従・検証**:
+   - `src/stores/migrations/projectMigration.test.ts` に旧データからの復元テストを追加。
+   - `src/stores/slices/projectPersistence.test.ts` のラウンドトリップテストに新プロパティを追加。
+
+### 3.4 非推奨（Deprecation）ライフサイクルと廃止手順
+
+互換コードが無限に蓄積してコードベースが肥大化することを防ぐため、以下の段階的廃止フローに従ってください。
+
+1. **Phase 1: 非推奨化（Deprecated）**
+   - 旧プロパティや旧アクションに JSDoc の `@deprecated` タグを付与し、移行先を明記。
+   - 境界アダプタで新形式へ自動変換。開発ビルド時のみ `console.warn` で開発者へ通知。
+2. **Phase 2: 移行猶予（Grace Period / Sunset）**
+   - マイナーバージョンアップ期間（または最低3ヶ月間）は互換アダプタを維持。
+   - ゴールデンテスト（旧形式データ読込テスト）で回帰を防止。
+3. **Phase 3: 廃止（Removed）**
+   - 次期メジャーバージョンアップ（例: v2.0）時に旧互換コード・アダプタを安全に削除。
+   - ドキュメントおよびテストを更新。
+
+

@@ -48,6 +48,7 @@ graph TD
         UI[UI Components / Panels]
         Store[Zustand AppStore]
         Canvas[PixiJS MapCanvas & Layers]
+        ACL[Anti-Corruption Layer: projectMigration / storageMigration]
     end
 
     subgraph Backend [Tauri Core / Rust]
@@ -59,6 +60,7 @@ graph TD
     subgraph External [External Operations]
         Python[Python Plugins]
         FS[(Local File System)]
+        LS[(Browser LocalStorage)]
     end
 
     UI -->|Action Dispatch| Store
@@ -67,7 +69,11 @@ graph TD
     Canvas -->|Pointer / Edit Event| Store
 
     UI -->|Invoke Command| IPC
-    Store -->|Sync / Save| IPC
+    Store -->|Save StrictProjectData| IPC
+    IPC -->|Load Raw JSON| ACL
+    ACL -->|StrictProjectData| Store
+    LS -->|Persisted State| ACL
+    ACL -->|Normalized State| Store
     IPC --> FileIO
     IPC --> PluginExec
     FileIO --> FS
@@ -78,7 +84,7 @@ graph TD
 
 1. **状態管理の単一真実源 (Zustand AppStore)**:
    - アプリケーション全体の全状態（マップ画像、Waypointデータ、パネル開閉状態、選択要素、Undo/Redo履歴等）を保持します。
-   - `src/stores/slices/` にて機能ごとに分割（`mapSlice`, `nodeSlice`, `pluginSlice`, `projectSlice`, `uiSlice`）管理されています。
+   - `src/stores/slices/` にて機能ごとに分割（`mapSlice`, `nodeSlice`, `pluginSlice`, `projectSlice`, `uiSlice` 等）管理されています。
 
 2. **UI レイヤー (React)**:
    - `appStore` の状態をサブスクライブし、表示およびユーザー入力を受け付けます。
@@ -88,8 +94,14 @@ graph TD
    - `src/components/canvas/MapCanvas.tsx` をエントリポイントとし、キャンバスビューポートとインフラ描画を提供します。
    - `layers/` 配下の独立した描画レイヤー（`WaypointLayer`, `PathLayer`, `FootprintLayer`, `GridLayer`, `PluginLayer` 等）が `appStore` を参照し WebGL メッシュとして描画します。
 
-4. **バックエンド (Tauri / Rust Core)**:
+4. **境界正規化・マイグレーションレイヤー (Anti-Corruption Layer: `src/stores/migrations/`)**:
+   - プロジェクトファイル（`.wptroj`）読み込み時の `projectMigration.ts`、およびブラウザローカルストレージ設定（`waypoint-tool-storage`）復元時の `storageMigration.ts` を統括します。
+   - 外部入力（旧バージョン形式、未定義プロパティ、キー名揺れ等）をエントリポイント境界で即座に検知し、最新の厳格なスキーマへと完全正規化・デフォルト値補完を実施します。
+   - これにより、内部スライスやコンポーネント内に互換フォールバック（`||` や `??`）を散乱させないクリーンアーキテクチャを実現します。
+
+5. **バックエンド (Tauri / Rust Core)**:
    - ファイルシステムの直接アクセス、Handlebars テンプレートによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
+   - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。
    - 外部 Python プラグインプロセスを標準入出力 (`stdin` / `stdout`) で起動・同期通信します。
 
 ---
@@ -102,7 +114,7 @@ graph TD
 - **`nodeSlice.ts`**: Waypoint ノードおよびジェネレーターノードの追加・削除・編集・一括操作・Undo/Redo。
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。
-- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、アノテーション＆グループ永続化・マイグレーション。
+- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、アクティブパネル、モーダル表示状態、ズーム/パン位置。
 
 ---
