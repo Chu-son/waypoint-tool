@@ -1,4 +1,4 @@
-import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../types/store';
+import { OptionsSchema, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../types/store';
 
 export type MapLoadResult = {
   info: {
@@ -53,8 +53,8 @@ export type BlendPreviewResult = {
 
 export interface IBackendAPI {
   loadROSMap(yamlPath: string): Promise<MapLoadResult>;
-  saveProject(path: string, data: ProjectData): Promise<void>;
-  loadProject(path: string): Promise<ProjectData>;
+  saveProject(path: string, data: any): Promise<void>;
+  loadProject(path: string): Promise<any>;
   loadOptionsSchema(yamlPath: string): Promise<OptionsSchema>;
   exportWaypoints(path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void>;
   importWaypointsRaw(path: string): Promise<any>;

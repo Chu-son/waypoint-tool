@@ -1,7 +1,7 @@
 use tauri::{command, AppHandle};
 use std::fs;
 use base64::{engine::general_purpose, Engine as _};
-use crate::{map, io, models::ProjectData};
+use crate::{map, io};
 
 #[command]
 pub fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
@@ -19,12 +19,12 @@ pub async fn blend_map_preview(layers: Vec<map::BlendPreviewLayer>) -> Result<ma
 }
 
 #[command]
-pub fn save_project(path: String, data: ProjectData) -> Result<(), String> {
+pub fn save_project(path: String, data: serde_json::Value) -> Result<(), String> {
     io::save_project(&path, &data)
 }
 
 #[command]
-pub fn load_project(path: String) -> Result<ProjectData, String> {
+pub fn load_project(path: String) -> Result<serde_json::Value, String> {
     io::load_project(&path)
 }
 

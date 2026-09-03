@@ -1,24 +1,19 @@
 use std::fs;
-use crate::models::ProjectData;
 use handlebars::Handlebars;
 
-pub fn save_project(path: &str, data: &ProjectData) -> Result<(), String> {
+pub fn save_project(path: &str, data: &serde_json::Value) -> Result<(), String> {
     let json = serde_json::to_string_pretty(data)
         .map_err(|e| format!("Serialization error: {}", e))?;
-    
     fs::write(path, json)
         .map_err(|e| format!("File write error: {}", e))?;
-    
     Ok(())
 }
 
-pub fn load_project(path: &str) -> Result<ProjectData, String> {
+pub fn load_project(path: &str) -> Result<serde_json::Value, String> {
     let content = fs::read_to_string(path)
         .map_err(|e| format!("File read error: {}", e))?;
-    
-    let data: ProjectData = serde_json::from_str(&content)
+    let data: serde_json::Value = serde_json::from_str(&content)
         .map_err(|e| format!("Deserialization error: {}", e))?;
-    
     Ok(data)
 }
 
@@ -327,63 +322,42 @@ mod tests {
 
     #[test]
     fn test_save_and_load_project() {
-        use crate::models::{WaypointNode, Transform};
-        use std::collections::HashMap;
-
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test_project.wptroj");
         let path_str = file_path.to_str().unwrap();
 
-        let mut nodes = HashMap::new();
-        nodes.insert(
-            "node1".to_string(),
-            WaypointNode {
-                id: "node1".to_string(),
-                node_type: "manual".to_string(),
-                name: Some("WP 1".to_string()),
-                transform: Some(Transform { x: 1.0, y: 2.0, z: None, qx: 0.0, qy: 0.0, qz: 0.0, qw: 1.0 }),
-                options: None,
-                plugin_id: None,
-                source_execution_id: None,
-                generator_params: None,
-                plugin_data: None,
-                children_ids: None,
+        let project_data = serde_json::json!({
+            "version": 1,
+            "root_node_ids": ["node1"],
+            "nodes": {
+                "node1": {
+                    "id": "node1",
+                    "type": "manual",
+                    "name": "WP 1",
+                    "transform": {
+                        "x": 1.0,
+                        "y": 2.0,
+                        "qx": 0.0,
+                        "qy": 0.0,
+                        "qz": 0.0,
+                        "qw": 1.0
+                    }
+                }
             },
-        );
-
-        let project_data = ProjectData {
-            root_node_ids: vec!["node1".to_string()],
-            nodes,
-            map_layers: None,
-            custom_layers: None,
-            annotation_objects: None,
-            annotation_groups: None,
-            root_annotation_ids: None,
-            edit_layers: None,
-            generated_layers: None,
-            options_schema: None,
-            export_templates: None,
-            default_export_formats: None,
-            export_regions: None,
-            robot_footprint: None,
-            occupancy_settings: Some(serde_json::json!({
+            "occupancy_settings": {
                 "defaultOccupiedThresh": 0.7,
                 "defaultFreeThresh": 0.2,
                 "defaultNegate": 0
-            })),
-            default_map_opacity: Some(0.85),
-            left_panel_view_mode: Some("split".to_string()),
-            right_panel_view_mode: Some("tabs".to_string()),
-            active_path_calculator_plugin_id: None,
-            path_calculator_params: None,
-            auto_recalculate_path: Some(true),
-            path_color: Some("#10b981".to_string()),
-            path_width: Some(0.2),
-            path_opacity: Some(0.8),
-            sync_path_width_with_footprint: Some(true),
-            workflow_state: None,
-            custom_ui_data: None,
-        };
+            },
+            "default_map_opacity": 0.85,
+            "left_panel_view_mode": "split",
+            "right_panel_view_mode": "tabs",
+            "auto_recalculate_path": true,
+            "path_color": "#10b981",
+            "path_width": 0.2,
+            "path_opacity": 0.8,
+            "sync_path_width_with_footprint": true
+        });
 
         // Save
         let save_res = save_project(path_str, &project_data);
@@ -394,23 +368,21 @@ mod tests {
         assert!(load_res.is_ok(), "Load project failed");
 
         let loaded_data = load_res.unwrap();
-        assert_eq!(loaded_data.default_map_opacity, Some(0.85));
-        assert_eq!(loaded_data.left_panel_view_mode, Some("split".to_string()));
-        assert_eq!(loaded_data.right_panel_view_mode, Some("tabs".to_string()));
-        assert_eq!(loaded_data.root_node_ids, vec!["node1".to_string()]);
-        assert!(loaded_data.nodes.contains_key("node1"));
-        assert!(loaded_data.occupancy_settings.is_some());
-        let occ = loaded_data.occupancy_settings.unwrap();
-        assert_eq!(occ["defaultOccupiedThresh"], 0.7);
-        assert_eq!(occ["defaultFreeThresh"], 0.2);
-        let node = loaded_data.nodes.get("node1").unwrap();
-        assert_eq!(node.id, "node1");
-        assert_eq!(node.node_type, "manual");
-        assert_eq!(node.transform.as_ref().unwrap().x, 1.0);
-        assert_eq!(node.transform.as_ref().unwrap().y, 2.0);
-        assert_eq!(node.transform.as_ref().unwrap().qx, 0.0);
-        assert_eq!(node.transform.as_ref().unwrap().qy, 0.0);
-        assert_eq!(node.transform.as_ref().unwrap().qz, 0.0);
-        assert_eq!(node.transform.as_ref().unwrap().qw, 1.0);
+        assert_eq!(loaded_data["version"], 1);
+        assert_eq!(loaded_data["default_map_opacity"], 0.85);
+        assert_eq!(loaded_data["left_panel_view_mode"], "split");
+        assert_eq!(loaded_data["right_panel_view_mode"], "tabs");
+        assert_eq!(loaded_data["root_node_ids"][0], "node1");
+        assert_eq!(loaded_data["occupancy_settings"]["defaultOccupiedThresh"], 0.7);
+        assert_eq!(loaded_data["occupancy_settings"]["defaultFreeThresh"], 0.2);
+        let node = &loaded_data["nodes"]["node1"];
+        assert_eq!(node["id"], "node1");
+        assert_eq!(node["type"], "manual");
+        assert_eq!(node["transform"]["x"], 1.0);
+        assert_eq!(node["transform"]["y"], 2.0);
+        assert_eq!(node["transform"]["qx"], 0.0);
+        assert_eq!(node["transform"]["qy"], 0.0);
+        assert_eq!(node["transform"]["qz"], 0.0);
+        assert_eq!(node["transform"]["qw"], 1.0);
     }
 }

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../../types/store';
+import { OptionsSchema, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -7,11 +7,11 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('load_ros_map', { yamlPath });
   }
 
-  async saveProject(path: string, data: ProjectData): Promise<void> {
+  async saveProject(path: string, data: any): Promise<void> {
     return invoke('save_project', { path, data });
   }
 
-  async loadProject(path: string): Promise<ProjectData> {
+  async loadProject(path: string): Promise<any> {
     return invoke('load_project', { path });
   }
 

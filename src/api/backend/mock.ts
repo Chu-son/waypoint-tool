@@ -1,4 +1,4 @@
-import { OptionsSchema, ProjectData, PluginInstance, ProjectMapLayer } from '../../types/store';
+import { OptionsSchema, PluginInstance, ProjectMapLayer } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class MockBackendAPI implements IBackendAPI {
@@ -19,13 +19,13 @@ export class MockBackendAPI implements IBackendAPI {
     };
   }
 
-  async saveProject(_path: string, _data: ProjectData): Promise<void> {
+  async saveProject(_path: string, _data: any): Promise<void> {
     console.log('[Mock Backend] saveProject called with path:', _path);
   }
 
-  async loadProject(path: string): Promise<ProjectData> {
+  async loadProject(path: string): Promise<any> {
     console.log('[Mock Backend] loadProject called with path:', path);
-    return { root_node_ids: [], nodes: {}, map_layers: [] };
+    return { version: 1, root_node_ids: [], nodes: {}, map_layers: [] };
   }
 
   async loadOptionsSchema(yamlPath: string): Promise<OptionsSchema> {
