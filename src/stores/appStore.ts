@@ -10,6 +10,7 @@ import { HistorySlice, createHistorySlice } from './slices/historySlice';
 import { CustomUISlice, createCustomUISlice } from './slices/customUiSlice';
 import { WorkflowSlice, createWorkflowSlice } from './slices/workflowSlice';
 import { AnnotationSlice, createAnnotationSlice } from './slices/annotationSlice';
+import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 
 export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice;
 
@@ -28,6 +29,8 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'waypoint-tool-storage',
+      version: STORAGE_VERSION,
+      migrate: (persistedState: unknown, version: number) => migrateStorage(persistedState, version),
       partialize: (state) => ({
         defaultMapOpacity: state.defaultMapOpacity,
         lastDirectory: state.lastDirectory,
