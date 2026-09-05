@@ -164,8 +164,30 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   decimalPrecision: 6,
   elementCopyState: null,
 
-  setElementCopyState: (state: ElementCopyState) => set({ elementCopyState: state }),
-  clearElementCopyState: () => set({ elementCopyState: null }),
+  setElementCopyState: (copyState: ElementCopyState) => {
+    set({ elementCopyState: copyState });
+    if (copyState) {
+      get().transitionToMode?.({
+        mode: 'element_paste',
+        field: copyState.field,
+        value: copyState.value,
+        coordSystem: copyState.coordSystem,
+        previewNodeId: copyState.previewNodeId,
+      });
+    } else {
+      const state = get();
+      if (state.appMode?.mode === 'element_paste') {
+        state.transitionToMode?.({ mode: 'select' });
+      }
+    }
+  },
+  clearElementCopyState: () => {
+    const state = get();
+    if (state.appMode?.mode === 'element_paste') {
+      state.transitionToMode?.({ mode: 'select' });
+    }
+    set({ elementCopyState: null });
+  },
 
   leftPanelActiveTab: 'project',
   rightPanelActiveTab: 'layers',
@@ -192,7 +214,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     subtitle: undefined,
     data: null,
   },
-  openPluginDataModal: (title, data, subtitle) =>
+  openPluginDataModal: (title, data, subtitle) => {
+    get().pushModal?.('plugin_data');
     set({
       pluginDataModalState: {
         isOpen: true,
@@ -200,14 +223,17 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         subtitle,
         data,
       },
-    }),
-  closePluginDataModal: () =>
+    });
+  },
+  closePluginDataModal: () => {
+    get().closeModal?.('plugin_data');
     set((state) => ({
       pluginDataModalState: {
         ...state.pluginDataModalState,
         isOpen: false,
       },
-    })),
+    }));
+  },
 
   isMapEditMode: false,
   mapEditSubTool: 'rect',
@@ -217,33 +243,84 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   activeMapLayerId: null,
   selectedEditObjectId: null,
 
-  setMapEditMode: (enabled) => set((state) => ({
-    isMapEditMode: enabled,
-    isAnnotationEditMode: enabled ? false : state.isAnnotationEditMode,
-  })),
+  setMapEditMode: (enabled) => {
+    const state = get();
+    if (enabled) {
+      if (state.transitionToMode) {
+        state.transitionToMode({
+          mode: 'custom_layer_edit',
+          subTool: state.mapEditSubTool,
+          targetLayerId:
+            state.activeCustomLayerId ||
+            state.activeEditLayerId ||
+            state.customLayers?.find((l) => l.type === 'manual')?.id ||
+            '',
+          fillValue: state.mapEditFillValue,
+          brushSize: state.mapEditBrushSize,
+        });
+      } else {
+        set({ isMapEditMode: true });
+      }
+    } else {
+      set({ isMapEditMode: false });
+      if (state.appMode?.mode === 'custom_layer_edit') {
+        state.transitionToMode?.({ mode: 'select' });
+      }
+    }
+  },
   setMapEditSubTool: (tool) => set({ mapEditSubTool: tool }),
   setMapEditFillValue: (value) => set({ mapEditFillValue: value }),
   setMapEditBrushSize: (size) => set({ mapEditBrushSize: size }),
   setActiveEditLayerId: (id) => set({ activeEditLayerId: id }),
   setActiveMapLayerId: (id) => set({ activeMapLayerId: id }),
-  setSelectedEditObjectId: (id) => set({ selectedEditObjectId: id }),
+  setSelectedEditObjectId: (id) => {
+    const state = get();
+    set({ selectedEditObjectId: id });
+    if (id) {
+      const layerId = state.activeCustomLayerId || state.activeEditLayerId || '';
+      state.setSelection?.({
+        type: 'custom_layer',
+        layerId,
+        selectedObjectId: id,
+      });
+    }
+  },
 
   setDirty: (dirty: boolean) => set({ isDirty: dirty }),
   setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),
 
-  setActiveTool: (tool: AppState['activeTool']) => set((state) => {
-    const updates: Partial<AppState> = { activeTool: tool };
-    if (tool === 'add_generator') {
-      updates.rightPanelActiveTab = 'inspector';
-    }
-    if (tool !== 'select' && state.isAnnotationEditMode) {
-      updates.isAnnotationEditMode = false;
-    }
+  setActiveTool: (tool: AppState['activeTool']) => {
+    const state = get();
     if (state.isMapEditMode) {
-      updates.isMapEditMode = false;
+      set({ isMapEditMode: false });
     }
-    return updates;
-  }),
+    if (state.transitionToMode) {
+      if (tool === 'select') {
+        state.transitionToMode({ mode: 'select' });
+      } else if (tool === 'add_point') {
+        state.transitionToMode({
+          mode: 'waypoint_add',
+          snapInput: '',
+          lockedWaypointId: null,
+          forcedAxis: null,
+          forcedSign: null,
+        });
+      } else if (tool === 'add_generator') {
+        state.transitionToMode({
+          mode: 'generator_add',
+          pluginId: state.activePluginId,
+        });
+      } else if (tool === 'add_export_region') {
+        state.transitionToMode({
+          mode: 'export_region_edit',
+        });
+      } else {
+        state.transitionToMode({ mode: 'select' });
+      }
+    } else {
+      set({ activeTool: tool, isMapEditMode: false });
+    }
+  },
 
   toggleAttributeVisibility: (attr: string) => set((state) => {
     const next = state.visibleAttributes.includes(attr) 
@@ -276,14 +353,33 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     isDirty: true
   }),
 
-  setSettingsModalOpen: (open, tab) => set((state) => ({
-    isSettingsModalOpen: open,
-    settingsModalTab: tab || state.settingsModalTab
-  })),
-  setExportModalOpen: (open) => set({ isExportModalOpen: open }),
-  setImportModalOpen: (open) => set({ isImportModalOpen: open }),
-  setExportMapsModalOpen: (open) => set({ isExportMapsModalOpen: open }),
-  setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
-  setWelcomeModalOpen: (open) => set({ isWelcomeModalOpen: open }),
+  setSettingsModalOpen: (open, tab) => {
+    if (open) {
+      get().pushModal?.('settings');
+      if (tab) set({ settingsModalTab: tab });
+    } else {
+      get().closeModal?.('settings');
+    }
+  },
+  setExportModalOpen: (open) => {
+    if (open) get().pushModal?.('export');
+    else get().closeModal?.('export');
+  },
+  setImportModalOpen: (open) => {
+    if (open) get().pushModal?.('import');
+    else get().closeModal?.('import');
+  },
+  setExportMapsModalOpen: (open) => {
+    if (open) get().pushModal?.('export_maps');
+    else get().closeModal?.('export_maps');
+  },
+  setShortcutsModalOpen: (open) => {
+    if (open) get().pushModal?.('shortcuts');
+    else get().closeModal?.('shortcuts');
+  },
+  setWelcomeModalOpen: (open) => {
+    if (open) get().pushModal?.('welcome');
+    else get().closeModal?.('welcome');
+  },
   setIsInitialLaunch: (initial) => set({ isInitialLaunch: initial }),
 });

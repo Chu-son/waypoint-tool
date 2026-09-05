@@ -239,9 +239,6 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
         tool: args?.tool,
       });
     }
-
-    // Switch to select tool so that canvas annotation pointer events are active
-    store.setActiveTool('select');
   },
 
   start_map_edit: (store, args) => {

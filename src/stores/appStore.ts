@@ -10,9 +10,10 @@ import { HistorySlice, createHistorySlice } from './slices/historySlice';
 import { CustomUISlice, createCustomUISlice } from './slices/customUiSlice';
 import { WorkflowSlice, createWorkflowSlice } from './slices/workflowSlice';
 import { AnnotationSlice, createAnnotationSlice } from './slices/annotationSlice';
+import { InteractionSlice, createInteractionSlice } from './slices/interactionSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 
-export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice;
+export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice & InteractionSlice;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -26,6 +27,7 @@ export const useAppStore = create<AppState>()(
       ...createCustomUISlice(set, get, api),
       ...createWorkflowSlice(set, get, api),
       ...createAnnotationSlice(set, get, api),
+      ...createInteractionSlice(set, get, api),
     }),
     {
       name: 'waypoint-tool-storage',
@@ -61,3 +63,11 @@ export const useAppStore = create<AppState>()(
 if (typeof window !== 'undefined') {
   (window as any).useAppStore = useAppStore;
 }
+
+// Backward-compatible facet selectors
+export const selectAppMode = (state: AppState) => state.appMode;
+export const selectActiveSelection = (state: AppState) => state.selection;
+export const selectActiveTool = (state: AppState) => state.activeTool;
+export const selectSelectedNodeIds = (state: AppState) => state.selectedNodeIds;
+export const selectIsMapEditMode = (state: AppState) => state.isMapEditMode;
+export const selectIsAnnotationEditMode = (state: AppState) => state.isAnnotationEditMode;

@@ -71,14 +71,31 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   showAnnotationLabels: true,
 
   setAnnotationEditMode: (enabled: boolean) => {
+    const state = get();
+    const subTool = enabled ? (state.activeAnnotationSubTool === 'select' ? 'point' : state.activeAnnotationSubTool) : 'select';
     set({
       isAnnotationEditMode: enabled,
-      activeAnnotationSubTool: enabled ? (get().activeAnnotationSubTool === 'select' ? 'point' : get().activeAnnotationSubTool) : 'select',
+      activeAnnotationSubTool: subTool,
     });
+    if (enabled) {
+      state.transitionToMode?.({
+        mode: 'annotation_edit',
+        subTool,
+        targetGroupId: state.activeAnnotationGroupId,
+      });
+    } else {
+      if (state.appMode?.mode === 'annotation_edit') {
+        state.transitionToMode?.({ mode: 'select' });
+      }
+    }
   },
 
   setActiveAnnotationSubTool: (tool: AnnotationToolType) => {
     set({ activeAnnotationSubTool: tool });
+    const state = get();
+    if (state.appMode?.mode === 'annotation_edit') {
+      state.updateAppMode?.({ subTool: tool });
+    }
   },
 
   setAllowedAnnotationSubTools: (tools: AnnotationToolType[] | null) => {
@@ -125,6 +142,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         rootAnnotationIds: newRootIds,
         annotationOrder: [...state.annotationOrder, obj.id],
         selectedAnnotationIds: [obj.id],
+        selection: { type: 'annotations', ids: [obj.id] },
+        selectedNodeIds: [],
+        activeCustomLayerId: null,
         isDirty: true,
       };
     });
@@ -154,6 +174,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       },
       rootAnnotationIds: [...state.rootAnnotationIds, group.id],
       selectedAnnotationIds: [group.id],
+      selection: { type: 'annotations', ids: [group.id] },
+      selectedNodeIds: [],
+      activeCustomLayerId: null,
       isDirty: true,
     }));
   },
@@ -274,6 +297,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         annotationGroups: newGroups,
         rootAnnotationIds: newRootIds,
         selectedAnnotationIds: [newGroupId],
+        selection: { type: 'annotations', ids: [newGroupId] },
+        selectedNodeIds: [],
+        activeCustomLayerId: null,
         isDirty: true,
       };
     });
@@ -351,6 +377,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         annotationGroups: newGroups,
         rootAnnotationIds: newRootIds,
         selectedAnnotationIds: childrenIds.length > 0 ? childrenIds : [],
+        selection: childrenIds.length > 0 ? { type: 'annotations', ids: childrenIds } : { type: 'none' },
+        selectedNodeIds: [],
+        activeCustomLayerId: null,
         isDirty: true,
       };
     });
@@ -545,6 +574,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         rootAnnotationIds: newRootIds,
         annotationOrder: newOrder,
         selectedAnnotationIds: newSelected,
+        selection: newSelected.length > 0 ? { type: 'annotations', ids: newSelected } : { type: 'none' },
         isDirty: true,
       };
     });
@@ -603,32 +633,24 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   },
 
   selectAnnotationObjects: (ids: string[], multi = false) => {
-    set((state) => {
-      if (multi) {
-        const setIds = new Set(state.selectedAnnotationIds);
-        ids.forEach((id) => {
-          if (setIds.has(id)) {
-            setIds.delete(id);
-          } else {
-            setIds.add(id);
-          }
-        });
-        return {
-          selectedAnnotationIds: Array.from(setIds),
-          selectedNodeIds: [],
-          activeCustomLayerId: null,
-        };
-      }
-      return {
-        selectedAnnotationIds: ids,
-        selectedNodeIds: [],
-        activeCustomLayerId: null,
-      };
-    });
+    const state = get();
+    const nextIds = multi ? (() => {
+      const setIds = new Set(state.selectedAnnotationIds);
+      ids.forEach((id) => {
+        if (setIds.has(id)) {
+          setIds.delete(id);
+        } else {
+          setIds.add(id);
+        }
+      });
+      return Array.from(setIds);
+    })() : ids;
+
+    state.setSelection(nextIds.length > 0 ? { type: 'annotations', ids: nextIds } : { type: 'none' });
   },
 
   clearAnnotationSelection: () => {
-    set({ selectedAnnotationIds: [] });
+    get().setSelection({ type: 'none' });
   },
 
   toggleAnnotationVisibility: (id: string) => {
@@ -827,6 +849,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         annotationGroups: nextGroups,
         rootAnnotationIds: nextRootIds,
         selectedAnnotationIds: createdTopLevelIds,
+        selection: createdTopLevelIds.length > 0 ? { type: 'annotations', ids: createdTopLevelIds } : { type: 'none' },
+        selectedNodeIds: [],
+        activeCustomLayerId: null,
         isDirty: true,
       };
     });
@@ -860,6 +885,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       rootAnnotationIds: finalRootIds,
       annotationOrder: order,
       selectedAnnotationIds: [],
+      selection: { type: 'none' },
     });
   },
 });

@@ -213,7 +213,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     isDirty: true
   })),
 
-  setProjectData: (rawData: any) =>
+  setProjectData: (rawData: any) => {
+    get().abortCanvasGestures?.();
     set((state) => {
       // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
       state.clearHistory();
@@ -255,6 +256,12 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         rootAnnotationIds: data.root_annotation_ids,
         annotationOrder: data.annotation_objects.map((a) => a.id),
         selectedAnnotationIds: [],
+        selection: { type: 'none' },
+        appMode: { mode: 'select' },
+        modalStack: state.isWelcomeModalOpen ? ['welcome'] : [],
+        activeTool: 'select',
+        isMapEditMode: false,
+        selectedEditObjectId: null,
         isAnnotationEditMode: false,
         exportTemplates: [...globalTemplates, ...localTemplates],
         exportRegions: data.export_regions,
@@ -276,9 +283,11 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         decimalPrecision: data.decimal_precision,
         isDirty: false,
       };
-    }),
+    });
+  },
 
   resetProject: () => {
+    get().abortCanvasGestures?.();
     get().resetWorkflow();
     set((state) => {
       // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
@@ -297,6 +306,12 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         rootAnnotationIds: [],
         annotationOrder: [],
         selectedAnnotationIds: [],
+        selection: { type: 'none' },
+        appMode: { mode: 'select' },
+        modalStack: state.isWelcomeModalOpen ? ['welcome'] : [],
+        activeTool: 'select',
+        isMapEditMode: false,
+        selectedEditObjectId: null,
         isAnnotationEditMode: false,
         activePathCalculatorPluginId: null,
         pathCalculatorParams: {},

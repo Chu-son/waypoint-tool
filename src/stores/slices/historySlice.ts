@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { WaypointNode, CustomLayer, AnnotationObject, InsertionTarget } from '../../types/store';
+import { ActiveSelection } from '../../types/selection';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
 
 const MAX_HISTORY_LENGTH = 100;
@@ -9,6 +10,7 @@ export type HistorySnapshot = {
   nodes: Record<string, WaypointNode>;
   rootNodeIds: string[];
   selectedNodeIds: string[];
+  selection: ActiveSelection;
   anchorNodeId: string | null;
   customLayers: CustomLayer[];
   annotationObjects: Record<string, AnnotationObject>;
@@ -30,10 +32,25 @@ export type HistorySlice = {
   clearHistory: () => void;
 };
 
+const cloneSelection = (sel: ActiveSelection | undefined): ActiveSelection => {
+  if (!sel) return { type: 'none' };
+  switch (sel.type) {
+    case 'none':
+      return { type: 'none' };
+    case 'nodes':
+      return { type: 'nodes', ids: [...sel.ids] };
+    case 'annotations':
+      return { type: 'annotations', ids: [...sel.ids] };
+    case 'custom_layer':
+      return { type: 'custom_layer', layerId: sel.layerId, selectedObjectId: sel.selectedObjectId };
+  }
+};
+
 const captureSnapshot = (state: AppState): HistorySnapshot => ({
   nodes: state.nodes,
   rootNodeIds: state.rootNodeIds,
   selectedNodeIds: state.selectedNodeIds,
+  selection: cloneSelection(state.selection ?? (state.selectedNodeIds?.length ? { type: 'nodes', ids: state.selectedNodeIds } : { type: 'none' })),
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
@@ -81,57 +98,77 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     }
   },
 
-  undo: () => set((state) => {
-    if (state.historyPast.length === 0) return {};
-    const nextPast = [...state.historyPast];
-    const snapshot = nextPast.pop()!;
-    const nextFuture = [...state.historyFuture, captureSnapshot(state)];
+  undo: () => {
+    get().abortCanvasGestures?.();
+    set((state) => {
+      if (state.historyPast.length === 0) return {};
+      const nextPast = [...state.historyPast];
+      const snapshot = nextPast.pop()!;
+      const nextFuture = [...state.historyFuture, captureSnapshot(state)];
+      const restoredTarget = validateAndCorrectInsertionTarget(
+        snapshot.insertionTarget ?? null,
+        snapshot.rootNodeIds,
+        snapshot.nodes
+      );
+      const restoredSelection: ActiveSelection = snapshot.selection ?? (
+        snapshot.selectedNodeIds?.length ? { type: 'nodes', ids: snapshot.selectedNodeIds } : { type: 'none' }
+      );
+
+      return {
+        historyPast: nextPast,
+        historyFuture: nextFuture,
+        nodes: snapshot.nodes,
+        rootNodeIds: snapshot.rootNodeIds,
+        selectedNodeIds: restoredSelection.type === 'nodes' ? restoredSelection.ids : [],
+        selectedAnnotationIds: restoredSelection.type === 'annotations' ? restoredSelection.ids : [],
+        activeCustomLayerId: restoredSelection.type === 'custom_layer' ? restoredSelection.layerId : null,
+        selectedEditObjectId: restoredSelection.type === 'custom_layer' ? restoredSelection.selectedObjectId : null,
+        selection: restoredSelection,
+        anchorNodeId: snapshot.anchorNodeId,
+        customLayers: snapshot.customLayers,
+        annotationObjects: snapshot.annotationObjects ?? {},
+        annotationOrder: snapshot.annotationOrder ?? [],
+        insertionTarget: restoredTarget,
+        isDirty: true,
+      };
+    });
+  },
+
+  redo: () => {
+    get().abortCanvasGestures?.();
+    set((state) => {
+      if (state.historyFuture.length === 0) return {};
+      const nextFuture = [...state.historyFuture];
+      const snapshot = nextFuture.pop()!;
+      const nextPast = [...state.historyPast, captureSnapshot(state)];
     const restoredTarget = validateAndCorrectInsertionTarget(
       snapshot.insertionTarget ?? null,
       snapshot.rootNodeIds,
       snapshot.nodes
     );
-
-    return {
-      historyPast: nextPast,
-      historyFuture: nextFuture,
-      nodes: snapshot.nodes,
-      rootNodeIds: snapshot.rootNodeIds,
-      selectedNodeIds: snapshot.selectedNodeIds,
-      anchorNodeId: snapshot.anchorNodeId,
-      customLayers: snapshot.customLayers,
-      annotationObjects: snapshot.annotationObjects ?? {},
-      annotationOrder: snapshot.annotationOrder ?? [],
-      insertionTarget: restoredTarget,
-      isDirty: true,
-    };
-  }),
-
-  redo: () => set((state) => {
-    if (state.historyFuture.length === 0) return {};
-    const nextFuture = [...state.historyFuture];
-    const snapshot = nextFuture.pop()!;
-    const nextPast = [...state.historyPast, captureSnapshot(state)];
-    const restoredTarget = validateAndCorrectInsertionTarget(
-      snapshot.insertionTarget ?? null,
-      snapshot.rootNodeIds,
-      snapshot.nodes
+    const restoredSelection: ActiveSelection = snapshot.selection ?? (
+      snapshot.selectedNodeIds?.length ? { type: 'nodes', ids: snapshot.selectedNodeIds } : { type: 'none' }
     );
 
-    return {
-      historyPast: nextPast,
-      historyFuture: nextFuture,
-      nodes: snapshot.nodes,
-      rootNodeIds: snapshot.rootNodeIds,
-      selectedNodeIds: snapshot.selectedNodeIds,
-      anchorNodeId: snapshot.anchorNodeId,
-      customLayers: snapshot.customLayers,
-      annotationObjects: snapshot.annotationObjects ?? {},
-      annotationOrder: snapshot.annotationOrder ?? [],
-      insertionTarget: restoredTarget,
-      isDirty: true,
-    };
-  }),
+      return {
+        historyPast: nextPast,
+        historyFuture: nextFuture,
+        nodes: snapshot.nodes,
+        rootNodeIds: snapshot.rootNodeIds,
+        selectedNodeIds: restoredSelection.type === 'nodes' ? restoredSelection.ids : [],
+        selectedAnnotationIds: restoredSelection.type === 'annotations' ? restoredSelection.ids : [],
+        activeCustomLayerId: restoredSelection.type === 'custom_layer' ? restoredSelection.layerId : null,
+        selectedEditObjectId: restoredSelection.type === 'custom_layer' ? restoredSelection.selectedObjectId : null,
+        selection: restoredSelection,
+        anchorNodeId: snapshot.anchorNodeId,
+        customLayers: snapshot.customLayers,
+        annotationObjects: snapshot.annotationObjects ?? {},
+        annotationOrder: snapshot.annotationOrder ?? [],
+        insertionTarget: restoredTarget,
+        isDirty: true,
+      };
+    });
+  },
 
   clearHistory: () => set({ historyPast: [], historyFuture: [], historyTransactionDepth: 0 }),
 });

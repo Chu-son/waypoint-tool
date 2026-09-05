@@ -268,11 +268,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         newNodes
       );
 
+      const nextSelected = expandSelectionWithDescendants([newGroupId], newNodes);
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: expandSelectionWithDescendants([newGroupId], newNodes),
+        selectedNodeIds: nextSelected,
+        selection: { type: 'nodes', ids: nextSelected },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
         isDirty: true,
       };
     });
@@ -324,11 +329,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         newNodes
       );
 
+      const nextSelected = expandSelectionWithDescendants(childIds, newNodes);
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: expandSelectionWithDescendants(childIds, newNodes),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
         isDirty: true,
       };
     });
@@ -512,11 +522,13 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         newNodes
       );
 
+      const nextSelected = state.selectedNodeIds.filter((id) => !idsToRemove.has(id));
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: state.selectedNodeIds.filter((id) => !idsToRemove.has(id)),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
         anchorNodeId: state.anchorNodeId && idsToRemove.has(state.anchorNodeId) ? null : state.anchorNodeId,
         isDirty: true,
       };
@@ -526,7 +538,8 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     }
   },
 
-  selectNodes: (ids: string[], multi = false) => set((state) => {
+  selectNodes: (ids: string[], multi = false) => {
+    const state = get();
     // グループが含まれる場合、その全子孫ノードIDを自動収集して展開（generatorは除外）
     const targetIds = expandSelectionWithDescendants(ids, state.nodes);
 
@@ -541,26 +554,19 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       return Array.from(current);
     })() : targetIds;
 
-    const updates: Partial<AppState> = { selectedNodeIds: nextIds };
-    if (nextIds.length > 0) {
-      updates.rightPanelActiveTab = 'inspector';
-      updates.activeCustomLayerId = null;
-      if (state.isAnnotationEditMode) {
-        updates.isAnnotationEditMode = false;
-      }
+    state.setSelection(nextIds.length > 0 ? { type: 'nodes', ids: nextIds } : { type: 'none' });
+    if (nextIds.length > 0 && state.isAnnotationEditMode) {
+      set({ isAnnotationEditMode: false });
     }
-    if (state.elementCopyState) {
-      const targetId = nextIds.length === 1 ? nextIds[0] : null;
-      updates.elementCopyState = { ...state.elementCopyState, previewNodeId: targetId };
-    }
-    return updates;
-  }),
+  },
 
-  selectAllNodes: () => set((state) => ({
-    selectedNodeIds: Object.keys(state.nodes)
-  })),
+  selectAllNodes: () => {
+    get().setSelection({ type: 'nodes', ids: Object.keys(get().nodes) });
+  },
   
-  deselectAllNodes: () => set({ selectedNodeIds: [] }),
+  deselectAllNodes: () => {
+    get().setSelection({ type: 'none' });
+  },
 
   duplicateNodes: (ids: string[]) => {
     if (!ids || ids.length === 0) return [];
@@ -673,11 +679,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         nextInsertionTarget = null;
       }
 
+      const nextSelected = expandSelectionWithDescendants(createdTopLevelIds, newNodes);
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: validateAndCorrectInsertionTarget(nextInsertionTarget, newRootIds, newNodes),
-        selectedNodeIds: expandSelectionWithDescendants(createdTopLevelIds, newNodes),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
         isDirty: true,
       };
     });

@@ -100,6 +100,9 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     set((state) => ({
       customLayers: [newLayer, ...state.customLayers].map((l, i) => ({ ...l, z_index: i })),
       activeCustomLayerId: newLayer.id,
+      selection: { type: 'custom_layer', layerId: newLayer.id, selectedObjectId: null },
+      selectedNodeIds: [],
+      selectedAnnotationIds: [],
       isDirty: true,
     }));
     return newLayer;
@@ -111,6 +114,9 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     return {
       customLayers: updated,
       activeCustomLayerId: layer.id,
+      selection: { type: 'custom_layer', layerId: layer.id, selectedObjectId: null },
+      selectedNodeIds: [],
+      selectedAnnotationIds: [],
       isDirty: true,
     };
   }),
@@ -123,6 +129,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   removeCustomLayer: (id: string) => set((state) => ({
     customLayers: state.customLayers.filter(l => l.id !== id),
     activeCustomLayerId: state.activeCustomLayerId === id ? null : state.activeCustomLayerId,
+    selection: state.selection.type === 'custom_layer' && state.selection.layerId === id ? { type: 'none' } : state.selection,
     isDirty: true,
   })),
 
@@ -134,7 +141,9 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     return { customLayers: updated, isDirty: true };
   }),
 
-  setActiveCustomLayerId: (id: string | null) => set({ activeCustomLayerId: id }),
+  setActiveCustomLayerId: (id: string | null) => {
+    get().setSelection(id ? { type: 'custom_layer', layerId: id, selectedObjectId: null } : { type: 'none' });
+  },
 
   addEditObject: (layerId: string, obj: EditObject) => set((state) => ({
     customLayers: state.customLayers.map(l => {
