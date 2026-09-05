@@ -17,6 +17,7 @@ export interface CustomUiThemeColors {
   surfaceBase?: string;
   surfacePanel?: string;
   surfaceHover?: string;
+  surfaceActive?: string;
   borderBase?: string;
   borderFocus?: string;
   borderError?: string;
@@ -37,7 +38,7 @@ export interface CustomUiThemeColors {
 }
 
 export interface CustomUiTheme {
-  preset?: 'default' | 'emerald' | 'roomba' | 'ocean' | 'amber' | 'purple' | 'midnight' | 'light' | (string & {});
+  preset?: 'default' | 'dark' | 'emerald' | 'roomba' | 'ocean' | 'amber' | 'purple' | 'midnight' | 'light' | (string & {});
   colors?: CustomUiThemeColors;
   colorScheme?: 'dark' | 'light';
   cssVariables?: Record<string, string>;

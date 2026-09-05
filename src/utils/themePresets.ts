@@ -6,6 +6,7 @@ export interface ThemeColorSet {
   surfaceBase: string;
   surfacePanel: string;
   surfaceHover: string;
+  surfaceActive?: string;
   borderBase: string;
   borderFocus: string;
   borderError: string;
@@ -28,16 +29,17 @@ export interface ThemeColorSet {
 
 export const THEME_PRESETS: Record<string, ThemeColorSet> = {
   default: {
-    primaryBase: '#3b82f6',
-    primaryHover: '#2563eb',
-    surfaceBase: '#0f172a',
-    surfacePanel: '#1e293b',
-    surfaceHover: '#334155',
-    borderBase: '#334155',
-    borderFocus: '#3b82f6',
+    primaryBase: '#5e6ad2',
+    primaryHover: '#6f7be8',
+    surfaceBase: '#090a0c',
+    surfacePanel: '#121316',
+    surfaceHover: 'rgba(255, 255, 255, 0.05)',
+    surfaceActive: 'rgba(255, 255, 255, 0.08)',
+    borderBase: 'rgba(255, 255, 255, 0.08)',
+    borderFocus: '#5e6ad2',
     borderError: '#ef4444',
-    textBase: '#f8fafc',
-    textMuted: '#94a3b8',
+    textBase: '#f7f8f8',
+    textMuted: '#8a8f98',
     textInverse: '#ffffff',
     dangerBase: '#b91c1c',
     dangerHover: '#dc2626',
@@ -178,16 +180,17 @@ export const THEME_PRESETS: Record<string, ThemeColorSet> = {
     colorScheme: 'dark',
   },
   light: {
-    primaryBase: '#2563eb',
-    primaryHover: '#1d4ed8',
-    surfaceBase: '#f8fafc',
+    primaryBase: '#5e6ad2',
+    primaryHover: '#4b55c0',
+    surfaceBase: '#f7f8f9',
     surfacePanel: '#ffffff',
-    surfaceHover: '#f1f5f9',
-    borderBase: '#e2e8f0',
-    borderFocus: '#3b82f6',
+    surfaceHover: '#f0f1f4',
+    surfaceActive: 'rgba(0, 0, 0, 0.07)',
+    borderBase: '#e2e4e8',
+    borderFocus: '#5e6ad2',
     borderError: '#ef4444',
-    textBase: '#0f172a',
-    textMuted: '#64748b',
+    textBase: '#17171a',
+    textMuted: '#686b74',
     textInverse: '#ffffff',
     dangerBase: '#dc2626',
     dangerHover: '#b91c1c',
@@ -206,6 +209,8 @@ export const THEME_PRESETS: Record<string, ThemeColorSet> = {
 
 // "roomba" alias for "emerald"
 THEME_PRESETS.roomba = THEME_PRESETS.emerald;
+// "dark" alias for "default"
+THEME_PRESETS.dark = THEME_PRESETS.default;
 
 /**
  * Resolves a CustomUiTheme configuration into a map of CSS custom properties and color-scheme.
@@ -225,6 +230,10 @@ export function resolveThemeVariables(theme?: CustomUiTheme): {
     surfaceBase: colors.surfaceBase || base.surfaceBase,
     surfacePanel: colors.surfacePanel || base.surfacePanel,
     surfaceHover: colors.surfaceHover || base.surfaceHover,
+    surfaceActive:
+      colors.surfaceActive ||
+      base.surfaceActive ||
+      (base.colorScheme === 'light' ? 'rgba(0, 0, 0, 0.07)' : 'rgba(255, 255, 255, 0.08)'),
     borderBase: colors.borderBase || base.borderBase,
     borderFocus: colors.borderFocus || (colors.primaryBase ? colors.primaryBase : base.borderFocus),
     borderError: colors.borderError || base.borderError,
@@ -249,6 +258,7 @@ export function resolveThemeVariables(theme?: CustomUiTheme): {
     '--color-surface-base': merged.surfaceBase,
     '--color-surface-panel': merged.surfacePanel,
     '--color-surface-hover': merged.surfaceHover,
+    '--color-surface-active': merged.surfaceActive || (merged.colorScheme === 'light' ? 'rgba(0, 0, 0, 0.07)' : 'rgba(255, 255, 255, 0.08)'),
     '--color-border-base': merged.borderBase,
     '--color-border-focus': merged.borderFocus,
     '--color-border-error': merged.borderError,
