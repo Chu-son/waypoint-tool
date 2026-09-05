@@ -296,7 +296,13 @@ export function AnnotationInspector() {
 
   const obj = annotationObjects[selectedId];
   if (!obj) {
-    return null;
+    return (
+      <div className="flex-1 overflow-y-auto w-full p-4">
+        <EmptyState
+          message="アノテーション未選択：リストまたはマップ上でアノテーションを選択するとプロパティが表示されます。"
+        />
+      </div>
+    );
   }
 
   const handleNameChange = (name: string) => {

@@ -54,8 +54,9 @@ export function CustomOptionsGroup({
                     }
                   });
                 } else {
-                  const n = currentState.nodes[node!.id];
-                  handleUpdate(node!.id, {
+                  if (!node) return;
+                  const n = currentState.nodes[node.id];
+                  handleUpdate(node.id, {
                     options: { ...(n.options || {}), [opt.name]: val },
                   });
                 }

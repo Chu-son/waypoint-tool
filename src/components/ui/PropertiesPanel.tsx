@@ -122,13 +122,19 @@ export function PropertiesPanel() {
     return copyNode;
   }, [rawNode, elementCopyState, anchorNode]);
 
+  const flatWaypointIds = useMemo(
+    () => getFlattenedWaypointIds(rootNodeIds, nodes),
+    [rootNodeIds, nodes]
+  );
+  const nodeIndex = node ? flatWaypointIds.indexOf(node.id) : -1;
+
   useEffect(() => {
     if (isMultiSelection || node?.type !== "generator") {
       useAppStore.getState().clearPluginInteractionData();
     }
   }, [node?.id, isMultiSelection]);
 
-  if (selectedNodeIds.length === 0) {
+  if (selectedNodeIds.length === 0 || (!isMultiSelection && !node)) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
         <EmptyState message="No item selected." />
@@ -139,14 +145,6 @@ export function PropertiesPanel() {
   const handleUpdate = (id: string, updates: any) => {
     updateNode(id, updates);
   };
-
-  if (!isMultiSelection && !node) return null;
-
-  const flatWaypointIds = useMemo(
-    () => getFlattenedWaypointIds(rootNodeIds, nodes),
-    [rootNodeIds, nodes]
-  );
-  const nodeIndex = node ? flatWaypointIds.indexOf(node.id) : -1;
 
   const handleContextMenuLabel = (field: ElementCopyField, e: React.MouseEvent) => {
     setCopyMenuState({
