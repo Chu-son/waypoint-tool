@@ -1,11 +1,16 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject, WaypointBaselineItem, GeneratorStash, Transform } from '../../types/store';
+import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject, WaypointBaselineItem, GeneratorStash, Transform, WaypointNode } from '../../types/store';
 import { BackendAPI } from '../../api';
 import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
 import { applyGeneratorStash } from '../../utils/generatorStashUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
+import { findNodeParentId } from '../../utils/treeUtils';
 import { v4 as uuidv4 } from 'uuid';
+
+export type PluginPlacement =
+  | { type: 'replace_ids'; ids: string[] }
+  | { type: 'use_insertion_target' };
 
 export interface ExecutePluginParams {
   plugin: PluginInstance;
@@ -16,6 +21,7 @@ export interface ExecutePluginParams {
   targetCustomLayerId?: string;
   targetAnnotationGroupId?: string;
   idsToConsume?: string[];
+  placement?: PluginPlacement;
   stashToApply?: GeneratorStash;
 }
 
@@ -77,7 +83,19 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   calculatedPathSegments: null,
   isCalculatingPath: false,
 
-  setPlugins: (plugins) => set({ plugins }),
+  setPlugins: (plugins) => {
+    const merged: Record<string, PluginInstance> = { ...plugins };
+    Object.values(plugins).forEach((p) => {
+      if (p.manifest?.legacy_ids) {
+        for (const legacyId of p.manifest.legacy_ids) {
+          if (!merged[legacyId]) {
+            merged[legacyId] = p;
+          }
+        }
+      }
+    });
+    set({ plugins: merged });
+  },
   
   setPluginSettings: (settings) => set({ pluginSettings: Array.isArray(settings) ? settings : [], isDirty: true }),
   
@@ -291,10 +309,30 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         } else {
           // New parent generator node
           parentId = uuidv4();
-          if (idsToConsume.length > 0) {
-            store.removeNodes(idsToConsume);
+          const placement: PluginPlacement = params.placement || (
+            (idsToConsume && idsToConsume.length > 0)
+              ? { type: 'replace_ids', ids: idsToConsume }
+              : { type: 'use_insertion_target' }
+          );
+
+          let targetParentId: string | null | undefined = undefined;
+          let targetIndex: number | undefined = undefined;
+
+          if (placement.type === 'replace_ids' && placement.ids.length > 0) {
+            const firstId = placement.ids[0];
+            const currentNodes = get().nodes;
+            const currentRootIds = get().rootNodeIds;
+            const parentOfFirst = findNodeParentId(firstId, currentRootIds, currentNodes);
+            targetParentId = parentOfFirst;
+            const siblings = parentOfFirst ? (currentNodes[parentOfFirst]?.children_ids || []) : currentRootIds;
+            const idx = siblings.indexOf(firstId);
+            if (idx !== -1) {
+              targetIndex = idx;
+            }
+            store.removeNodes(placement.ids);
           }
-          store.addNode({
+
+          const generatorNode: WaypointNode = {
             id: parentId,
             type: 'generator',
             name: waypointGroupName || plugin.manifest.name,
@@ -304,8 +342,9 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             plugin_data: waypointPluginData || rawResult.plugin_data,
             children_ids: [],
             baseline_waypoints: baselineWaypoints,
-          });
+          };
 
+          store.addNodes([generatorNode], targetParentId, targetIndex);
           resultingParentWaypointId = parentId;
         }
 
@@ -314,8 +353,8 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           ? applyGeneratorStash(waypointItems, stashToApply)
           : waypointItems;
 
-        // Add child waypoint nodes
-        waypointsToInstantiate.forEach((wp) => {
+        // Add child waypoint nodes in a single atomic batch
+        const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => {
           let qx = wp.qx ?? 0,
             qy = wp.qy ?? 0,
             qz = wp.qz ?? 0,
@@ -326,26 +365,26 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             qw = Math.cos(halfYaw);
           }
 
-          const childId = uuidv4();
-          store.addNode(
-            {
-              id: childId,
-              type: 'manual',
-              name: wp.name,
-              transform: wp.transform || {
-                x: wp.x ?? 0,
-                y: wp.y ?? 0,
-                z: wp.z ?? 0,
-                qx,
-                qy,
-                qz,
-                qw,
-              },
-              options: wp.options || {},
+          return {
+            id: uuidv4(),
+            type: 'manual' as const,
+            name: wp.name,
+            transform: wp.transform || {
+              x: wp.x ?? 0,
+              y: wp.y ?? 0,
+              z: wp.z ?? 0,
+              qx,
+              qy,
+              qz,
+              qw,
             },
-            parentId
-          );
+            options: wp.options || {},
+          };
         });
+
+        if (childNodes.length > 0) {
+          store.addNodes(childNodes, parentId);
+        }
       }
 
       // ----------------------------------------------------
@@ -688,6 +727,17 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
       }
       
+      // Alias resolution for legacy_ids
+      Object.values(newMap).forEach((p) => {
+        if (p.manifest?.legacy_ids) {
+          for (const legacyId of p.manifest.legacy_ids) {
+            if (!newMap[legacyId]) {
+              newMap[legacyId] = p;
+            }
+          }
+        }
+      });
+
       set({ plugins: newMap });
       console.log("[AppStore] Plugins reloaded successfully (with custom merging).");
     } catch (err) {

@@ -401,6 +401,41 @@ describe('projectMigration', () => {
     };
 
     const normalized = migrateAndNormalizeProjectData(rawData);
-    expect(normalized.nodes['gen-1'].plugin_id).toBe('my-custom-plugin');
+    expect(normalized.nodes['gen-1'].plugin_id).toBe('my_custom_plugin');
+  });
+
+  it('unconditionally normalizes generator plugin_id and handles CamelCase/acronyms', () => {
+    const rawData = {
+      root_node_ids: ['gen-1', 'gen-2', 'gen-3'],
+      nodes: {
+        'gen-1': {
+          id: 'gen-1',
+          type: 'generator',
+          plugin_id: 'SweepOffsetLinesGenerator',
+        },
+        'gen-2': {
+          id: 'gen-2',
+          type: 'generator',
+          plugin_id: 'SweepGeneratorRS',
+        },
+        'gen-3': {
+          id: 'gen-3',
+          type: 'generator',
+          children_ids: ['child-3'],
+        },
+        'child-3': {
+          id: 'child-3',
+          type: 'manual',
+          options: {
+            generated_by: 'SweepOffsetLinesGenerator',
+          },
+        },
+      },
+    };
+
+    const normalized = migrateAndNormalizeProjectData(rawData);
+    expect(normalized.nodes['gen-1'].plugin_id).toBe('sweep_offset_lines_generator');
+    expect(normalized.nodes['gen-2'].plugin_id).toBe('sweep_generator_rs');
+    expect(normalized.nodes['gen-3'].plugin_id).toBe('sweep_offset_lines_generator');
   });
 });

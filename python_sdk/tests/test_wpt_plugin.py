@@ -338,6 +338,29 @@ class TestPluginGeneratorUnified(unittest.TestCase):
         self.assertIsNone(plugin.get_plugin_data(raw))
         self.assertIsNone(plugin.get_plugin_data(None))
 
+    def test_get_selected_points(self):
+        gen = StubGenerator()
+        
+        # Test with points
+        context = {
+            "selected_points": [
+                {"x": 1.5, "y": 2.5, "qz": 0.0, "qw": 1.0},
+                {"x": 3.0, "y": 4.0, "yaw": 0.5}
+            ]
+        }
+        points = gen.get_selected_points(context)
+        self.assertEqual(len(points), 2)
+        self.assertEqual(points[0].x, 1.5)
+        self.assertEqual(points[0].y, 2.5)
+        self.assertAlmostEqual(points[0].yaw, 0.0, places=4)
+        self.assertEqual(points[1].x, 3.0)
+        self.assertEqual(points[1].y, 4.0)
+
+        # Test empty or missing
+        self.assertEqual(gen.get_selected_points({}), [])
+        self.assertEqual(gen.get_selected_points({"selected_points": None}), [])
+        self.assertEqual(gen.get_selected_points({"selected_points": []}), [])
+
 
 if __name__ == '__main__':
     unittest.main()

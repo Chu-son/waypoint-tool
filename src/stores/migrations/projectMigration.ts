@@ -72,6 +72,48 @@ export function normalizeRobotFootprint(rawFootprint: any): RobotFootprint {
 }
 
 /**
+ * 既知の旧プラグイン識別子・クラス名と正式プラグインIDのマッピング辞書
+ */
+export const LEGACY_PLUGIN_ID_MAP: Record<string, string> = {
+  SweepOffsetLinesGenerator: 'sweep_offset_lines_generator',
+  SweepGenerator: 'sweep_generator',
+  PathInterpolationGenerator: 'path_interpolation_generator',
+  LinePathGenerator: 'line_path_generator',
+  RectSearchGenerator: 'rect_search_generator',
+  RectSearchObstacleGenerator: 'rect_search_obstacle_generator',
+  ZigzagPathGenerator: 'zigzag_path_generator',
+  DijkstraPathCalculator: 'dijkstra_path_calculator',
+  DrivableAreaLayerGenerator: 'drivable_area_layer_generator',
+  DrivableAreaAnnotationGenerator: 'drivable_area_annotation_generator',
+  NoiseFilterLayerGenerator: 'noise_filter_layer_generator',
+};
+
+/**
+ * 頭字語（例: RS, ROS等）に対応した CamelCase/PascalCase -> snake_case 変換関数
+ */
+export function toSnakeCase(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z\d])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toLowerCase();
+}
+
+/**
+ * プラグイン識別子を決定論的に正規化する。
+ * 1. 既知の旧ID辞書（LEGACY_PLUGIN_ID_MAP）
+ * 2. 頭字語対応 snake_case 変換
+ */
+export function normalizePluginId(id: string): string {
+  if (!id) return id;
+  if (LEGACY_PLUGIN_ID_MAP[id]) {
+    return LEGACY_PLUGIN_ID_MAP[id];
+  }
+  return toSnakeCase(id);
+}
+
+/**
  * v1 データの正規化パイプライン。
  * 全27フィールドを厳格に検証・補完し、型安全な StrictProjectData を生成する。
  */
@@ -88,21 +130,21 @@ export function normalizeV1(raw: any): StrictProjectData {
 
   Object.keys(nodes).forEach((id) => {
     const node = nodes[id];
-    if (node && node.type === 'generator' && !node.plugin_id) {
-      let inferredPluginId: string | undefined;
-      if (Array.isArray(node.children_ids)) {
+    if (node && node.type === 'generator') {
+      let pluginId = node.plugin_id;
+      if (!pluginId && Array.isArray(node.children_ids)) {
         for (const childId of node.children_ids) {
           const child = nodes[childId];
           if (child?.options?.generated_by && typeof child.options.generated_by === 'string') {
-            inferredPluginId = child.options.generated_by;
+            pluginId = child.options.generated_by;
             break;
           }
         }
       }
-      if (inferredPluginId) {
+      if (pluginId) {
         nodes[id] = {
           ...node,
-          plugin_id: inferredPluginId,
+          plugin_id: normalizePluginId(pluginId),
         };
       }
     }

@@ -99,6 +99,8 @@ pub struct PluginManifest {
     pub icon: Option<String>,
     #[serde(default)]
     pub properties: Vec<serde_json::Value>,
+    #[serde(default)]
+    pub legacy_ids: Vec<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -224,6 +226,19 @@ mod tests {
         assert_eq!(manifest.inputs[0].multiple, Some(true));
         assert_eq!(manifest.inputs[1].input_type, PluginInputType::CustomLayer);
         assert_eq!(manifest.inputs[1].multiple, Some(false));
+    }
+
+    #[test]
+    fn test_legacy_ids_manifest_deserialize() {
+        let json = r#"{
+            "name": "Sweep Generator",
+            "type": "python",
+            "executable": "main.py",
+            "inputs": [],
+            "legacy_ids": ["SweepOffsetLinesGenerator", "SweepGeneratorRS"]
+        }"#;
+        let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.legacy_ids, vec!["SweepOffsetLinesGenerator", "SweepGeneratorRS"]);
     }
 }
 

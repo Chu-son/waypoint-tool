@@ -156,7 +156,6 @@ export function PluginParamsPanel() {
               const minIdx = Math.min(...waypointIndices);
               const maxIdx = Math.max(...waypointIndices);
               idsToConsume = rootNodeIds.slice(minIdx, maxIdx + 1);
-              useAppStore.getState().setInsertionTarget({ parentId: null, index: minIdx });
             }
           }
 
@@ -164,7 +163,9 @@ export function PluginParamsPanel() {
             plugin,
             properties: params,
             interactionData: pluginInteractionData,
-            idsToConsume,
+            placement: idsToConsume.length > 0
+              ? { type: 'replace_ids', ids: idsToConsume }
+              : { type: 'use_insertion_target' },
           });
 
           if (result.success) {

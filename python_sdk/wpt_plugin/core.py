@@ -139,6 +139,22 @@ class PluginBase:
             return None
         return RobotFootprint.from_dict(data)
 
+    def get_selected_points(self, context: Dict[str, Any]) -> List[Point]:
+        """context["selected_points"] を Point のリストとして返す。
+        needs に "selected_points" を指定していない場合や空の場合は空リストを返す。"""
+        data = context.get("selected_points")
+        if not data or not isinstance(data, list):
+            return []
+        points = []
+        for item in data:
+            if isinstance(item, dict) and "x" in item and "y" in item:
+                points.append(Point(
+                    x=float(item.get("x", 0.0)),
+                    y=float(item.get("y", 0.0)),
+                    yaw=quaternion_to_yaw(item)
+                ))
+        return points
+
     @staticmethod
     def log(message: str):
         print(f"[PLUGIN] {message}", file=sys.stderr)

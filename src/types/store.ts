@@ -189,6 +189,7 @@ export type PluginManifest = {
   needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region' | 'robot_footprint')[];
   properties: OptionDef[];
   icon?: string;
+  legacy_ids?: string[];
 };
 
 export type DefaultExportFormat = {
