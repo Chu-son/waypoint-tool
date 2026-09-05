@@ -35,24 +35,27 @@
   - **概要**: 汎用モーダルダイアログコンテナ（アニメーション背景・ヘッダー・フッター標準化）。
   - **主要Props**: `isOpen`, `onClose`, `title`, `children`, `footer`
 - **`Button`** ([`src/components/ui/common/Button.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Button.tsx))
-  - **概要**: デザインシステムに準拠したボタン要素 (`variant`: primary / secondary / outline / danger / ghost / icon 等)。
-  - **主要Props**: `variant`, `size`, `isLoading`, `disabled`, `onClick`
+  - **概要**: デザインシステムに準拠したボタン要素 (`variant`: primary / secondary / outline / danger / ghost 等)。デスクトップ高密度（32px: `default`、28px: `sm`、24px: `xs`）および `rounded-md` 準拠。
+  - **主要Props**: `variant`, `size` (`default` | `sm` | `xs` | `icon` | `icon-sm`), `isLoading`, `disabled`, `onClick`
+- **`Kbd`** ([`src/components/ui/common/Kbd.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Kbd.tsx))
+  - **概要**: キーボードショートカットやキーバインドを美しく統一表示するキーキャップバッジ。
+  - **主要Props**: `children`, `className`
 - **`DynamicIcon`** ([`src/components/common/DynamicIcon.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/common/DynamicIcon.tsx))
   - **概要**: Lucide React のアイコン名文字列（例: `"FolderOpen"`, `"MapPin"`, `"Play"` 等）から安全に動的アイコンを描画する共通ヘルパーコンポーネント。
   - **主要Props**: `name`, `size`, `className`, `fallback`
 - **`Input`** / **`Select`** / **`Slider`** / **`Checkbox`** / **`Label`** ([`src/components/ui/common/`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/))
-  - **概要**: 統一されたダークテーマ適用済みの各種標準フォームコンポーネント。
+  - **概要**: 統一されたダークテーマ適用済みの各種標準フォームコンポーネント。デスクトップ高密度（`h-8`, `text-[13px]`, `rounded-md`）準拠。
 - **`EmptyState`** ([`src/components/ui/common/EmptyState.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/EmptyState.tsx))
-  - **概要**: リストなどが空の場合のプレースホルダー表示用コンポーネント。
+  - **概要**: リストなどが空の場合のプレースホルダー表示用コンポーネント。Linear Style準拠（過度なアニメーションや丸みを排した `rounded-lg border` 構造）。
   - **主要Props**: `message`
 - **`FormField`** ([`src/components/ui/common/FormField.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/FormField.tsx))
   - **概要**: ラベル、説明文、コントロール要素を一式にまとめたレイアウト部品。
   - **主要Props**: `label`, `description`, `children`
 - **`OptionCard`** ([`src/components/ui/common/OptionCard.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/OptionCard.tsx))
-  - **概要**: 設定モーダルなどで利用されるチェックボックス付き大型カード。
+  - **概要**: 設定モーダルなどで利用されるチェックボックス付き大型カード（`rounded-lg`）。
   - **主要Props**: `checked`, `onChange`, `title`, `description`, `children`
 - **`BrowseInput`** ([`src/components/ui/common/BrowseInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/BrowseInput.tsx))
-  - **概要**: ファイルやフォルダのパス入力欄と Browse ボタンを一体化した共通コンポーネント。
+  - **概要**: ファイルやフォルダのパス入力欄と Browse ボタンを一体化した共通コンポーネント（デスクトップ高密度 `h-8` / `h-7`）。
   - **主要Props**: `value`, `onChange`, `placeholder`, `dialogOptions`, `size`
 - **`AlertBox`** ([`src/components/ui/common/AlertBox.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/AlertBox.tsx))
   - **概要**: パネルやモーダルで警告やエラーメッセージを表示するためのバナー部品。
