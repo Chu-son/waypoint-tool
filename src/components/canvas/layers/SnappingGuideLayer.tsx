@@ -1,4 +1,5 @@
 import { TextStyle } from 'pixi.js';
+import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_COLOR_HEX } from '../canvasConstants';
 
 interface SnappingGuideLayerProps {
   scale: number;
@@ -32,7 +33,7 @@ export function SnappingGuideLayer({ scale, snapState, snapInput }: SnappingGuid
       <pixiGraphics
         draw={(g) => {
           g.clear();
-          g.strokeStyle = { width: 1.5 / Math.max(scale, 0.001), color: 0x3b82f6, alpha: 0.8 };
+          g.strokeStyle = { width: 1.5 / Math.max(scale, 0.001), color: CANVAS_ACCENT_COLOR, alpha: 0.8 };
           const { x: sx, y: sy } = snapState.origin!;
           
           const dx = ex - sx;
@@ -71,7 +72,7 @@ export function SnappingGuideLayer({ scale, snapState, snapInput }: SnappingGuid
             text={`Dist: ${snapInput}`} 
             style={
               new TextStyle({
-                fill: '#3b82f6',
+                fill: CANVAS_ACCENT_COLOR_HEX,
                 fontSize: 16,
                 fontFamily: 'Arial',
                 fontWeight: 'bold',

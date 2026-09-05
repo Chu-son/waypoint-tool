@@ -10,6 +10,7 @@ import {
   CircleAnnotation,
 } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
+import { CANVAS_ACCENT_COLOR } from '../canvasConstants';
 
 interface AnnotationLayerProps {
   scale: number;
@@ -19,7 +20,7 @@ interface AnnotationLayerProps {
   onAnnotationHandlePointerDown?: (e: FederatedPointerEvent, id: string, handleType: string) => void;
 }
 
-export function parseHexColor(colorStr?: string, fallback = 0x3b82f6): number {
+export function parseHexColor(colorStr?: string, fallback = CANVAS_ACCENT_COLOR): number {
   if (!colorStr) return fallback;
   const cleaned = colorStr.replace('#', '');
   const parsed = parseInt(cleaned, 16);
@@ -69,7 +70,7 @@ export function AnnotationLayer({
     }
 
     const isSelected = !isPreview && selectedAnnotationIds.includes(obj.id);
-    const baseColorHex = parseHexColor(obj.color, 0x3b82f6);
+    const baseColorHex = parseHexColor(obj.color, CANVAS_ACCENT_COLOR);
     const strokeWidth = (isSelected ? 3.0 : 2.0) / safeScale;
     const isInteractive = !isPreview;
     const cursor = isPlacing ? 'crosshair' : isInteractive ? 'pointer' : 'default';
@@ -109,7 +110,7 @@ export function AnnotationLayer({
                 y={0}
                 scale={scale}
                 type="circle"
-                colorHex={0x3b82f6}
+                colorHex={CANVAS_ACCENT_COLOR}
                 cursor="move"
                 onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, point.id, 'center')}
               />
@@ -166,7 +167,7 @@ export function AnnotationLayer({
                   y={0}
                   scale={scale}
                   type="circle"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="grab"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, op.id, 'yaw')}
                 />
@@ -233,7 +234,7 @@ export function AnnotationLayer({
                   y={line.y1}
                   scale={scale}
                   type="square"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="crosshair"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, line.id, 'start')}
                 />
@@ -242,7 +243,7 @@ export function AnnotationLayer({
                   y={line.y2}
                   scale={scale}
                   type="square"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="crosshair"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, line.id, 'end')}
                 />
@@ -251,7 +252,7 @@ export function AnnotationLayer({
                   y={midY}
                   scale={scale}
                   type="circle"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="move"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, line.id, 'midpoint')}
                 />
@@ -319,7 +320,7 @@ export function AnnotationLayer({
                       y={c.y}
                       scale={scale}
                       type="square"
-                      colorHex={0x3b82f6}
+                      colorHex={CANVAS_ACCENT_COLOR}
                       cursor="pointer"
                       onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, rect.id, `corner_${c.name}`)}
                     />
@@ -329,7 +330,7 @@ export function AnnotationLayer({
                     y={0}
                     scale={scale}
                     type="circle"
-                    colorHex={0x3b82f6}
+                    colorHex={CANVAS_ACCENT_COLOR}
                     cursor="grab"
                     onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, rect.id, 'rotate')}
                   />
@@ -338,7 +339,7 @@ export function AnnotationLayer({
                     y={0}
                     scale={scale}
                     type="circle"
-                    colorHex={0x3b82f6}
+                    colorHex={CANVAS_ACCENT_COLOR}
                     cursor="move"
                     onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, rect.id, 'center')}
                   />
@@ -404,7 +405,7 @@ export function AnnotationLayer({
                     y={rh.y}
                     scale={scale}
                     type="circle"
-                    colorHex={0x3b82f6}
+                    colorHex={CANVAS_ACCENT_COLOR}
                     cursor="ew-resize"
                     onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, circle.id, `radius_${rh.name}`)}
                   />
@@ -414,7 +415,7 @@ export function AnnotationLayer({
                   y={0}
                   scale={scale}
                   type="circle"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="move"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, circle.id, 'center')}
                 />

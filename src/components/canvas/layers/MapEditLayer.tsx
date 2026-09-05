@@ -2,6 +2,7 @@ import { FederatedPointerEvent } from 'pixi.js';
 import { ManualCustomLayer, EditObject } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
 import { computePointsBoundingBox } from '../../../utils/geometry';
+import { CANVAS_ACCENT_COLOR, CANVAS_PREVIEW_COLOR } from '../canvasConstants';
 
 interface SingleLayerProps {
   scale: number;
@@ -34,7 +35,7 @@ function renderSingleEditObject(
   const isSelected = !isEffectiveExportPreview && !isPreview && selectedEditObjectId === obj.id;
   const fillVal = Math.min(255, Math.max(0, Math.round(obj.fillValue)));
   const colorHex = (fillVal << 16) | (fillVal << 8) | fillVal;
-  const strokeColor = isSelected ? 0x3b82f6 : isPreview ? 0x94a3b8 : colorHex;
+  const strokeColor = isSelected ? CANVAS_ACCENT_COLOR : isPreview ? CANVAS_PREVIEW_COLOR : colorHex;
 
   if (obj.type === 'rect') {
     const handleOffset = obj.width / 2 + 20 / safeScale;
@@ -83,7 +84,7 @@ function renderSingleEditObject(
               y={c.y}
               scale={scale}
               type="square"
-              colorHex={0x3b82f6}
+              colorHex={CANVAS_ACCENT_COLOR}
               cursor="pointer"
               onPointerDown={(e: FederatedPointerEvent) =>
                 onObjectResizeHandlePointerDown?.(e, layerId, obj.id, c.name)
@@ -98,7 +99,7 @@ function renderSingleEditObject(
             y={0}
             scale={scale}
             type="circle"
-            colorHex={0x3b82f6}
+            colorHex={CANVAS_ACCENT_COLOR}
             cursor="grab"
             onPointerDown={(e: FederatedPointerEvent) => onObjectHandlePointerDown?.(e, layerId, obj.id)}
           />
@@ -148,7 +149,7 @@ function renderSingleEditObject(
               y={qh.y}
               scale={scale}
               type="circle"
-              colorHex={0x3b82f6}
+              colorHex={CANVAS_ACCENT_COLOR}
               cursor="pointer"
               onPointerDown={(e: FederatedPointerEvent) =>
                 onObjectResizeHandlePointerDown?.(e, layerId, obj.id, qh.name)
@@ -200,7 +201,7 @@ function renderSingleEditObject(
             }
 
             if (isSelected) {
-              g.strokeStyle = { width: 1 / safeScale, color: 0x3b82f6, alpha: 0.8 };
+              g.strokeStyle = { width: 1 / safeScale, color: CANVAS_ACCENT_COLOR, alpha: 0.8 };
               g.rect(bbox.minX, bbox.minY, bbox.width, bbox.height);
               g.stroke();
             }
@@ -214,7 +215,7 @@ function renderSingleEditObject(
               y={fc.y}
               scale={scale}
               type="square"
-              colorHex={0x3b82f6}
+              colorHex={CANVAS_ACCENT_COLOR}
               cursor="pointer"
               onPointerDown={(e: FederatedPointerEvent) =>
                 onObjectResizeHandlePointerDown?.(e, layerId, obj.id, fc.name)
@@ -244,7 +245,7 @@ function renderSingleEditObject(
 
             // Selection glow outline
             if (isSelected) {
-              g.strokeStyle = { width: lineStrokeWidth + 4 / safeScale, color: 0x3b82f6, alpha: 0.6 };
+              g.strokeStyle = { width: lineStrokeWidth + 4 / safeScale, color: CANVAS_ACCENT_COLOR, alpha: 0.6 };
               g.moveTo(obj.x1, obj.y1);
               g.lineTo(obj.x2, obj.y2);
               g.stroke();
@@ -268,7 +269,7 @@ function renderSingleEditObject(
               g.circle(obj.x2, obj.y2, 3 / safeScale);
               g.fill();
             } else if (isSelected) {
-              g.strokeStyle = { width: lineStrokeWidth, color: 0x3b82f6, alpha: 1.0 };
+              g.strokeStyle = { width: lineStrokeWidth, color: CANVAS_ACCENT_COLOR, alpha: 1.0 };
               g.moveTo(obj.x1, obj.y1);
               g.lineTo(obj.x2, obj.y2);
               g.stroke();
@@ -284,7 +285,7 @@ function renderSingleEditObject(
               y={obj.y1}
               scale={scale}
               type="square"
-              colorHex={0x3b82f6}
+              colorHex={CANVAS_ACCENT_COLOR}
               cursor="crosshair"
               onPointerDown={(e: FederatedPointerEvent) =>
                 onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'start')
@@ -295,7 +296,7 @@ function renderSingleEditObject(
               y={obj.y2}
               scale={scale}
               type="square"
-              colorHex={0x3b82f6}
+              colorHex={CANVAS_ACCENT_COLOR}
               cursor="crosshair"
               onPointerDown={(e: FederatedPointerEvent) =>
                 onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'end')
@@ -306,7 +307,7 @@ function renderSingleEditObject(
               y={midY}
               scale={scale}
               type="circle"
-              colorHex={0x3b82f6}
+              colorHex={CANVAS_ACCENT_COLOR}
               cursor="move"
               onPointerDown={(e: FederatedPointerEvent) =>
                 onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'midpoint')
@@ -398,8 +399,8 @@ export function MapEditToolOverlay({
           eventMode="none"
           draw={(g) => {
             g.clear();
-            g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6, alpha: 0.8 };
-            g.fillStyle = { color: 0x3b82f6, alpha: 0.15 };
+            g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ACCENT_COLOR, alpha: 0.8 };
+            g.fillStyle = { color: CANVAS_ACCENT_COLOR, alpha: 0.15 };
             g.circle(0, 0, brushPreviewRadius);
             g.fill();
             g.stroke();

@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../../../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
+import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_HOVER_COLOR } from '../canvasConstants';
 
 interface WaypointLayerProps {
   scale: number;
@@ -118,7 +119,7 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
           : parentIsGenerator
           ? 0x22c55e
           : 0xffa500;
-        const selectedColor = 0x3b82f6;
+        const selectedColor = CANVAS_ACCENT_COLOR;
         const normalFill = isLocked
           ? 0x34d399
           : isReferenced
@@ -128,7 +129,7 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
           : parentIsGenerator
           ? 0x4ade80
           : 0xffd700;
-        const selectedFill = 0x60a5fa;
+        const selectedFill = CANVAS_ACCENT_HOVER_COLOR;
 
         const labelLayout = labelLayoutMap.get(node.id);
         const labelOffsetX = labelLayout ? labelLayout.x : 15 / safeScale;
@@ -176,7 +177,7 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
                   g.circle(0, 0, 15 / safeScale);
                   g.fill();
 
-                  g.strokeStyle = { width: 1.5 / safeScale, color: 0x3b82f6 };
+                  g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ACCENT_COLOR };
                   g.fillStyle = { color: 0xffffff, alpha: 0.9 };
                   g.circle(0, 0, 4 / safeScale);
                   g.fill();

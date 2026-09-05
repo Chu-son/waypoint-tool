@@ -1,4 +1,5 @@
 import { FederatedPointerEvent } from 'pixi.js';
+import { CANVAS_ACCENT_COLOR } from '../canvasConstants';
 
 interface CanvasHandleProps {
   x: number;
@@ -15,7 +16,7 @@ export function CanvasHandle({
   y,
   scale,
   type = 'square',
-  colorHex = 0x3b82f6,
+  colorHex = CANVAS_ACCENT_COLOR,
   cursor = 'pointer',
   onPointerDown,
 }: CanvasHandleProps) {

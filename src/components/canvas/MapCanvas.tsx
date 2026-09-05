@@ -27,6 +27,7 @@ import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
 import { getPrecedingManualWaypoint } from '../../utils/treeUtils';
 
 import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
+import { CANVAS_ACCENT_COLOR, CANVAS_SURFACE_BASE, CANVAS_SURFACE_BASE_HEX } from './canvasConstants';
 
 extend({
   Container,
@@ -42,14 +43,18 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
   const occupancyHighlightAlpha = useAppStore((state) => state.occupancyHighlightAlpha);
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+  const themeMode = useAppStore((state) => state.themeMode);
 
   const occThresh = layer.info?.occupied_thresh ?? 0.65;
   const freeThresh = layer.info?.free_thresh ?? 0.25;
   const negate = layer.info?.negate ?? 0;
 
   const resolvedTheme = useMemo(() => {
-    return resolveThemeVariables(isCustomUiMode && customUiConfig ? customUiConfig.theme : undefined);
-  }, [isCustomUiMode, customUiConfig]);
+    if (isCustomUiMode && customUiConfig?.theme) {
+      return resolveThemeVariables(customUiConfig.theme);
+    }
+    return resolveThemeVariables({ preset: themeMode || 'default' });
+  }, [isCustomUiMode, customUiConfig, themeMode]);
 
   const freeColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-free'], [0.0627, 0.7255, 0.5059]), [resolvedTheme]);
   const obstacleColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-obstacle'], [0.9373, 0.2667, 0.2667]), [resolvedTheme]);
@@ -247,14 +252,18 @@ export function MapCanvas() {
 
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+  const themeMode = useAppStore((state) => state.themeMode);
 
   const resolvedTheme = useMemo(() => {
-    return resolveThemeVariables(isCustomUiMode && customUiConfig ? customUiConfig.theme : undefined);
-  }, [isCustomUiMode, customUiConfig]);
+    if (isCustomUiMode && customUiConfig?.theme) {
+      return resolveThemeVariables(customUiConfig.theme);
+    }
+    return resolveThemeVariables({ preset: themeMode || 'default' });
+  }, [isCustomUiMode, customUiConfig, themeMode]);
 
   const canvasBackgroundColor = useMemo(() => {
-    const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || '#0f172a';
-    return hexStringToNumber(surfaceBaseHex, 0x0f172a);
+    const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || CANVAS_SURFACE_BASE_HEX;
+    return hexStringToNumber(surfaceBaseHex, CANVAS_SURFACE_BASE);
   }, [resolvedTheme]);
 
   // blend_mode, z_index, visible, image_base64, customLayers, occupancySettings の変更キーを生成
@@ -388,8 +397,8 @@ export function MapCanvas() {
     const w = maxX - minX;
     const h = maxY - minY;
 
-    g.fillStyle = { color: 0x3b82f6, alpha: 0.15 };
-    g.strokeStyle = { width: 1.5 / scale, color: 0x3b82f6, alpha: 0.8 };
+    g.fillStyle = { color: CANVAS_ACCENT_COLOR, alpha: 0.15 };
+    g.strokeStyle = { width: 1.5 / scale, color: CANVAS_ACCENT_COLOR, alpha: 0.8 };
     g.rect(minX, minY, w, h);
     g.fill();
     g.stroke();
