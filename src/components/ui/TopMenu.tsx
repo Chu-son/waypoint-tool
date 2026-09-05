@@ -6,6 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { MousePointer2, Minus, Square, X } from "lucide-react";
 import { cn } from "../../utils/cn";
+import { confirmDiscardChanges } from "../../utils/projectGuard";
 
 import * as LucideIcons from "lucide-react";
 
@@ -207,17 +208,6 @@ export function TopMenu() {
     if (activeMenu && activeMenu !== menuName) {
       setActiveMenu(menuName);
     }
-  };
-
-  const confirmDiscardChanges = async (): Promise<boolean> => {
-    if (!useAppStore.getState().isDirty) return true;
-    return await DialogAPI.ask(
-      "未保存の変更があります。破棄して続行しますか？",
-      {
-        title: "未保存の変更の確認",
-        kind: "warning",
-      }
-    );
   };
 
   const handleNewProject = async () => {

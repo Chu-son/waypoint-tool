@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
+import { confirmDiscardChanges } from "../../utils/projectGuard";
 
 export function ShortcutManager() {
   const {
@@ -7,6 +8,7 @@ export function ShortcutManager() {
     activeTool,
     removeNodes,
     selectAllNodes,
+    selectNodes,
     setExportModalOpen,
     loadProject,
     saveProject,
@@ -17,12 +19,20 @@ export function ShortcutManager() {
     redo,
     selectedEditObjectId,
     activeCustomLayerId,
+    setActiveCustomLayerId,
     removeEditObject,
     setSelectedEditObjectId,
     pushHistorySnapshot,
     selectedAnnotationIds = [],
     removeAnnotationObjects,
     clearAnnotationSelection,
+    setAnnotationEditMode,
+    setActiveTool,
+    setActivePlugin,
+    clearPluginInteractionData,
+    setMapEditMode,
+    showOccupancyHighlight,
+    setShowOccupancyHighlight,
   } = useAppStore();
 
   useEffect(() => {
@@ -53,21 +63,19 @@ export function ShortcutManager() {
           setSelectedEditObjectId(null);
         }
         if (selectedNodeIds.length > 0) {
-          useAppStore.setState?.({ selectedNodeIds: [] });
+          selectNodes?.([]);
         }
         if (activeCustomLayerId) {
-          useAppStore.setState?.({ activeCustomLayerId: null });
+          setActiveCustomLayerId?.(null);
         }
         if (selectedAnnotationIds.length > 0) {
           clearAnnotationSelection?.();
         }
-        useAppStore.setState?.({
-          isMapEditMode: false,
-          isAnnotationEditMode: false,
-          activeTool: "select",
-          activePluginId: null,
-          pluginInteractionData: {},
-        });
+        setAnnotationEditMode?.(false);
+        setMapEditMode?.(false);
+        setActiveTool?.("select");
+        setActivePlugin?.(null);
+        clearPluginInteractionData?.();
         
         // Return to Layers panel on Escape
         setRightPanelActiveTab("layers");
@@ -75,10 +83,10 @@ export function ShortcutManager() {
 
       // Tool Selection
       if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey) {
-        useAppStore.setState({ activeTool: "select" });
+        setActiveTool("select");
       }
       if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey) {
-        useAppStore.setState({ activeTool: "add_point" });
+        setActiveTool("add_point");
       }
 
       // Modifier-based Shortcuts
@@ -102,11 +110,21 @@ export function ShortcutManager() {
             break;
           case "o":
             e.preventDefault();
-            loadProject();
+            void (async () => {
+              const ok = await confirmDiscardChanges();
+              if (ok) {
+                await loadProject();
+              }
+            })();
             break;
           case "n":
             e.preventDefault();
-            resetProject();
+            void (async () => {
+              const ok = await confirmDiscardChanges();
+              if (ok) {
+                resetProject();
+              }
+            })();
             break;
           case "z":
             e.preventDefault();
@@ -118,7 +136,7 @@ export function ShortcutManager() {
             break;
           case "h":
             e.preventDefault();
-            useAppStore.setState((s) => ({ showOccupancyHighlight: !s.showOccupancyHighlight }));
+            setShowOccupancyHighlight(!showOccupancyHighlight);
             break;
         }
       }
@@ -131,6 +149,7 @@ export function ShortcutManager() {
     activeTool,
     removeNodes,
     selectAllNodes,
+    selectNodes,
     setExportModalOpen,
     loadProject,
     saveProject,
@@ -139,6 +158,22 @@ export function ShortcutManager() {
     setRightPanelActiveTab,
     undo,
     redo,
+    selectedEditObjectId,
+    activeCustomLayerId,
+    setActiveCustomLayerId,
+    removeEditObject,
+    setSelectedEditObjectId,
+    pushHistorySnapshot,
+    selectedAnnotationIds,
+    removeAnnotationObjects,
+    clearAnnotationSelection,
+    setAnnotationEditMode,
+    setActiveTool,
+    setActivePlugin,
+    clearPluginInteractionData,
+    setMapEditMode,
+    showOccupancyHighlight,
+    setShowOccupancyHighlight,
   ]);
 
   return null;

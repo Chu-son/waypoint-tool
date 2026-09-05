@@ -239,6 +239,9 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     if (tool !== 'select' && state.isAnnotationEditMode) {
       updates.isAnnotationEditMode = false;
     }
+    if (state.isMapEditMode) {
+      updates.isMapEditMode = false;
+    }
     return updates;
   }),
 

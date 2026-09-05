@@ -3,10 +3,10 @@ import { Modal, ModalHeader, ModalContent } from "./common/Modal";
 import { Button } from "./common/Button";
 import { EmptyState } from "./common/EmptyState";
 import { useAppStore } from "../../stores/appStore";
-import { DialogAPI } from "../../api";
 import { MousePointer2, Plus, FolderOpen, Clock, FileText } from "lucide-react";
 import { getVersion } from "@tauri-apps/api/app";
 import { cn } from "../../utils/cn";
+import { confirmDiscardChanges } from "../../utils/projectGuard";
 
 export interface WelcomeModalProps {
   isOpen: boolean;
@@ -21,7 +21,6 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const resetProject = useAppStore((state) => state.resetProject);
   const loadProject = useAppStore((state) => state.loadProject);
   const loadProjectFromPath = useAppStore((state) => state.loadProjectFromPath);
-  const isDirty = useAppStore((state) => state.isDirty);
 
   const [version, setVersion] = useState<string>("");
 
@@ -30,17 +29,6 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
       .then((v) => setVersion(v))
       .catch(() => setVersion(""));
   }, []);
-
-  const confirmDiscardChanges = async (): Promise<boolean> => {
-    if (!isDirty) return true;
-    return await DialogAPI.ask(
-      "未保存の変更があります。破棄して続行しますか？",
-      {
-        title: "未保存の変更の確認",
-        kind: "warning",
-      }
-    );
-  };
 
   const handleClose = () => {
     if (isInitialLaunch) return;
