@@ -31,6 +31,7 @@ const shortcuts = [
   { action: "Fit Map to Screen", keys: ["Middle Double Click"] },
   { action: "Select Node", keys: ["Left Click"] },
   { action: "Select Multiple", keys: ["Shift", "+", "Left Click"] },
+  { action: "Box / Marquee Selection", keys: ["Shift", "+", "Left Mouse Drag"] },
   { action: "Set / Clear Anchor", keys: ["Right Click Node"] },
   { action: "Copy Transform Element", keys: ["Right Click Label"] },
 ];

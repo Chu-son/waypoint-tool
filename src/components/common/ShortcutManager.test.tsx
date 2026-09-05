@@ -150,7 +150,18 @@ describe('ShortcutManager', () => {
     expect(mockSetExportModalOpen).toHaveBeenCalledWith(true);
   });
 
-  it('resets selection and tool on Escape', () => {
+  it('triggers handleGlobalEscape on Escape key', () => {
+    const mockHandleGlobalEscape = vi.fn().mockReturnValue(true);
+    (useAppStore as any).mockReturnValue({
+      handleGlobalEscape: mockHandleGlobalEscape,
+    });
+    render(<ShortcutManager />);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(mockHandleGlobalEscape).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets selection and tool on Escape when handleGlobalEscape is absent (fallback)', () => {
     (useAppStore as any).mockReturnValue({
       selectedNodeIds: ['node-1'],
       activeTool: 'add',

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, ReactElement } from 'react';
 import { PanelTab } from './PanelContainer';
 import { CustomUiPanelTabDef } from '../../types/customUi';
 import { ObjectsPanel } from './ObjectsPanel';
@@ -14,6 +14,9 @@ import { Box, Puzzle, Layers, Settings2, ListOrdered, Globe, Code } from 'lucide
 import * as LucideIcons from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
+import { AppModeState } from '../../types/mode';
+import { ActiveSelection } from '../../types/selection';
+
 function resolveLucideIcon(name: string | undefined, defaultIcon: ReactNode): ReactNode {
   if (!name) return defaultIcon;
   const IconComponent = (LucideIcons as any)[name];
@@ -23,7 +26,43 @@ function resolveLucideIcon(name: string | undefined, defaultIcon: ReactNode): Re
   return defaultIcon;
 }
 
+export function resolveInspectorComponent(
+  appMode?: AppModeState,
+  selection?: ActiveSelection,
+  activePlugin?: any
+): ReactElement {
+  // 1. Primary mode specific inspector requirements (matching docs/STATE_MACHINE.md §4.2)
+  if (appMode?.mode === 'generator_add' || appMode?.mode === 'plugin_interaction') {
+    if (activePlugin?.manifest?.category === 'map_layer_generator') {
+      return <CustomLayerInspector />;
+    }
+    return <PluginParamsPanel />;
+  }
+
+  if (appMode?.mode === 'custom_layer_edit') {
+    return <CustomLayerInspector />;
+  }
+
+  if (appMode?.mode === 'annotation_edit') {
+    return <AnnotationInspector />;
+  }
+
+  // 2. Selection-based inspector resolution
+  if (selection?.type === 'custom_layer') {
+    return <CustomLayerInspector />;
+  }
+
+  if (selection?.type === 'annotations') {
+    return <AnnotationInspector />;
+  }
+
+  // 3. Default to properties panel (selected waypoint nodes or project settings)
+  return <PropertiesPanel />;
+}
+
 export function useInspectorPanelComponent() {
+  const appMode = useAppStore((state) => state.appMode);
+  const selection = useAppStore((state) => state.selection);
   const activeTool = useAppStore((state) => state.activeTool);
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const activePluginId = useAppStore((state) => state.activePluginId);
@@ -31,26 +70,25 @@ export function useInspectorPanelComponent() {
   const plugins = useAppStore((state) => state.plugins) || {};
   const activePlugin = activePluginId ? plugins[activePluginId] : null;
 
-  // 1. If actively in generator mode, render the inspector matching the selected plugin
-  if (activeTool === 'add_generator') {
-    if (activePlugin?.manifest?.category === 'map_layer_generator') {
-      return <CustomLayerInspector />;
+  const effectiveMode: AppModeState =
+    activeTool === 'add_generator' && appMode?.mode !== 'generator_add'
+      ? { mode: 'generator_add', pluginId: activePluginId || '' }
+      : appMode || { mode: 'select' };
+
+  let effectiveSelection: ActiveSelection = selection || { type: 'none' };
+  if (effectiveSelection.type === 'none') {
+    if (activeCustomLayerId) {
+      effectiveSelection = {
+        type: 'custom_layer',
+        layerId: activeCustomLayerId,
+        selectedObjectId: null,
+      };
+    } else if (selectedAnnotationIds.length > 0) {
+      effectiveSelection = { type: 'annotations', ids: selectedAnnotationIds };
     }
-    return <PluginParamsPanel />;
   }
 
-  // 2. If a custom layer is selected (manual vector edit, layer opacity, settings)
-  if (activeCustomLayerId) {
-    return <CustomLayerInspector />;
-  }
-
-  // 3. If an annotation object is selected
-  if (selectedAnnotationIds.length > 0) {
-    return <AnnotationInspector />;
-  }
-
-  // 4. Default to properties panel (selected waypoint nodes or project settings)
-  return <PropertiesPanel />;
+  return resolveInspectorComponent(effectiveMode, effectiveSelection, activePlugin);
 }
 
 export function resolvePanelTabs(

@@ -33,14 +33,17 @@ export function ShortcutManager() {
     setMapEditMode,
     showOccupancyHighlight,
     setShowOccupancyHighlight,
+    handleGlobalEscape,
   } = useAppStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore shortcuts when user is typing in input fields
+      // Ignore shortcuts when user is typing in input fields (except Escape)
       if (
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA"
+        (document.activeElement?.tagName === "INPUT" ||
+          document.activeElement?.tagName === "TEXTAREA" ||
+          (document.activeElement as HTMLElement)?.isContentEditable) &&
+        e.key !== "Escape"
       ) {
         return;
       }
@@ -59,26 +62,32 @@ export function ShortcutManager() {
       }
 
       if (e.key === "Escape") {
-        if (selectedEditObjectId && setSelectedEditObjectId) {
-          setSelectedEditObjectId(null);
+        if (typeof handleGlobalEscape === 'function') {
+          handleGlobalEscape();
+        } else if (typeof (useAppStore as any).getState?.()?.handleGlobalEscape === 'function') {
+          (useAppStore as any).getState().handleGlobalEscape();
+        } else {
+          // Fallback if handleGlobalEscape is not in store (e.g. mocked store in legacy unit tests)
+          if (selectedEditObjectId && setSelectedEditObjectId) {
+            setSelectedEditObjectId(null);
+          }
+          if (selectedNodeIds.length > 0) {
+            selectNodes?.([]);
+          }
+          if (activeCustomLayerId) {
+            setActiveCustomLayerId?.(null);
+          }
+          if (selectedAnnotationIds.length > 0) {
+            clearAnnotationSelection?.();
+          }
+          setAnnotationEditMode?.(false);
+          setMapEditMode?.(false);
+          setActiveTool?.("select");
+          setActivePlugin?.(null);
+          clearPluginInteractionData?.();
+          setRightPanelActiveTab?.("layers");
         }
-        if (selectedNodeIds.length > 0) {
-          selectNodes?.([]);
-        }
-        if (activeCustomLayerId) {
-          setActiveCustomLayerId?.(null);
-        }
-        if (selectedAnnotationIds.length > 0) {
-          clearAnnotationSelection?.();
-        }
-        setAnnotationEditMode?.(false);
-        setMapEditMode?.(false);
-        setActiveTool?.("select");
-        setActivePlugin?.(null);
-        clearPluginInteractionData?.();
-        
-        // Return to Layers panel on Escape
-        setRightPanelActiveTab("layers");
+        return;
       }
 
       // Tool Selection
@@ -174,6 +183,7 @@ export function ShortcutManager() {
     setMapEditMode,
     showOccupancyHighlight,
     setShowOccupancyHighlight,
+    handleGlobalEscape,
   ]);
 
   return null;

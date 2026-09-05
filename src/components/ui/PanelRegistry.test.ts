@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { resolvePanelTabs, useInspectorPanelComponent } from './PanelRegistry';
+import { resolvePanelTabs, useInspectorPanelComponent, resolveInspectorComponent } from './PanelRegistry';
 import { PanelTab } from './PanelContainer';
 import { PluginParamsPanel } from './PluginParamsPanel';
 import { CustomLayerInspector } from './properties/CustomLayerInspector';
+import { AnnotationInspector } from './properties/AnnotationInspector';
 import { PropertiesPanel } from './PropertiesPanel';
 import { useAppStore } from '../../stores/appStore';
 
@@ -114,6 +115,83 @@ describe('PanelRegistry', () => {
 
       const { result } = renderHook(() => useInspectorPanelComponent());
       expect(result.current.type).toBe(PropertiesPanel);
+    });
+  });
+
+  describe('resolveInspectorComponent', () => {
+    it('returns CustomLayerInspector for generator_add with map_layer_generator category', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'generator_add', pluginId: 'map-gen' },
+        { type: 'none' },
+        { manifest: { category: 'map_layer_generator' } }
+      );
+      expect(el.type).toBe(CustomLayerInspector);
+    });
+
+    it('returns PluginParamsPanel for generator_add with non-map generator', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'generator_add', pluginId: 'wp-gen' },
+        { type: 'none' },
+        { manifest: { category: 'waypoint_generator' } }
+      );
+      expect(el.type).toBe(PluginParamsPanel);
+    });
+
+    it('returns CustomLayerInspector when selection is custom_layer', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'select' },
+        { type: 'custom_layer', layerId: 'l1', selectedObjectId: null }
+      );
+      expect(el.type).toBe(CustomLayerInspector);
+    });
+
+    it('returns AnnotationInspector when selection is annotations', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'select' },
+        { type: 'annotations', ids: ['ann-1'] }
+      );
+      expect(el.type).toBe(AnnotationInspector);
+    });
+
+    it('returns PropertiesPanel when selection is nodes', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'select' },
+        { type: 'nodes', ids: ['node-1'] }
+      );
+      expect(el.type).toBe(PropertiesPanel);
+    });
+
+    it('returns PluginParamsPanel for plugin_interaction mode', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'plugin_interaction', pluginId: 'wp-gen', inputKey: 'pos' },
+        { type: 'none' },
+        { manifest: { category: 'waypoint_generator' } }
+      );
+      expect(el.type).toBe(PluginParamsPanel);
+    });
+
+    it('returns CustomLayerInspector for custom_layer_edit mode regardless of selection', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'custom_layer_edit', targetLayerId: 'l1', subTool: 'rect', fillValue: 100, brushSize: 5 },
+        { type: 'none' }
+      );
+      expect(el.type).toBe(CustomLayerInspector);
+    });
+
+    it('returns AnnotationInspector for annotation_edit mode even when selection is none', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'annotation_edit', subTool: 'rect', targetGroupId: null },
+        { type: 'none' }
+      );
+      expect(el.type).toBe(AnnotationInspector);
+    });
+
+    it('returns PropertiesPanel when selection is none', () => {
+      const el = resolveInspectorComponent(
+        { mode: 'select' },
+        { type: 'none' }
+      );
+      expect(el.type).toBe(PropertiesPanel);
     });
   });
 });

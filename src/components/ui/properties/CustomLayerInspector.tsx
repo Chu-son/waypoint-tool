@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { DialogAPI } from "../../../api";
 import { PluginInstance } from "../../../types/store";
@@ -70,6 +70,14 @@ export function CustomLayerInspector() {
   const [isReference, setIsReference] = useState<boolean>(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
+
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const activePlugin: PluginInstance | undefined = plugins[selectedPluginId];
 
@@ -195,9 +203,13 @@ export function CustomLayerInspector() {
       );
     } catch (err: any) {
       console.error("Custom layer generation failed:", err);
-      setErrorInfo(err.toString());
+      if (isMountedRef.current) {
+        setErrorInfo(err.toString());
+      }
     } finally {
-      setIsExecuting(false);
+      if (isMountedRef.current) {
+        setIsExecuting(false);
+      }
     }
   };
 
