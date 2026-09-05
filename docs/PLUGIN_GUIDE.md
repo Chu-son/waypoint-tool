@@ -35,16 +35,17 @@ my_plugin/
     - `max_points`: 最大点数（省略可、デフォルト 50）。
     - `allow_yaw`: 各点に向き（Yaw）を持たせるか（デフォルト `false`）。
   - `type: "rectangle"`: 範囲をドラッグで指定。
-  - `type: "waypoint"`: 既存のウェイポイントを選択。
+  - `type: "waypoint"`: 既存のウェイポイントを選択。プラグインには `{ id, name, transform, options }` の正規化ペイロードが渡されます（参照先ノードが削除されていた場合は `null` となり事前バリデーションで検知可能）。
   - `type: "annotation"`: プロジェクト内の参照用アノテーションオブジェクトを選択。
     - `object_type`: 受け付けたいアノテーションの種類（`"point"`, `"oriented_point"`, `"line"`, `"rect"`, `"circle"`, `"any"`。デフォルト `"any"`）。
     - `multiple`: 複数選択を許可するか（`true` の場合は配列、`false` の場合は単一オブジェクト）。
   - `type: "custom_layer"`: プロジェクト内のカスタムレイヤー（手動描画またはプラグイン生成レイヤー）を選択。
     - `multiple`: 複数選択を許可するか（`true` の場合はプルダウン選択＋追加リストUI、`false` の場合は単一選択プルダウン）。
+- `legacy_ids`: 旧プラグインIDや旧クラス名（例: `["SweepOffsetLinesGenerator", "SweepGenerator"]`）のエイリアスリスト。プロジェクト読み込み時の互換解決に使用されます。
 - `properties`: UI に表示されるパラメータ（数値、文字列、真偽値等）。
   - `interaction_hints`: キャンバス上にプレビュー図形を描画するためのヒント情報。
 - `needs`: アプリ本体から追加情報（マップや選択中のポイントなど）を要求する場合に指定。現在サポートされている値は以下の通りです：
-  - `"selected_points"`: ユーザーが選択している Waypoint のインデックスリスト (`context["selected_points"]`) を注入します。
+  - `"selected_points"`: ユーザーが選択している Waypoint の正規化された `Transform` オブジェクト配列（`[{ x, y, z, qx, qy, qz, qw }]`）を `context["selected_points"]` に注入します。Python SDK では `self.get_selected_points(context)` ヘルパー経由で `List[Point]` として取得可能です。
   - `"occupancy_grid"`: 現在表示されているマップ画像から占有格子データを生成し (`context["occupancy_grid"]`) 注入します。
   - `"occupancy_grid_in_region"`: `inputs` で指定した `rectangle` の範囲内のみの占有格子データを生成し注入します（全体を生成するより高速です）。
   - `"robot_footprint"`: プロジェクト設定で定義されたロボットの形状・寸法データ (`context["robot_footprint"]`) を注入します。

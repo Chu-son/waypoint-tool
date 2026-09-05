@@ -69,7 +69,7 @@
 | **プロジェクトファイル** | `.wptroj` | `src/stores/migrations/projectMigration.ts` | ・`migrateAndNormalizeProjectData` で v0 から v1 への昇格と全必須フィールドのデフォルト補完。<br>・Rust側は `serde_json::Value` で完全透過。<br>・保存時は `buildProjectData` により常に最新形式（StrictProjectData / version: 1）で書き出し。 |
 | **ユーザー設定永続化** | LocalStorage / Zustand persist | `src/stores/migrations/storageMigration.ts` | ・`persist` ミドルウェアに `version: STORAGE_VERSION` および `migrateStorage` を設定。<br>・設定項目の追加・変更時は旧ストレージデータの自動補完・型正規化を実装。 |
 | **プラグイン通信** | `manifest.json`, IPC stdio JSON | `src/stores/slices/pluginSlice.ts` / Rust `plugins` | ・**追加のみ（Additive Only）の原則**: プラグインへ送る `context` は既存キーを変更せず、新情報は新キーとして追加。<br>・旧マニフェスト（`category` 等）は読み込み時に新仕様（`primary_output`）へ自動マッピング。<br>・出力結果は旧仕様（単一ウェイポイント配列）と新仕様（`PluginResult`）の両方を境界で判別・正規化。 |
-| **外部入出力** | ROS Map, Waypoint Import, Handlebars Template | `src/utils/importUtils.ts`, `src/utils/exportUtils.ts` | ・インポート時はカラム名・キー名揺れを推論アダプタで吸収。<br>・エクスポート用 Handlebars コンテキストには旧テンプレート互換用エイリアス（例: `node.name` と `node.label`）を維持・提供。 |
+| **外部入出力** | ROS Map, Waypoint Import, Handlebars Template | `src/utils/importUtils.ts`, `src/components/ui/ExportModal.tsx`, `src/utils/treeUtils.ts` | ・インポート時はカラム名・キー名揺れを推論アダプタで吸収。<br>・エクスポート用 Handlebars コンテキストには旧テンプレート互換用エイリアス（例: `node.name` と `node.label`）を維持・提供。 |
 | **ストアアクション** | `src/stores/slices/*.ts` | アクション定義部 | ・引数の拡張は**オプション引数オブジェクト化（`options?: { ... }`）**を推奨。<br>・シグネチャ変更時は旧関数を即時削除せず、`@deprecated` を付与したラッパーとして一時維持。 |
 | **操作体系・ショートカット** | `ShortcutManager.tsx` | キーイベントディスパッチャ | ・既存ショートカットの破壊的変更時はエイリアスキーを提供。<br>・ショートカット変更時は本ガイド 1.2 項に従い `KeyboardShortcutsModal.tsx` を必ず同期更新。 |
 
@@ -105,5 +105,22 @@
 3. **Phase 3: 廃止（Removed）**
    - 次期メジャーバージョンアップ（例: v2.0）時に旧互換コード・アダプタを安全に削除。
    - ドキュメントおよびテストを更新。
+
+---
+
+## 4. ストアミューテーションおよび安全規約 (Store Mutation & Safety Rules)
+
+### 4.1 Direct setState 禁止原則 (No Direct setState Rule)
+- コンポーネントやイベントリスナー（`ShortcutManager.tsx` 等）から `useAppStore.setState` を直接呼び出して状態を変更することを厳禁とする。
+- すべての状態変更は、事前検証（バリデーション）と関連状態クリーンアップ（例: ツール切り替え時の編集モード解除など）をカプセル化した Store スライスのアクション（`setActiveTool`, `selectNodes` 等）を経由しなければならない。
+
+### 4.2 破壊的操作ガード規約 (Destructive Operation Guard Pattern)
+- `resetProject()`, `loadProject()` など、現在のプロジェクト状態を初期化・破棄するすべてのアクションは、UI 側の個別ダイアログに依存せず、ドメイン境界で `isDirty` を評価する統一ガード機構（`confirmDiscardChanges`）を通すことを義務付ける。
+- キーボードショートカット（`Ctrl+N`, `Ctrl+O`）であっても、このガードをバイパスしてはならない。
+
+### 4.3 履歴スナップショット一元管理原則 (History Snapshot Rule)
+- `pushHistorySnapshot()` の呼び出しを UI コンポーネントや描画 Hook（`useMapEdit*.ts` 等）内で行うことを禁止する。
+- ユーザー操作によるドメインデータ変更はすべて Store アクション内に閉じ、Store アクション側で原子的（Atomic）に履歴スナップショットを記録する。
+
 
 

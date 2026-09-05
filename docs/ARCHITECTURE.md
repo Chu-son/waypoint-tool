@@ -116,6 +116,9 @@ graph TD
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。
 - **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、アクティブパネル、モーダル表示状態、ズーム/パン位置。
+- **`historySlice.ts`**: 履歴スタック管理（Undo / Redo、トランザクション、`pushHistorySnapshot` による原子的履歴記録）。
+- **`workflowSlice.ts`**: ワークフローステップ管理（動的UIでのステップ進行、ステップ実行状態・変数の追跡）。
+- **`customUiSlice.ts`**: 動的UI定義（プリセット検出、カスタムUI設定ロード、レイアウトオーバーライド）。
 
 ---
 
@@ -130,4 +133,27 @@ graph TD
 | **主な属性** | `name`, `color`, `visible`, `group_id` | `fillValue` (0:黒/障害物, 255:白/自由空間), `opacity`, `blend_mode` |
 | **出力結果** | ベクターデータ (JSON / YAML / メタデータ) | ラスター画像 (PGM / PNG / Base64 Occupancy Grid) |
 | **Lineの役割** | 仮想壁、境界線、進入禁止ラインなどの幾何データ | マップ画像上に引く実寸幅の障害物壁・白線などのピクセル描画 |
+
+---
+
+## 5. システム不変条件 (System Invariants)
+
+システム全体の整合性と拡張性を維持するため、以下の不変条件がアーキテクチャ全体に義務付けられています。
+
+### 5.1 コンテナ受入不変条件 (Container Acceptance Invariant)
+- ツリー構造において、子ノード（`children_ids`）を保持できるのは `manual_group` および `group` のみとする。
+- `generator`（外部プラグインによる自動生成管理）および `manual`（単一の葉ノード）に対する子ノードの挿入・ドラッグ＆ドロップ投入は、ドメイン境界（Store アクション `moveNodesInTree`, `addNodes` 等）で厳格に遮断・拒絶（Reject）する。
+- 自動生成ノードを手動編集したい場合は、明示的な「グループ展開（Explode / `ungroupNode`）」アクションを通じて `manual_group` へ変換することを必須とする。
+
+### 5.2 経路走査の正準 DFS 規約 (Canonical Traversal Standard)
+- ウェイポイントの走査順序（番号順）を扱うすべての機能（`PathLayer`, `PathRouter`, `ExportModal`, 経路長計算等）は、独自走査ループの実装を禁止し、共通関数 `getFlattenedWaypointIds`（`src/utils/treeUtils.ts`）による深さ優先探索（DFS）を単一の真実（Single Source of Truth）とする。
+
+### 5.3 マップ原点の 2D 剛体変換規約 (Rigid 2D Map Origin Transform)
+- ROS のマップ原点 `origin: [x, y, yaw]` に対し、世界座標 $(x_w, y_w)$ とピクセル座標 $(c, r)$ の相互変換は、必ず $Yaw$ 回転行列 $R(\theta)$ を含む 2D 剛体変換式を一貫適用する。
+- フロントエンドの描画・ラスタライズと、Rust バックエンド（`blending.rs` 等）の双方でこの数学的変換式を統一する。
+
+### 5.4 ツリー変形時の挿入境界射影規約 (Adjacent Boundary Projection Standard)
+- ツリー変形（ノード削除、Group作成・解除、ノード移動、複製等）を行うすべての Store アクションは、直前ノードに基づく共通写像関数 `mapInsertionTarget`（`src/utils/treeUtils.ts`）を介して `insertionTarget` を安全に追従・更新しなければならない。
+- 複数ノードの追加はループによる個別 `addNode` 呼び出しを禁止し、単一トランザクション・単一履歴スナップショットで完結する `addNodes` 一括登録 API を使用すること。
+
 

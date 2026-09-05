@@ -197,6 +197,19 @@
   - **概要**: マップ未読み込み時にキャンバス上に表示されるウェルカム・ドロップエリアガイド UI。
   - **主要Props**: `onOpenMap`
 
+### Canvas 10層描画スタック順序 (Render & Event Priority Hierarchy)
+`MapCanvas.tsx` における WebGL コンテナの重なり順（背面から前面）およびポインターイベント優先順位は以下の通り厳格に規定されています：
+1. **`MapLayerSprite` (Base Map)**: 背景ROSマップ画像の表示
+2. **`Custom Layers` (Raster / Manual Vector)**: 手動ベクター描画およびプラグイン生成カスタムレイヤー
+3. **`GridLayer`**: 1m メッシュ等のワールドグリッド線
+4. **`PathLayer`**: ウェイポイント間パス補間線・コリドー帯
+5. **`FootprintLayer`**: ロボット形状フットプリント表示
+6. **`AnnotationLayer`**: アノテーション図形（Point, Line, Rect, Circle等）
+7. **`WaypointLayer`**: ウェイポイント矢印マーカー、ラベル、回転ハンドル
+8. **`PluginLayer`**: プラグイン自動生成プレビューおよび Interaction Hints 視覚補助
+9. **`ExportRegionLayer`**: マップ切り出しエクスポート枠
+10. **`SnappingGuideLayer`**: 直交スナップガイド線および数値入力 HUD（最前面）
+
 ### Canvas レイヤー & フィルター群 (`src/components/canvas/`)
 - **`OccupancyHighlightFilter`** ([`src/components/canvas/filters/OccupancyHighlightFilter.ts`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/filters/OccupancyHighlightFilter.ts))
   - **概要**: マップ画像を 2D Occupancy Grid の 3 領域（Obstacle: 赤, Free: 緑, Unknown: 紫）にリアルタイム色分けする PixiJS GPU GLSL シェーダーフィルター。
