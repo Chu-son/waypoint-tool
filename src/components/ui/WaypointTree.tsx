@@ -40,7 +40,11 @@ import {
   getVisibleTreeNodes,
   computeDragDropPosition,
   findNodeParentId,
+  getNodeDepth,
   getNodesAfterInsertionTarget,
+  isInsertableContainer,
+  escapeCollapsedInsertionTarget,
+  determineMultiDepthDropTarget,
 } from '../../utils/treeUtils';
 import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
 
@@ -331,12 +335,25 @@ export function WaypointTree() {
   }, []);
 
   const toggleExpand = (id: string) => {
-    setExpandedNodes((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    const isCurrentlyExpanded = expandedNodes.has(id);
+    const next = new Set(expandedNodes);
+    if (isCurrentlyExpanded) {
+      next.delete(id);
+      if (insertionTarget) {
+        const escaped = escapeCollapsedInsertionTarget(
+          insertionTarget,
+          next,
+          rootNodeIds,
+          nodes
+        );
+        if (escaped && (escaped.parentId !== insertionTarget.parentId || escaped.index !== insertionTarget.index)) {
+          setInsertionTarget(escaped);
+        }
+      }
+    } else {
+      next.add(id);
+    }
+    setExpandedNodes(next);
   };
 
   // マニュアルウェイポイントのインデックスマップ
@@ -371,54 +388,114 @@ export function WaypointTree() {
       return [{ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: true }];
     }
 
-    const result: DisplayTreeItem[] = [];
-    let barInserted = false;
-
-    // 挿入位置がルート先頭 (null, 0) の場合
-    if (insertionTarget && insertionTarget.parentId === null && insertionTarget.index === 0) {
-      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: false });
-      barInserted = true;
+    // insertionTarget が null の場合: ツリーの末尾に挿入バーを配置
+    if (!insertionTarget) {
+      const result: DisplayTreeItem[] = visibleNodes.map((item) => ({
+        id: item.id,
+        depth: item.depth,
+        node: nodes[item.id],
+      }));
+      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: true });
+      return result;
     }
 
-    for (let i = 0; i < visibleNodes.length; i++) {
-      const item = visibleNodes[i];
-      const node = nodes[item.id];
-      result.push({ id: item.id, depth: item.depth, node });
+    // insertionTarget が存在する場合の挿入バー配置位置を特定
+    let insertBarAfterVisibleIndex: number | null = null; // -1 は先頭（第0要素の前）
+    let insertBarDepth = 0;
 
-      if (insertionTarget && !barInserted) {
-        // ケースA: 空グループまたはグループ先頭 (index 0) に挿入
-        if (insertionTarget.parentId === item.id && insertionTarget.index === 0) {
-          result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: item.depth + 1, isAtEnd: false });
-          barInserted = true;
-          continue;
-        }
-
-        // ケースB: このアイテムの直後に挿入
-        const itemParentId = findNodeParentId(item.id, rootNodeIds, nodes);
-        if (itemParentId === insertionTarget.parentId) {
-          const siblings = itemParentId ? (nodes[itemParentId]?.children_ids || []) : rootNodeIds;
-          const idxInSiblings = siblings.indexOf(item.id);
-          if (idxInSiblings === insertionTarget.index - 1) {
-            // このアイテム自身が展開されたグループで子を持つ場合は、子ノード群の後に挿入バーを出す
-            const hasExpandedChildren = (node?.type === 'manual_group' || node?.type === 'group' || node?.type === 'generator') &&
-                                        expandedNodes.has(item.id) &&
-                                        (node.children_ids?.length ?? 0) > 0;
-            if (!hasExpandedChildren) {
-              result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: item.depth, isAtEnd: false });
-              barInserted = true;
+    if (insertionTarget.parentId === null) {
+      insertBarDepth = 0;
+      if (insertionTarget.index === 0) {
+        insertBarAfterVisibleIndex = -1;
+      } else {
+        const refIndex = Math.min(insertionTarget.index - 1, rootNodeIds.length - 1);
+        const refChildId = rootNodeIds[refIndex];
+        const visibleIdx = visibleNodes.findIndex((v) => v.id === refChildId);
+        if (visibleIdx !== -1) {
+          // refChildId の全可視子孫ノードを走査し、最後の子孫の直後を挿入位置とする
+          const refDepth = visibleNodes[visibleIdx].depth;
+          let lastDescendantIdx = visibleIdx;
+          for (let j = visibleIdx + 1; j < visibleNodes.length; j++) {
+            if (visibleNodes[j].depth > refDepth) {
+              lastDescendantIdx = j;
+            } else {
+              break;
             }
           }
+          insertBarAfterVisibleIndex = lastDescendantIdx;
+        }
+      }
+    } else {
+      // 親グループが存在する場合
+      const parentNode = nodes[insertionTarget.parentId];
+      const children = parentNode?.children_ids || [];
+      const parentVisibleIdx = visibleNodes.findIndex((v) => v.id === insertionTarget.parentId);
+      const parentDepth = parentVisibleIdx !== -1
+        ? visibleNodes[parentVisibleIdx].depth
+        : getNodeDepth(insertionTarget.parentId, rootNodeIds, nodes);
+      insertBarDepth = parentDepth + 1;
+
+      let found = false;
+
+      if (insertionTarget.index > 0 && children.length > 0) {
+        const refIndex = Math.min(insertionTarget.index - 1, children.length - 1);
+        const refChildId = children[refIndex];
+        const visibleIdx = visibleNodes.findIndex((v) => v.id === refChildId);
+        if (visibleIdx !== -1) {
+          const refDepth = visibleNodes[visibleIdx].depth;
+          let lastDescendantIdx = visibleIdx;
+          for (let j = visibleIdx + 1; j < visibleNodes.length; j++) {
+            if (visibleNodes[j].depth > refDepth) {
+              lastDescendantIdx = j;
+            } else {
+              break;
+            }
+          }
+          insertBarAfterVisibleIndex = lastDescendantIdx;
+          found = true;
+        }
+      }
+
+      if (!found) {
+        // index === 0 または 子ノードが非表示（親や先祖が折りたたまれている）場合
+        // insertionTarget.parentId から遡って最も近い可視の先祖ノードを探索
+        let ancestorId: string | null = insertionTarget.parentId;
+        while (ancestorId) {
+          const ancestorVisibleIdx = visibleNodes.findIndex((v) => v.id === ancestorId);
+          if (ancestorVisibleIdx !== -1) {
+            insertBarAfterVisibleIndex = ancestorVisibleIdx;
+            insertBarDepth = visibleNodes[ancestorVisibleIdx].depth + 1;
+            found = true;
+            break;
+          }
+          ancestorId = findNodeParentId(ancestorId, rootNodeIds, nodes);
         }
       }
     }
 
-    // まだ挿入されていない場合（末尾または insertionTarget === null のデフォルト時）
-    if (!barInserted) {
-      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: insertionTarget === null });
+    const result: DisplayTreeItem[] = [];
+
+    if (insertBarAfterVisibleIndex === -1) {
+      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: insertBarDepth, isAtEnd: false });
+    }
+
+    for (let i = 0; i < visibleNodes.length; i++) {
+      const item = visibleNodes[i];
+      result.push({ id: item.id, depth: item.depth, node: nodes[item.id] });
+
+      if (insertBarAfterVisibleIndex === i) {
+        result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: insertBarDepth, isAtEnd: false });
+      }
+    }
+
+    // もし親が非表示などで可視ツリー内に挿入バーが配置できなかった場合の安全なフォールバック
+    const hasBar = result.some((item) => item.isInsertionBar);
+    if (!hasBar) {
+      result.push({ id: INSERTION_BAR_ID, isInsertionBar: true, depth: 0, isAtEnd: false });
     }
 
     return result;
-  }, [visibleNodes, insertionTarget, rootNodeIds, nodes, expandedNodes]);
+  }, [visibleNodes, insertionTarget, rootNodeIds, nodes]);
 
   const visibleIds = useMemo(() => displayItems.map((n) => n.id), [displayItems]);
   const selectableIds = useMemo(() => displayItems.filter((n) => !n.isInsertionBar).map((n) => n.id), [displayItems]);
@@ -478,22 +555,26 @@ export function WaypointTree() {
 
     // 挿入バーがドラッグされた場合
     if (activeId === INSERTION_BAR_ID) {
-      const parentId = findNodeParentId(overId, rootNodeIds, nodes);
-      const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
-      const idx = siblings.indexOf(overId);
+      let relativeX = 0;
+      if (event.activatorEvent && 'clientX' in event.activatorEvent && over.rect) {
+        const currentPointerX = (event.activatorEvent as MouseEvent).clientX + event.delta.x;
+        relativeX = currentPointerX - over.rect.left;
+      } else {
+        relativeX = event.delta.x;
+      }
 
       const position = computeDragDropPosition(activeId, overId, visibleIds);
-      if (position === 'before') {
-        setInsertionTarget({ parentId, index: Math.max(0, idx) });
-      } else {
-        // after
-        const isRootLast = parentId === null && idx === rootNodeIds.length - 1;
-        if (isRootLast) {
-          setInsertionTarget(null); // 末尾復帰
-        } else {
-          setInsertionTarget({ parentId, index: idx + 1 });
-        }
-      }
+      const target = determineMultiDepthDropTarget({
+        activeId,
+        overId,
+        relativeX,
+        position,
+        rootNodeIds,
+        nodes,
+        expandedNodes,
+      });
+
+      setInsertionTarget(target);
       return;
     }
 
@@ -505,9 +586,19 @@ export function WaypointTree() {
       if (insertionTarget) {
         const { parentId, index } = insertionTarget;
         const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
-        const targetNodeId = siblings[index] || siblings[siblings.length - 1];
-        if (targetNodeId && !movingIds.includes(targetNodeId)) {
-          moveNodesInTree(movingIds, targetNodeId, index < siblings.length ? 'before' : 'after');
+        if (siblings.length === 0 && parentId) {
+          moveNodesInTree(movingIds, parentId, 'inside');
+        } else {
+          const targetNodeId = siblings[index] || siblings[siblings.length - 1];
+          if (targetNodeId && !movingIds.includes(targetNodeId)) {
+            moveNodesInTree(movingIds, targetNodeId, index < siblings.length ? 'before' : 'after');
+          }
+        }
+      } else {
+        // insertionTarget === null (ツリー末尾)
+        const lastRootId = rootNodeIds[rootNodeIds.length - 1];
+        if (lastRootId && !movingIds.includes(lastRootId)) {
+          moveNodesInTree(movingIds, lastRootId, 'after');
         }
       }
       return;
@@ -633,6 +724,7 @@ export function WaypointTree() {
           {(() => {
             const targetNode = nodes[contextMenu.nodeId];
             const isContainer = targetNode?.type === 'generator' || targetNode?.type === 'manual_group' || targetNode?.type === 'group';
+            const isInsertable = isInsertableContainer(targetNode);
             const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextMenu.nodeId);
             const targetIds = isMultiSelected ? selectedNodeIds : [contextMenu.nodeId];
 
@@ -680,10 +772,15 @@ export function WaypointTree() {
                 {/* 挿入位置に設定 */}
                 <button
                   onClick={() => {
-                    const parentId = findNodeParentId(contextMenu.nodeId, rootNodeIds, nodes);
-                    const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
-                    const idx = siblings.indexOf(contextMenu.nodeId);
-                    setInsertionTarget({ parentId, index: idx + 1 });
+                    let targetParentId = findNodeParentId(contextMenu.nodeId, rootNodeIds, nodes);
+                    let refNodeId = contextMenu.nodeId;
+                    while (targetParentId && !isInsertableContainer(nodes[targetParentId])) {
+                      refNodeId = targetParentId;
+                      targetParentId = findNodeParentId(targetParentId, rootNodeIds, nodes);
+                    }
+                    const siblings = targetParentId ? (nodes[targetParentId]?.children_ids || []) : rootNodeIds;
+                    const idx = siblings.indexOf(refNodeId);
+                    setInsertionTarget({ parentId: targetParentId, index: idx + 1 });
                     setContextMenu(null);
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
@@ -691,7 +788,7 @@ export function WaypointTree() {
                   <ArrowDownToLine size={13} className="text-primary-base" />
                   <span>この直後に挿入を設定</span>
                 </button>
-                {isContainer && (
+                {isInsertable && (
                   <button
                     onClick={() => {
                       setInsertionTarget({ parentId: contextMenu.nodeId, index: 0 });

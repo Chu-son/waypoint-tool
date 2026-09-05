@@ -263,7 +263,7 @@ describe('NodeSlice - groupNodes and ungroupNode', () => {
 
     const state = useAppStore.getState();
     expect(state.rootNodeIds).toEqual([newGroupId!, 'wp-3']);
-    expect(state.selectedNodeIds).toEqual([newGroupId!]);
+    expect(state.selectedNodeIds).toEqual([newGroupId!, 'wp-1', 'wp-2']);
 
     const groupNode = state.nodes[newGroupId!];
     expect(groupNode).toBeDefined();
@@ -617,6 +617,27 @@ describe('NodeSlice - insertionTarget & group selection', () => {
     expect(group.children_ids).toEqual(['c1']);
   });
 
+  it('removeNodes retains insertionTarget at the position where deleted group was located in root', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const child1: WaypointNode = { id: 'c1', type: 'manual' };
+    const group: WaypointNode = { id: 'grp', type: 'manual_group', children_ids: ['c1'] };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, c1: child1, grp: group, 'wp-2': wp2 },
+      rootNodeIds: ['wp-1', 'grp', 'wp-2'],
+      insertionTarget: { parentId: 'grp', index: 1 }, // Target was inside grp
+      selectedNodeIds: ['grp'],
+    });
+
+    useAppStore.getState().removeNodes(['grp']);
+    const state = useAppStore.getState();
+
+    expect(state.rootNodeIds).toEqual(['wp-1', 'wp-2']);
+    // insertionTarget must stay at root index 1 (between wp-1 and wp-2, where grp was), NOT 0!
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 1 });
+  });
+
   it('ungroupNode and moveNodesInTree apply validateAndCorrectInsertionTarget', () => {
     const child1: WaypointNode = { id: 'c1', type: 'manual' };
     const child2: WaypointNode = { id: 'c2', type: 'manual' };
@@ -634,5 +655,96 @@ describe('NodeSlice - insertionTarget & group selection', () => {
 
     // Group is deleted, insertionTarget should fallback to root index 2
     expect(state.insertionTarget).toEqual({ parentId: null, index: 2 });
+  });
+
+  it('addNodes adds multiple nodes in a single history transaction and preserves insertionTarget on explicit placement', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+    const wp3: WaypointNode = { id: 'wp-3', type: 'manual' };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1 },
+      rootNodeIds: ['wp-1'],
+      insertionTarget: { parentId: null, index: 1 },
+      historyPast: [],
+      historyFuture: [],
+    });
+
+    // Explicit placement at Root index 0
+    useAppStore.getState().addNodes([wp2, wp3], null, 0);
+
+    let state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-2', 'wp-3', 'wp-1']);
+    expect(state.nodes['wp-2']).toBeDefined();
+    expect(state.nodes['wp-3']).toBeDefined();
+    // InsertionTarget should NOT be corrupted by explicit root placement
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 1 });
+    // History should have exactly 1 snapshot
+    expect(state.historyPast).toHaveLength(1);
+
+    // Undo should cleanly revert both nodes at once
+    useAppStore.getState().undo();
+    state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-1']);
+    expect(state.nodes['wp-2']).toBeUndefined();
+    expect(state.nodes['wp-3']).toBeUndefined();
+  });
+
+  it('addNodes advances insertionTarget when placement is NOT explicit', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
+
+    useAppStore.setState({
+      nodes: {},
+      rootNodeIds: [],
+      insertionTarget: { parentId: null, index: 0 },
+    });
+
+    useAppStore.getState().addNodes([wp1, wp2]);
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual(['wp-1', 'wp-2']);
+    // insertionTarget should advance by 2
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 2 });
+  });
+
+  it('moveNodesInTree rejects moving inside generator or manual nodes or non-existent nodes', () => {
+    const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
+    const gen: WaypointNode = { id: 'gen-1', type: 'generator', children_ids: [] };
+    const moving: WaypointNode = { id: 'moving-1', type: 'manual' };
+
+    useAppStore.setState({
+      nodes: { 'wp-1': wp1, 'gen-1': gen, 'moving-1': moving },
+      rootNodeIds: ['wp-1', 'gen-1', 'moving-1'],
+    });
+
+    // 1. Attempt move inside generator -> should be rejected
+    useAppStore.getState().moveNodesInTree(['moving-1'], 'gen-1', 'inside');
+    expect(useAppStore.getState().rootNodeIds).toEqual(['wp-1', 'gen-1', 'moving-1']);
+    expect(useAppStore.getState().nodes['gen-1'].children_ids).toEqual([]);
+
+    // 2. Attempt move inside manual -> should be rejected
+    useAppStore.getState().moveNodesInTree(['moving-1'], 'wp-1', 'inside');
+    expect(useAppStore.getState().rootNodeIds).toEqual(['wp-1', 'gen-1', 'moving-1']);
+
+    // 3. Attempt move inside non-existent node -> should be rejected
+    useAppStore.getState().moveNodesInTree(['moving-1'], 'non-existent', 'inside');
+    expect(useAppStore.getState().rootNodeIds).toEqual(['wp-1', 'gen-1', 'moving-1']);
+  });
+
+  it('setInsertionTarget validates and corrects invalid parent (e.g. inside generator)', () => {
+    const gen: WaypointNode = { id: 'gen-1', type: 'generator', children_ids: ['c1'] };
+    const c1: WaypointNode = { id: 'c1', type: 'manual' };
+
+    useAppStore.setState({
+      nodes: { 'gen-1': gen, c1 },
+      rootNodeIds: ['gen-1'],
+    });
+
+    // Attempt to set insertionTarget inside generator
+    useAppStore.getState().setInsertionTarget({ parentId: 'gen-1', index: 0 });
+
+    // Should automatically escape outside generator (after gen-1 at Root index 1)
+    expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
   });
 });

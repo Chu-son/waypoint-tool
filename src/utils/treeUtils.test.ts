@@ -12,6 +12,11 @@ import {
   getNodesAfterInsertionTarget,
   getPrecedingManualWaypoint,
   validateAndCorrectInsertionTarget,
+  isInsertableContainer,
+  expandSelectionWithDescendants,
+  mapInsertionTarget,
+  escapeCollapsedInsertionTarget,
+  determineMultiDepthDropTarget,
 } from './treeUtils';
 import { WaypointNode } from '../types/store';
 
@@ -303,6 +308,448 @@ describe('treeUtils', () => {
         parentId: null,
         index: 3,
       });
+    });
+
+    it('escapes generator parent to the position after the generator', () => {
+      const genNodes: Record<string, WaypointNode> = {
+        'wp-1': { id: 'wp-1', type: 'manual' },
+        'gen-1': { id: 'gen-1', type: 'generator', children_ids: ['child-1', 'child-2'] },
+        'child-1': { id: 'child-1', type: 'manual' },
+        'child-2': { id: 'child-2', type: 'manual' },
+        'wp-2': { id: 'wp-2', type: 'manual' },
+      };
+      const genRoots = ['wp-1', 'gen-1', 'wp-2'];
+
+      // When target points inside generator 'gen-1'
+      const corrected = validateAndCorrectInsertionTarget(
+        { parentId: 'gen-1', index: 1 },
+        genRoots,
+        genNodes
+      );
+      // gen-1 is at root index 1, so escaping places target after gen-1 at root index 2
+      expect(corrected).toEqual({
+        parentId: null,
+        index: 2,
+      });
+    });
+  });
+
+  describe('isInsertableContainer', () => {
+    it('returns true for null/undefined (root)', () => {
+      expect(isInsertableContainer(null)).toBe(true);
+      expect(isInsertableContainer(undefined)).toBe(true);
+    });
+
+    it('returns true for manual_group and group', () => {
+      expect(isInsertableContainer({ id: 'g1', type: 'manual_group' })).toBe(true);
+      expect(isInsertableContainer({ id: 'g2', type: 'group' as any })).toBe(true);
+    });
+
+    it('returns false for manual waypoint and generator', () => {
+      expect(isInsertableContainer({ id: 'wp1', type: 'manual' })).toBe(false);
+      expect(isInsertableContainer({ id: 'gen1', type: 'generator' })).toBe(false);
+    });
+  });
+
+  describe('expandSelectionWithDescendants', () => {
+    const testNodes: Record<string, WaypointNode> = {
+      'g1': { id: 'g1', type: 'manual_group', children_ids: ['w1', 'g2'] },
+      'w1': { id: 'w1', type: 'manual' },
+      'g2': { id: 'g2', type: 'manual_group', children_ids: ['w2'] },
+      'w2': { id: 'w2', type: 'manual' },
+      'gen': { id: 'gen', type: 'generator', children_ids: ['gw1'] },
+      'gw1': { id: 'gw1', type: 'manual' },
+      'root_w': { id: 'root_w', type: 'manual' },
+    };
+
+    it('expands manual_group descendants recursively', () => {
+      const res = expandSelectionWithDescendants(['g1'], testNodes);
+      expect(res).toEqual(['g1', 'w1', 'g2', 'w2']);
+    });
+
+    it('does not expand generator node children', () => {
+      const res = expandSelectionWithDescendants(['gen'], testNodes);
+      expect(res).toEqual(['gen']);
+    });
+
+    it('leaves leaf nodes untouched and eliminates duplicates', () => {
+      const res = expandSelectionWithDescendants(['g1', 'w1', 'root_w'], testNodes);
+      expect(res).toEqual(['g1', 'w1', 'g2', 'w2', 'root_w']);
+    });
+  });
+
+  describe('mapInsertionTarget', () => {
+    it('maps insertion target when anchor node survives after transformation', () => {
+      const oldNodes: Record<string, WaypointNode> = {
+        'w1': { id: 'w1', type: 'manual' },
+        'w2': { id: 'w2', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const oldRoots = ['w1', 'w2', 'w3'];
+
+      // Insertion target was after w2 (index: 2)
+      const currentTarget = { parentId: null, index: 2 };
+
+      // w1 is deleted, w2 moves to index 0
+      const newNodes: Record<string, WaypointNode> = {
+        'w2': { id: 'w2', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const newRoots = ['w2', 'w3'];
+
+      const mapped = mapInsertionTarget(currentTarget, oldRoots, oldNodes, newRoots, newNodes);
+      // w2 is now index 0, so insertion target after w2 becomes index 1
+      expect(mapped).toEqual({ parentId: null, index: 1 });
+    });
+
+    it('tracks preceding sibling when anchor node is deleted', () => {
+      const oldNodes: Record<string, WaypointNode> = {
+        'w1': { id: 'w1', type: 'manual' },
+        'w2': { id: 'w2', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const oldRoots = ['w1', 'w2', 'w3'];
+
+      // Insertion target was after w2 (index: 2)
+      const currentTarget = { parentId: null, index: 2 };
+
+      // w2 is deleted, w1 and w3 remain
+      const newNodes: Record<string, WaypointNode> = {
+        'w1': { id: 'w1', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const newRoots = ['w1', 'w3'];
+
+      const mapped = mapInsertionTarget(currentTarget, oldRoots, oldNodes, newRoots, newNodes);
+      // Anchor w2 was deleted; backward scan finds w1 (at index 0), so target becomes index 1
+      expect(mapped).toEqual({ parentId: null, index: 1 });
+    });
+
+    it('tracks ungrouped node when group is dissolved', () => {
+      const oldNodes: Record<string, WaypointNode> = {
+        'grp': { id: 'grp', type: 'manual_group', children_ids: ['w1', 'w2'] },
+        'w1': { id: 'w1', type: 'manual' },
+        'w2': { id: 'w2', type: 'manual' },
+      };
+      const oldRoots = ['grp'];
+
+      // Insertion target was inside grp after w1 (index: 1)
+      const currentTarget = { parentId: 'grp', index: 1 };
+
+      // grp is ungrouped; w1 and w2 are now at root
+      const newNodes: Record<string, WaypointNode> = {
+        'w1': { id: 'w1', type: 'manual' },
+        'w2': { id: 'w2', type: 'manual' },
+      };
+      const newRoots = ['w1', 'w2'];
+
+      const mapped = mapInsertionTarget(currentTarget, oldRoots, oldNodes, newRoots, newNodes);
+      // w1 is at root index 0, so target stays right after w1 (index 1) at root
+      expect(mapped).toEqual({ parentId: null, index: 1 });
+    });
+
+    it('maintains position at Root index when Group is deleted after insertion target was set after Group', () => {
+      // root: ['w0', 'w1', 'grp', 'w3']
+      const oldNodes: Record<string, WaypointNode> = {
+        'w0': { id: 'w0', type: 'manual' },
+        'w1': { id: 'w1', type: 'manual' },
+        'grp': { id: 'grp', type: 'manual_group', children_ids: ['c1'] },
+        'c1': { id: 'c1', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const oldRoots = ['w0', 'w1', 'grp', 'w3'];
+
+      // Insertion target was after grp (index: 3)
+      const currentTarget = { parentId: null, index: 3 };
+
+      // grp and its children are deleted
+      const newNodes: Record<string, WaypointNode> = {
+        'w0': { id: 'w0', type: 'manual' },
+        'w1': { id: 'w1', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const newRoots = ['w0', 'w1', 'w3'];
+
+      const mapped = mapInsertionTarget(currentTarget, oldRoots, oldNodes, newRoots, newNodes);
+      // Stays after w1 at index 2 (where grp was), NOT jumping to index 0!
+      expect(mapped).toEqual({ parentId: null, index: 2 });
+    });
+
+    it('falls back to Group position at Root when target was inside Group and Group is deleted', () => {
+      // root: ['w0', 'w1', 'grp', 'w3']
+      const oldNodes: Record<string, WaypointNode> = {
+        'w0': { id: 'w0', type: 'manual' },
+        'w1': { id: 'w1', type: 'manual' },
+        'grp': { id: 'grp', type: 'manual_group', children_ids: ['c1', 'c2'] },
+        'c1': { id: 'c1', type: 'manual' },
+        'c2': { id: 'c2', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const oldRoots = ['w0', 'w1', 'grp', 'w3'];
+
+      // Insertion target was inside grp at index 1
+      const currentTarget = { parentId: 'grp', index: 1 };
+
+      // grp and all children deleted
+      const newNodes: Record<string, WaypointNode> = {
+        'w0': { id: 'w0', type: 'manual' },
+        'w1': { id: 'w1', type: 'manual' },
+        'w3': { id: 'w3', type: 'manual' },
+      };
+      const newRoots = ['w0', 'w1', 'w3'];
+
+      const mapped = mapInsertionTarget(currentTarget, oldRoots, oldNodes, newRoots, newNodes);
+      // Falls back to root index 2 (after w1, where grp was), NOT index 0!
+      expect(mapped).toEqual({ parentId: null, index: 2 });
+    });
+
+    it('resolves inside nested parent when deep subgroup is deleted', () => {
+      // parentGrp has ['w_prev', 'subgrp', 'w_next']
+      // subgrp has ['sub_c1', 'sub_c2']
+      const oldNodes: Record<string, WaypointNode> = {
+        'parentGrp': { id: 'parentGrp', type: 'manual_group', children_ids: ['w_prev', 'subgrp', 'w_next'] },
+        'w_prev': { id: 'w_prev', type: 'manual' },
+        'subgrp': { id: 'subgrp', type: 'manual_group', children_ids: ['sub_c1', 'sub_c2'] },
+        'sub_c1': { id: 'sub_c1', type: 'manual' },
+        'sub_c2': { id: 'sub_c2', type: 'manual' },
+        'w_next': { id: 'w_next', type: 'manual' },
+      };
+      const oldRoots = ['parentGrp'];
+
+      // Target was inside subgrp
+      const currentTarget = { parentId: 'subgrp', index: 2 };
+
+      // subgrp deleted, parentGrp remains with ['w_prev', 'w_next']
+      const newNodes: Record<string, WaypointNode> = {
+        'parentGrp': { id: 'parentGrp', type: 'manual_group', children_ids: ['w_prev', 'w_next'] },
+        'w_prev': { id: 'w_prev', type: 'manual' },
+        'w_next': { id: 'w_next', type: 'manual' },
+      };
+      const newRoots = ['parentGrp'];
+
+      const mapped = mapInsertionTarget(currentTarget, oldRoots, oldNodes, newRoots, newNodes);
+      // In parentGrp, should be after w_prev at index 1
+      expect(mapped).toEqual({ parentId: 'parentGrp', index: 1 });
+    });
+  });
+
+  describe('escapeCollapsedInsertionTarget', () => {
+    const testNodes: Record<string, WaypointNode> = {
+      'grp-1': { id: 'grp-1', type: 'manual_group', children_ids: ['c1', 'subgrp-1'] },
+      'c1': { id: 'c1', type: 'manual' },
+      'subgrp-1': { id: 'subgrp-1', type: 'manual_group', children_ids: ['sub-c1'] },
+      'sub-c1': { id: 'sub-c1', type: 'manual' },
+      'wp-end': { id: 'wp-end', type: 'manual' },
+    };
+    const testRoots = ['grp-1', 'wp-end'];
+
+    it('returns null when target is null', () => {
+      expect(escapeCollapsedInsertionTarget(null, new Set(), testRoots, testNodes)).toBeNull();
+    });
+
+    it('returns root target unchanged even if groups are collapsed', () => {
+      const rootTarget = { parentId: null, index: 1 };
+      expect(escapeCollapsedInsertionTarget(rootTarget, new Set(), testRoots, testNodes)).toEqual(rootTarget);
+    });
+
+    it('returns target unchanged when parent group is expanded', () => {
+      const target = { parentId: 'grp-1', index: 1 };
+      const expanded = new Set(['grp-1']);
+      expect(escapeCollapsedInsertionTarget(target, expanded, testRoots, testNodes)).toEqual(target);
+    });
+
+    it('escapes target to outside group in root when parent group is collapsed', () => {
+      const target = { parentId: 'grp-1', index: 2 };
+      const expanded = new Set<string>(); // grp-1 is collapsed
+      const escaped = escapeCollapsedInsertionTarget(target, expanded, testRoots, testNodes);
+      // grp-1 is at root index 0, so escaped target is root index 1
+      expect(escaped).toEqual({ parentId: null, index: 1 });
+    });
+
+    it('escapes nested target to intermediate expanded parent when subgroup is collapsed', () => {
+      const target = { parentId: 'subgrp-1', index: 1 };
+      // grp-1 is expanded, subgrp-1 is collapsed
+      const expanded = new Set(['grp-1']);
+      const escaped = escapeCollapsedInsertionTarget(target, expanded, testRoots, testNodes);
+      // subgrp-1 is in grp-1 at index 1, so escaped target is inside grp-1 at index 2
+      expect(escaped).toEqual({ parentId: 'grp-1', index: 2 });
+    });
+
+    it('escapes deeply nested target all the way to root when top group is also collapsed', () => {
+      const target = { parentId: 'subgrp-1', index: 1 };
+      // both grp-1 and subgrp-1 are collapsed
+      const expanded = new Set<string>();
+      const escaped = escapeCollapsedInsertionTarget(target, expanded, testRoots, testNodes);
+      // grp-1 is at root index 0, so escaped target is root index 1
+      expect(escaped).toEqual({ parentId: null, index: 1 });
+    });
+  });
+
+  describe('determineMultiDepthDropTarget', () => {
+    const testNodes: Record<string, WaypointNode> = {
+      'wp-0': { id: 'wp-0', type: 'manual' },
+      'grp-1': { id: 'grp-1', type: 'manual_group', children_ids: ['c1', 'c2'] },
+      'c1': { id: 'c1', type: 'manual' },
+      'c2': { id: 'c2', type: 'manual' },
+      'wp-end': { id: 'wp-end', type: 'manual' },
+    };
+    const testRoots = ['wp-0', 'grp-1', 'wp-end'];
+
+    it('selects inside group when dropping after last child with relativeX >= threshold', () => {
+      const target = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'c2', // last child of grp-1
+        relativeX: 35, // >= 28
+        position: 'after',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(['grp-1']),
+      });
+      expect(target).toEqual({ parentId: 'grp-1', index: 2 });
+    });
+
+    it('selects outside group (parent level) when dropping after last child with relativeX < threshold', () => {
+      const target = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'c2', // last child of grp-1
+        relativeX: 10, // < 28
+        position: 'after',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(['grp-1']),
+      });
+      // grp-1 is at root index 1, so outside after grp-1 is root index 2
+      expect(target).toEqual({ parentId: null, index: 2 });
+    });
+
+    it('selects inside group when dropping after non-last child regardless of relativeX', () => {
+      const target = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'c1', // first of 2 children
+        relativeX: 5,
+        position: 'after',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(['grp-1']),
+      });
+      expect(target).toEqual({ parentId: 'grp-1', index: 1 });
+    });
+
+    it('handles position before correctly', () => {
+      const target = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'c2',
+        relativeX: 0,
+        position: 'before',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(['grp-1']),
+      });
+      expect(target).toEqual({ parentId: 'grp-1', index: 1 });
+    });
+
+    it('places target outside after collapsed group header', () => {
+      const target = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'grp-1',
+        relativeX: 40,
+        position: 'after',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(), // collapsed
+      });
+      // Always outside collapsed group: root index 2
+      expect(target).toEqual({ parentId: null, index: 2 });
+    });
+
+    it('allows dropping inside empty expanded group header with indent', () => {
+      const emptyGroupNodes = {
+        ...testNodes,
+        'grp-empty': { id: 'grp-empty', type: 'manual_group' as const, children_ids: [] },
+      };
+      const emptyRoots = ['wp-0', 'grp-empty'];
+
+      const targetInside = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'grp-empty',
+        relativeX: 30, // >= 28
+        position: 'after',
+        rootNodeIds: emptyRoots,
+        nodes: emptyGroupNodes,
+        expandedNodes: new Set(['grp-empty']),
+      });
+      expect(targetInside).toEqual({ parentId: 'grp-empty', index: 0 });
+
+      const targetOutside = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'grp-empty',
+        relativeX: 10, // < 28
+        position: 'after',
+        rootNodeIds: emptyRoots,
+        nodes: emptyGroupNodes,
+        expandedNodes: new Set(['grp-empty']),
+      });
+      expect(targetOutside).toBeNull(); // root end
+    });
+
+    it('allows dropping inside expanded group header WITH children with indent', () => {
+      const targetInside = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'grp-1', // has children ['c1', 'c2']
+        relativeX: 30, // >= 28
+        position: 'after',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(['grp-1']),
+      });
+      expect(targetInside).toEqual({ parentId: 'grp-1', index: 0 });
+
+      const targetOutside = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'grp-1',
+        relativeX: 10, // < 28
+        position: 'after',
+        rootNodeIds: testRoots,
+        nodes: testNodes,
+        expandedNodes: new Set(['grp-1']),
+      });
+      // grp-1 is at root index 1, so outside after grp-1 is root index 2
+      expect(targetOutside).toEqual({ parentId: null, index: 2 });
+    });
+
+    it('handles deeply nested groups boundary snapping', () => {
+      const nestedNodes: Record<string, WaypointNode> = {
+        'top-grp': { id: 'top-grp', type: 'manual_group', children_ids: ['sub-grp'] },
+        'sub-grp': { id: 'sub-grp', type: 'manual_group', children_ids: ['deep-c'] },
+        'deep-c': { id: 'deep-c', type: 'manual' },
+        'wp-after': { id: 'wp-after', type: 'manual' },
+      };
+      const nestedRoots = ['top-grp', 'wp-after'];
+      const expanded = new Set(['top-grp', 'sub-grp']);
+
+      // Dropping after deep-c (innermost child) with high indent -> inside sub-grp (depth 2)
+      const targetInnermost = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'deep-c',
+        relativeX: 35,
+        position: 'after',
+        rootNodeIds: nestedRoots,
+        nodes: nestedNodes,
+        expandedNodes: expanded,
+      });
+      expect(targetInnermost).toEqual({ parentId: 'sub-grp', index: 1 });
+
+      // Dropping after deep-c with low indent -> outermost parent (root after top-grp, depth 0)
+      const targetOutermost = determineMultiDepthDropTarget({
+        activeId: '__insertion_bar__',
+        overId: 'deep-c',
+        relativeX: 5,
+        position: 'after',
+        rootNodeIds: nestedRoots,
+        nodes: nestedNodes,
+        expandedNodes: expanded,
+      });
+      expect(targetOutermost).toEqual({ parentId: null, index: 1 });
     });
   });
 });

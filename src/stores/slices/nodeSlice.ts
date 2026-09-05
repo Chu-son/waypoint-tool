@@ -9,6 +9,9 @@ import {
   getFlattenedNodeIds,
   getNextSequentialName,
   validateAndCorrectInsertionTarget,
+  isInsertableContainer,
+  expandSelectionWithDescendants,
+  mapInsertionTarget,
 } from '../../utils/treeUtils';
 
 export type NodeSlice = {
@@ -19,7 +22,13 @@ export type NodeSlice = {
   
   anchorNodeId: string | null;
   setAnchorNode: (id: string | null) => void;
-  addNode: (node: WaypointNode, parentId?: string, options?: { skipRecalculate?: boolean }) => void;
+  addNode: (node: WaypointNode, parentId?: string | null, options?: { skipRecalculate?: boolean }) => void;
+  addNodes: (
+    nodes: WaypointNode[],
+    parentId?: string | null,
+    targetIndex?: number,
+    options?: { skipRecalculate?: boolean }
+  ) => void;
   updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => void;
   updateNodes: (updates: Record<string, Partial<WaypointNode>>, options?: { skipRecalculate?: boolean }) => void;
   renameNode: (id: string, name: string) => void;
@@ -46,60 +55,83 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
   setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
 
-  setInsertionTarget: (target: InsertionTarget | null) => set({
-    insertionTarget: target,
-  }),
+  setInsertionTarget: (target: InsertionTarget | null) => set((state) => ({
+    insertionTarget: validateAndCorrectInsertionTarget(target, state.rootNodeIds, state.nodes),
+  })),
 
-  addNode: (node: WaypointNode, parentId?: string, options?: { skipRecalculate?: boolean }) => {
+  addNodes: (
+    nodesToAdd: WaypointNode[],
+    parentId?: string | null,
+    targetIndex?: number,
+    options?: { skipRecalculate?: boolean }
+  ) => {
+    if (!nodesToAdd || nodesToAdd.length === 0) return;
     get().pushHistorySnapshot();
     set((state) => {
-      const newNodes = { ...state.nodes, [node.id]: node };
+      const newNodes = { ...state.nodes };
+      nodesToAdd.forEach((n) => {
+        newNodes[n.id] = n;
+      });
+      const nodeIds = nodesToAdd.map((n) => n.id);
       let newRootIds = [...state.rootNodeIds];
 
+      const isExplicitPlacement = parentId !== undefined || targetIndex !== undefined;
       const effectiveParentId = parentId !== undefined
-        ? parentId
-        : state.insertionTarget?.parentId ?? undefined;
+        ? (parentId ?? undefined)
+        : (state.insertionTarget?.parentId ?? undefined);
 
       let nextInsertionTarget = state.insertionTarget;
 
       if (effectiveParentId && newNodes[effectiveParentId]) {
         const parent = newNodes[effectiveParentId];
         const children = [...(parent.children_ids || [])];
-        const insIdx = (state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0)
-          ? Math.min(state.insertionTarget.index, children.length)
+        let insIdx = targetIndex !== undefined
+          ? Math.min(targetIndex, children.length)
           : children.length;
 
-        children.splice(insIdx, 0, node.id);
+        if (!isExplicitPlacement && state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+          insIdx = Math.min(state.insertionTarget.index, children.length);
+        }
+
+        children.splice(insIdx, 0, ...nodeIds);
         newNodes[effectiveParentId] = {
           ...parent,
           children_ids: children,
         };
 
-        if (state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
-          nextInsertionTarget = { parentId: effectiveParentId, index: insIdx + 1 };
+        if (!isExplicitPlacement && state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+          nextInsertionTarget = { parentId: effectiveParentId, index: insIdx + nodeIds.length };
         }
       } else {
-        const insIdx = (state.insertionTarget?.parentId === null && state.insertionTarget !== null && state.insertionTarget.index >= 0)
-          ? Math.min(state.insertionTarget.index, newRootIds.length)
+        let insIdx = targetIndex !== undefined
+          ? Math.min(targetIndex, newRootIds.length)
           : newRootIds.length;
 
-        newRootIds.splice(insIdx, 0, node.id);
+        if (!isExplicitPlacement && state.insertionTarget?.parentId === null && state.insertionTarget !== null && state.insertionTarget.index >= 0) {
+          insIdx = Math.min(state.insertionTarget.index, newRootIds.length);
+        }
 
-        if (state.insertionTarget?.parentId === null && state.insertionTarget.index >= 0) {
-          nextInsertionTarget = { parentId: null, index: insIdx + 1 };
+        newRootIds.splice(insIdx, 0, ...nodeIds);
+
+        if (!isExplicitPlacement && state.insertionTarget?.parentId === null && state.insertionTarget.index >= 0) {
+          nextInsertionTarget = { parentId: null, index: insIdx + nodeIds.length };
         }
       }
 
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
-        insertionTarget: nextInsertionTarget,
+        insertionTarget: validateAndCorrectInsertionTarget(nextInsertionTarget, newRootIds, newNodes),
         isDirty: true,
       };
     });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
       get().debouncedRecalculatePath(150);
     }
+  },
+
+  addNode: (node: WaypointNode, parentId?: string | null, options?: { skipRecalculate?: boolean }) => {
+    get().addNodes([node], parentId, undefined, options);
   },
 
   updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => {
@@ -228,10 +260,19 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         newRootIds.splice(safeIdx, 0, newGroupId);
       }
 
+      const nextTarget = mapInsertionTarget(
+        state.insertionTarget,
+        state.rootNodeIds,
+        state.nodes,
+        newRootIds,
+        newNodes
+      );
+
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
-        selectedNodeIds: [newGroupId],
+        insertionTarget: nextTarget,
+        selectedNodeIds: expandSelectionWithDescendants([newGroupId], newNodes),
         isDirty: true,
       };
     });
@@ -275,13 +316,19 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         });
       }
 
-      const nextTarget = validateAndCorrectInsertionTarget(state.insertionTarget, newRootIds, newNodes);
+      const nextTarget = mapInsertionTarget(
+        state.insertionTarget,
+        state.rootNodeIds,
+        state.nodes,
+        newRootIds,
+        newNodes
+      );
 
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: childIds.length > 0 ? childIds : [],
+        selectedNodeIds: expandSelectionWithDescendants(childIds, newNodes),
         isDirty: true,
       };
     });
@@ -298,6 +345,13 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
   moveNodesInTree: (movingIds: string[], targetId: string, position: 'before' | 'after' | 'inside') => {
     if (!movingIds || movingIds.length === 0 || !targetId) return;
     if (movingIds.includes(targetId) && position !== 'inside') return;
+
+    if (position === 'inside') {
+      const targetNode = get().nodes[targetId];
+      if (!targetNode || !isInsertableContainer(targetNode)) {
+        return; // generator や manual へのドロップ投入拒絶
+      }
+    }
 
     get().pushHistorySnapshot();
 
@@ -384,7 +438,13 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         }
       }
 
-      const nextTarget = validateAndCorrectInsertionTarget(state.insertionTarget, newRootIds, newNodes);
+      const nextTarget = mapInsertionTarget(
+        state.insertionTarget,
+        state.rootNodeIds,
+        state.nodes,
+        newRootIds,
+        newNodes
+      );
 
       return {
         nodes: newNodes,
@@ -444,7 +504,13 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         }
       });
 
-      const nextTarget = validateAndCorrectInsertionTarget(state.insertionTarget, newRootIds, newNodes);
+      const nextTarget = mapInsertionTarget(
+        state.insertionTarget,
+        state.rootNodeIds,
+        state.nodes,
+        newRootIds,
+        newNodes
+      );
 
       return {
         nodes: newNodes,
@@ -462,15 +528,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
   selectNodes: (ids: string[], multi = false) => set((state) => {
     // グループが含まれる場合、その全子孫ノードIDを自動収集して展開（generatorは除外）
-    const expandedTargetIds = new Set<string>();
-    ids.forEach((id) => {
-      expandedTargetIds.add(id);
-      const node = state.nodes[id];
-      if (node && (node.type === 'manual_group' || node.type === 'group')) {
-        collectDescendantIds(id, state.nodes).forEach((dId) => expandedTargetIds.add(dId));
-      }
-    });
-    const targetIds = Array.from(expandedTargetIds);
+    const targetIds = expandSelectionWithDescendants(ids, state.nodes);
 
     const nextIds = multi ? (() => {
       const current = new Set(state.selectedNodeIds);
@@ -618,8 +676,8 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
-        insertionTarget: nextInsertionTarget,
-        selectedNodeIds: createdTopLevelIds,
+        insertionTarget: validateAndCorrectInsertionTarget(nextInsertionTarget, newRootIds, newNodes),
+        selectedNodeIds: expandSelectionWithDescendants(createdTopLevelIds, newNodes),
         isDirty: true,
       };
     });
