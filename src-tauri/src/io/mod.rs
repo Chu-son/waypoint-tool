@@ -385,4 +385,73 @@ mod tests {
         assert_eq!(node["transform"]["qz"], 0.0);
         assert_eq!(node["transform"]["qw"], 1.0);
     }
+
+    #[test]
+    fn test_save_and_load_generator_node_with_baseline_and_unknown_fields() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test_generator_project.wptroj");
+        let path_str = file_path.to_str().unwrap();
+
+        let project_data = serde_json::json!({
+            "version": 1,
+            "root_node_ids": ["gen1"],
+            "nodes": {
+                "gen1": {
+                    "id": "gen1",
+                    "type": "generator",
+                    "name": "Sweep Generator",
+                    "plugin_id": "sweep_generator",
+                    "source_execution_id": "exec-12345",
+                    "children_ids": ["wp1"],
+                    "generator_params": {
+                        "properties": { "pitch": 1.5 },
+                        "interaction_data": { "start": { "x": 0.0, "y": 0.0 } }
+                    },
+                    "plugin_data": {
+                        "total_length": 42.5,
+                        "sub_metrics": { "efficiency": 0.95 }
+                    },
+                    "baseline_waypoints": [
+                        {
+                            "name": "Base WP 1",
+                            "transform": { "x": 1.0, "y": 2.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+                            "options": { "speed": 1.2 }
+                        }
+                    ],
+                    "unknown_nested_future_field": {
+                        "arbitrary_key": [1, 2, 3],
+                        "deeply": { "nested": true }
+                    }
+                },
+                "wp1": {
+                    "id": "wp1",
+                    "type": "manual",
+                    "name": "WP 1",
+                    "transform": { "x": 1.0, "y": 2.0, "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0 },
+                    "options": { "speed": 1.2 }
+                }
+            }
+        });
+
+        // Save
+        let save_res = save_project(path_str, &project_data);
+        assert!(save_res.is_ok(), "Save project failed");
+
+        // Load
+        let load_res = load_project(path_str);
+        assert!(load_res.is_ok(), "Load project failed");
+
+        let loaded_data = load_res.unwrap();
+        assert_eq!(loaded_data["version"], 1);
+        let gen_node = &loaded_data["nodes"]["gen1"];
+        assert_eq!(gen_node["type"], "generator");
+        assert_eq!(gen_node["plugin_id"], "sweep_generator");
+        assert_eq!(gen_node["source_execution_id"], "exec-12345");
+        assert_eq!(gen_node["plugin_data"]["total_length"], 42.5);
+        assert_eq!(gen_node["plugin_data"]["sub_metrics"]["efficiency"], 0.95);
+        assert_eq!(gen_node["baseline_waypoints"][0]["name"], "Base WP 1");
+        assert_eq!(gen_node["baseline_waypoints"][0]["transform"]["x"], 1.0);
+        assert_eq!(gen_node["baseline_waypoints"][0]["options"]["speed"], 1.2);
+        assert_eq!(gen_node["unknown_nested_future_field"]["deeply"]["nested"], true);
+    }
 }

@@ -59,11 +59,12 @@ describe('CustomLayerInspector', () => {
     const generateBtn = screen.getByText('Generate Layer');
     fireEvent.click(generateBtn);
 
-    // After async run, layer should be added
+    // After async run, layer should be added and execution finished
     await vi.waitFor(() => {
       const layers = useAppStore.getState().customLayers;
       expect(layers.length).toBeGreaterThan(0);
       expect(layers[0].type).toBe('plugin');
+      expect(screen.queryByText('Generating...')).not.toBeInTheDocument();
     });
   });
 
@@ -130,6 +131,7 @@ describe('CustomLayerInspector', () => {
 
     await vi.waitFor(() => {
       expect(BackendAPI.runPlugin).toHaveBeenCalled();
+      expect(screen.queryByText('Generating...')).not.toBeInTheDocument();
     });
   });
 });

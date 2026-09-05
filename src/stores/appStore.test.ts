@@ -244,6 +244,29 @@ describe('AppStore Zustand Store', () => {
     expect(useAppStore.getState().pluginInteractionData).toEqual({});
   });
 
+  it('should map legacy_ids aliases in setPlugins', () => {
+    const { setPlugins } = useAppStore.getState();
+    const pluginInstance = {
+      id: 'sweep_offset_lines_generator',
+      manifest: {
+        name: 'Sweep Offset Lines Generator',
+        type: 'python',
+        executable: 'main.py',
+        inputs: [],
+        properties: [],
+        legacy_ids: ['SweepOffsetLinesGenerator', 'SweepGeneratorRS'],
+      },
+      folder_path: '/plugins/sweep',
+      is_builtin: true,
+    } as any;
+
+    setPlugins({ sweep_offset_lines_generator: pluginInstance });
+    const plugins = useAppStore.getState().plugins;
+    expect(plugins['sweep_offset_lines_generator']).toBe(pluginInstance);
+    expect(plugins['SweepOffsetLinesGenerator']).toBe(pluginInstance);
+    expect(plugins['SweepGeneratorRS']).toBe(pluginInstance);
+  });
+
   // --- 要件10: エクスポートサフィックス ---
 
   it('should update default export format suffix', () => {
@@ -421,5 +444,28 @@ describe('AppStore Zustand Store', () => {
     resetProject();
     state = useAppStore.getState();
     expect(state.mapLayers).toEqual([]);
+  });
+
+  it('should clear isMapEditMode and handle state transitions on setActiveTool', () => {
+    const store = useAppStore.getState();
+    
+    // Set map edit mode to true
+    store.setMapEditMode(true);
+    expect(useAppStore.getState().isMapEditMode).toBe(true);
+
+    // Switching tool to 'select' should clear isMapEditMode
+    store.setActiveTool('select');
+    expect(useAppStore.getState().isMapEditMode).toBe(false);
+    expect(useAppStore.getState().activeTool).toBe('select');
+
+    // Setting map edit mode again and switching to 'add_point'
+    store.setMapEditMode(true);
+    store.setActiveTool('add_point');
+    expect(useAppStore.getState().isMapEditMode).toBe(false);
+    expect(useAppStore.getState().activeTool).toBe('add_point');
+
+    // Switching to add_generator opens inspector
+    store.setActiveTool('add_generator');
+    expect(useAppStore.getState().rightPanelActiveTab).toBe('inspector');
   });
 });

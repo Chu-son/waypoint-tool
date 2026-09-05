@@ -311,4 +311,107 @@ describe('projectPersistence roundtrip & strict validation', () => {
     // Clean up
     useAppStore.setState({ isCustomUiMode: false, customUiConfig: null });
   });
+
+  it('preserves generator node with baseline_waypoints, plugin_id, generator_params, and plugin_data on roundtrip', () => {
+    const projectWithGenerator: StrictProjectData = {
+      version: 1,
+      root_node_ids: ['gen-1'],
+      nodes: {
+        'gen-1': {
+          id: 'gen-1',
+          type: 'generator',
+          name: 'Sweep Path',
+          plugin_id: 'sweep_offset_lines_generator',
+          source_execution_id: 'exec-999',
+          children_ids: ['child-1'],
+          generator_params: {
+            properties: { spacing: 1.5, angle: 45 },
+            interaction_data: { start_point: { x: 5.0, y: 10.0 } },
+          },
+          plugin_data: {
+            coverage_percentage: 98.4,
+            metrics: { steps: 120 },
+          },
+          baseline_waypoints: [
+            {
+              name: 'Base WP 1',
+              transform: { x: 5.0, y: 10.0, qx: 0, qy: 0, qz: 0, qw: 1 },
+              options: { speed: 1.0 },
+            },
+          ],
+          unknown_node_field: {
+            deeply: { nested: true },
+            arbitrary_list: [1, 2, 3],
+          },
+        } as any,
+        'child-1': {
+          id: 'child-1',
+          type: 'manual',
+          name: 'WP 1',
+          transform: { x: 5.0, y: 10.0, qx: 0, qy: 0, qz: 0, qw: 1 },
+          options: { speed: 1.0 },
+          children_ids: [],
+        },
+      },
+      map_layers: [],
+      custom_layers: [],
+      annotation_objects: [],
+      annotation_groups: {},
+      root_annotation_ids: [],
+      export_regions: [],
+      options_schema: null,
+      export_templates: [],
+      default_export_formats: DEFAULT_EXPORT_FORMATS,
+      robot_footprint: DEFAULT_ROBOT_FOOTPRINT,
+      occupancy_settings: DEFAULT_OCCUPANCY_SETTINGS,
+      default_map_opacity: DEFAULT_MAP_OPACITY,
+      left_panel_view_mode: 'tabs',
+      right_panel_view_mode: 'tabs',
+      active_path_calculator_plugin_id: null,
+      path_calculator_params: {},
+      auto_recalculate_path: true,
+      path_color: '#3b82f6',
+      path_width: 0.1,
+      path_opacity: 0.7,
+      sync_path_width_with_footprint: false,
+      index_start_index: 0,
+      decimal_precision: 6,
+      custom_ui_data: {
+        workflow_state: {
+          current_step_index: 0,
+          max_reached_step_index: 0,
+          workflow_variables: {},
+          step_execution_ids: {},
+        },
+      },
+    };
+
+    useAppStore.getState().setProjectData(projectWithGenerator);
+    const roundtrip = buildProjectData(useAppStore.getState());
+
+    const genNode = roundtrip.nodes['gen-1'] as any;
+    expect(genNode).toBeDefined();
+    expect(genNode.type).toBe('generator');
+    expect(genNode.plugin_id).toBe('sweep_offset_lines_generator');
+    expect(genNode.source_execution_id).toBe('exec-999');
+    expect(genNode.generator_params).toEqual({
+      properties: { spacing: 1.5, angle: 45 },
+      interaction_data: { start_point: { x: 5.0, y: 10.0 } },
+    });
+    expect(genNode.plugin_data).toEqual({
+      coverage_percentage: 98.4,
+      metrics: { steps: 120 },
+    });
+    expect(genNode.baseline_waypoints).toEqual([
+      {
+        name: 'Base WP 1',
+        transform: { x: 5.0, y: 10.0, qx: 0, qy: 0, qz: 0, qw: 1 },
+        options: { speed: 1.0 },
+      },
+    ]);
+    expect(genNode.unknown_node_field).toEqual({
+      deeply: { nested: true },
+      arbitrary_list: [1, 2, 3],
+    });
+  });
 });
