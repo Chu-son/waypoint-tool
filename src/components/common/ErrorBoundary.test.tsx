@@ -32,7 +32,7 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText(/Test explosive crash/)).toBeInTheDocument();
     expect(screen.getByText('再試行')).toBeInTheDocument();
     expect(screen.getByText('再読み込み')).toBeInTheDocument();
-    expect(screen.getByText('設定をリセット')).toBeInTheDocument();
+    expect(screen.queryByText('設定をリセット')).not.toBeInTheDocument();
 
     consoleErrorSpy.mockRestore();
   });

@@ -1,5 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle, RefreshCw, RotateCcw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
@@ -33,15 +33,6 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleReload = () => {
-    window.location.reload();
-  };
-
-  private handleResetStorageAndReload = () => {
-    try {
-      localStorage.removeItem('waypoint-tool-storage');
-    } catch (e) {
-      console.error('Failed to clear storage:', e);
-    }
     window.location.reload();
   };
 
@@ -88,14 +79,6 @@ export class ErrorBoundary extends Component<Props, State> {
               >
                 <RefreshCw size={13} />
                 再読み込み
-              </button>
-              <button
-                onClick={this.handleResetStorageAndReload}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-danger-base/10 hover:bg-danger-base/20 text-danger-base border border-danger-base/30 transition-colors flex items-center gap-1.5"
-                title="ローカルに保存されたUI設定を初期化して再読み込みします"
-              >
-                <RotateCcw size={13} />
-                設定をリセット
               </button>
             </div>
           </div>
