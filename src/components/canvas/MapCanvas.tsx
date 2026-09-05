@@ -190,7 +190,10 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
 
 export function MapCanvas() {
   const activeTool = useAppStore(state => state.activeTool);
+  const appMode = useAppStore(state => state.appMode);
+  const registerCanvasAbortHandler = useAppStore(state => state.registerCanvasAbortHandler);
   const addNode = useAppStore(state => state.addNode);
+  const removeNodes = useAppStore(state => state.removeNodes);
   const selectNodes = useAppStore(state => state.selectNodes);
   const nodes = useAppStore(state => state.nodes);
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
@@ -198,6 +201,7 @@ export function MapCanvas() {
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
   const updateNodes = useAppStore(state => state.updateNodes);
+  const removeExportRegion = useAppStore(state => state.removeExportRegion);
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
@@ -351,7 +355,7 @@ export function MapCanvas() {
     };
   }, [previewTexture]);
 
-  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region' | 'drag_points_item' | 'set_yaw_points_item'>('none');
+  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region' | 'drag_points_item' | 'set_yaw_points_item' | 'marquee_select'>('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
   const movingNodesState = useRef<{
@@ -367,9 +371,161 @@ export function MapCanvas() {
   const pointsInputKey = useRef<string>('');
   const pointsItemIndex = useRef<number>(-1);
   const regionDragOffset = useRef({ x: 0, y: 0 });
+  const initialYawTransform = useRef<{ x: number; y: number; z?: number; qx: number; qy: number; qz: number; qw: number } | null>(null);
+  const isCreatingNewNodeOnYaw = useRef<boolean>(false);
+  const justAbortedRef = useRef<boolean>(false);
+
+  const [marqueeBox, setMarqueeBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const marqueeOrigin = useRef<{ x: number; y: number } | null>(null);
+
+  const drawMarquee = useCallback((g: Graphics) => {
+    g.clear();
+    if (!marqueeBox) return;
+    const minX = Math.min(marqueeBox.x1, marqueeBox.x2);
+    const maxX = Math.max(marqueeBox.x1, marqueeBox.x2);
+    const minY = Math.min(marqueeBox.y1, marqueeBox.y2);
+    const maxY = Math.max(marqueeBox.y1, marqueeBox.y2);
+    const w = maxX - minX;
+    const h = maxY - minY;
+
+    g.fillStyle = { color: 0x3b82f6, alpha: 0.15 };
+    g.strokeStyle = { width: 1.5 / scale, color: 0x3b82f6, alpha: 0.8 };
+    g.rect(minX, minY, w, h);
+    g.fill();
+    g.stroke();
+  }, [marqueeBox, scale]);
 
   const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
+
+  const abortRef = useRef<() => boolean>(() => false);
+
+  const abort = useCallback((): boolean => {
+    // 1. Dragging node(s): rollback initial positions & cancel transaction
+    if (interactionMode.current === 'drag_node' && movingNodesState.current) {
+      const rollback: Record<string, Partial<WaypointNode>> = {};
+      Object.entries(movingNodesState.current.initialTransforms).forEach(([id, initTr]) => {
+        rollback[id] = { transform: { ...initTr } };
+      });
+      updateNodes(rollback, { skipRecalculate: true });
+      useAppStore.getState().endHistoryTransaction();
+      movingNodesState.current = null;
+      activeNodeId.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 2. Setting yaw: delete temporary created node if freshly added, or rollback orientation if rotating existing node
+    if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
+      if (isCreatingNewNodeOnYaw.current) {
+        removeNodes([activeNodeId.current]);
+      } else if (initialYawTransform.current) {
+        updateNodes({
+          [activeNodeId.current]: { transform: { ...initialYawTransform.current } }
+        }, { skipRecalculate: true });
+      }
+      useAppStore.getState().endHistoryTransaction();
+      activeNodeId.current = null;
+      initialYawTransform.current = null;
+      isCreatingNewNodeOnYaw.current = false;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 3. Marquee selection: cancel marquee
+    if (interactionMode.current === 'marquee_select') {
+      interactionMode.current = 'none';
+      setMarqueeBox(null);
+      marqueeOrigin.current = null;
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 4. Export region drawing / moving / resizing
+    if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
+      removeExportRegion?.(activeNodeId.current);
+      useAppStore.getState().endHistoryTransaction();
+      activeNodeId.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    if (interactionMode.current === 'move_export_region' || interactionMode.current === 'resize_export_region') {
+      regionDragOffset.current = { x: 0, y: 0 };
+      rectDragCorner.current = 'max';
+      activeNodeId.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 5. Plugin parameter gestures
+    if (
+      interactionMode.current === 'draw_rect' ||
+      interactionMode.current === 'drag_rect_corner' ||
+      interactionMode.current === 'set_rect_rotation' ||
+      interactionMode.current === 'drag_points_item' ||
+      interactionMode.current === 'set_yaw_points_item' ||
+      interactionMode.current === 'set_yaw_plugin'
+    ) {
+      interactionMode.current = 'none';
+      activeNodeId.current = null;
+      pointsInputKey.current = '';
+      pointsItemIndex.current = -1;
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 6. Annotation drawing
+    if (interactionMode.current === ('draw_annotation' as any)) {
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 7. Annotation move / transform
+    if (interactionMode.current === ('move_annotation' as any) || interactionMode.current === ('transform_annotation' as any)) {
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 8. Map edit draw / move / resize
+    if (
+      interactionMode.current === ('edit_map_draw_rect' as any) ||
+      interactionMode.current === ('edit_map_draw_circle' as any) ||
+      interactionMode.current === ('edit_map_freehand' as any) ||
+      interactionMode.current === ('edit_map_draw_line' as any) ||
+      interactionMode.current === ('edit_map_move_object' as any) ||
+      interactionMode.current === ('edit_map_resize_object' as any) ||
+      interactionMode.current === ('edit_map_set_rect_rotation' as any)
+    ) {
+      if (interactionMode.current === ('edit_map_move_object' as any) || interactionMode.current === ('edit_map_resize_object' as any)) {
+        useAppStore.getState().endHistoryTransaction();
+      }
+      movingEditObject.current = null;
+      resizingEditObject.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 9. Pan map
+    if (interactionMode.current === 'pan_map') {
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    return false;
+  }, [updateNodes, removeNodes, removeExportRegion]);
+
+  abortRef.current = abort;
+
+  useEffect(() => {
+    return registerCanvasAbortHandler(abort);
+  }, [registerCanvasAbortHandler, abort]);
+
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      abortRef.current?.();
+    };
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, []);
 
   // Map Edit hooks
   const {
@@ -816,6 +972,20 @@ export function MapCanvas() {
       lastMiddleClickTime.current = now;
     }
 
+    // Shift + Left Click on canvas background -> Start marquee selection
+    if (e.button === 0 && e.shiftKey && (activeTool === 'select' || appMode?.mode === 'select') && interactionMode.current === 'none') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      marqueeOrigin.current = worldPos;
+      setMarqueeBox({ x1: worldPos.x, y1: worldPos.y, x2: worldPos.x, y2: worldPos.y });
+      interactionMode.current = 'marquee_select';
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+
     // Middle click or (Left click + Select Mode + Not hovering over node) -> Pan Map
     if (e.button === 1 || (e.button === 0 && activeTool === 'select' && interactionMode.current === 'none')) {
       interactionMode.current = 'pan_map';
@@ -831,6 +1001,8 @@ export function MapCanvas() {
 
       const id = uuidv4();
       useAppStore.getState().beginHistoryTransaction();
+      isCreatingNewNodeOnYaw.current = true;
+      initialYawTransform.current = null;
       addNode({
         id,
         type: 'manual',
@@ -1239,6 +1411,16 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === 'marquee_select' && marqueeOrigin.current) {
+      setMarqueeBox({
+        x1: marqueeOrigin.current.x,
+        y1: marqueeOrigin.current.y,
+        x2: worldX,
+        y2: worldY,
+      });
+      return;
+    }
+
     if (interactionMode.current === 'pan_map') {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
@@ -1553,6 +1735,16 @@ export function MapCanvas() {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (justAbortedRef.current) {
+      justAbortedRef.current = false;
+      isCreatingNewNodeOnYaw.current = false;
+      initialYawTransform.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      return;
+    }
+
     if (isMapEditMode) {
       if (interactionMode.current === ('edit_map_draw_rect' as any)) {
         handleRectDrawEnd();
@@ -1602,6 +1794,41 @@ export function MapCanvas() {
       handleTransformAnnotationEnd();
       e.currentTarget.releasePointerCapture(e.pointerId);
       interactionMode.current = 'none';
+      return;
+    }
+
+    if (interactionMode.current === 'marquee_select') {
+      if (marqueeBox) {
+        const minX = Math.min(marqueeBox.x1, marqueeBox.x2);
+        const maxX = Math.max(marqueeBox.x1, marqueeBox.x2);
+        const minY = Math.min(marqueeBox.y1, marqueeBox.y2);
+        const maxY = Math.max(marqueeBox.y1, marqueeBox.y2);
+
+        const allNodes = useAppStore.getState().nodes;
+        const hitNodeIds: string[] = [];
+        Object.values(allNodes).forEach(node => {
+          if (node.transform) {
+            const nx = node.transform.x;
+            const ny = node.transform.y;
+            if (nx >= minX && nx <= maxX && ny >= minY && ny <= maxY) {
+              hitNodeIds.push(node.id);
+            }
+          }
+        });
+
+        const isCumulative = e.shiftKey || e.metaKey || e.ctrlKey;
+        if (isCumulative) {
+          const currentSelected = useAppStore.getState().selectedNodeIds;
+          const merged = Array.from(new Set([...currentSelected, ...hitNodeIds]));
+          selectNodes(merged);
+        } else {
+          selectNodes(hitNodeIds);
+        }
+      }
+      setMarqueeBox(null);
+      marqueeOrigin.current = null;
+      interactionMode.current = 'none';
+      e.currentTarget.releasePointerCapture(e.pointerId);
       return;
     }
 
@@ -1700,16 +1927,18 @@ export function MapCanvas() {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={(e) => {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+        abortRef.current?.();
+        setCursorPosition(null);
+      }}
+      onLostPointerCapture={() => {
+        abortRef.current?.();
+        setCursorPosition(null);
+      }}
       onPointerLeave={() => { 
-        if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
-          useAppStore.getState().endHistoryTransaction();
-          if (useAppStore.getState().autoRecalculatePath && useAppStore.getState().activePathCalculatorPluginId) {
-            useAppStore.getState().recalculatePath({ immediate: true });
-          }
-        }
-        interactionMode.current = 'none';
-        activeNodeId.current = null;
-        movingNodesState.current = null;
         setCursorPosition(null);
       }}
       onWheel={handleWheel}
@@ -1906,6 +2135,9 @@ export function MapCanvas() {
             onNodeHandlePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
               if (isMapEditMode) return;
               e.stopPropagation();
+              const existingNode = useAppStore.getState().nodes[nodeId];
+              initialYawTransform.current = existingNode?.transform ? { ...existingNode.transform } : null;
+              isCreatingNewNodeOnYaw.current = false;
               useAppStore.getState().beginHistoryTransaction();
               interactionMode.current = 'set_yaw';
               activeNodeId.current = nodeId;
@@ -1979,6 +2211,11 @@ export function MapCanvas() {
 
           {/* Render Snapping Guide */}
           <SnappingGuideLayer scale={scale} snapState={snapState} snapInput={snapInput} />
+
+          {/* Marquee Selection Rectangle */}
+          {marqueeBox && (
+            <pixiGraphics draw={drawMarquee} zIndex={10000} />
+          )}
 
         </pixiContainer>
       </Application>
