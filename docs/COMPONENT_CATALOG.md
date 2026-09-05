@@ -183,7 +183,7 @@
   - **概要**: パネルタブID（`project`, `inspector`, `layers`, `plugins`, `workflow`, `custom_html` 等）から対応するパネルコンポーネントを動的に解決・レンダリングするレジストリモジュール。
   - **主要Props**: なし
 - **`StatusBar`** ([`src/components/ui/StatusBar.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/StatusBar.tsx))
-  - **概要**: 画面最下部にマウスのワールド座標 (X, Y)、現在のズーム倍率、アクティブツール状態を表示するバー。
+  - **概要**: 画面最下部に常駐する高機能ステータスバー。状態機械と連動した「現在のモードバッジ」および「Escキー遷移先（Next on Esc）ボタン」、バックグラウンドタスク進捗、カーソル世界座標 (X, Y)・相対極座標・ローカル座標、挿入位置インジケータ、選択ノード数/総数カウンター、全経路長 (m)、未保存 (Dirty) インジケータ＆保存ボタン、スナップON/OFFトグル、マップ解像度 (m/px)、ズーム倍率および Fit ボタンを表示。
   - **主要Props**: なし
 
 ---
