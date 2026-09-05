@@ -24,6 +24,7 @@ vi.mock('lucide-react', () => ({
   RotateCcw: () => <div data-testid="rotate-ccw-icon" />,
   SlidersHorizontal: () => <div data-testid="sliders-horizontal-icon" />,
   Bookmark: () => <div data-testid="bookmark-icon" />,
+  Target: () => <div data-testid="target-icon" />,
 }));
 
 // Mock API

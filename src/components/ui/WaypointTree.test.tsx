@@ -18,6 +18,7 @@ vi.mock('lucide-react', () => ({
   Edit2: () => <div data-testid="edit-icon" />,
   ArrowDownToLine: () => <div data-testid="arrow-down-to-line-icon" />,
   X: () => <div data-testid="x-icon" />,
+  Target: () => <div data-testid="target-icon" />,
 }));
 
 // Mock Store

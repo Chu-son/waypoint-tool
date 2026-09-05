@@ -103,7 +103,7 @@ export function PathRouterMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1.5 w-80 bg-surface-panel/95 backdrop-blur-md border border-border-base shadow-2xl rounded-2xl p-4 z-50 animate-in fade-in slide-in-from-top-1 duration-100 space-y-4 max-h-[85vh] overflow-y-auto">
+        <div className="absolute left-0 top-full mt-1.5 w-80 bg-surface-panel/95 backdrop-blur-md border border-border-base shadow-2xl rounded-xl p-4 z-50 animate-in fade-in slide-in-from-top-1 duration-100 space-y-4 max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-border-base/40 pb-2">
             <div className="flex items-center gap-2">
               <Route size={16} className="text-accent-generator" />

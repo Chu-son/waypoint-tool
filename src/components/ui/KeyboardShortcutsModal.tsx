@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { Keyboard } from "lucide-react";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
 import { Button } from "./common/Button";
+import { Kbd } from "./common/Kbd";
 
 type KeyboardShortcutsModalProps = {
   isOpen: boolean;
@@ -35,14 +36,6 @@ const shortcuts = [
   { action: "Set / Clear Anchor", keys: ["Right Click Node"] },
   { action: "Copy Transform Element", keys: ["Right Click Label"] },
 ];
-
-function Kbd({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="bg-surface-base border-b-2 border-border-base px-2.5 py-1 rounded-md text-text-base text-[12px] font-mono shadow-sm">
-      {children}
-    </kbd>
-  );
-}
 
 function ShortcutRow({ action, keys }: { action: string; keys: string[] }) {
   return (

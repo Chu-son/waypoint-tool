@@ -353,9 +353,9 @@ function App() {
                 variant="secondary"
                 size="icon"
                 onClick={() => setLeftPanelOpen(true)}
-                className="pointer-events-auto h-10 w-10 bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={16} />
               </Button>
             ) : (
               <div />
@@ -366,9 +366,9 @@ function App() {
                 variant="secondary"
                 size="icon"
                 onClick={() => setRightPanelOpen(true)}
-                className="pointer-events-auto h-10 w-10 bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={16} />
               </Button>
             ) : (
               <div />

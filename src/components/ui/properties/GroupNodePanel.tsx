@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../common/Button";
-import { Folder, Unlink, Edit2, BoxSelect } from "lucide-react";
+import { Folder, Unlink, Edit2, BoxSelect, Target, Layers } from "lucide-react";
 import { WaypointNode } from "../../../types/store";
 
 interface GroupNodePanelProps {
@@ -111,20 +111,29 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
               <span className="font-bold text-text-base">{childCount}</span>
             </div>
             {childBreakdown.waypoints > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">🎯 Waypoints</span>
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted flex items-center gap-1">
+                  <Target size={12} className="shrink-0" />
+                  Waypoints
+                </span>
                 <span className="text-text-base">{childBreakdown.waypoints}</span>
               </div>
             )}
             {childBreakdown.groups > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">📁 Sub-Groups</span>
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted flex items-center gap-1">
+                  <Folder size={12} className="shrink-0" />
+                  Sub-Groups
+                </span>
                 <span className="text-text-base">{childBreakdown.groups}</span>
               </div>
             )}
             {childBreakdown.generators > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">⚙️ Generators</span>
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted flex items-center gap-1">
+                  <Layers size={12} className="shrink-0" />
+                  Generators
+                </span>
                 <span className="text-text-base">{childBreakdown.generators}</span>
               </div>
             )}
@@ -137,7 +146,7 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
             <Button
               variant="secondary"
               onClick={handleSelectChildren}
-              className="w-full h-9 gap-2"
+              className="w-full gap-2"
             >
               <BoxSelect size={14} />
               子要素をすべて選択
@@ -146,7 +155,7 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
           <Button
             variant="danger"
             onClick={() => ungroupNode(node.id)}
-            className="w-full h-9 gap-2"
+            className="w-full gap-2"
           >
             <Unlink size={14} />
             グループ解除 (Ungroup)

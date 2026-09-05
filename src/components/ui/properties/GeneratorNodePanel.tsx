@@ -196,7 +196,7 @@ export function GeneratorNodePanel({
               variant="primary"
               disabled={isExecuting}
               onClick={handleRegenerateClick}
-              className="w-full h-9 gap-2"
+              className="w-full gap-2"
             >
               {isExecuting ? (
                 <RefreshCcw size={14} className="animate-spin" />
@@ -217,7 +217,7 @@ export function GeneratorNodePanel({
                   explodeGenerator(node.id);
                 }
               }}
-              className="w-full h-9 gap-2"
+              className="w-full gap-2"
               title="Explode into individual manual waypoints"
             >
               <BoxSelect size={14} />
@@ -249,7 +249,7 @@ export function GeneratorNodePanel({
                   explodeGenerator(node.id);
                 }
               }}
-              className="w-full h-9 gap-2"
+              className="w-full gap-2"
               title="個別ウェイポイントに展開"
             >
               <BoxSelect size={14} />

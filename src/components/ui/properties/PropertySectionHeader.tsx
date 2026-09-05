@@ -28,8 +28,8 @@ export function PropertySectionHeader({
       {hasToggle && (
         <Button
           variant="ghost"
-          size="sm"
-          className="h-6 w-6 p-0 text-text-muted hover:text-text-base shrink-0"
+          size="icon-xs"
+          className="text-text-muted hover:text-text-base"
           onClick={(e) => {
             e.stopPropagation();
             onToggleVisible();

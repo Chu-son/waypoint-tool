@@ -178,7 +178,6 @@ export function SimplifiedControls({
                   <Select
                     value={val ?? c.default}
                     onChange={(e) => handleControlChange(c, e.target.value)}
-                    className="h-10 text-sm"
                   >
                     {c.options?.map((opt, oIdx) => (
                       <option key={oIdx} value={opt.value}>
@@ -211,7 +210,7 @@ export function SimplifiedControls({
                     step={c.step ?? 1}
                     value={val ?? c.default ?? 0}
                     onChange={(newVal) => handleControlChange(c, newVal)}
-                    className="h-10 text-sm font-mono"
+                    className="font-mono"
                   />
                 </FormField>
               );

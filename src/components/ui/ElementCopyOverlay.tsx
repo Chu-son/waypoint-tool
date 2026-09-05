@@ -1,6 +1,6 @@
 import { useAppStore } from '../../stores/appStore';
 import { FloatingActionBanner } from './common/FloatingActionBanner';
-import { Check, X, Copy } from 'lucide-react';
+import { Check, X, Copy, Target } from 'lucide-react';
 import { applyElementPaste } from '../../utils/transformUtils';
 
 export function ElementCopyOverlay() {
@@ -19,7 +19,6 @@ export function ElementCopyOverlay() {
   const targetNode = targetId ? nodes[targetId] : null;
   const targetIndex = targetNode ? rootNodeIds.indexOf(targetNode.id) : -1;
 
-  // Confirm paste action
   const handleConfirmPaste = () => {
     if (targetNode && elementCopyState) {
       applyElementPaste(targetNode, elementCopyState, anchorNodeId, nodes, updateNode);
@@ -33,13 +32,14 @@ export function ElementCopyOverlay() {
     <FloatingActionBanner
       icon={<Copy size={16} className="animate-pulse" />}
       title={`${elementCopyState.field.toUpperCase()} コピー中`}
-      subtitle={elementCopyState.coordSystem === 'world' ? 'World' : '⚓ Anchor相対'}
+      subtitle={elementCopyState.coordSystem === 'world' ? 'World' : 'Anchor 相対'}
       valueDisplay={elementCopyState.value}
       statusText={
         <div className="truncate min-w-0">
           {targetNode ? (
-            <span className="text-accent-generator font-medium flex items-center gap-1 truncate">
-              <span>🎯</span> Waypoint [{targetIndex >= 0 ? targetIndex + indexStartIndex : '?'}] に適用中
+            <span className="text-accent-generator font-medium flex items-center gap-1.5 truncate">
+              <Target size={13} className="shrink-0" />
+              Waypoint [{targetIndex >= 0 ? targetIndex + indexStartIndex : '?'}] に適用中
             </span>
           ) : (
             <span className="italic text-text-muted/70 truncate">Waypointをクリックして選択</span>

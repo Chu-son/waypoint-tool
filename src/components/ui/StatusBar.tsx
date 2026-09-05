@@ -14,8 +14,10 @@ import {
   Check,
   Loader2,
   Maximize2,
+  X,
 } from 'lucide-react';
 import { Slider } from './common/Slider';
+import { Kbd } from './common/Kbd';
 import { getPrecedingManualWaypoint, getFlattenedWaypointIds } from '../../utils/treeUtils';
 import { computeStatusInteraction, computeTotalPathDistance, StatusIconType, StatusModeVariant } from '../../utils/statusUtils';
 import { cn } from '../../utils/cn';
@@ -205,13 +207,11 @@ export const StatusBar: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleGlobalEscape()}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface-base border border-border-base text-text-muted hover:text-text-base hover:border-border-focus hover:bg-surface-hover transition-colors font-mono text-[11px] shrink-0"
+                className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-surface-base border border-border-base text-text-muted hover:text-text-base hover:border-border-focus hover:bg-surface-hover transition-colors text-[11px] shrink-0"
                 title={`Escキーまたはクリックで ${statusInfo.escActionLabel}`}
               >
-                <span className="font-semibold text-[10px] px-1 py-0.2 rounded bg-surface-panel border border-border-base/60 text-text-base">
-                  Esc
-                </span>
-                <span className="font-sans text-[11px] text-text-muted">{statusInfo.escActionLabel}</span>
+                <Kbd className="text-[10px] px-1 py-0.2">Esc</Kbd>
+                <span className="text-[11px] text-text-muted">{statusInfo.escActionLabel}</span>
               </button>
             )}
 
@@ -250,7 +250,9 @@ export const StatusBar: React.FC = () => {
             className="cursor-pointer font-sans text-[11px] px-1.5 py-0.5 rounded bg-primary-base/15 border border-primary-base/40 text-primary-base hover:bg-primary-base/25 transition-colors flex items-center gap-1"
             title="クリックで挿入位置指定を解除"
           >
-            📍 挿入: {insertionTarget.parentId ? (nodes[insertionTarget.parentId]?.name || 'Group') : 'ルート'} [{insertionTarget.index}] ✕
+            <MapPin size={11} className="text-primary-base shrink-0" />
+            <span>挿入: {insertionTarget.parentId ? (nodes[insertionTarget.parentId]?.name || 'Group') : 'ルート'} [{insertionTarget.index}]</span>
+            <X size={10} className="shrink-0 text-primary-base ml-0.5" />
           </button>
         )}
       </div>

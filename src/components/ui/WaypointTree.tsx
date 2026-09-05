@@ -14,6 +14,7 @@ import {
   Edit2,
   ArrowDownToLine,
   X,
+  Target,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
@@ -199,12 +200,12 @@ function SortableTreeNodeItem({
         onContextMenu={onContextMenu}
         style={{ paddingLeft: `${Math.min(depth * 10 + 6, 32)}px` }}
         className={cn(
-          'group relative flex items-center justify-between gap-1 py-1.5 pr-1.5 rounded-lg text-xs transition-all cursor-pointer border overflow-hidden',
+          'group relative flex items-center justify-between gap-1 py-1 pr-1.5 rounded-md text-xs transition-colors cursor-pointer border overflow-hidden',
           isSelected
             ? isGenerator
-              ? 'bg-accent-generator/20 border-accent-generator text-text-base shadow-sm ring-1 ring-accent-generator/30'
-              : 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30'
-            : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+              ? 'bg-accent-generator/15 border-accent-generator/50 text-text-base'
+              : 'bg-primary-base/15 border-primary-base/50 text-text-base'
+            : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
           isAnchor && 'border-accent-anchor/60 bg-accent-anchor/20',
           isAfterInsertion && 'opacity-40 grayscale-[35%] hover:opacity-75'
         )}
@@ -244,7 +245,7 @@ function SortableTreeNodeItem({
             ) : isGroup ? (
               <Folder size={13} className="text-accent-anchor" />
             ) : (
-              <span className="text-xs">🎯</span>
+              <Target size={13} className="text-primary-base" />
             )}
           </div>
 
@@ -277,8 +278,8 @@ function SortableTreeNodeItem({
                 {isContainer ? (node.name || defaultDisplayName) : defaultDisplayName}
               </span>
               {isAnchor && (
-                <span className="text-accent-anchor text-xs font-bold shrink-0" title="Anchor Point">
-                  ⚓
+                <span title="Anchor Point" className="shrink-0 flex items-center">
+                  <Anchor size={12} className="text-accent-anchor" />
                 </span>
               )}
             </div>

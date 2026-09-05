@@ -21,6 +21,7 @@ vi.mock('lucide-react', () => ({
   RotateCcw: () => <div data-testid="rotate-ccw-icon" />,
   FlipHorizontal2: () => <div data-testid="flip-horizontal-2-icon" />,
   RotateCw: () => <div data-testid="rotate-cw-icon" />,
+  Anchor: () => <div data-testid="anchor-icon" />,
 }));
 
 // Mock Store

@@ -68,10 +68,10 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
         {/* Option 1: Manual Vector Layer */}
         <div className="space-y-3">
           <FieldLabel className="text-xs">Option 1: Manual Vector Drawing</FieldLabel>
-          <div className="p-4 rounded-2xl border border-border-base/50 bg-surface-panel/40 hover:border-primary-base/50 transition-all space-y-3">
+          <div className="p-4 rounded-lg border border-border-base/50 bg-surface-panel/40 hover:border-primary-base/50 transition-all space-y-3">
             <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-primary-base/10 text-primary-base">
-                <Pencil size={20} />
+              <div className="p-2 rounded-md bg-primary-base/10 text-primary-base">
+                <Pencil size={18} />
               </div>
               <div className="flex-1 space-y-1">
                 <h4 className="text-sm font-bold text-text-base">Manual Vector Layer</h4>
@@ -94,7 +94,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
               <Button
                 variant="primary"
                 onClick={handleCreateManual}
-                className="h-8 text-xs font-bold gap-1.5 shrink-0"
+                className="h-8 text-xs font-medium gap-1.5 shrink-0"
               >
                 <Plus size={14} />
                 <span>Create Manual Layer</span>
@@ -118,7 +118,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
         <div className="space-y-3">
           <FieldLabel className="text-xs">Option 2: Plugin Generator</FieldLabel>
           {layerPlugins.length === 0 ? (
-            <div className="p-4 rounded-2xl border border-border-base/30 bg-surface-panel/20 text-center text-xs text-text-muted">
+            <div className="p-4 rounded-lg border border-border-base/30 bg-surface-panel/20 text-center text-xs text-text-muted">
               No <code>map_layer_generator</code> plugins currently installed.
             </div>
           ) : (
@@ -128,14 +128,14 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                   key={plugin.id}
                   onClick={() => handleSelectPlugin(plugin.id)}
                   className={cn(
-                    "p-3.5 rounded-2xl border border-border-base/40 bg-surface-panel/30",
-                    "hover:border-accent-automation/50 hover:bg-accent-automation/5 transition-all cursor-pointer",
+                    "p-3 rounded-lg border border-border-base/40 bg-surface-panel/30",
+                    "hover:border-accent-automation/50 hover:bg-accent-automation/5 transition-colors cursor-pointer",
                     "flex items-center justify-between gap-3 group"
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-accent-automation/10 text-accent-automation group-hover:scale-110 transition-transform">
-                      <Sparkles size={18} />
+                    <div className="p-2 rounded-md bg-accent-automation/10 text-accent-automation">
+                      <Sparkles size={16} />
                     </div>
                     <div>
                       <h4 className="text-xs font-bold text-text-base group-hover:text-accent-automation transition-colors">

@@ -27,11 +27,11 @@ export function PluginDataModal() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-surface-base/80 backdrop-blur-xs">
-      <div className="bg-surface-panel border border-border-base rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-surface-panel border border-border-base rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="px-5 py-4 border-b border-border-base/40 flex items-center justify-between bg-surface-panel/80">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-accent-automation/10 text-accent-automation border border-accent-automation/20">
+            <div className="p-2 rounded-md bg-accent-automation/10 text-accent-automation border border-accent-automation/20">
               <Code2 size={20} />
             </div>
             <div>

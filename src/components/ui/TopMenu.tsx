@@ -4,9 +4,10 @@ import { DialogAPI, BackendAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
-import { MousePointer2, Minus, Square, X } from "lucide-react";
+import { MousePointer2, Minus, Square, X, Check } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { confirmDiscardChanges } from "../../utils/projectGuard";
+import { Kbd } from "./common/Kbd";
 
 import * as LucideIcons from "lucide-react";
 
@@ -18,6 +19,7 @@ type MenuOption = {
   divider?: boolean;
   danger?: boolean;
   disabled?: boolean;
+  checked?: boolean;
 };
 
 function DropdownMenu({
@@ -63,7 +65,7 @@ function DropdownMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-56 bg-surface-panel/95 backdrop-blur-md border border-border-base shadow-2xl rounded-lg py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+        <div className="absolute left-0 top-full mt-1 min-w-56 bg-surface-panel/95 backdrop-blur-md border border-border-base shadow-2xl rounded-lg py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
           {options.map((opt, i) =>
             opt.divider ? (
               <div key={i} className="h-px bg-border-base/50 my-1 mx-2" />
@@ -77,20 +79,28 @@ function DropdownMenu({
                   onClose();
                 }}
                 className={cn(
-                  "w-full text-left px-4 py-1.5 text-[13px] flex justify-between items-center transition-colors group",
+                  "w-[calc(100%-0.5rem)] mx-1 text-left px-2.5 py-1.5 text-[13px] flex justify-between items-center transition-colors group rounded-md",
                   opt.disabled
                     ? "text-text-muted/40 cursor-not-allowed hover:bg-transparent hover:text-text-muted/40"
-                    : opt.danger ? "text-danger-base hover:bg-danger-base/10" : "text-text-muted hover:bg-primary-base hover:text-text-inverse"
+                    : opt.danger
+                    ? "text-danger-base hover:bg-danger-base/10"
+                    : "text-text-muted hover:bg-surface-hover hover:text-text-base"
                 )}
               >
-                <span>{opt.label}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {opt.checked !== undefined ? (
+                    opt.checked ? (
+                      <Check size={14} className="text-primary-base shrink-0" />
+                    ) : (
+                      <span className="w-3.5 shrink-0" />
+                    )
+                  ) : null}
+                  <span className="truncate text-text-base">{opt.label}</span>
+                </div>
                 {opt.shortcut && (
-                  <span className={cn(
-                    "text-[10px] text-text-muted font-mono tracking-tighter truncate ml-2",
-                    !opt.danger && "group-hover:text-text-inverse/80"
-                  )}>
+                  <Kbd className="text-[10px] ml-3 shrink-0">
                     {opt.shortcut}
-                  </span>
+                  </Kbd>
                 )}
               </button>
             ),
@@ -168,6 +178,9 @@ export function TopMenu() {
   const showFootprints = useAppStore((state) => state.showFootprints);
   const enableSnapping = useAppStore((state) => state.enableSnapping);
   
+  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
+  const setShowOccupancyHighlight = useAppStore((state) => state.setShowOccupancyHighlight);
+
   const setShowPaths = (v: boolean) => useAppStore.setState({ showPaths: v });
   const setShowGrid = (v: boolean) => useAppStore.setState({ showGrid: v });
   const setShowFootprints = (v: boolean) => useAppStore.setState({ showFootprints: v });
@@ -309,22 +322,23 @@ export function TopMenu() {
       {
         label: "View",
         options: [
-          { id: "view_show_properties", label: `${showProperties ? "✓ " : "  "}Show Properties`, action: () => setShowProperties(!showProperties) },
+          { id: "view_show_properties", label: "Show Properties", checked: showProperties, action: () => setShowProperties(!showProperties) },
           { divider: true, label: "" },
-          { id: "view_show_paths", label: `${showPaths ? "✓ " : "  "}Show Paths`, action: () => setShowPaths(!showPaths) },
-          { id: "view_show_grid", label: `${showGrid ? "✓ " : "  "}Show Grid (Axes)`, action: () => setShowGrid(!showGrid) },
-          { id: "view_show_footprints", label: `${showFootprints ? "✓ " : "  "}Show Robot Footprints`, action: () => setShowFootprints(!showFootprints) },
+          { id: "view_show_paths", label: "Show Paths", checked: showPaths, action: () => setShowPaths(!showPaths) },
+          { id: "view_show_grid", label: "Show Grid (Axes)", checked: showGrid, action: () => setShowGrid(!showGrid) },
+          { id: "view_show_footprints", label: "Show Robot Footprints", checked: showFootprints, action: () => setShowFootprints(!showFootprints) },
           {
             id: "view_show_occupancy",
-            label: `${useAppStore.getState().showOccupancyHighlight ? "✓ " : "  "}Show Occupancy Highlight`,
-            action: () => useAppStore.getState().setShowOccupancyHighlight(!useAppStore.getState().showOccupancyHighlight),
+            label: "Show Occupancy Highlight",
+            checked: showOccupancyHighlight,
+            action: () => setShowOccupancyHighlight(!showOccupancyHighlight),
             shortcut: "Ctrl+H",
           },
-          { id: "view_snap_waypoint", label: `${enableSnapping ? "✓ " : "  "}Snap to Previous Waypoint`, action: () => setEnableSnapping(!enableSnapping) },
+          { id: "view_snap_waypoint", label: "Snap to Previous Waypoint", checked: enableSnapping, action: () => setEnableSnapping(!enableSnapping) },
           { id: "view_fit_to_map", label: "Fit to Map", action: triggerFitToMaps, shortcut: "Mid D-Click" },
           { divider: true, label: "" },
-          { id: "view_show_left_panel", label: `${isLeftPanelOpen ? "✓ " : "  "}Show Left Panel`, action: () => setLeftPanelOpen(!isLeftPanelOpen) },
-          { id: "view_show_right_panel", label: `${isRightPanelOpen ? "✓ " : "  "}Show Right Panel`, action: () => setRightPanelOpen(!isRightPanelOpen) },
+          { id: "view_show_left_panel", label: "Show Left Panel", checked: isLeftPanelOpen, action: () => setLeftPanelOpen(!isLeftPanelOpen) },
+          { id: "view_show_right_panel", label: "Show Right Panel", checked: isRightPanelOpen, action: () => setRightPanelOpen(!isRightPanelOpen) },
           { divider: true, label: "" },
           { id: "view_reset_layout", label: "Reset Window Layout", action: resetWindowLayout },
         ],
@@ -338,7 +352,8 @@ export function TopMenu() {
           ...(isCustomUiMode ? [
             {
               id: "help_custom_ui_toggle",
-              label: "✓ Custom UI Mode (Switch to Standard)",
+              label: "Custom UI Mode (Switch to Standard)",
+              checked: true,
               action: () => toggleCustomUiMode(),
             },
             {
@@ -350,7 +365,8 @@ export function TopMenu() {
             ...(customUiConfig ? [
               {
                 id: "help_custom_ui_toggle",
-                label: "  Standard Mode (Switch to Custom UI)",
+                label: "Standard Mode (Switch to Custom UI)",
+                checked: false,
                 action: () => toggleCustomUiMode(),
               }
             ] : customUiPresetType ? [

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette, Bookmark, Code2 } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette, Bookmark, Code2, Target } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI, BackendAPI } from "../../api";
 import { Button } from "./common/Button";
@@ -33,7 +33,7 @@ function CardFrame({
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={cn(
-        "bg-surface-panel/40 backdrop-blur-sm border rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer",
+        "bg-surface-panel/40 backdrop-blur-sm border rounded-lg p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer",
         isActive ? "border-primary-base/80 bg-primary-base/5 ring-1 ring-primary-base/30" : "border-border-base/30",
         className
       )}
@@ -167,19 +167,19 @@ export function LayerPanel() {
         <Button
           onClick={handleLoadMap}
           variant="secondary"
-          className="w-full h-9 shadow-sm border-border-base/50 group hover:border-accent-generator/30 transition-all font-bold"
+          className="w-full shadow-xs border-border-base/50 font-medium"
         >
-          <FolderOpen size={16} className="text-accent-generator group-hover:scale-110 transition-transform" />
+          <FolderOpen size={16} className="text-accent-generator" />
           <span>Load Map</span>
         </Button>
 
         <Button
           onClick={() => setIsNewCustomLayerModalOpen(true)}
           variant="secondary"
-          className="w-full h-9 shadow-sm border-border-base/50 group hover:border-primary-base/30 transition-all font-bold"
+          className="w-full shadow-xs border-border-base/50 font-medium"
           title="Create Custom Layer (Manual vector drawing or plugin generator)"
         >
-          <Plus size={16} className="text-primary-base group-hover:scale-110 transition-transform" />
+          <Plus size={16} className="text-primary-base" />
           <span>Custom Layer</span>
         </Button>
       </div>
@@ -879,8 +879,9 @@ function LayerCard({
                 {layer.name}
               </span>
               {isMapEditMode && isActiveTargetMap && (
-                <span className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded">
-                  🎯 Target Map
+                <span className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded flex items-center gap-1">
+                  <Target size={11} className="shrink-0" />
+                  Target Map
                 </span>
               )}
             </div>

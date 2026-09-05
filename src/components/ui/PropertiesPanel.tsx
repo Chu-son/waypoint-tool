@@ -10,6 +10,7 @@ import { CustomOptionsGroup } from "./properties/CustomOptionsGroup";
 import { ElementCopyContextMenu } from "./properties/ElementCopyContextMenu";
 import { ElementCopyField } from "../../stores/slices/uiSlice";
 import { EmptyState } from "./common/EmptyState";
+import { Anchor } from "lucide-react";
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from "../../utils/transformUtils";
 import { collectDescendantIds, getFlattenedWaypointIds } from "../../utils/treeUtils";
 import { WaypointNode } from "../../types/store";
@@ -202,8 +203,9 @@ export function PropertiesPanel() {
           <p className="text-xs text-text-muted font-mono break-all flex items-center gap-1">
             {node?.id}
             {anchorNodeId === node?.id && (
-              <span className="text-accent-anchor font-sans text-xs bg-accent-anchor/20 border border-accent-anchor/40 px-1.5 py-0.5 rounded">
-                ⚓ Anchor
+              <span className="text-accent-anchor font-sans text-xs bg-accent-anchor/20 border border-accent-anchor/40 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Anchor size={11} className="shrink-0" />
+                Anchor
               </span>
             )}
           </p>

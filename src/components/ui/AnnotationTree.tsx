@@ -152,10 +152,10 @@ function SortableAnnotationTreeNode({
         onContextMenu={onContextMenu}
         style={{ paddingLeft: `${Math.min(depth * 10 + 6, 32)}px` }}
         className={cn(
-          'group relative flex items-center justify-between gap-1 py-1.5 pr-1.5 rounded-lg text-xs transition-all cursor-pointer border overflow-hidden',
+          'group relative flex items-center justify-between gap-1 py-1 pr-1.5 rounded-md text-xs transition-colors cursor-pointer border overflow-hidden',
           isSelected
-            ? 'bg-primary-base/20 border-primary-base text-text-base shadow-sm ring-1 ring-primary-base/30 font-bold'
-            : 'bg-surface-panel/60 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+            ? 'bg-primary-base/15 border-primary-base/50 text-text-base font-medium'
+            : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
           !isVisible && 'opacity-60 grayscale-[0.3]'
         )}
       >

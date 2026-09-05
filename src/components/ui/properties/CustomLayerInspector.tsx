@@ -689,7 +689,7 @@ export function CustomLayerInspector() {
               variant="primary"
               onClick={handleExecutePlugin}
               disabled={isExecuting || !activePlugin}
-              className="w-full h-9 text-xs font-bold gap-2 text-text-inverse shadow-md"
+              className="w-full gap-2 text-text-inverse"
             >
               {isExecuting ? (
                 <>

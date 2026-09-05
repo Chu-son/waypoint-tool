@@ -32,8 +32,10 @@ function ToolIconButton({
       variant={isActive ? "primary" : "icon"}
       size="icon"
       className={cn(
-        "rounded-xl transition-all flex-shrink-0 group",
-        isActive && "shadow-[0_0_15px_var(--color-primary-base)] border-2 border-primary-base/50"
+        "rounded-md transition-colors flex-shrink-0",
+        isActive
+          ? "bg-primary-base text-text-inverse border-primary-base shadow-xs"
+          : "hover:border-border-focus/60"
       )}
     >
       {children}
@@ -81,11 +83,8 @@ export function ToolPanel() {
   const hasBottomActions = allowImport || allowExport || allowSettings;
 
   return (
-    <Panel
-      className="flex flex-col items-center py-4 px-2 gap-3 z-10 transition-all duration-300 relative border-r border-border-base"
-      style={{ minWidth: "4rem", width: "auto" }}
-    >
-      <FieldLabel className="mb-1">Tools</FieldLabel>
+    <Panel className="w-12 flex flex-col items-center py-3 px-1 gap-2 z-10 transition-all duration-200 relative border-r border-border-base shrink-0 select-none">
+      <FieldLabel className="mb-0.5 text-[10px] tracking-wider uppercase">Tools</FieldLabel>
 
       {visibleTools.map((tool) => {
         const Icon = tool.icon;
@@ -101,28 +100,22 @@ export function ToolPanel() {
               setActivePlugin(null);
             }}
           >
-            <Icon
-              size={20}
-              className={isActive ? "" : "group-hover:scale-110 transition-transform"}
-            />
+            <Icon size={16} />
           </ToolIconButton>
         );
       })}
 
       {hasBottomActions && (
-        <div className="mt-auto mb-4 border-t border-border-base pt-4 flex flex-col items-center w-full gap-3">
+        <div className="mt-auto mb-2 border-t border-border-base pt-2 flex flex-col items-center w-full gap-2">
           {allowImport && (
             <Button
               onClick={handleImportWaypointsClick}
               title="Import Waypoints"
               variant="icon"
               size="icon"
-              className="rounded-xl group"
+              className="rounded-md"
             >
-              <Upload
-                size={20}
-                className="group-hover:scale-110 transition-transform text-primary-base"
-              />
+              <Upload size={16} className="text-primary-base" />
             </Button>
           )}
 
@@ -132,12 +125,9 @@ export function ToolPanel() {
               title="Export Waypoints"
               variant="icon"
               size="icon"
-              className="rounded-xl group"
+              className="rounded-md"
             >
-              <Download
-                size={20}
-                className="group-hover:scale-110 transition-transform text-primary-base"
-              />
+              <Download size={16} className="text-primary-base" />
             </Button>
           )}
 
@@ -147,10 +137,10 @@ export function ToolPanel() {
               title="Settings & Plugins"
               variant="icon"
               size="icon"
-              className="rounded-xl mt-2"
+              className="rounded-md mt-1"
             >
               <Settings
-                size={20}
+                size={16}
                 className="text-text-muted hover:text-text-base transition-colors"
               />
             </Button>

@@ -363,7 +363,7 @@ export function PluginParamsPanel() {
           }
           onClick={handleExecute}
           variant="primary"
-          className="h-9 w-full"
+          className="w-full"
         >
           {isExecuting ? (
             <RefreshCcw size={14} className="animate-spin mr-2" />

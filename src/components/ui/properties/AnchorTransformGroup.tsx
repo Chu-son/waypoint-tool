@@ -4,6 +4,7 @@ import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } fr
 import { ElementCopyField } from '../../../stores/slices/uiSlice';
 import { TransformField } from './TransformField';
 import { PropertySectionHeader } from './PropertySectionHeader';
+import { Anchor } from 'lucide-react';
 
 interface AnchorTransformGroupProps {
   node: WaypointNode;
@@ -64,9 +65,10 @@ export function AnchorTransformGroup({
     <div className="space-y-2 pt-4 border-t border-accent-anchor/30 relative">
       <PropertySectionHeader
         title={
-          <>
-            <span>⚓</span> Transform (From Anchor)
-          </>
+          <span className="flex items-center gap-1">
+            <Anchor size={12} className="shrink-0" />
+            Transform (From Anchor)
+          </span>
         }
         className="text-accent-anchor"
       />
