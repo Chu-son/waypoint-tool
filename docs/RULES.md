@@ -122,5 +122,43 @@
 - `pushHistorySnapshot()` の呼び出しを UI コンポーネントや描画 Hook（`useMapEdit*.ts` 等）内で行うことを禁止する。
 - ユーザー操作によるドメインデータ変更はすべて Store アクション内に閉じ、Store アクション側で原子的（Atomic）に履歴スナップショットを記録する。
 
+---
 
+## 5. 状態遷移・モード管理および選択権限規約 (State Transition & Selection Rules)
 
+状態の組み合わせ爆発を防ぎ、決定論的な操作性を保証するため、以下の規約を厳格に遵守してください（詳細仕様は 📖 [STATE_MACHINE.md](./STATE_MACHINE.md) を参照）。
+
+### 5.1 プライマリモード完全排他律 (Mode Exclusivity Rule)
+- **`AppModeState` の使用義務**:
+  モードの切り替えは、必ず `useAppStore.getState().transitionToMode(...)` を経由して行わなければならない。
+- **独立ブール値によるモード管理の禁止**:
+  コンポーネント内で独立したフラグ（`isEditing`, `isMapEditMode` 等）を直接 `setState` して独自のモード状態を作り出してはならない。
+  すべての主要ツールモード（8種）は `AppModeState`（Discriminated Union）として単一化され、多重起動は型レベルで排除されなければならない。
+
+### 5.2 選択ドメイン排他律 (Selection Domain Exclusivity Rule)
+- **`setSelection` 経由の義務**:
+  選択状態の変更は、必ず `useAppStore.getState().setSelection(...)` を使用すること。
+- **複数ドメイン同時選択の禁止**:
+  ウェイポイントノード（`selectedNodeIds`）とアノテーション（`selectedAnnotationIds`）やカスタムレイヤー（`activeCustomLayerId`）を同時に選択状態にしてはならない。
+  `ActiveSelection`（単一真実源）を介することで、別ドメインが選択された際は直前の選択IDが自動クリアされ、右ペインの Inspector 表示権が一意に保証される。
+
+### 5.3 階層型エスケープ順序律 (Escape Hierarchy Ladder Rule)
+- **`handleGlobalEscape` の遵守**:
+  Escape キー入力によるキャンセル処理は、`src/stores/slices/interactionSlice.ts` の `handleGlobalEscape()` を唯一の窓口とし、数学的順序律（Tier 1〜Tier 7）に従って処理すること。
+- **ローカルでの Escape 握りつぶし禁止**:
+  個別の UI コンポーネントや Canvas イベントハンドラが `e.stopPropagation()` 等を用いて Escape キーイベントを無秩序に消費（握りつぶし）してはならない。
+  局所的な過渡状態の中断は、後述の `registerCanvasAbortHandler` または DOM フォーカスの `blur()` を介してパイプラインから適切に起動されなければならない。
+
+### 5.4 過渡ジェスチャーのアトミック性とポインタ喪失保護 (Gesture Atomicity & Pointer Loss Protection Rule)
+- **Abort ハンドラーの登録義務とロールバック保証**:
+  キャンバス上でポインタの押下（PointerDown）から離脱（PointerUp）までにまたがるドラッグ、回転、描画などの過渡操作を実装する際は、必ず `registerCanvasAbortHandler` に中断ハンドラを登録しなければならない。
+- **操作前座標への完全復元**:
+  過渡ジェスチャー中に Escape キー等で中断された場合、未確定の座標変更は直前の初期状態（`initialTransforms` 等）へ原子的（Atomic）にロールバックし、作成途中の履歴スナップショット（ドラフト）は確実に破棄しなければならない。
+- **ポインタ喪失イベント（`pointercancel`, `lostpointercapture`, `blur`）の捕捉**:
+  OS通知やウィンドウ切替、タッチ操作等でポインタが喪失された場合、キャンバスは `abort()` を同期実行してドラッグ状態を解放し、ポインタのスタック（Sticky Mouse）を防止しなければならない。
+
+### 5.5 単一トランジションチョークポイント原則 (Unified Transition Choke Point Rule)
+- **`transitionToMode` 単一経由の義務**:
+  モード遷移を発生させるすべてのコード（ツールバー、ショートカット、プラグイン対話、プロジェクト読込・リセット）は、例外なく `transitionToMode`（または `abortCanvasGestures`）を経由しなければならない。
+- **OnExit での過渡ジェスチャー自動破棄**:
+  モード遷移時は、OnExit フェーズにおいて進行中の過渡ジェスチャーが自動的に強制ロールバック（アボート）される。コンポーネント側で独自のクリーンアップコードを重複実装する必要はなく、ストアのチョークポイントに委譲すること。

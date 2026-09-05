@@ -27,6 +27,9 @@ AIエージェントは、これから実行するタスクの内容に応じて
 - 📖 **[docs/RULES.md](./docs/RULES.md)**
   - **いつ読むか**: UIコンポーネントを追加・修正する時。**キーボードショートカットを追加・変更する時**。
   - **目的**: ディレクトリ分割ルールの確認。ショートカット変更時にHelp（Shortcut一覧）を追従更新する義務の確認。
+- 📖 **[docs/STATE_MACHINE.md](./docs/STATE_MACHINE.md)**
+  - **いつ読むか**: 新規モードやツールを追加する時、選択挙動やEscapeキー処理、過渡対話（ドラッグ・回転等）を実装・修正する時。
+  - **目的**: 5つの直交軸、8つのプライマリモード、ActiveSelection単一権限、Tier 1〜Tier 7 Escape順序律、不変条件の確認。
 - 📖 **[docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md)**
   - **いつ読むか**: 開発環境のセットアップやテスト実行を行う時、命名規則を確認する時。
   - **目的**: 命名規則（CamelCase vs PascalCase, Rustのsnake_case等）やテスト方針の確認。

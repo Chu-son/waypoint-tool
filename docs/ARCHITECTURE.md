@@ -13,6 +13,7 @@ waypoint-tool/
 │   ├── COMPONENT_CATALOG.md   # UI・Canvasコンポーネントカタログ
 │   ├── DEVELOPMENT_GUIDE.md   # 開発者ガイド・セットアップ手順
 │   ├── RULES.md               # 開発ルール・ショートカット管理
+│   ├── STATE_MACHINE.md       # 状態機械・モード遷移・選択権限仕様書
 │   ├── REQUIREMENTS.md        # システム要件定義
 │   ├── USER_GUIDE.md          # ユーザーガイド
 │   └── PLUGIN_GUIDE.md        # プラグイン開発仕様書
@@ -115,6 +116,7 @@ graph TD
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。
 - **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
+- **`interactionSlice.ts`**: 状態機械および対話管理（8種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、アクティブパネル、モーダル表示状態、ズーム/パン位置。
 - **`historySlice.ts`**: 履歴スタック管理（Undo / Redo、トランザクション、`pushHistorySnapshot` による原子的履歴記録）。
 - **`workflowSlice.ts`**: ワークフローステップ管理（動的UIでのステップ進行、ステップ実行状態・変数の追跡）。
@@ -156,4 +158,91 @@ graph TD
 - ツリー変形（ノード削除、Group作成・解除、ノード移動、複製等）を行うすべての Store アクションは、直前ノードに基づく共通写像関数 `mapInsertionTarget`（`src/utils/treeUtils.ts`）を介して `insertionTarget` を安全に追従・更新しなければならない。
 - 複数ノードの追加はループによる個別 `addNode` 呼び出しを禁止し、単一トランザクション・単一履歴スナップショットで完結する `addNodes` 一括登録 API を使用すること。
 
+---
 
+## 6. 状態遷移および対話アーキテクチャ (State Machine & Interaction Architecture)
+
+複雑なツールモードや過渡操作の競合を防ぐため、本アプリケーションは状態機械（State Machine）を中心に設計されています。
+ユーザー操作（Action）、状態機械コア（State）、および画面UI表示（View）が3層で協調し、Single Source of Truth に基づく決定論的な振る舞いを保証します。
+
+詳細な設計仕様、直交5軸の定義、ウェイポイント操作モデル、UI表示マトリクス、完全な状態遷移マトリクス、Mermaid状態遷移図、および不変条件カタログについては、公式仕様書 📖 **[docs/STATE_MACHINE.md](./STATE_MACHINE.md)** を参照してください。
+
+### 6.1 「状態（State）× 操作（Action）× UI表示（View）」の3層協調アーキテクチャ
+
+```mermaid
+graph TD
+    subgraph UserInput ["1. ユーザー操作 (User Input)"]
+        UI_Key["キーボード (P, V, Esc, Del, Tab, 0-9)"]
+        UI_Mouse["マウス / ポインタ (Click, Drag, Shift+Drag)"]
+        UI_TreeBtn["ツリーボタン (+, 削除, 目アイコン)"]
+    end
+
+    subgraph StateCore ["2. 状態機械コア (State Machine Core)"]
+        Axis_Mode["プライマリモード (AppModeState: 8種)<br>【入力解釈の前提ルール】"]
+        Axis_Sel["選択権限 (ActiveSelection: 単一真実源)<br>【操作対象の排他的特定】"]
+        Axis_Gest["キャンバス過渡ジェスチャー (Transient Gesture)<br>【PointerDown〜Upの短命状態】"]
+        Axis_Hist["履歴トランザクション (HistorySnapshot)<br>【Undo/Redo & ロールバック】"]
+    end
+
+    subgraph ViewPresentation ["3. 画面UI表示 (View Presentation)"]
+        V_Canvas["中央キャンバス (MapCanvas)<br>・カーソル形状 / ノード選択枠<br>・スナップ補助線 / 矩形選択オーバーレイ"]
+        V_Left["左ペイン (Objects / Layers)<br>・ツリー選択ハイライト<br>・点滅する挿入バー (InsertionTarget)"]
+        V_Right["右ペイン (Inspector)<br>・単一/複数ノード設定<br>・アノテーション / レイヤー設定"]
+        V_Status["下部ステータスバー (StatusBar)<br>・モード名 / カーソル世界座標 / 選択数"]
+    end
+
+    UI_Key -->|Shortcut / Key Event| Axis_Mode
+    UI_Mouse -->|Pointer Event| Axis_Gest
+    UI_TreeBtn -->|Command Action| Axis_Sel
+
+    Axis_Mode -->|解釈規則の決定| Axis_Gest
+    Axis_Gest -->|確定 / ロールバック| Axis_Hist
+    Axis_Gest -->|選択ノード特定| Axis_Sel
+
+    Axis_Mode -. モード通知 .-> V_Canvas
+    Axis_Mode -. ツール名表示 .-> V_Status
+    Axis_Sel -->|属性バインド| V_Right
+    Axis_Sel -->|ハイライト更新| V_Left
+    Axis_Sel -->|選択枠描画| V_Canvas
+    Axis_Gest -->|ラバーバンド / スナップ描画| V_Canvas
+```
+
+### 6.2 画面レイアウトと各UI領域の表示責務マップ (UI Presentation Layout)
+
+```mermaid
+graph TB
+    subgraph AppWindow ["ROS Waypoint Tool メイン画面"]
+        TopBar["上部バー: TopMenu & ToolPanel<br>【モード切替アイコン (Select/Add/Annot/Layer)、Undo/Redo、Save】"]
+        
+        subgraph MiddleArea ["中央ワークスペース (Split Pane)"]
+            LeftPane["左ペイン: ObjectsPanel / LayerPanel<br>・Objects タブ: 階層ツリー、選択ハイライト、挿入バー (青いライン)<br>・Layers タブ: マップ/レイヤー一覧、アノテーション一覧、可視性"]
+            CenterCanvas["中央キャンバス: MapCanvas (PixiJS)<br>・背景マップ / ウェイポイントノード / パスライン<br>・カーソル形状 (矢印 / 十字 / ハンドル)<br>・スナップ補助線 / 矩形選択オーバーレイ枠"]
+            RightPane["右ペイン: Inspector (PanelRegistry)<br>・未選択: ProjectPropertiesPanel (ロボット寸法・設定)<br>・ノード選択: PropertiesPanel (座標X/Y/Z/Yaw, Anchor)<br>・アノテーション: AnnotationInspector (色・寸法・頂点)<br>・レイヤー: CustomLayerInspector (ブラシサイズ・黒白値)<br>・プラグイン: PluginParamsPanel (引数UI)"]
+        end
+        
+        BottomBar["下部バー: StatusBar<br>【現在のモード名 (Select/Add/Edit)、マウス世界座標、選択ノード数、直前基準ノード】"]
+    end
+
+    TopBar -->|ツール選択| CenterCanvas
+    LeftPane -->|ツリー選択| RightPane
+    CenterCanvas -->|クリック / ドラッグ選択| RightPane
+    CenterCanvas -->|クリック / ドラッグ選択| LeftPane
+    CenterCanvas -->|マウス移動| BottomBar
+```
+
+### 6.3 コアコンセプトの要約
+1. **5つの直交状態軸**:
+   - `Modal Stack`（最上位モーダル）
+   - `DOM Text Focus`（文字入力専有）
+   - `Primary Tool Mode`（8種の完全排他モード `AppModeState`）
+   - `Canvas Transient Gestures`（短命ドラッグ・描画操作）
+   - `Selection Authority`（単一真実源 `ActiveSelection`）
+2. **4フェーズ同期ライフサイクルパイプライン**:
+   - `transitionToMode` 単一チョークポイントにおいて、`Phase 1: Guard` → `Phase 2: OnExit（過渡アボート強制ロールバック・同期リスナー通知）` → `Phase 3: State Mutation（状態更新・非互換選択クリア）` → `Phase 4: OnEnter（新モード初期化・同期リスナー通知）` を決定論的に実行。
+3. **委譲型過渡アボートとポインタ喪失保護 (Inversion of Control)**:
+   - ストアはキャンバスの具体実装を知らず、`registerCanvasAbortHandler` 経由で登録された破棄関数を呼ぶのみの疎結合構造。
+   - キャンバスは `pointercancel`, `lostpointercapture`, `window.blur` を監視し、OS/ブラウザレベルでのポインタ喪失時にも即座に安全なロールバックを実行。
+4. **階層型エスケープ・パイプライン**:
+   - `Tier 1（最前面モーダル）` → `Tier 2（入力フォーカス）` → `Tier 3（過渡ジェスチャーロールバック）` → `Tier 4（スナップ精密入力クリア）` → `Tier 5（選択解除）` → `Tier 6（モード復帰）` → `Tier 7（アイドル）` の順序律で段階的にキャンセルを実行。
+5. **決定論的 Inspector 解決**:
+   - モードと `ActiveSelection` に基づき、右ペインに表示すべき Inspector を一意かつ決定論的にルーティング（純粋関数解決）。
