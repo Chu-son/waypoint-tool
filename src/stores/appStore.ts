@@ -47,6 +47,7 @@ export const useAppStore = create<AppState>()(
         pluginSettings: state.pluginSettings,
         globalPythonPath: state.globalPythonPath,
         decimalPrecision: state.decimalPrecision,
+        themeMode: state.themeMode,
         leftPanelViewMode: state.leftPanelViewMode,
         rightPanelViewMode: state.rightPanelViewMode,
         leftPanelWidth: state.leftPanelWidth,

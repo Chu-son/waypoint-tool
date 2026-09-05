@@ -1,4 +1,3 @@
-import { } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 
@@ -70,9 +69,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               variant={activeTab === tab.id ? "secondary" : "ghost"}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "w-full justify-start font-bold text-xs sm:text-[13px] h-9 sm:h-10 px-2.5 sm:px-4 transition-all truncate",
+                "w-full justify-start font-medium text-[13px] h-8 px-3 transition-colors truncate rounded-md",
                 activeTab === tab.id
-                  ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-sm"
+                  ? "bg-primary-base/10 text-primary-base border border-primary-base/20 shadow-xs"
                   : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
               )}
             >

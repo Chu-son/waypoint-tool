@@ -57,6 +57,13 @@ describe('storageMigration', () => {
     expect(corruptIndex.indexStartIndex).toBe(0);
   });
 
+  it('normalizes themeMode to dark or light correctly', () => {
+    expect(migrateStorage({ themeMode: 'light' }, 2).themeMode).toBe('light');
+    expect(migrateStorage({ themeMode: 'dark' }, 2).themeMode).toBe('dark');
+    expect(migrateStorage({ themeMode: 'unknown' }, 2).themeMode).toBe('dark');
+    expect(migrateStorage({}, 2).themeMode).toBe('dark');
+  });
+
   it('fills missing default properties when partial state is provided', () => {
     const partialState = {
       lastDirectory: '/home/user/maps',

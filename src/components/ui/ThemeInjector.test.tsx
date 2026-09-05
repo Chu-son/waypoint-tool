@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ThemeInjector } from './ThemeInjector';
 import { useAppStore } from '../../stores/appStore';
@@ -10,6 +10,7 @@ describe('ThemeInjector', () => {
     useAppStore.setState({
       customUiConfig: null,
       isCustomUiMode: false,
+      themeMode: 'dark',
     });
   });
 
@@ -44,9 +45,42 @@ describe('ThemeInjector', () => {
     render(<ThemeInjector />);
 
     const root = document.documentElement;
-    expect(root.style.getPropertyValue('--color-primary-base')).toBe('#2563eb');
-    expect(root.style.getPropertyValue('--color-surface-base')).toBe('#f8fafc');
+    expect(root.style.getPropertyValue('--color-primary-base')).toBe('#5e6ad2');
+    expect(root.style.getPropertyValue('--color-surface-base')).toBe('#f7f8f9');
     expect(root.style.getPropertyValue('color-scheme')).toBe('light');
+  });
+
+  it('injects Linear Light theme CSS variables when themeMode is light in standard mode', () => {
+    useAppStore.setState({
+      isCustomUiMode: false,
+      themeMode: 'light',
+    });
+
+    render(<ThemeInjector />);
+
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--color-primary-base')).toBe('#5e6ad2');
+    expect(root.style.getPropertyValue('--color-surface-base')).toBe('#f7f8f9');
+    expect(root.style.getPropertyValue('color-scheme')).toBe('light');
+  });
+
+  it('resets variables when themeMode switches from light to dark in standard mode', () => {
+    useAppStore.setState({
+      isCustomUiMode: false,
+      themeMode: 'light',
+    });
+
+    const { rerender } = render(<ThemeInjector />);
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--color-surface-base')).toBe('#f7f8f9');
+
+    act(() => {
+      useAppStore.setState({ themeMode: 'dark' });
+    });
+    rerender(<ThemeInjector />);
+
+    expect(root.style.getPropertyValue('--color-surface-base')).toBe('');
+    expect(root.style.getPropertyValue('color-scheme')).toBe('');
   });
 
   it('allows overriding colors in theme', () => {

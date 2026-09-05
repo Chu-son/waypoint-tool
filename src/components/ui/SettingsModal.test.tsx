@@ -128,6 +128,47 @@ describe('SettingsModal UI', () => {
     expect(useAppStore.getState().globalPythonPath).toBe('/usr/bin/python3');
   });
 
+  it('allows switching color theme between dark and light on the General tab', async () => {
+    useAppStore.setState({ themeMode: 'dark', isCustomUiMode: false, customUiConfig: null });
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const lightBtn = screen.getByRole('button', { name: /Light \(Linear Light\)/i });
+    const darkBtn = screen.getByRole('button', { name: /Dark \(Linear Dark\)/i });
+    expect(lightBtn).toBeInTheDocument();
+    expect(darkBtn).toBeInTheDocument();
+    expect(darkBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(lightBtn).toHaveAttribute('aria-pressed', 'false');
+
+    act(() => {
+      fireEvent.click(lightBtn);
+    });
+
+    expect(useAppStore.getState().themeMode).toBe('light');
+    expect(lightBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(darkBtn).toHaveAttribute('aria-pressed', 'false');
+
+    act(() => {
+      fireEvent.click(darkBtn);
+    });
+
+    expect(useAppStore.getState().themeMode).toBe('dark');
+    expect(darkBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(lightBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('shows overriding notice when Custom UI theme is active on General tab', async () => {
+    useAppStore.setState({
+      themeMode: 'dark',
+      isCustomUiMode: true,
+      customUiConfig: { theme: { preset: 'ocean' } } as any,
+    });
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    expect(
+      screen.getByText(/Custom UI theme is active and overriding default appearance/i)
+    ).toBeInTheDocument();
+  });
+
   it('handles plugin management in the Plugins tab', async () => {
     const mockUpdatePluginSetting = vi.fn();
     useAppStore.setState({

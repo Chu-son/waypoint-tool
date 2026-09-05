@@ -26,6 +26,8 @@ export type UISlice = {
   mouseCenteredZoom: boolean;
   visibleAttributes: string[];
   indexStartIndex: 0 | 1;
+  themeMode: 'dark' | 'light';
+  setThemeMode: (mode: 'dark' | 'light') => void;
   isDirty: boolean;
   decimalPrecision: number;
   elementCopyState: ElementCopyState;
@@ -160,6 +162,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   mouseCenteredZoom: true,
   visibleAttributes: [],
   indexStartIndex: 0,
+  themeMode: 'dark',
+  setThemeMode: (mode: 'dark' | 'light') => set({ themeMode: mode === 'light' ? 'light' : 'dark' }),
   isDirty: false,
   decimalPrecision: 6,
   elementCopyState: null,

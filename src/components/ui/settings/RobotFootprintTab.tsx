@@ -159,7 +159,7 @@ export function RobotFootprintTab() {
                   variant={footprint.type === item.type ? "secondary" : "ghost"}
                   onClick={() => handleTypeChange(item.type as any)}
                   className={cn(
-                    "h-10 text-xs font-semibold justify-center border",
+                    "h-8 text-[13px] font-medium justify-center rounded-md border",
                     footprint.type === item.type
                       ? "bg-primary-base/15 border-primary-base text-primary-base shadow-sm"
                       : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
@@ -203,13 +203,13 @@ export function RobotFootprintTab() {
 
         {/* Right column: SVG Visual Preview */}
         <div className="col-span-5">
-          <div className="bg-surface-panel/50 border border-border-base/40 rounded-2xl p-4 flex flex-col items-center sticky top-0">
+          <div className="bg-surface-panel/50 border border-border-base/40 rounded-lg p-4 flex flex-col items-center sticky top-0">
             <div className="w-full flex items-center justify-between mb-2">
               <FieldLabel className="text-xs font-bold text-text-base">Footprint Preview</FieldLabel>
               <span className="text-[10px] text-text-muted font-mono">X: Red (Forward), Y: Green</span>
             </div>
             
-            <div className="w-full aspect-square bg-surface-base rounded-xl border border-border-base/50 relative overflow-hidden flex items-center justify-center shadow-inner">
+            <div className="w-full aspect-square bg-surface-base rounded-md border border-border-base/50 relative overflow-hidden flex items-center justify-center shadow-inner">
               <FootprintSvgPreview footprint={footprint} />
             </div>
 
@@ -249,7 +249,7 @@ function CircularEditor({
           precision={3}
           value={footprint.radius}
           onChange={onChange}
-          className="h-10 text-sm font-mono"
+          className="font-mono"
           placeholder="0.3"
         />
       </FormField>
@@ -277,7 +277,7 @@ function RectangularEditor({
             precision={3}
             value={footprint.length}
             onChange={(val) => onChange({ length: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.65"
           />
         </FormField>
@@ -291,7 +291,7 @@ function RectangularEditor({
             precision={3}
             value={footprint.width}
             onChange={(val) => onChange({ width: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.45"
           />
         </FormField>
@@ -307,7 +307,7 @@ function RectangularEditor({
             precision={3}
             value={footprint.offset_x ?? 0}
             onChange={(val) => onChange({ offset_x: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.0"
           />
         </FormField>
@@ -320,7 +320,7 @@ function RectangularEditor({
             precision={3}
             value={footprint.offset_y ?? 0}
             onChange={(val) => onChange({ offset_y: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.0"
           />
         </FormField>

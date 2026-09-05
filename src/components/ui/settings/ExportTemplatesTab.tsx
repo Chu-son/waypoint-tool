@@ -416,7 +416,7 @@ export function ExportTemplatesTab() {
                     name: e.target.value,
                   } as any)
                 }
-                className="h-9 text-sm font-semibold flex-1 border-transparent hover:border-border-base focus:border-primary-base bg-transparent focus:bg-surface-base shadow-none hover:shadow-subtle"
+                className="h-8 text-[13px] font-medium flex-1 border-transparent hover:border-border-base focus:border-primary-base bg-transparent focus:bg-surface-base shadow-none hover:shadow-subtle"
                 placeholder="Template Name"
               />
               <div className="flex items-center gap-4">

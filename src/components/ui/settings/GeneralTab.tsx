@@ -6,10 +6,18 @@ import { FormField } from "../common/FormField";
 import { Slider } from "../common/Slider";
 import { BrowseInput } from "../common/BrowseInput";
 import { SectionDivider } from "../common/SectionDivider";
+import { Button } from "../common/Button";
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 import { NumericInput } from "../NumericInput";
+import { Moon, Sun } from "lucide-react";
+import { cn } from "../../../utils/cn";
 
 export function GeneralTab() {
+  const themeMode = useAppStore((state) => state.themeMode);
+  const setThemeMode = useAppStore((state) => state.setThemeMode);
+  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+  const customUiConfig = useAppStore((state) => state.customUiConfig);
+
   const defaultMapOpacity = useAppStore((state) => state.defaultMapOpacity);
   const setDefaultMapOpacity = useAppStore((state) => state.setDefaultMapOpacity);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
@@ -33,6 +41,48 @@ export function GeneralTab() {
 
   return (
     <div className="space-y-6 max-w-lg animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <FormField
+        label="Color Theme"
+        description="Choose between Dark mode (Linear Dark) and Light mode (Linear Light)."
+      >
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Color Theme">
+          <Button
+            type="button"
+            variant={themeMode === "dark" ? "secondary" : "ghost"}
+            onClick={() => setThemeMode("dark")}
+            aria-pressed={themeMode === "dark"}
+            className={cn(
+              "h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all",
+              themeMode === "dark"
+                ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs"
+                : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+            )}
+          >
+            <Moon className="w-4 h-4 shrink-0" />
+            <span>Dark (Linear Dark)</span>
+          </Button>
+          <Button
+            type="button"
+            variant={themeMode === "light" ? "secondary" : "ghost"}
+            onClick={() => setThemeMode("light")}
+            aria-pressed={themeMode === "light"}
+            className={cn(
+              "h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all",
+              themeMode === "light"
+                ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs"
+                : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+            )}
+          >
+            <Sun className="w-4 h-4 shrink-0" />
+            <span>Light (Linear Light)</span>
+          </Button>
+        </div>
+        {isCustomUiMode && customUiConfig?.theme && (
+          <p className="text-[11px] text-text-muted/80 mt-1">
+            Custom UI theme is active and overriding default appearance.
+          </p>
+        )}
+      </FormField>
       <FormField
         label="Default Map Opacity"
         labelRight={`${Math.round(defaultMapOpacity * 100)}%`}
@@ -63,7 +113,6 @@ export function GeneralTab() {
         <Select
           value={indexStartIndex}
           onChange={(e) => setIndexStartIndex(parseInt(e.target.value) as 0 | 1)}
-          className="h-10 text-sm"
         >
           <option value={0}>0 (0-indexed)</option>
           <option value={1}>1 (1-indexed)</option>
@@ -113,12 +162,12 @@ export function GeneralTab() {
               type="color"
               value={pathColor || DEFAULT_PATH_COLOR}
               onChange={(e) => setPathColor(e.target.value)}
-              className="w-9 h-9 rounded border border-border-base cursor-pointer bg-transparent p-0 shrink-0"
+              className="w-8 h-8 rounded-md border border-border-base cursor-pointer bg-transparent p-0 shrink-0"
             />
             <Input
               value={pathColor || DEFAULT_PATH_COLOR}
               onChange={(e) => setPathColor(e.target.value)}
-              className="h-9 px-3 py-1.5 text-xs font-mono w-32"
+              className="w-32 font-mono"
             />
           </div>
         </FormField>
@@ -273,7 +322,6 @@ export function GeneralTab() {
                 defaultNegate: parseInt(e.target.value) as 0 | 1,
               })
             }
-            className="h-10 text-sm"
           >
             <option value={0}>0 (Standard: Black = Obstacle, White = Free)</option>
             <option value={1}>1 (Inverted: White = Obstacle, Black = Free)</option>

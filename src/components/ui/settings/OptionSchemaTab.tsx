@@ -212,7 +212,7 @@ export function OptionSchemaTab() {
                       handleUpdateOption(i, { name: sanitized });
                     }}
                     className={cn(
-                      "h-9 text-xs font-mono",
+                      "h-8 text-[13px] font-mono",
                       (localOptions.filter((o) => o.name === opt.name).length > 1 || opt.name.trim() === "")
                         ? "border-danger-base focus:border-danger-base ring-danger-base/20"
                         : ""
@@ -227,7 +227,7 @@ export function OptionSchemaTab() {
                     onChange={(e) =>
                       handleUpdateOption(i, { label: e.target.value })
                     }
-                    className="h-9 text-xs"
+                    className="h-8 text-[13px]"
                     placeholder="e.g. Target Speed"
                   />
                 </SchemaFieldCell>
@@ -237,7 +237,7 @@ export function OptionSchemaTab() {
                     onChange={(e) =>
                       handleUpdateOption(i, { type: e.target.value })
                     }
-                    className="h-9 text-xs"
+                    className="h-8 text-[13px]"
                   >
                     <option value="string">String</option>
                     <option value="float">Float</option>
@@ -284,7 +284,7 @@ export function OptionSchemaTab() {
                       }
                     }}
                     className={cn(
-                      "h-9 text-xs font-mono",
+                      "h-8 text-[13px] font-mono",
                       !isDefaultValid(opt) ? "border-danger-base focus:border-danger-base ring-danger-base/20" : ""
                     )}
                     placeholder={
@@ -307,7 +307,7 @@ export function OptionSchemaTab() {
                           item_type: e.target.value,
                         })
                       }
-                      className="h-9 text-xs"
+                      className="h-8 text-[13px]"
                     >
                       <option value="string">String</option>
                       <option value="float">Float</option>
@@ -333,7 +333,7 @@ export function OptionSchemaTab() {
                             .filter((s) => s.length > 0),
                         })
                       }
-                      className="h-9 text-xs"
+                      className="h-8 text-[13px]"
                       placeholder="e.g. none, docking"
                     />
                   </SchemaFieldCell>

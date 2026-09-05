@@ -17,6 +17,7 @@ export interface PersistedStorageState {
   pluginSettings?: PluginSetting[];
   globalPythonPath?: string | null;
   decimalPrecision?: number;
+  themeMode?: 'dark' | 'light';
   leftPanelViewMode?: 'tabs' | 'split';
   rightPanelViewMode?: 'tabs' | 'split';
   leftPanelWidth?: number;
@@ -42,6 +43,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   pluginSettings: [],
   globalPythonPath: null,
   decimalPrecision: 6,
+  themeMode: 'dark',
   leftPanelViewMode: 'tabs',
   rightPanelViewMode: 'tabs',
   leftPanelWidth: 320,
@@ -111,6 +113,7 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     pluginSettings: Array.isArray(state.pluginSettings) ? state.pluginSettings : DEFAULT_STORAGE_STATE.pluginSettings,
     indexStartIndex: state.indexStartIndex === 1 ? 1 : 0,
     decimalPrecision: typeof state.decimalPrecision === 'number' ? Math.max(0, Math.floor(state.decimalPrecision)) : 6,
+    themeMode: state.themeMode === 'light' ? 'light' : 'dark',
     defaultMapOpacity: typeof state.defaultMapOpacity === 'number' ? state.defaultMapOpacity : DEFAULT_MAP_OPACITY,
   };
 }
