@@ -31,7 +31,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ className }) => 
         className
       )}
     >
-      <div className="bg-surface-panel/95 border border-border-base/80 rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 min-w-[280px] max-w-sm text-center">
+      <div className="bg-surface-panel/95 border border-border-base/80 rounded-xl p-6 shadow-2xl flex flex-col items-center gap-3 min-w-[280px] max-w-sm text-center">
         <Loader2 size={32} className="animate-spin text-primary-base" />
         <div className="space-y-1">
           <div className="text-sm font-semibold text-text-base">

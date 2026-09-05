@@ -34,4 +34,40 @@ describe('FloatingActionBanner', () => {
     fireEvent.click(applyBtn);
     expect(handleAction).toHaveBeenCalled();
   });
+
+  it('renders secondary and danger button variants without forcing danger style onto secondary', () => {
+    const handleSecondary = vi.fn();
+    const handleDanger = vi.fn();
+
+    render(
+      <FloatingActionBanner
+        title="MULTI ACTIONS"
+        actions={[
+          { label: 'Cancel', variant: 'secondary', onClick: handleSecondary },
+          { label: 'Delete', variant: 'danger', onClick: handleDanger },
+        ]}
+      />
+    );
+
+    const cancelBtn = screen.getByRole('button', { name: /Cancel/ });
+    const deleteBtn = screen.getByRole('button', { name: /Delete/ });
+
+    expect(cancelBtn.className).not.toContain('bg-danger-base');
+    expect(deleteBtn.className).toContain('bg-danger-base');
+  });
+
+  it('renders primary button variant with primary brand styling', () => {
+    render(
+      <FloatingActionBanner
+        title="PRIMARY ACTION"
+        actions={[
+          { label: 'Save', variant: 'primary', onClick: vi.fn() },
+        ]}
+      />
+    );
+
+    const saveBtn = screen.getByRole('button', { name: /Save/ });
+    expect(saveBtn.className).toContain('bg-primary-base');
+    expect(saveBtn.className).not.toContain('bg-status-success');
+  });
 });

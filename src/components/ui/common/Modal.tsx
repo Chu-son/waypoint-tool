@@ -53,7 +53,7 @@ export function Modal({
       {/* Content */}
       <Panel
         className={cn(
-          "relative w-full flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 shadow-2xl",
+          "relative w-full flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 shadow-2xl rounded-xl border border-border-base",
           sizeVariants[size],
           className
         )}

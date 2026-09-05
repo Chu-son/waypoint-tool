@@ -66,14 +66,14 @@ export function BrowseInput({
         list={list}
         value={value}
         onChange={(e) => onChange?.(e.target.value)}
-        className={cn(isSm ? "h-8 text-[11px]" : "h-10 text-sm", inputClassName)}
+        className={cn(isSm ? "h-7 text-xs" : "h-8 text-[13px]", inputClassName)}
         placeholder={placeholder}
       />
       <Button
         variant="secondary"
         onClick={handleBrowse}
         className={cn(
-          isSm ? "h-8 px-3 text-[10px]" : "h-10 px-6 shrink-0",
+          isSm ? "h-7 px-2.5 text-xs" : "h-8 px-4 shrink-0 text-[13px]",
           buttonClassName
         )}
       >
