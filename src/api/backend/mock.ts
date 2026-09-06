@@ -157,4 +157,23 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] loadCustomUiPreset called');
     return this.mockCustomUiPreset;
   }
+
+  async checkPythonPackages(pythonPath: string, packages: string[]): Promise<Record<string, boolean>> {
+    console.log('[Mock Backend] checkPythonPackages called for:', pythonPath, packages);
+    const result: Record<string, boolean> = {};
+    for (const pkg of packages) {
+      result[pkg] = true;
+    }
+    return result;
+  }
+
+  async createVirtualenv(targetDir: string, basePython?: string): Promise<string> {
+    console.log('[Mock Backend] createVirtualenv called at:', targetDir, 'with base:', basePython);
+    return `${targetDir}/bin/python`;
+  }
+
+  async installPipPackages(pythonPath: string, packages: string[]): Promise<string> {
+    console.log('[Mock Backend] installPipPackages called for:', pythonPath, packages);
+    return `Successfully installed ${packages.join(', ')}`;
+  }
 }

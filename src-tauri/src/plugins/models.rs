@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -78,6 +79,85 @@ pub struct PluginInputDef {
     pub description: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct PluginDependencyDef {
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    pub version: String,
+}
+
+fn normalize_version_for_semver(v: &str) -> String {
+    let clean = v.trim().trim_start_matches('v').trim_start_matches('V');
+    let parts: Vec<&str> = clean.split('.').collect();
+    match parts.len() {
+        1 if !parts[0].is_empty() => format!("{}.0.0", parts[0]),
+        2 => format!("{}.{}.0", parts[0], parts[1]),
+        _ => clean.to_string(),
+    }
+}
+
+impl PluginDependencyDef {
+    /// Check if candidate_version satisfies this semver requirement (or wildcard/exact match)
+    pub fn matches_version(&self, candidate_version: &str) -> bool {
+        let req_str = self.version.trim();
+        if req_str == "*" || req_str.is_empty() {
+            return true;
+        }
+
+        let cand_norm = normalize_version_for_semver(candidate_version);
+
+        if let Ok(req) = semver::VersionReq::parse(req_str) {
+            if let Ok(ver) = semver::Version::parse(&cand_norm) {
+                return req.matches(&ver);
+            }
+        }
+
+        self.version == candidate_version || self.version == cand_norm
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct PythonDependencyDef {
+    pub name: String,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub optional: Option<bool>,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+pub struct PipelineStepExportsDef {
+    #[serde(default)]
+    pub custom_layers: Option<bool>,
+    #[serde(default)]
+    pub waypoints: Option<bool>,
+    #[serde(default)]
+    pub annotations: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct PipelineStepDef {
+    pub step_id: String,
+    pub plugin_id: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub bindings: HashMap<String, String>,
+    #[serde(default)]
+    pub property_overrides: Option<serde_json::Value>,
+    #[serde(default)]
+    pub exports: Option<PipelineStepExportsDef>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct PipelineRecipeDef {
+    #[serde(default)]
+    pub steps: Vec<PipelineStepDef>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PluginManifest {
     pub name: String,
@@ -89,8 +169,11 @@ pub struct PluginManifest {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(rename = "type")]
-    pub plugin_type: String, // "python" or "wasm"
+    pub plugin_type: String, // "python", "wasm", "python_library", or "pipeline"
+    #[serde(default)]
     pub executable: String,
+    #[serde(default)]
+    pub module_name: Option<String>,
     #[serde(default)]
     pub inputs: Vec<PluginInputDef>,
     #[serde(default)]
@@ -101,6 +184,12 @@ pub struct PluginManifest {
     pub properties: Vec<serde_json::Value>,
     #[serde(default)]
     pub legacy_ids: Vec<String>,
+    #[serde(default)]
+    pub plugin_dependencies: Vec<PluginDependencyDef>,
+    #[serde(default)]
+    pub python_dependencies: Vec<PythonDependencyDef>,
+    #[serde(default)]
+    pub pipeline: Option<PipelineRecipeDef>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -239,6 +328,157 @@ mod tests {
         }"#;
         let manifest: PluginManifest = serde_json::from_str(json).unwrap();
         assert_eq!(manifest.legacy_ids, vec!["SweepOffsetLinesGenerator", "SweepGeneratorRS"]);
+    }
+
+    #[test]
+    fn test_executable_manifest_with_dependencies_deserialize() {
+        let json = r#"{
+            "name": "Advanced Generator",
+            "version": "1.2.0",
+            "type": "python",
+            "executable": "main.py",
+            "plugin_dependencies": [
+                { "id": "geom_lib", "name": "Geometry Library", "version": ">=1.0.0" }
+            ],
+            "python_dependencies": [
+                { "name": "numpy", "version": ">=1.20", "optional": false, "description": "For array operations" },
+                { "name": "scipy", "optional": true }
+            ]
+        }"#;
+        let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.name, "Advanced Generator");
+        assert_eq!(manifest.plugin_type, "python");
+        assert_eq!(manifest.executable, "main.py");
+        assert_eq!(manifest.plugin_dependencies.len(), 1);
+        assert_eq!(manifest.plugin_dependencies[0].id, "geom_lib");
+        assert_eq!(manifest.plugin_dependencies[0].name, "Geometry Library");
+        assert_eq!(manifest.plugin_dependencies[0].version, ">=1.0.0");
+        assert!(manifest.plugin_dependencies[0].matches_version("1.2.3"));
+        assert!(!manifest.plugin_dependencies[0].matches_version("0.9.0"));
+
+        assert_eq!(manifest.python_dependencies.len(), 2);
+        assert_eq!(manifest.python_dependencies[0].name, "numpy");
+        assert_eq!(manifest.python_dependencies[0].version.as_deref(), Some(">=1.20"));
+        assert_eq!(manifest.python_dependencies[0].optional, Some(false));
+        assert_eq!(manifest.python_dependencies[0].description.as_deref(), Some("For array operations"));
+        assert_eq!(manifest.python_dependencies[1].name, "scipy");
+        assert_eq!(manifest.python_dependencies[1].version, None);
+        assert_eq!(manifest.python_dependencies[1].optional, Some(true));
+    }
+
+    #[test]
+    fn test_python_library_manifest_deserialize() {
+        let json = r#"{
+            "name": "Shared Geometry Lib",
+            "version": "1.0.0",
+            "type": "python_library",
+            "module_name": "wpt_geom",
+            "description": "Shared geometry routines",
+            "python_dependencies": [
+                { "name": "shapely", "version": ">=2.0.0" }
+            ]
+        }"#;
+        let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.name, "Shared Geometry Lib");
+        assert_eq!(manifest.plugin_type, "python_library");
+        assert_eq!(manifest.module_name.as_deref(), Some("wpt_geom"));
+        assert!(manifest.executable.is_empty());
+        assert_eq!(manifest.python_dependencies.len(), 1);
+        assert_eq!(manifest.python_dependencies[0].name, "shapely");
+        assert_eq!(manifest.python_dependencies[0].version.as_deref(), Some(">=2.0.0"));
+    }
+
+    #[test]
+    fn test_pipeline_manifest_deserialize() {
+        let json = r#"{
+            "name": "Coverage and Path Pipeline",
+            "version": "0.1.0",
+            "type": "pipeline",
+            "pipeline": {
+                "steps": [
+                    {
+                        "step_id": "step1",
+                        "plugin_id": "drivable_area_layer_generator",
+                        "name": "Generate Drivable Area",
+                        "bindings": {
+                            "seed_points": "start_point"
+                        },
+                        "property_overrides": {
+                            "expansion": 2.5
+                        },
+                        "exports": {
+                            "custom_layers": true,
+                            "waypoints": false,
+                            "annotations": false
+                        }
+                    },
+                    {
+                        "step_id": "step2",
+                        "plugin_id": "dijkstra_path_calculator",
+                        "bindings": {
+                            "start_point": "start_point",
+                            "goal_point": "goal_point"
+                        }
+                    }
+                ]
+            }
+        }"#;
+        let manifest: PluginManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.name, "Coverage and Path Pipeline");
+        assert_eq!(manifest.plugin_type, "pipeline");
+        assert!(manifest.executable.is_empty());
+        assert!(manifest.pipeline.is_some());
+        let pipeline = manifest.pipeline.unwrap();
+        assert_eq!(pipeline.steps.len(), 2);
+        assert_eq!(pipeline.steps[0].step_id, "step1");
+        assert_eq!(pipeline.steps[0].plugin_id, "drivable_area_layer_generator");
+        assert_eq!(pipeline.steps[0].name.as_deref(), Some("Generate Drivable Area"));
+        assert_eq!(pipeline.steps[0].bindings.get("seed_points").unwrap(), "start_point");
+        assert_eq!(
+            pipeline.steps[0].property_overrides.as_ref().unwrap().get("expansion").unwrap(),
+            2.5
+        );
+        let exports = pipeline.steps[0].exports.as_ref().unwrap();
+        assert_eq!(exports.custom_layers, Some(true));
+        assert_eq!(exports.waypoints, Some(false));
+        assert_eq!(exports.annotations, Some(false));
+
+        assert_eq!(pipeline.steps[1].step_id, "step2");
+        assert_eq!(pipeline.steps[1].plugin_id, "dijkstra_path_calculator");
+        assert_eq!(pipeline.steps[1].bindings.get("goal_point").unwrap(), "goal_point");
+        assert!(pipeline.steps[1].exports.is_none());
+    }
+
+    #[test]
+    fn test_plugin_dependency_matches_version() {
+        let dep_range = PluginDependencyDef {
+            id: "my_dep".to_string(),
+            name: "My Dep".to_string(),
+            version: ">=1.0.0, <2.0.0".to_string(),
+        };
+        assert!(dep_range.matches_version("1.0.0"));
+        assert!(dep_range.matches_version("1.5.2"));
+        assert!(dep_range.matches_version("1.0")); // partial version normalization
+        assert!(dep_range.matches_version("v1.2.3")); // v-prefix stripping
+        assert!(!dep_range.matches_version("0.9.0"));
+        assert!(!dep_range.matches_version("2.0.0"));
+
+        let dep_wildcard = PluginDependencyDef {
+            id: "any_dep".to_string(),
+            name: "Any".to_string(),
+            version: "*".to_string(),
+        };
+        assert!(dep_wildcard.matches_version("0.0.1"));
+        assert!(dep_wildcard.matches_version("99.9.9"));
+
+        let dep_caret = PluginDependencyDef {
+            id: "caret_dep".to_string(),
+            name: "Caret".to_string(),
+            version: "^1.2.0".to_string(),
+        };
+        assert!(dep_caret.matches_version("1.2.3"));
+        assert!(dep_caret.matches_version("1.9.0"));
+        assert!(!dep_caret.matches_version("2.0.0"));
     }
 }
 

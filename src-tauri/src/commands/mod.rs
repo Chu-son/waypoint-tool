@@ -87,6 +87,9 @@ pub use plugins::*;
 pub mod custom_ui;
 pub use custom_ui::*;
 
+pub mod venv;
+pub use venv::*;
+
 #[command]
 pub fn force_exit(app: AppHandle) {
     app.exit(0);
@@ -122,7 +125,10 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         read_image_base64,
         open_devtools,
         load_custom_ui_config,
-        load_custom_ui_preset
+        load_custom_ui_preset,
+        venv::check_python_packages,
+        venv::create_virtualenv,
+        venv::install_pip_packages
     ]
 }
 

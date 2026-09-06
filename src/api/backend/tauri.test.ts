@@ -47,4 +47,34 @@ describe('TauriBackendAPI', () => {
       imageDataB64: null
     });
   });
+
+  it('calls check_python_packages with pythonPath and packages', async () => {
+    (invoke as any).mockResolvedValue({ numpy: true, scipy: false });
+    const result = await api.checkPythonPackages('/usr/bin/python3', ['numpy', 'scipy']);
+    expect(invoke).toHaveBeenCalledWith('check_python_packages', {
+      pythonPath: '/usr/bin/python3',
+      packages: ['numpy', 'scipy'],
+    });
+    expect(result).toEqual({ numpy: true, scipy: false });
+  });
+
+  it('calls create_virtualenv with targetDir and basePython', async () => {
+    (invoke as any).mockResolvedValue('/path/to/venv/bin/python');
+    const result = await api.createVirtualenv('/path/to/venv', '/usr/bin/python3');
+    expect(invoke).toHaveBeenCalledWith('create_virtualenv', {
+      targetDir: '/path/to/venv',
+      basePython: '/usr/bin/python3',
+    });
+    expect(result).toBe('/path/to/venv/bin/python');
+  });
+
+  it('calls install_pip_packages with pythonPath and packages', async () => {
+    (invoke as any).mockResolvedValue('Successfully installed numpy');
+    const result = await api.installPipPackages('/path/to/venv/bin/python', ['numpy']);
+    expect(invoke).toHaveBeenCalledWith('install_pip_packages', {
+      pythonPath: '/path/to/venv/bin/python',
+      packages: ['numpy'],
+    });
+    expect(result).toBe('Successfully installed numpy');
+  });
 });

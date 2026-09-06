@@ -96,4 +96,16 @@ export class TauriBackendAPI implements IBackendAPI {
   async loadCustomUiPreset(): Promise<any> {
     return invoke('load_custom_ui_preset');
   }
+
+  async checkPythonPackages(pythonPath: string, packages: string[]): Promise<Record<string, boolean>> {
+    return invoke('check_python_packages', { pythonPath, packages });
+  }
+
+  async createVirtualenv(targetDir: string, basePython?: string): Promise<string> {
+    return invoke('create_virtualenv', { targetDir, basePython });
+  }
+
+  async installPipPackages(pythonPath: string, packages: string[]): Promise<string> {
+    return invoke('install_pip_packages', { pythonPath, packages });
+  }
 }

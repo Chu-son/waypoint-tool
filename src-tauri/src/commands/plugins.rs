@@ -175,11 +175,94 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
     Ok(())
 }
 
+/// Filter plugins of type `python_library` or having `module_name` set, and return deduplicated folder paths.
+pub fn collect_python_library_paths_from_plugins(plugins: &[PluginInstance]) -> Vec<std::path::PathBuf> {
+    let mut paths = Vec::new();
+    for p in plugins {
+        let has_module = p.manifest.module_name.as_ref().map_or(false, |m| !m.trim().is_empty());
+        if p.manifest.plugin_type == "python_library" || has_module {
+            let path = std::path::PathBuf::from(&p.folder_path);
+            if !path.as_os_str().is_empty() && !paths.contains(&path) {
+                paths.push(path);
+            }
+        }
+    }
+    paths
+}
+
+/// Construct a clean PYTHONPATH using the OS-specific delimiter (';' on Windows, ':' on Unix).
+pub fn build_safe_python_path(paths: &[std::path::PathBuf]) -> String {
+    let sep = if cfg!(windows) { ";" } else { ":" };
+    paths
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .filter(|s| !s.trim().is_empty())
+        .collect::<Vec<String>>()
+        .join(sep)
+}
+
+/// Collect paths of all currently scanned/installed plugins that are of type `python_library`
+/// (or have `module_name` set), plus bundled SDK directory if available.
+pub fn collect_python_library_paths(app: Option<&AppHandle>) -> Vec<std::path::PathBuf> {
+    let mut plugins = Vec::new();
+
+    if let Some(app) = app {
+        if let Ok(app_data_dir) = app.path().app_data_dir() {
+            let resource_dir = app.path().resource_dir().ok();
+            let manager = PluginManager::new(&app_data_dir, resource_dir);
+            if let Ok(scanned) = manager.scan_plugins() {
+                plugins.extend(scanned);
+            }
+        }
+    } else {
+        // Fallback for tests / environment without AppHandle
+        if let Ok(current_dir) = std::env::current_dir() {
+            for dev_dir in &[
+                current_dir.join("../python_sdk"),
+                current_dir.join("python_sdk"),
+            ] {
+                let resolved = dev_dir.canonicalize().unwrap_or_else(|_| dev_dir.clone());
+                if resolved.exists() && resolved.is_dir() {
+                    plugins.extend(PluginManager::scan_plugins_in_dir(&resolved, true));
+                }
+            }
+        }
+    }
+
+    let mut paths = collect_python_library_paths_from_plugins(&plugins);
+
+    // If bundled SDK (python_sdk/wpt_plugin) exists, ensure its parent directory
+    // (python_sdk) is included so wpt_plugin is importable
+    if let Some(app) = app {
+        if let Ok(sdk_dir) = find_bundled_sdk_path(app) {
+            if let Some(parent) = sdk_dir.parent() {
+                let parent_buf = parent.to_path_buf();
+                if !paths.contains(&parent_buf) {
+                    paths.push(parent_buf);
+                }
+            }
+        }
+    } else if let Ok(current_dir) = std::env::current_dir() {
+        for dev_path in &[
+            current_dir.join("../python_sdk"),
+            current_dir.join("python_sdk"),
+        ] {
+            let resolved = dev_path.canonicalize().unwrap_or_else(|_| dev_path.clone());
+            if resolved.join("wpt_plugin").exists() && !paths.contains(&resolved) {
+                paths.push(resolved);
+            }
+        }
+    }
+
+    paths
+}
+
 pub fn run_plugin_sync(
     plugin_instance: PluginInstance,
     context_json: String,
     python_path: Option<String>,
     map_layers: Option<Vec<crate::plugins::models::PluginMapLayer>>,
+    app: Option<&AppHandle>,
 ) -> Result<serde_json::Value, String> {
     // 【プラグイン・アーキテクチャの背景】
     // このツールでは、外部の経路生成アルゴリズム（PythonやWebAssembly）と連携するために、
@@ -188,6 +271,13 @@ pub fn run_plugin_sync(
     // 開発者が使い慣れた言語で柔軟に拡張機能を作成できるよう設計されています。
     
     if plugin_instance.manifest.plugin_type == "python" {
+        if plugin_instance.manifest.executable.trim().is_empty() {
+            return Err(format!(
+                "Plugin '{}' does not specify an executable.",
+                plugin_instance.manifest.name
+            ));
+        }
+
         use std::process::{Command, Stdio};
         
         let default_cmd = if cfg!(windows) { "python".to_string() } else { "python3".to_string() };
@@ -195,33 +285,50 @@ pub fn run_plugin_sync(
             Some(p) if !p.trim().is_empty() => p.trim().to_string(),
             _ => default_cmd,
         };
+
+        // Construct clean safe PYTHONPATH containing all scanned python_library plugins
+        let library_paths = collect_python_library_paths(app);
+        let safe_python_path = build_safe_python_path(&library_paths);
         
         println!("[DEBUG/RUST] Executing plugin: {} with cmd: {}", plugin_instance.manifest.executable, py_cmd);
         println!("[DEBUG/RUST] Using Context JSON: {}", context_json);
+        if !safe_python_path.is_empty() {
+            println!("[DEBUG/RUST] Using safe PYTHONPATH: {}", safe_python_path);
+        }
 
-        let child_res = Command::new(&py_cmd)
-            .arg(&plugin_instance.manifest.executable)
+        let mut cmd = Command::new(&py_cmd);
+        cmd.arg(&plugin_instance.manifest.executable)
             .current_dir(&plugin_instance.folder_path)
-            .env_remove("PYTHONPATH")
             .env_remove("PYTHONHOME")
+            .env_remove("PYTHONPATH") // Remove inherited/untrusted system PYTHONPATH
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn();
+            .stderr(Stdio::piped());
+
+        if !safe_python_path.is_empty() {
+            cmd.env("PYTHONPATH", &safe_python_path);
+        }
+
+        let child_res = cmd.spawn();
 
         let mut child = match child_res {
             Ok(c) => c,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound && py_cmd == "python" && !cfg!(windows) => {
                 println!("[DEBUG/RUST] 'python' command not found. Falling back to 'python3'...");
-                Command::new("python3")
-                    .arg(&plugin_instance.manifest.executable)
+                let mut cmd3 = Command::new("python3");
+                cmd3.arg(&plugin_instance.manifest.executable)
                     .current_dir(&plugin_instance.folder_path)
-                    .env_remove("PYTHONPATH")
                     .env_remove("PYTHONHOME")
+                    .env_remove("PYTHONPATH")
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .spawn()
+                    .stderr(Stdio::piped());
+
+                if !safe_python_path.is_empty() {
+                    cmd3.env("PYTHONPATH", &safe_python_path);
+                }
+
+                cmd3.spawn()
                     .map_err(|e2| format!("Failed to spawn python (also tried python3): {}", e2))?
             }
             Err(e) => return Err(format!("Failed to spawn python ({}): {}", py_cmd, e)),
@@ -298,13 +405,14 @@ pub fn run_plugin_sync(
 
 #[tauri::command]
 pub async fn run_plugin(
+    app: AppHandle,
     plugin_instance: PluginInstance,
     context_json: String,
     python_path: Option<String>,
     map_layers: Option<Vec<crate::plugins::models::PluginMapLayer>>,
 ) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        run_plugin_sync(plugin_instance, context_json, python_path, map_layers)
+        run_plugin_sync(plugin_instance, context_json, python_path, map_layers, Some(&app))
     })
     .await
     .map_err(|e| format!("Plugin task execution failed to join: {}", e))?
@@ -412,5 +520,168 @@ mod tests {
         let envs = get_python_environments();
         // Should at least return the fallback "python" or "python3"
         assert!(!envs.is_empty());
+    }
+
+    #[test]
+    fn test_collect_python_library_paths_and_build_safe_python_path() {
+        let manifest_lib = crate::plugins::models::PluginManifest {
+            name: "Lib A".to_string(),
+            version: Some("1.0.0".to_string()),
+            category: None,
+            primary_output: None,
+            description: None,
+            plugin_type: "python_library".to_string(),
+            executable: "".to_string(),
+            module_name: Some("lib_a".to_string()),
+            inputs: vec![],
+            needs: vec![],
+            icon: None,
+            properties: vec![],
+            legacy_ids: vec![],
+            plugin_dependencies: vec![],
+            python_dependencies: vec![],
+            pipeline: None,
+        };
+        let p1 = PluginInstance {
+            id: "lib_a".to_string(),
+            manifest: manifest_lib,
+            folder_path: "/path/to/lib_a".to_string(),
+            is_builtin: true,
+            sdk_version: None,
+        };
+
+        let manifest_exec = crate::plugins::models::PluginManifest {
+            name: "Exec Plugin".to_string(),
+            version: Some("1.0.0".to_string()),
+            category: None,
+            primary_output: None,
+            description: None,
+            plugin_type: "python".to_string(),
+            executable: "main.py".to_string(),
+            module_name: None,
+            inputs: vec![],
+            needs: vec![],
+            icon: None,
+            properties: vec![],
+            legacy_ids: vec![],
+            plugin_dependencies: vec![],
+            python_dependencies: vec![],
+            pipeline: None,
+        };
+        let p2 = PluginInstance {
+            id: "exec_plugin".to_string(),
+            manifest: manifest_exec,
+            folder_path: "/path/to/exec".to_string(),
+            is_builtin: false,
+            sdk_version: None,
+        };
+
+        let manifest_mod = crate::plugins::models::PluginManifest {
+            name: "Module Plugin".to_string(),
+            version: Some("1.0.0".to_string()),
+            category: None,
+            primary_output: None,
+            description: None,
+            plugin_type: "python".to_string(),
+            executable: "".to_string(),
+            module_name: Some("mod_b".to_string()),
+            inputs: vec![],
+            needs: vec![],
+            icon: None,
+            properties: vec![],
+            legacy_ids: vec![],
+            plugin_dependencies: vec![],
+            python_dependencies: vec![],
+            pipeline: None,
+        };
+        let p3 = PluginInstance {
+            id: "mod_b".to_string(),
+            manifest: manifest_mod.clone(),
+            folder_path: "/path/to/mod_b".to_string(),
+            is_builtin: false,
+            sdk_version: None,
+        };
+
+        // Also test duplicate path deduplication
+        let p4 = PluginInstance {
+            id: "mod_b_dup".to_string(),
+            manifest: manifest_mod.clone(),
+            folder_path: "/path/to/mod_b".to_string(),
+            is_builtin: false,
+            sdk_version: None,
+        };
+
+        let paths = collect_python_library_paths_from_plugins(&[p1, p2, p3, p4]);
+        assert_eq!(paths.len(), 2);
+        assert_eq!(paths[0], std::path::PathBuf::from("/path/to/lib_a"));
+        assert_eq!(paths[1], std::path::PathBuf::from("/path/to/mod_b"));
+
+        let joined = build_safe_python_path(&paths);
+        let expected_sep = if cfg!(windows) { ";" } else { ":" };
+        assert_eq!(joined, format!("/path/to/lib_a{}/path/to/mod_b", expected_sep));
+    }
+
+    #[test]
+    fn test_collect_python_library_paths_skips_empty_module_name() {
+        let manifest_empty_mod = crate::plugins::models::PluginManifest {
+            name: "Empty Mod".to_string(),
+            version: Some("1.0.0".to_string()),
+            category: None,
+            primary_output: None,
+            description: None,
+            plugin_type: "python".to_string(),
+            executable: "main.py".to_string(),
+            module_name: Some("   ".to_string()),
+            inputs: vec![],
+            needs: vec![],
+            icon: None,
+            properties: vec![],
+            legacy_ids: vec![],
+            plugin_dependencies: vec![],
+            python_dependencies: vec![],
+            pipeline: None,
+        };
+        let p = PluginInstance {
+            id: "empty_mod".to_string(),
+            manifest: manifest_empty_mod,
+            folder_path: "/path/to/empty_mod".to_string(),
+            is_builtin: false,
+            sdk_version: None,
+        };
+        let paths = collect_python_library_paths_from_plugins(&[p]);
+        assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn test_run_plugin_sync_empty_executable_fails() {
+        let manifest = crate::plugins::models::PluginManifest {
+            name: "No Exec Plugin".to_string(),
+            version: Some("1.0.0".to_string()),
+            category: None,
+            primary_output: None,
+            description: None,
+            plugin_type: "python".to_string(),
+            executable: "".to_string(),
+            module_name: None,
+            inputs: vec![],
+            needs: vec![],
+            icon: None,
+            properties: vec![],
+            legacy_ids: vec![],
+            plugin_dependencies: vec![],
+            python_dependencies: vec![],
+            pipeline: None,
+        };
+        let p = PluginInstance {
+            id: "no_exec".to_string(),
+            manifest,
+            folder_path: "/dummy".to_string(),
+            is_builtin: false,
+            sdk_version: None,
+        };
+
+        let res = run_plugin_sync(p, "{}".to_string(), None, None, None);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("does not specify an executable"));
     }
 }

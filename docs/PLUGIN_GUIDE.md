@@ -227,8 +227,11 @@ class PathFollowerPlugin(PluginGenerator):
 - `self.get_annotation(context, input_id)` / `self.get_annotations(context, input_id)`: アノテーション入力オブジェクトの取得ヘルパー。
 - `self.get_custom_layer(context, input_id)` / `self.get_custom_layers(context, input_id)`: カスタムレイヤー入力データの取得ヘルパー。
 - `self.get_plugin_data(obj)`: オブジェクト（レイヤー/アノテーション等）に紐付く `plugin_data` を安全に取得するヘルパー。
-- `self.get_custom_layer_grid(custom_layer)`: カスタムレイヤーに占有格子データが含まれる場合に `OccupancyGrid` を返すヘルパー。
 - `encode_rgba_to_png_base64(width, height, rgba_bytes)`: 純粋Pythonによる高速PNG Base64エンコーダー。
+- `get_grid_backend()`: 最適な 2D 格子配列処理バックエンド (`NumpyGridBackend` / `PurePythonGridBackend`) を自動取得。
+- `erode(grid, radius)` / `dilate(grid, radius)`: 円形構造要素によるモルフォロジー収縮・膨張ヘルパー。
+- `distance_transform(grid)`: 高速ユークリッド距離変換 (EDT) ヘルパー。
+- `gaussian_blur(grid, sigma)`: 分離可能 2D ガウシアン平滑化フィルタ。
 
 ## 6. プラグインの登録
 1. アプリの Settings > Plugins タブを開きます。
@@ -249,5 +252,257 @@ class PathFollowerPlugin(PluginGenerator):
    - 新しい入力型（`annotation`, `custom_layer`）はオプショナルであり、既存プラグインの `inputs` 定義を壊しません。
 3. **出力形式の柔軟な受容**:
    - ツール本体は、旧来のリスト単体返却形式（`[ { "x": ..., "y": ... } ]`）と、新仕様の複数出力オブジェクト形式（`PluginResult`）の両方を境界で判別・受容します。
+
+---
+
+## 8. 共有ライブラリプラグイン (Shared Library Plugins: `type: "python_library"`)
+
+複数のプラグインで共通して利用したい幾何学計算ルーチン、ロボット固有の運動学モデル、最適化アルゴリズムなどをパッケージ化し、他の実行可能プラグインから簡単に再利用できる仕組みです。
+
+### 1) マニフェストの定義
+共有ライブラリプラグインでは、`type` に `"python_library"` を指定し、`module_name` に Python インポート名（フォルダ名・モジュール識別子）を指定します。
+
+```json
+{
+  "name": "Sample Shared Geometry Library",
+  "version": "1.0.0",
+  "type": "python_library",
+  "module_name": "sample_geo_lib",
+  "description": "多角形面積、軌道平滑化、累積距離計算などの共通計算を提供する共有ライブラリです。",
+  "python_dependencies": []
+}
+```
+
+### 2) ディレクトリ構成
+プラグインディレクトリ内に、`module_name` と同名の Python パッケージディレクトリ（または単一 `.py` ファイル）を配置します。
+
+```
+sample_geo_lib/
+├── manifest.json
+└── sample_geo_lib/
+    └── __init__.py      # polygon_area, smooth_trajectory などを実装
+```
+
+### 3) 自動 PYTHONPATH 注入と利用方法
+Tauri バックエンドは、登録・スキャンされたすべての `python_library` プラグイン（または `module_name` を持つプラグイン）の配置パスを自動収集し、実行可能プラグインのプロセス起動時に OS 固有の区切り文字（Unix `:`, Windows `;`）で `PYTHONPATH` 環境変数へ注入します。
+
+したがって、呼び出し側のプラグインスクリプト（`main.py`）では、**`sys.path.append(...)` のような壊れやすい相対パス操作を行わずに直接インポート**できます：
+
+```python
+# 各自のプラグイン内 main.py
+from wpt_plugin import PluginGenerator, PluginResult
+import sample_geo_lib  # 自動的に PYTHONPATH から解決されます
+
+class AreaSurveyGenerator(PluginGenerator):
+    def generate(self, context):
+        polygon_pts = [(0.0, 0.0), (10.0, 0.0), (10.0, 8.0), (0.0, 8.0)]
+        area = sample_geo_lib.polygon_area(polygon_pts)
+        self.log(f"Survey polygon area: {area:.2f} m²")
+        ...
+```
+
+---
+
+## 9. 外部依存パッケージの管理と推奨設計パターン
+
+プラグインが NumPy, SciPy, Shapely などの外部 Python ライブラリを必要とする場合、`manifest.json` の `python_dependencies` フィールドに宣言します。
+
+### 1) `python_dependencies` の指定
+
+```json
+{
+  "name": "Advanced Coverage Generator",
+  "type": "python",
+  "executable": "main.py",
+  "python_dependencies": [
+    {
+      "name": "numpy",
+      "version": ">=1.20.0",
+      "optional": false,
+      "description": "高速な 2D 占有格子データ処理および行列演算に必要です。"
+    },
+    {
+      "name": "scipy",
+      "optional": true,
+      "description": "高速なモルフォロジー演算および距離変換のアクセラレーションに使用されます。"
+    }
+  ]
+}
+```
+
+- `name`: PyPI パッケージ名。
+- `version`: セマンティックバージョニング条件（`">=1.20"`, `"^2.0"` など、省略時は全バージョン適合）。
+- `optional`: `true` の場合、ライブラリ未導入時も警告のみが表示されプラグインは実行可能です。`false`（必須依存）の場合は実行前にセットアップ警告モーダルが提示されます。
+
+### 2) 推奨設計パターン：1層ラップ（Backend Adapter パターン）
+
+外部依存ライブラリ（NumPy 等）をオプショナルとして扱う際、**ビジネスロジックの各所で `try...import` や `if has_numpy:` 分岐を散乱させることは重大なアンチパターン**です。
+
+#### ❌ アンチパターン：ビジネスロジック全体への条件分岐散乱
+```python
+# 悪い例: アルゴリズム各所にライブラリ有無の分岐が散らばる
+def compute_cost(grid):
+    try:
+        import numpy as np
+        arr = np.array(grid)
+        # NumPy による計算
+        ...
+    except ImportError:
+        # Pure Python による計算（二重保守、境界処理の不整合バグの温床）
+        ...
+
+def filter_noise(grid):
+    if has_numpy:
+        ...
+    else:
+        ...
+```
+- **問題点**:
+  1. 同じアルゴリズムを NumPy 版と Pure Python 版で 2 箇所に書くことになり、保守コストが 2 倍になる。
+  2. 境界値（丸め誤差、インデックス外参照、境界モード）の僅かな差異によって環境依存の挙動差・再現不能バグが生じる。
+  3. テストマトリクスが複雑化し、エッジケースの検証が極めて困難になる。
+
+####  推奨パターン：公式リファレンス実装 `wpt_plugin.array`
+公式 SDK の `wpt_plugin.array` では、この問題を解決する **Backend Adapter パターン（1層ラップ）** を提供しています。
+
+```
+                    [ ユーザーのプラグイン ロジック ]
+                                   │
+                                   ▼
+                [ 抽象インターフェース (GridArrayBackend) ]
+                                   │
+              ┌────────────────────┴────────────────────┐
+              ▼                                         ▼
+   [ 高速バックエンド (NumpyGridBackend) ]     [ 純粋フォールバック (PurePythonGridBackend) ]
+   (NumPy / SciPy C 拡張による超高速処理)      (標準ライブラリのみ、外部依存ゼロ)
+```
+
+1. **抽象インターフェース (`GridArrayBackend`)**:
+   - `erode(grid, radius)`: 円形構造要素による収縮
+   - `dilate(grid, radius)`: 円形構造要素による膨張
+   - `distance_transform(grid)`: 高速ユークリッド距離変換 (EDT)
+   - `gaussian_blur(grid, sigma)`: 分離可能 2D ガウシアン平滑化フィルタ
+2. **単一の境界プローブ (`get_grid_backend()`)**:
+   - モジュールロード時・初回呼び出し時に 1 度だけ環境を検出し、最適なバックエンドを透過的に選定。
+3. **ビジネスロジックの単純化**:
+   - プラグイン作者は外部ライブラリの有無を一切気にせず、トップレベル関数（またはアダプタ経由）を呼び出すだけで安全かつ最大効率の処理が行われます：
+
+```python
+from wpt_plugin import PluginGenerator, PluginResult
+from wpt_plugin.array import erode, dilate, distance_transform, gaussian_blur
+
+class RobustFilterPlugin(PluginGenerator):
+    def generate(self, context):
+        grid = self.get_occupancy_grid(context)
+        # NumPy があれば C 拡張で一瞬で完了、無ければ純粋 Python ループで自動実行
+        # どちらの環境でも得られる結果（セル値）は数学的に完全に一致します
+        eroded_grid = erode(grid.to_list(), radius=2)
+        dist_map = distance_transform(eroded_grid)
+        smoothed = gaussian_blur(dist_map, sigma=1.5)
+        ...
+```
+
+---
+
+## 10. パイプラインプラグイン (Pipeline Plugins: `type: "pipeline"`)
+
+複数の単機能プラグイン（ノイズ除去レイヤー生成 ➔ 走行可能領域解析 ➔ 走査経路生成 等）を宣言的に結合し、1 クリックで一連のワークフローを実行するプラグインです。
+
+### 1) パイプラインの定義 (`manifest.json`)
+パイプラインプラグインには Python 実行ファイル（`main.py`）は不要です。`manifest.json` の `pipeline.steps` 配列に実行順序とデータ配管（バインディング）を記述します。
+
+```json
+{
+  "name": "Noise Filtered Sweep Pipeline",
+  "version": "1.0.0",
+  "type": "pipeline",
+  "description": "ノイズ除去マスクを生成した後に、指定領域の走査カバレッジ経路を生成します。",
+  "pipeline": {
+    "steps": [
+      {
+        "step_id": "filter_step",
+        "plugin_id": "noise_filter_layer_generator",
+        "name": "Noise Filter Preprocessing",
+        "bindings": {
+          "roi_region": "sweep_rect"
+        },
+        "property_overrides": {
+          "mode": "remove_obstacles",
+          "noise_size": 0.15
+        },
+        "exports": {
+          "custom_layers": false,
+          "waypoints": false,
+          "annotations": false
+        }
+      },
+      {
+        "step_id": "sweep_step",
+        "plugin_id": "rect_search_generator",
+        "name": "Generate Sweep Route",
+        "bindings": {
+          "sweep_rect": "sweep_rect"
+        },
+        "property_overrides": {
+          "num_lines": 6,
+          "sweep_direction": "Horizontal"
+        },
+        "exports": {
+          "custom_layers": false,
+          "waypoints": true,
+          "annotations": false
+        }
+      }
+    ]
+  }
+}
+```
+
+### 2) レシピフィールド仕様
+- `step_id`: パイプライン内で一意のステップ識別子。
+- `plugin_id`: 呼び出すプラグインのフォルダ ID または識別名。
+- `bindings`:
+  - 前段ステップの出力を参照: `"$steps.<step_id>.custom_layers[0]"` や `"$steps.<step_id>.waypoints"`
+  - 共通手動入力の共有: 複数ステップで同じ入力（例: `"sweep_rect"`）をバインドすることで、ユーザーはキャンバス上で 1 回矩形を描画するだけで全ステップにその座標が共有されます。
+- `property_overrides`: そのステップ実行時のみ適用したい固定プロパティ値の上書き。
+- `exports`: 出力ルーティング制御（不要な中間データの破棄）。
+  - `custom_layers`: `false` にすると、そのステップで生成されたレイヤー画像はプロジェクトのレイヤー一覧に保存されず、後続ステップへの内部受け渡しのみに利用されます。
+  - `waypoints`: `true` にすると、最終的なウェイポイントとしてプロジェクトツリーに追加されます。
+
+### 3) 実行ライフサイクルと同期再生成 (`generatorStash`)
+1. **事前パラメータ集約 (`extractPipelineParameters`)**:
+   - パイプライン実行前に、バインディングやオーバーライドで解決されていない「未束縛の入力・プロパティ」のみが抽出され、UI にすっきりと集約表示されます。
+2. **アトミックトランザクション実行**:
+   - パイプライン全体の実行は 1 つのアトミックな履歴トランザクション（`beginHistoryTransaction`）内で完了します。途中でエラーが発生した場合は自動的に全ステップが元の状態にロールバックされ、Undo/Redo も 1 アクションで綺麗に元に戻せます。
+3. **同期再生成 (`generatorStash`)**:
+   - 生成された各オブジェクトには `pipeline_metadata`（`pipeline_id`, `pipeline_execution_id`, `step_id`）が付与されます。パイプラインパラメータを変更して再生成した際、同一パイプライン実行に属する関連オブジェクト群が一括して整合性を保ちながら置き換えられます。
+
+---
+
+## 11. ツール支援による仮想環境・依存関係の分離管理 (`.venv` & `pythonOverridePath`)
+
+ROS Waypoint Tool は、OS 全体の Python 環境（システム Python）を汚染することなく、プラグインごとの独立した仮想環境実行を公式にサポートしています。
+
+### 1) 仮想環境の優先解決順序
+プラグイン実行時、Tauri バックエンドは以下の優先度で Python 実行ファイルを特定します：
+
+1. **プラグイン個別設定 (`pythonOverridePath`)**:
+   - Settings > Plugins または UI から個別に指定された Python インタプリタの絶対パス。
+2. **プラグインローカル仮想環境 (`<plugin_dir>/.venv`)**:
+   - 各プラグインフォルダ直下の `.venv/bin/python`（Windows では `.venv\Scripts\python.exe`）。
+3. **アプリ共通仮想環境 (`<app_data_dir>/plugins/.venv`)**:
+   - プラグイン共通環境が存在する場合に自動利用。
+4. **システム Python (`python3` または `python`)**:
+   - システム PATH から検出されたグローバル Python。
+
+### 2) UI からの 1 クリック仮想環境セットアップ (VenvSetupModal)
+`manifest.json` の `python_dependencies` に記載された外部ライブラリが現在の Python 環境に不足している場合、Settings > Plugins タブ上で警告バッジ（⚠️ Missing Dependencies）が表示され、「Setup Environment」ボタンが有効化されます。
+
+モーダルを開いて「Create .venv & Install」をクリックすると、ツールがバックグラウンドで以下を安全に実行します：
+1. `python3 -m venv <plugin_dir>/.venv` による独立した仮想環境の初期化
+2. `.venv/bin/pip install` によるマニフェスト記載ライブラリの自動インストール
+3. インストール完了後、自動的にそのプラグインの実行パスが `.venv` 内の Python に切り替わります。
+
+これにより、ユーザーにターミナル操作を強いることなく、NumPy や SciPy を用いた高度な Python プラグインをワンストップで稼働させることができます。
 
 

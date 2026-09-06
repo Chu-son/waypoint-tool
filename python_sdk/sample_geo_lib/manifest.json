@@ -1,0 +1,8 @@
+{
+  "name": "Sample Shared Geometry Library",
+  "version": "1.0.0",
+  "type": "python_library",
+  "module_name": "sample_geo_lib",
+  "description": "共通幾何計算ユーティリティ（多角形面積、軌道平滑化、経路長計算等）を提供する共有ライブラリプラグインです。",
+  "python_dependencies": []
+}

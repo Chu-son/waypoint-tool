@@ -78,6 +78,9 @@ export interface IBackendAPI {
   blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult>;
   loadCustomUiConfig(): Promise<any>;
   loadCustomUiPreset(): Promise<{ type: 'dev' | 'sample'; path: string; config: any } | null>;
+  checkPythonPackages(pythonPath: string, packages: string[]): Promise<Record<string, boolean>>;
+  createVirtualenv(targetDir: string, basePython?: string): Promise<string>;
+  installPipPackages(pythonPath: string, packages: string[]): Promise<string>;
 }
 
 export interface OpenDialogOptions {

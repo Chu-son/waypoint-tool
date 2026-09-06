@@ -47,6 +47,9 @@ pub fn run() {
             commands::open_devtools,
             commands::load_custom_ui_config,
             commands::load_custom_ui_preset,
+            commands::check_python_packages,
+            commands::create_virtualenv,
+            commands::install_pip_packages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

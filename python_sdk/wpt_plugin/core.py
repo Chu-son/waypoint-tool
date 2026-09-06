@@ -60,15 +60,17 @@ class PluginBase:
 
     def get_interaction_rect(self, context: Dict[str, Any], input_id: str) -> Optional[Rectangle]:
         data = self.get_interaction_data(context, input_id)
-        if not data:
+        if not data or not isinstance(data, dict):
             return None
         center_data = data.get("center", {})
-        center = Point(center_data.get("x", 0.0), center_data.get("y", 0.0))
+        if not isinstance(center_data, dict):
+            return None
+        center = Point(float(center_data.get("x", 0.0)), float(center_data.get("y", 0.0)))
         return Rectangle(
             center=center,
-            width=data.get("width", 1.0),
-            height=data.get("height", 1.0),
-            yaw=data.get("yaw", 0.0)
+            width=float(data.get("width", 1.0)),
+            height=float(data.get("height", 1.0)),
+            yaw=float(data.get("yaw", 0.0))
         )
 
     def get_annotation(self, context: Dict[str, Any], input_id: str) -> Optional[Dict[str, Any]]:
