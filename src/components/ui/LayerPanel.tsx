@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, Palette, Bookmark, Code2, Target } from "lucide-react";
+import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, RotateCw, FlipHorizontal2, Move, Palette, Bookmark, Code2, Target } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { DialogAPI, BackendAPI } from "../../api";
 import { Button } from "./common/Button";
 import { Slider } from "./common/Slider";
 import { Select } from "./common/Select";
 import { Input } from "./common/Input";
-import { NumericInput } from "./NumericInput";
+import { LabeledNumericInput } from "./common/LabeledNumericInput";
 import { FieldLabel } from "./common/FieldLabel";
 import { EmptyState } from "./common/EmptyState";
 import { ProjectMapLayer, CustomLayer, ExportRegion } from "../../types/store";
@@ -33,7 +33,7 @@ function CardFrame({
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={cn(
-        "bg-surface-panel/40 backdrop-blur-sm border rounded-lg p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer",
+        "bg-surface-panel/40 backdrop-blur-sm border rounded-lg p-3 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer",
         isActive ? "border-primary-base/80 bg-primary-base/5 ring-1 ring-primary-base/30" : "border-border-base/30",
         className
       )}
@@ -43,6 +43,147 @@ function CardFrame({
       )}
       {children}
     </div>
+  );
+}
+
+interface LayerCardShellProps {
+  visible: boolean;
+  isActive?: boolean;
+  onClick?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
+  icon?: React.ReactNode;
+  title: React.ReactNode;
+  subBadges?: React.ReactNode;
+  headerActions?: React.ReactNode;
+  showSettings: boolean;
+  onToggleSettings: () => void;
+  settingsTooltip?: string;
+  onToggleVisible: () => void;
+  onRemove: () => void;
+  removeTooltip?: string;
+  children?: React.ReactNode;
+}
+
+function LayerCardShell({
+  visible,
+  isActive = false,
+  onClick,
+  onContextMenu,
+  onMoveUp,
+  onMoveDown,
+  isFirst = false,
+  isLast = false,
+  icon,
+  title,
+  subBadges,
+  headerActions,
+  showSettings,
+  onToggleSettings,
+  settingsTooltip = "Settings",
+  onToggleVisible,
+  onRemove,
+  removeTooltip = "Remove",
+  children,
+}: LayerCardShellProps) {
+  const hasReorder = !!onMoveUp && !!onMoveDown;
+
+  return (
+    <CardFrame visible={visible} isActive={isActive} onClick={onClick} onContextMenu={onContextMenu}>
+      <div className={cn("flex items-center justify-between relative z-10", showSettings ? "mb-2.5" : "mb-0")}>
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-1.5">
+          {hasReorder && (
+            <div className="flex flex-col gap-0.5 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
+                onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
+                disabled={isFirst}
+                title="Move Up"
+              >
+                <ChevronUp size={13} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
+                onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
+                disabled={isLast}
+                title="Move Down"
+              >
+                <ChevronDown size={13} />
+              </Button>
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {icon}
+              {title}
+            </div>
+            {subBadges && (
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {subBadges}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {headerActions}
+
+          <Button
+            variant={showSettings ? "secondary" : "ghost"}
+            size="icon"
+            className={cn(
+              "h-7 w-7 text-text-muted hover:text-text-base transition-all",
+              showSettings && "text-accent-reference bg-accent-reference/10 border border-accent-reference/20"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSettings();
+            }}
+            title={settingsTooltip}
+            aria-expanded={showSettings}
+          >
+            <SlidersHorizontal size={14} />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
+            onClick={(e) => { e.stopPropagation(); onToggleVisible(); }}
+            title="Toggle Visibility"
+          >
+            {visible ? <Eye size={15} /> : <EyeOff size={15} />}
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            title={removeTooltip}
+          >
+            <Trash2 size={15} />
+          </Button>
+        </div>
+      </div>
+
+      {showSettings && children && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative z-10 mt-2.5 pt-2.5 border-t border-border-base/40 space-y-3 bg-surface-base/40 p-2.5 rounded-xl animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          {children}
+        </div>
+      )}
+    </CardFrame>
   );
 }
 
@@ -611,67 +752,58 @@ function CustomLayerCard({
   onUpdateLayer,
 }: CustomLayerCardProps) {
   const isManual = layer.type === "manual";
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
-    <CardFrame visible={layer.visible} isActive={isActive || isEditing} onClick={onSelect} onContextMenu={onContextMenu}>
-      <div className="flex items-center justify-between mb-3 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
-              onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
-              disabled={isFirst}
-              title="Move Up"
+    <LayerCardShell
+      visible={layer.visible}
+      isActive={isActive || isEditing}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
+      isFirst={isFirst}
+      isLast={isLast}
+      icon={
+        isManual ? (
+          <Pencil size={14} className="text-primary-base shrink-0" />
+        ) : (
+          <Sparkles size={14} className="text-accent-automation shrink-0" />
+        )
+      }
+      title={
+        <Input
+          value={layer.name}
+          onChange={(e) => onUpdateLayer({ name: e.target.value })}
+          onClick={(e) => e.stopPropagation()}
+          className="h-6 text-sm font-bold bg-transparent border-none p-0 focus:ring-0 focus:bg-surface-base/50 truncate max-w-[140px]"
+        />
+      }
+      subBadges={
+        <>
+          <span
+            className={cn(
+              "text-[9px] font-bold uppercase px-1 py-0.2 rounded",
+              isManual ? "bg-primary-base/15 text-primary-base" : "bg-accent-automation/20 text-accent-automation"
+            )}
+          >
+            {isManual ? "Manual" : "Plugin"}
+          </span>
+          {layer.is_reference && (
+            <span
+              className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-accent-reference/20 text-accent-reference border border-accent-reference/30"
+              title="Reference Layer (Excluded from Merge/Export)"
             >
-              <ChevronUp size={14} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
-              onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
-              disabled={isLast}
-              title="Move Down"
-            >
-              <ChevronDown size={14} />
-            </Button>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              {isManual ? (
-                <Pencil size={14} className="text-primary-base" />
-              ) : (
-                <Sparkles size={14} className="text-accent-automation" />
-              )}
-              <Input
-                value={layer.name}
-                onChange={(e) => onUpdateLayer({ name: e.target.value })}
-                onClick={(e) => e.stopPropagation()}
-                className="h-6 text-sm font-bold bg-transparent border-none p-0 focus:ring-0 focus:bg-surface-base/50"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className={cn(
-                "text-[9px] font-bold uppercase px-1 py-0.2 rounded",
-                isManual ? "bg-primary-base/15 text-primary-base" : "bg-accent-automation/20 text-accent-automation"
-              )}>
-                {isManual ? "Manual" : "Plugin"}
-              </span>
-              {layer.is_reference && (
-                <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-accent-reference/20 text-accent-reference border border-accent-reference/30" title="Reference Layer (Excluded from Merge/Export)">
-                  REF
-                </span>
-              )}
-              <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
-                Layer {index + 1} {isManual ? `• ${layer.editObjects.length} obj` : ""}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
+              REF
+            </span>
+          )}
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
+            Layer {index + 1} {isManual ? `• ${layer.editObjects.length} obj` : ""}
+          </span>
+        </>
+      }
+      headerActions={
+        <>
           <Button
             variant="ghost"
             size="icon"
@@ -685,7 +817,11 @@ function CustomLayerCard({
               e.stopPropagation();
               onUpdateLayer({ is_reference: !layer.is_reference });
             }}
-            title={layer.is_reference ? "Reference Layer: ON (マージ除外・オーバーレイ参照用)" : "Reference Layer: OFF (通常レイヤー)"}
+            title={
+              layer.is_reference
+                ? "Reference Layer: ON (マージ除外・オーバーレイ参照用)"
+                : "Reference Layer: OFF (通常レイヤー)"
+            }
           >
             <Bookmark size={14} className={layer.is_reference ? "fill-accent-reference" : ""} />
           </Button>
@@ -717,36 +853,18 @@ function CustomLayerCard({
               <Settings2 size={15} />
             </Button>
           )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleVisible();
-            }}
-            title="Toggle Visibility"
-          >
-            {layer.visible ? <Eye size={15} /> : <EyeOff size={15} />}
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-            title="Remove Layer"
-          >
-            <Trash2 size={15} />
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-2.5 relative z-10 px-1">
+        </>
+      }
+      showSettings={showSettings}
+      onToggleSettings={() => setShowSettings(!showSettings)}
+      settingsTooltip="Edit Layer Settings (Opacity, Blend Mode)"
+      onToggleVisible={onToggleVisible}
+      onRemove={onRemove}
+      removeTooltip="Remove Layer"
+    >
+      {/* Display Settings */}
+      <div className="space-y-2">
+        <span className="text-[11px] font-bold text-text-base">Display</span>
         <Slider
           label="Opacity"
           valueDisplay={`${Math.round((layer.opacity ?? 1) * 100)}%`}
@@ -757,24 +875,22 @@ function CustomLayerCard({
           onChange={(e) => onUpdateLayer({ opacity: parseFloat(e.target.value) })}
         />
 
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] text-text-muted font-medium">Blend Mode</span>
-            <Select
-              value={layer.blend_mode || "overwrite"}
-              disabled={!!layer.is_reference}
-              onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
-              onClick={(e) => e.stopPropagation()}
-              className={cn(
-                "h-7 text-xs bg-surface-base border-border-base/50 w-36",
-                layer.is_reference && "opacity-50 cursor-not-allowed bg-surface-base/30"
-              )}
-            >
-              <option value="overwrite">Overwrite</option>
-              <option value="merge_obstacles">Merge Obstacles</option>
-              <option value="merge_free">Merge Free Space</option>
-            </Select>
-          </div>
+        <div className="flex flex-col gap-1 mt-1">
+          <FieldLabel>Blend Mode</FieldLabel>
+          <Select
+            value={layer.blend_mode || "overwrite"}
+            disabled={!!layer.is_reference}
+            onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
+            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              "h-7 text-xs bg-surface-base border-border-base/50",
+              layer.is_reference && "opacity-50 cursor-not-allowed bg-surface-base/30"
+            )}
+          >
+            <option value="overwrite">Overwrite</option>
+            <option value="merge_obstacles">Merge Obstacles</option>
+            <option value="merge_free">Merge Free Space</option>
+          </Select>
           {layer.is_reference && (
             <p className="text-[9px] text-accent-reference/80 text-right">
               ※ 参照レイヤーのため合成されません
@@ -782,7 +898,34 @@ function CustomLayerCard({
           )}
         </div>
       </div>
-    </CardFrame>
+
+      {/* Layer Actions */}
+      <div className="pt-2 border-t border-border-base/30 flex items-center justify-between gap-2">
+        {isManual ? (
+          <span className="text-[10px] text-text-muted">
+            Objects: <span className="font-semibold text-text-base">{layer.editObjects.length}</span>
+          </span>
+        ) : (
+          <span className="text-[10px] text-text-muted truncate">
+            Plugin: <span className="font-semibold text-text-base">{layer.plugin_id || "Generator"}</span>
+          </span>
+        )}
+        {!isManual && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-6 text-[10px] px-2"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenInspector();
+            }}
+          >
+            <Settings2 size={12} />
+            <span>Inspector</span>
+          </Button>
+        )}
+      </div>
+    </LayerCardShell>
   );
 }
 
@@ -817,17 +960,70 @@ function LayerCard({
   onRemove,
   onUpdateLayer,
 }: LayerCardProps) {
-  const [showThresholds, setShowThresholds] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const occupancySettings = useAppStore((state) => state.occupancySettings);
 
   const occThresh = layer.info?.occupied_thresh ?? occupancySettings?.defaultOccupiedThresh ?? 0.65;
   const freeThresh = layer.info?.free_thresh ?? occupancySettings?.defaultFreeThresh ?? 0.25;
   const negate = layer.info?.negate ?? occupancySettings?.defaultNegate ?? 0;
 
+  // Origin & Initial Origin handling
+  const rawOrigin = layer.info?.origin;
+  const origin: [number, number, number] = Array.isArray(rawOrigin) && rawOrigin.length >= 2
+    ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
+    : [0, 0, 0];
+
+  const rawInitialOrigin = layer.info?.initial_origin;
+  const initialOrigin: [number, number, number] = Array.isArray(rawInitialOrigin) && rawInitialOrigin.length >= 2
+    ? [Number(rawInitialOrigin[0]) || 0, Number(rawInitialOrigin[1]) || 0, Number(rawInitialOrigin[2]) || 0]
+    : [...origin];
+
+  const deltaX = origin[0] - initialOrigin[0];
+  const deltaY = origin[1] - initialOrigin[1];
+  const deltaYawRad = origin[2] - initialOrigin[2];
+  const deltaYawDeg = deltaYawRad * (180.0 / Math.PI);
+
+  const handleUpdateDelta = (updates: Partial<{ deltaX: number; deltaY: number; deltaYawDeg: number }>) => {
+    const newDx = updates.deltaX !== undefined ? updates.deltaX : deltaX;
+    const newDy = updates.deltaY !== undefined ? updates.deltaY : deltaY;
+    const newDeg = updates.deltaYawDeg !== undefined ? updates.deltaYawDeg : deltaYawDeg;
+    const newDeltaYawRad = newDeg * (Math.PI / 180.0);
+
+    const newOx = initialOrigin[0] + newDx;
+    const newOy = initialOrigin[1] + newDy;
+    const newOyaw = initialOrigin[2] + newDeltaYawRad;
+
+    onUpdateLayer({
+      info: {
+        ...layer.info,
+        origin: [newOx, newOy, newOyaw],
+        initial_origin: initialOrigin,
+      },
+    });
+  };
+
+  const handleResetPose = () => {
+    onUpdateLayer({
+      info: {
+        ...layer.info,
+        origin: [...initialOrigin],
+        initial_origin: initialOrigin,
+      },
+    });
+  };
+
+  const handleRotateDelta = (stepDeg: number) => {
+    let newDeg = Math.round((deltaYawDeg + stepDeg) / 90) * 90;
+    newDeg = ((newDeg + 180) % 360 + 360) % 360 - 180;
+    handleUpdateDelta({ deltaYawDeg: newDeg });
+  };
+
   const handleUpdateInfo = (updates: Partial<{ occupied_thresh: number; free_thresh: number; negate: number }>) => {
     onUpdateLayer({
       info: {
         ...layer.info,
+        origin,
+        initial_origin: initialOrigin,
         ...updates,
       },
     });
@@ -837,6 +1033,8 @@ function LayerCard({
     onUpdateLayer({
       info: {
         ...layer.info,
+        origin,
+        initial_origin: initialOrigin,
         occupied_thresh: occupancySettings?.defaultOccupiedThresh ?? 0.65,
         free_thresh: occupancySettings?.defaultFreeThresh ?? 0.25,
         negate: occupancySettings?.defaultNegate ?? 0,
@@ -845,90 +1043,136 @@ function LayerCard({
   };
 
   return (
-    <CardFrame visible={layer.visible} isActive={isActiveTargetMap} onClick={onSelect} onContextMenu={onContextMenu}>
-      <div className="flex items-center justify-between mb-4 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-0.5">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
-              onClick={(e) => { e.stopPropagation(); onMoveUp(); }}
-              disabled={isFirst}
-              title="Move Up"
-            >
-              <ChevronUp size={14} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
-              onClick={(e) => { e.stopPropagation(); onMoveDown(); }}
-              disabled={isLast}
-              title="Move Down"
-            >
-              <ChevronDown size={14} />
-            </Button>
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span
-                className="text-sm font-bold text-text-base truncate block max-w-[120px]"
-                title={layer.name}
-              >
-                {layer.name}
-              </span>
-              {isMapEditMode && isActiveTargetMap && (
-                <span className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded flex items-center gap-1">
-                  <Target size={11} className="shrink-0" />
-                  Target Map
-                </span>
-              )}
-            </div>
-            <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
-              Layer {index + 1}
+    <LayerCardShell
+      visible={layer.visible}
+      isActive={isActiveTargetMap}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
+      isFirst={isFirst}
+      isLast={isLast}
+      title={
+        <span
+          className="text-sm font-bold text-text-base truncate block max-w-[140px]"
+          title={layer.name}
+        >
+          {layer.name}
+        </span>
+      }
+      subBadges={
+        <>
+          {isMapEditMode && isActiveTargetMap && (
+            <span className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded flex items-center gap-1">
+              <Target size={11} className="shrink-0" />
+              Target Map
             </span>
-          </div>
+          )}
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
+            Layer {index + 1}
+          </span>
+        </>
+      }
+      showSettings={showSettings}
+      onToggleSettings={() => setShowSettings(!showSettings)}
+      settingsTooltip="Edit Map Layer (Pose, Opacity, Blend, Thresholds)"
+      onToggleVisible={onToggleVisible}
+      onRemove={onRemove}
+      removeTooltip="Remove Map"
+    >
+      {/* Section 1: Relative Pose */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-text-base flex items-center gap-1.5">
+            <Move size={12} className="text-accent-generator" />
+            Relative Pose (from YAML)
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px] text-text-muted hover:text-text-base gap-1"
+            onClick={handleResetPose}
+            title="Reset pose to YAML origin"
+          >
+            <RotateCcw size={11} />
+            <span>Reset</span>
+          </Button>
         </div>
-        
-        <div className="flex items-center gap-1.5">
+
+        {/* Quick Rotate Buttons */}
+        <div className="grid grid-cols-3 gap-1.5">
           <Button
-            variant={showThresholds ? "secondary" : "ghost"}
-            size="icon"
-            className={cn(
-              "h-8 w-8 text-text-muted hover:text-text-base transition-all",
-              showThresholds && "text-accent-reference bg-accent-reference/10 border border-accent-reference/20"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowThresholds(!showThresholds);
-            }}
-            title="Threshold Settings (Occupied, Free, Negate)"
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
+            onClick={() => handleRotateDelta(-90)}
+            title="Rotate -90° (Counter-clockwise)"
           >
-            <SlidersHorizontal size={15} />
+            <RotateCcw size={12} />
+            <span>-90°</span>
           </Button>
           <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
-            onClick={(e) => { e.stopPropagation(); onToggleVisible(); }}
-            title="Toggle Visibility"
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
+            onClick={() => handleRotateDelta(180)}
+            title="Rotate 180°"
           >
-            {layer.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+            <FlipHorizontal2 size={12} />
+            <span>180°</span>
           </Button>
           <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            title="Remove Map"
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
+            onClick={() => handleRotateDelta(90)}
+            title="Rotate +90° (Clockwise)"
           >
-            <Trash2 size={16} />
+            <RotateCw size={12} />
+            <span>+90°</span>
           </Button>
+        </div>
+
+        {/* Numeric Inputs for deltaX, deltaY, deltaYaw */}
+        <div className="grid grid-cols-3 gap-1.5">
+          <LabeledNumericInput
+            label="ΔX (m)"
+            value={deltaX}
+            step={0.05}
+            precision={3}
+            onChange={(val) => handleUpdateDelta({ deltaX: val })}
+          />
+          <LabeledNumericInput
+            label="ΔY (m)"
+            value={deltaY}
+            step={0.05}
+            precision={3}
+            onChange={(val) => handleUpdateDelta({ deltaY: val })}
+          />
+          <LabeledNumericInput
+            label="ΔYaw (°)"
+            value={deltaYawDeg}
+            step={1}
+            precision={1}
+            onChange={(val) => handleUpdateDelta({ deltaYawDeg: val })}
+          />
+        </div>
+
+        {/* Subtext with original YAML origin */}
+        <div
+          className="text-[9px] text-text-muted truncate font-mono px-0.5"
+          title={`YAML Origin: [${initialOrigin[0]}, ${initialOrigin[1]}, ${initialOrigin[2]}]`}
+        >
+          YAML Origin: [{initialOrigin[0].toFixed(2)}, {initialOrigin[1].toFixed(2)}, {(initialOrigin[2] * (180 / Math.PI)).toFixed(1)}°]
         </div>
       </div>
 
-      <div className="relative z-10 px-1 flex flex-col gap-3">
+      {/* Section 2: Display Settings */}
+      <div className="space-y-2 pt-2 border-t border-border-base/30">
+        <span className="text-[11px] font-bold text-text-base">Display</span>
         <Slider
           label="Layer Opacity"
           valueDisplay={`${Math.round(layer.opacity * 100)}%`}
@@ -938,107 +1182,102 @@ function LayerCard({
           value={layer.opacity}
           onChange={(e) => onUpdateLayer({ opacity: parseFloat(e.target.value) })}
         />
-        <div className="flex flex-col gap-1.5 mt-1">
+        <div className="flex flex-col gap-1 mt-1">
           <FieldLabel>Blend Mode</FieldLabel>
           <Select
             value={layer.blend_mode || 'overwrite'}
             onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
             onClick={(e) => e.stopPropagation()}
-            className="text-sm border-border-base/50"
+            className="text-xs border-border-base/50 h-7"
           >
             <option value="overwrite">Overwrite (Ignore Unknown)</option>
             <option value="merge_obstacles">Merge Obstacles</option>
             <option value="merge_free">Merge Free Space</option>
           </Select>
         </div>
-
-        {/* Collapsible Occupancy Thresholds Section */}
-        {showThresholds && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="mt-2 pt-3 border-t border-border-base/40 space-y-3 bg-surface-base/40 p-2.5 rounded-xl animate-in fade-in slide-in-from-top-1 duration-150"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-text-base flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-occupancy-unknown inline-block" />
-                Occupancy Thresholds
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-1.5 text-[10px] text-text-muted hover:text-text-base gap-1"
-                onClick={handleResetThresholds}
-                title="Reset thresholds to project defaults"
-              >
-                <RotateCcw size={11} />
-                <span>Reset</span>
-              </Button>
-            </div>
-
-            {/* Mini Visual Threshold Bar */}
-            <div className="h-2 w-full rounded overflow-hidden flex border border-border-base/40">
-              <div
-                style={{ width: `${Math.min(100, Math.max(0, freeThresh * 100))}%` }}
-                className="bg-occupancy-free/80"
-                title={`Free: 0.00 ~ ${freeThresh.toFixed(2)}`}
-              />
-              <div
-                style={{
-                  width: `${Math.max(0, (occThresh - freeThresh) * 100)}%`,
-                }}
-                className="bg-occupancy-unknown/80"
-                title={`Unknown: ${freeThresh.toFixed(2)} ~ ${occThresh.toFixed(2)}`}
-              />
-              <div
-                style={{
-                  width: `${Math.max(0, (1.0 - occThresh) * 100)}%`,
-                }}
-                className="bg-occupancy-obstacle/80"
-                title={`Obstacle: ${occThresh.toFixed(2)} ~ 1.00`}
-              />
-            </div>
-
-            <Slider
-              label="Occupied Thresh"
-              valueDisplay={occThresh.toFixed(2)}
-              min="0"
-              max="1"
-              step="0.01"
-              value={occThresh}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                handleUpdateInfo({ occupied_thresh: Math.max(val, freeThresh) });
-              }}
-            />
-
-            <Slider
-              label="Free Thresh"
-              valueDisplay={freeThresh.toFixed(2)}
-              min="0"
-              max="1"
-              step="0.01"
-              value={freeThresh}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                handleUpdateInfo({ free_thresh: Math.min(val, occThresh) });
-              }}
-            />
-
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] text-text-muted font-medium">Negate</span>
-              <Select
-                value={negate}
-                onChange={(e) => handleUpdateInfo({ negate: parseInt(e.target.value) as 0 | 1 })}
-                className="h-6 text-[11px] bg-surface-base border-border-base/50 w-32 py-0"
-              >
-                <option value={0}>0 (Standard)</option>
-                <option value={1}>1 (Inverted)</option>
-              </Select>
-            </div>
-          </div>
-        )}
       </div>
-    </CardFrame>
+
+      {/* Section 3: Occupancy Thresholds */}
+      <div className="space-y-3 pt-2 border-t border-border-base/30">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-text-base flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-occupancy-unknown inline-block" />
+            Occupancy Thresholds
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-1.5 text-[10px] text-text-muted hover:text-text-base gap-1"
+            onClick={handleResetThresholds}
+            title="Reset thresholds to project defaults"
+          >
+            <RotateCcw size={11} />
+            <span>Reset</span>
+          </Button>
+        </div>
+
+        {/* Mini Visual Threshold Bar */}
+        <div className="h-2 w-full rounded overflow-hidden flex border border-border-base/40">
+          <div
+            style={{ width: `${Math.min(100, Math.max(0, freeThresh * 100))}%` }}
+            className="bg-occupancy-free/80"
+            title={`Free: 0.00 ~ ${freeThresh.toFixed(2)}`}
+          />
+          <div
+            style={{
+              width: `${Math.max(0, (occThresh - freeThresh) * 100)}%`,
+            }}
+            className="bg-occupancy-unknown/80"
+            title={`Unknown: ${freeThresh.toFixed(2)} ~ ${occThresh.toFixed(2)}`}
+          />
+          <div
+            style={{
+              width: `${Math.max(0, (1.0 - occThresh) * 100)}%`,
+            }}
+            className="bg-occupancy-obstacle/80"
+            title={`Obstacle: ${occThresh.toFixed(2)} ~ 1.00`}
+          />
+        </div>
+
+        <Slider
+          label="Occupied Thresh"
+          valueDisplay={occThresh.toFixed(2)}
+          min="0"
+          max="1"
+          step="0.01"
+          value={occThresh}
+          onChange={(e) => {
+            const val = parseFloat(e.target.value);
+            handleUpdateInfo({ occupied_thresh: Math.max(val, freeThresh) });
+          }}
+        />
+
+        <Slider
+          label="Free Thresh"
+          valueDisplay={freeThresh.toFixed(2)}
+          min="0"
+          max="1"
+          step="0.01"
+          value={freeThresh}
+          onChange={(e) => {
+            const val = parseFloat(e.target.value);
+            handleUpdateInfo({ free_thresh: Math.min(val, occThresh) });
+          }}
+        />
+
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] text-text-muted font-medium">Negate</span>
+          <Select
+            value={negate}
+            onChange={(e) => handleUpdateInfo({ negate: parseInt(e.target.value) as 0 | 1 })}
+            className="h-6 text-[11px] bg-surface-base border-border-base/50 w-32 py-0"
+          >
+            <option value={0}>0 (Standard)</option>
+            <option value={1}>1 (Inverted)</option>
+          </Select>
+        </div>
+      </div>
+    </LayerCardShell>
   );
 }
 
@@ -1057,93 +1296,69 @@ function RegionCard({
   onRemove,
   onUpdateRegion,
 }: RegionCardProps) {
-  return (
-    <CardFrame visible={region.visible}>
-      <div className="flex items-center justify-between mb-2 relative z-10">
-        <div className="flex items-center gap-2">
-          <Crop size={16} className="text-accent-generator" />
-          <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
-            Region {index + 1}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
-            onClick={(e) => { e.stopPropagation(); onToggleVisible(); }}
-            title="Toggle Visibility"
-          >
-            {region.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
-            title="Remove Region"
-          >
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      </div>
+  const [showSettings, setShowSettings] = useState(false);
 
-      <div className="relative z-10 px-1">
+  return (
+    <LayerCardShell
+      visible={region.visible}
+      icon={<Crop size={14} className="text-accent-generator shrink-0" />}
+      title={
         <Input
           value={region.name}
           onChange={(e) => onUpdateRegion({ name: e.target.value })}
+          onClick={(e) => e.stopPropagation()}
           placeholder="Region Name"
-          className="h-8 text-sm bg-surface-base border-border-base/50 focus:border-primary-base/50"
+          className="h-6 text-sm font-bold bg-transparent border-none p-0 focus:ring-0 focus:bg-surface-base/50 truncate max-w-[140px]"
         />
-        <div className="mt-2 flex gap-2">
-          <CoordField
-            label="X"
+      }
+      subBadges={
+        <span className="text-[9px] font-bold uppercase px-1 py-0.2 rounded bg-accent-generator/20 text-accent-generator">
+          Region {index + 1}
+        </span>
+      }
+      showSettings={showSettings}
+      onToggleSettings={() => setShowSettings(!showSettings)}
+      settingsTooltip="Region Bounds Settings"
+      onToggleVisible={onToggleVisible}
+      onRemove={onRemove}
+      removeTooltip="Remove Region"
+    >
+      <div className="space-y-2">
+        <span className="text-[11px] font-bold text-text-base">Region Bounds</span>
+        <div className="grid grid-cols-2 gap-2">
+          <LabeledNumericInput
+            label="X (m)"
             value={region.rect.x}
+            step={0.1}
+            precision={2}
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, x: val } })}
           />
-          <CoordField
-            label="Y"
+          <LabeledNumericInput
+            label="Y (m)"
             value={region.rect.y}
+            step={0.1}
+            precision={2}
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, y: val } })}
           />
-          <CoordField
-            label="W"
+          <LabeledNumericInput
+            label="Width (m)"
             value={region.rect.width}
             min={0}
+            step={0.1}
+            precision={2}
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, width: val } })}
           />
-          <CoordField
-            label="H"
+          <LabeledNumericInput
+            label="Height (m)"
             value={region.rect.height}
             min={0}
+            step={0.1}
+            precision={2}
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, height: val } })}
           />
         </div>
       </div>
-    </CardFrame>
+    </LayerCardShell>
   );
 }
 
-interface CoordFieldProps {
-  label: string;
-  value: number;
-  min?: number;
-  onChange: (val: number) => void;
-}
-
-function CoordField({ label, value, min, onChange }: CoordFieldProps) {
-  return (
-    <div className="flex-1 flex items-center gap-1">
-      <span className="text-[10px] text-text-muted font-bold uppercase">{label}</span>
-      <NumericInput
-        step={0.1}
-        min={min}
-        precision={2}
-        value={value}
-        onChange={onChange}
-        className="h-6 text-xs p-1 font-mono bg-surface-base"
-      />
-    </div>
-  );
-}
