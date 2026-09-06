@@ -8,6 +8,7 @@ import { BrowseInput } from "../common/BrowseInput";
 import { SectionDivider } from "../common/SectionDivider";
 import { Button } from "../common/Button";
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
+import { ACCENT_THEME_PRESETS } from '../../../utils/themePresets';
 import { NumericInput } from "../NumericInput";
 import { Moon, Sun } from "lucide-react";
 import { cn } from "../../../utils/cn";
@@ -15,6 +16,8 @@ import { cn } from "../../../utils/cn";
 export function GeneralTab() {
   const themeMode = useAppStore((state) => state.themeMode);
   const setThemeMode = useAppStore((state) => state.setThemeMode);
+  const themePreset = useAppStore((state) => state.themePreset);
+  const setThemePreset = useAppStore((state) => state.setThemePreset);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const customUiConfig = useAppStore((state) => state.customUiConfig);
 
@@ -54,7 +57,7 @@ export function GeneralTab() {
             className={cn(
               "h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all",
               themeMode === "dark"
-                ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs"
+                ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base"
                 : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
             )}
           >
@@ -69,13 +72,50 @@ export function GeneralTab() {
             className={cn(
               "h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all",
               themeMode === "light"
-                ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs"
+                ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base"
                 : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
             )}
           >
             <Sun className="w-4 h-4 shrink-0" />
             <span>Light (Linear Light)</span>
           </Button>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border-base/40 space-y-1.5">
+          <div className="text-[11px] font-medium text-text-muted">
+            Accent Theme
+          </div>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Accent Theme Presets">
+            {ACCENT_THEME_PRESETS.map((preset) => {
+              const currentPreset =
+                themePreset === "roomba"
+                  ? "emerald"
+                  : themePreset === "dark"
+                  ? "default"
+                  : themePreset || "default";
+              const isSelected = currentPreset === preset.id;
+              return (
+                <Button
+                  key={preset.id}
+                  type="button"
+                  variant={isSelected ? "secondary" : "ghost"}
+                  onClick={() => setThemePreset(preset.id)}
+                  aria-pressed={isSelected}
+                  className={cn(
+                    "h-8 text-xs font-medium justify-start px-2.5 rounded-md border flex items-center gap-2 transition-all",
+                    isSelected
+                      ? "bg-primary-base/15 border-primary-base text-text-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base"
+                      : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+                  )}
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs ring-1 ring-black/20"
+                    style={{ backgroundColor: preset.primaryColor }}
+                  />
+                  <span className="truncate">{preset.title}</span>
+                </Button>
+              );
+            })}
+          </div>
         </div>
         {isCustomUiMode && customUiConfig?.theme && (
           <p className="text-[11px] text-text-muted/80 mt-1">

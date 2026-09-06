@@ -36,6 +36,30 @@ extend({
   Text,
 });
 
+/**
+ * Resolves colors for the canvas fallback grid texture when no maps are loaded.
+ * Under Option A (CAD / RViz approach), in light mode the viewport maintains high-contrast
+ * dark charcoal styling (#121316 background, hairline grid lines, muted text) unless
+ * customUiConfig explicitly defines custom surface colors.
+ */
+export function getFallbackGridColors(
+  resolvedTheme: { variables: Record<string, string>; colorScheme: 'dark' | 'light' },
+  hasExplicitCustomSurface: boolean
+): { bg: string; grid: string; text: string } {
+  const isCadDarkViewport = resolvedTheme.colorScheme === 'light' && !hasExplicitCustomSurface;
+  return {
+    bg: isCadDarkViewport
+      ? '#121316'
+      : resolvedTheme.variables['--color-surface-panel'] || '#121316',
+    grid: isCadDarkViewport
+      ? 'rgba(255, 255, 255, 0.08)'
+      : resolvedTheme.variables['--color-border-base'] || '#334155',
+    text: isCadDarkViewport
+      ? '#8a8f98'
+      : resolvedTheme.variables['--color-text-muted'] || '#94a3b8',
+  };
+}
+
 export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: ProjectMapLayer | PluginCustomLayer | any, scale: number, textStyle: TextStyle, overrideTexture?: Texture | null }) {
   const [texture, setTexture] = useState<Texture | null>(overrideTexture || null);
   const [imgSize, setImgSize] = useState({ w: overrideTexture ? overrideTexture.width : 0, h: overrideTexture ? overrideTexture.height : 0 });
@@ -44,6 +68,7 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const themeMode = useAppStore((state) => state.themeMode);
+  const themePreset = useAppStore((state) => state.themePreset);
 
   const occThresh = layer.info?.occupied_thresh ?? 0.65;
   const freeThresh = layer.info?.free_thresh ?? 0.25;
@@ -53,8 +78,11 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
     if (isCustomUiMode && customUiConfig?.theme) {
       return resolveThemeVariables(customUiConfig.theme);
     }
-    return resolveThemeVariables({ preset: themeMode || 'default' });
-  }, [isCustomUiMode, customUiConfig, themeMode]);
+    return resolveThemeVariables({
+      preset: themePreset || 'default',
+      colorScheme: themeMode,
+    });
+  }, [isCustomUiMode, customUiConfig, themeMode, themePreset]);
 
   const freeColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-free'], [0.0627, 0.7255, 0.5059]), [resolvedTheme]);
   const obstacleColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-obstacle'], [0.9373, 0.2667, 0.2667]), [resolvedTheme]);
@@ -253,18 +281,44 @@ export function MapCanvas() {
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const themeMode = useAppStore((state) => state.themeMode);
+  const themePreset = useAppStore((state) => state.themePreset);
 
   const resolvedTheme = useMemo(() => {
     if (isCustomUiMode && customUiConfig?.theme) {
       return resolveThemeVariables(customUiConfig.theme);
     }
-    return resolveThemeVariables({ preset: themeMode || 'default' });
-  }, [isCustomUiMode, customUiConfig, themeMode]);
+    return resolveThemeVariables({
+      preset: themePreset || 'default',
+      colorScheme: themeMode,
+    });
+  }, [isCustomUiMode, customUiConfig, themeMode, themePreset]);
+
+  const hasExplicitCustomSurface = useMemo(() => {
+    return Boolean(
+      isCustomUiMode &&
+      (customUiConfig?.theme?.colors?.surfaceBase ||
+       customUiConfig?.theme?.colors?.surfacePanel ||
+       customUiConfig?.theme?.cssVariables?.['--color-surface-base'] ||
+       customUiConfig?.theme?.cssVariables?.['--color-surface-panel'])
+    );
+  }, [isCustomUiMode, customUiConfig]);
 
   const canvasBackgroundColor = useMemo(() => {
+    // If customUiConfig explicitly defines surface colors, honor it
+    if (hasExplicitCustomSurface) {
+      const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || CANVAS_SURFACE_BASE_HEX;
+      return hexStringToNumber(surfaceBaseHex, CANVAS_SURFACE_BASE);
+    }
+
+    // In light mode (Option A - CAD / RViz approach), keep high contrast dark viewport background
+    // so ROS maps (free space = #ffffff) and paths remain clearly visible.
+    if (resolvedTheme.colorScheme === 'light') {
+      return CANVAS_SURFACE_BASE;
+    }
+
     const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || CANVAS_SURFACE_BASE_HEX;
     return hexStringToNumber(surfaceBaseHex, CANVAS_SURFACE_BASE);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, hasExplicitCustomSurface]);
 
   // blend_mode, z_index, visible, image_base64, customLayers, occupancySettings の変更キーを生成
   const previewSyncKey = useMemo(() => {
@@ -734,9 +788,7 @@ export function MapCanvas() {
     canvas.height = 1000;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      const bg = resolvedTheme.variables['--color-surface-panel'] || '#1e293b';
-      const grid = resolvedTheme.variables['--color-border-base'] || '#334155';
-      const text = resolvedTheme.variables['--color-text-muted'] || '#94a3b8';
+      const { bg, grid, text } = getFallbackGridColors(resolvedTheme, hasExplicitCustomSurface);
 
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, 1000, 1000);
@@ -750,7 +802,7 @@ export function MapCanvas() {
       ctx.fillText('No Map Loaded. Use Load Map button.', 50, 50);
     }
     return Texture.from(canvas);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, hasExplicitCustomSurface]);
 
   const fitToMaps = useCallback(() => {
     if (!containerRef.current) return;

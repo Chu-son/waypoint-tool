@@ -1,11 +1,11 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MapCanvas } from './MapCanvas';
+import { MapCanvas, getFallbackGridColors } from './MapCanvas';
 import { useAppStore } from '../../stores/appStore';
 
 // Mock PixiJS and @pixi/react
 vi.mock('@pixi/react', () => ({
-  Application: ({ children }: any) => <div data-testid="pixi-app">{children}</div>,
+  Application: ({ children, background }: any) => <div data-testid="pixi-app" data-background={background}>{children}</div>,
   extend: vi.fn(),
 }));
 
@@ -143,5 +143,102 @@ describe('MapCanvas', () => {
     fireEvent.pointerUp(canvasDiv, { pointerId: 1 });
 
     expect(useAppStore.getState().selectedNodeIds).toEqual([]);
+  });
+
+  describe('canvasBackgroundColor (CAD / RViz approach)', () => {
+    it('uses charcoal surface base (0x090a0c) in default dark mode', () => {
+      useAppStore.setState({
+        themeMode: 'dark',
+        themePreset: 'default',
+        isCustomUiMode: false,
+        customUiConfig: null,
+      });
+
+      render(<MapCanvas />);
+      const app = screen.getByTestId('pixi-app');
+      // 0x090a0c in decimal is 592396
+      expect(app.getAttribute('data-background')).toBe(String(0x090a0c));
+    });
+
+    it('maintains high-contrast dark charcoal background (0x090a0c) in light mode (Option A)', () => {
+      useAppStore.setState({
+        themeMode: 'light',
+        themePreset: 'emerald',
+        isCustomUiMode: false,
+        customUiConfig: null,
+      });
+
+      render(<MapCanvas />);
+      const app = screen.getByTestId('pixi-app');
+      // Even in light mode with emerald accent, canvas background must remain 0x090a0c (not off-white 0xf7f8f9)
+      expect(app.getAttribute('data-background')).toBe(String(0x090a0c));
+    });
+
+    it('honors explicit custom surfaceBase override in customUiConfig', () => {
+      useAppStore.setState({
+        themeMode: 'light',
+        isCustomUiMode: true,
+        customUiConfig: {
+          theme: {
+            colors: {
+              surfaceBase: '#1a1a1a',
+            },
+          },
+        } as any,
+      });
+
+      render(<MapCanvas />);
+      const app = screen.getByTestId('pixi-app');
+      // 0x1a1a1a in decimal is 1710618
+      expect(app.getAttribute('data-background')).toBe(String(0x1a1a1a));
+    });
+  });
+
+  describe('getFallbackGridColors (Option A CAD grid fallback)', () => {
+    it('uses panel colors from resolved theme in dark mode', () => {
+      const resolved = {
+        variables: {
+          '--color-surface-panel': '#121316',
+          '--color-border-base': 'rgba(255, 255, 255, 0.08)',
+          '--color-text-muted': '#8a8f98',
+        },
+        colorScheme: 'dark' as const,
+      };
+      const colors = getFallbackGridColors(resolved, false);
+      expect(colors.bg).toBe('#121316');
+      expect(colors.grid).toBe('rgba(255, 255, 255, 0.08)');
+      expect(colors.text).toBe('#8a8f98');
+    });
+
+    it('uses CAD dark viewport colors in light mode (Option A) when no explicit surface is set', () => {
+      const resolved = {
+        variables: {
+          '--color-surface-panel': '#ffffff',
+          '--color-border-base': '#e2e4e8',
+          '--color-text-muted': '#686b74',
+        },
+        colorScheme: 'light' as const,
+      };
+      const colors = getFallbackGridColors(resolved, false);
+      // In light mode Option A, fallback grid texture must NOT be pure white #ffffff
+      expect(colors.bg).toBe('#121316');
+      expect(colors.grid).toBe('rgba(255, 255, 255, 0.08)');
+      expect(colors.text).toBe('#8a8f98');
+    });
+
+    it('honors resolved theme colors in light mode when explicit custom surface is set', () => {
+      const resolved = {
+        variables: {
+          '--color-surface-panel': '#e5e7eb',
+          '--color-border-base': '#9ca3af',
+          '--color-text-muted': '#374151',
+        },
+        colorScheme: 'light' as const,
+      };
+      const colors = getFallbackGridColors(resolved, true);
+      expect(colors.bg).toBe('#e5e7eb');
+      expect(colors.grid).toBe('#9ca3af');
+      expect(colors.text).toBe('#374151');
+    });
   });
 });

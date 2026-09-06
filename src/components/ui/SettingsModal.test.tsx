@@ -156,6 +156,58 @@ describe('SettingsModal UI', () => {
     expect(lightBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('allows selecting accent theme presets with visual chips on General tab in both dark and light modes', async () => {
+    useAppStore.setState({ themeMode: 'dark', themePreset: 'default', isCustomUiMode: false, customUiConfig: null });
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Presets should be visible in dark mode
+    const indigoBtn = screen.getByRole('button', { name: /^Indigo$/i });
+    const emeraldBtn = screen.getByRole('button', { name: /^Emerald$/i });
+    const oceanBtn = screen.getByRole('button', { name: /^Ocean$/i });
+    const amberBtn = screen.getByRole('button', { name: /^Amber$/i });
+    const purpleBtn = screen.getByRole('button', { name: /^Purple$/i });
+    const midnightBtn = screen.getByRole('button', { name: /^Midnight$/i });
+
+    expect(indigoBtn).toBeInTheDocument();
+    expect(emeraldBtn).toBeInTheDocument();
+    expect(oceanBtn).toBeInTheDocument();
+    expect(amberBtn).toBeInTheDocument();
+    expect(purpleBtn).toBeInTheDocument();
+    expect(midnightBtn).toBeInTheDocument();
+
+    // Default preset is Indigo
+    expect(indigoBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(oceanBtn).toHaveAttribute('aria-pressed', 'false');
+
+    // Click Ocean preset
+    act(() => {
+      fireEvent.click(oceanBtn);
+    });
+
+    expect(useAppStore.getState().themePreset).toBe('ocean');
+    expect(oceanBtn).toHaveAttribute('aria-pressed', 'true');
+    expect(indigoBtn).toHaveAttribute('aria-pressed', 'false');
+
+    // Switch to Light mode: presets grid remains visible and accessible
+    const lightBtn = screen.getByRole('button', { name: /Light \(Linear Light\)/i });
+    act(() => {
+      fireEvent.click(lightBtn);
+    });
+
+    expect(useAppStore.getState().themeMode).toBe('light');
+    expect(screen.getByRole('button', { name: /^Ocean$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Emerald$/i })).toBeInTheDocument();
+
+    // Click Emerald preset while in Light mode
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /^Emerald$/i }));
+    });
+
+    expect(useAppStore.getState().themePreset).toBe('emerald');
+    expect(screen.getByRole('button', { name: /^Emerald$/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /^Ocean$/i })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('shows overriding notice when Custom UI theme is active on General tab', async () => {
     useAppStore.setState({
       themeMode: 'dark',
