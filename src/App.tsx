@@ -16,6 +16,7 @@ import { StatusBar } from "./components/ui/StatusBar";
 import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
 import { MapEditOverlay } from "./components/ui/MapEditOverlay";
 import { AnnotationEditOverlay } from "./components/ui/AnnotationEditOverlay";
+import { MeasureOverlay } from "./components/ui/MeasureOverlay";
 import { LoadingOverlay } from "./components/ui/common/LoadingOverlay";
 import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoadingBadge";
 import { ShortcutManager } from "./components/common/ShortcutManager";
@@ -345,6 +346,7 @@ function App() {
           <ElementCopyOverlay />
           <MapEditOverlay />
           <AnnotationEditOverlay />
+          <MeasureOverlay />
           <BackgroundLoadingBadge />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">

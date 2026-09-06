@@ -97,6 +97,9 @@ export function ShortcutManager() {
       if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey) {
         setActiveTool("add_point");
       }
+      if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey) {
+        setActiveTool(activeTool === "measure" ? "select" : "measure");
+      }
 
       // Modifier-based Shortcuts
       if (e.ctrlKey || e.metaKey) {

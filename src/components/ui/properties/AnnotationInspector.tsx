@@ -508,16 +508,26 @@ export function AnnotationInspector() {
                 onChange={(val) => updateAnnotationObject(obj.id, { y2: val })}
               />
             </div>
-            {/* Computed Length */}
+            {/* Computed Length & Show Length Toggle */}
             {(() => {
               const ln = obj as LineAnnotation;
               const dx = ln.x2 - ln.x1;
               const dy = ln.y2 - ln.y1;
               const len = Math.sqrt(dx * dx + dy * dy);
               return (
-                <div className="flex items-center justify-between text-xs text-text-muted px-1 pt-1">
-                  <span>線分長 (Length):</span>
-                  <span className="font-mono text-text-base">{len.toFixed(decimalPrecision)} m</span>
+                <div className="space-y-2 pt-1 border-t border-border-base/20">
+                  <div className="flex items-center justify-between text-xs text-text-muted px-1">
+                    <span>線分長 (Length):</span>
+                    <span className="font-mono text-text-base font-semibold">{len.toFixed(decimalPrecision)} m</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-text-muted px-1">
+                    <span>線分長ラベルを表示:</span>
+                    <ToggleSwitch
+                      checked={ln.showLength ?? false}
+                      onChange={(checked) => updateAnnotationObject(obj.id, { showLength: checked })}
+                      title="キャンバス上に線分長を表示"
+                    />
+                  </div>
                 </div>
               );
             })()}

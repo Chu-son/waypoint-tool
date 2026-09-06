@@ -23,6 +23,8 @@ const shortcuts = [
   { action: "Deselect / Cancel", keys: ["Esc"] },
   { action: "Select Tool", keys: ["V"] },
   { action: "Add Waypoint Tool", keys: ["P"] },
+  { action: "Measure Distance Tool", keys: ["M"] },
+  { action: "Snap to Object (Measure Tool)", keys: ["Alt", "+", "Left Click"] },
   { action: "Cycle Snap Base Node (Add Mode)", keys: ["Tab"] },
   { action: "Distance Input (Add Mode)", keys: ["0", "-", "9", ".", "-"] },
   { action: "Confirm Snapped Waypoint (Add Mode)", keys: ["Enter"] },

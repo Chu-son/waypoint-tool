@@ -19,6 +19,7 @@ vi.mock('lucide-react', () => ({
   Wand2: () => <div data-testid="wand-icon" />,
   Image: () => <div data-testid="image-icon" />,
   Crop: () => <div data-testid="crop-icon" />,
+  Ruler: () => <div data-testid="ruler-icon" />,
   Pencil: () => <div data-testid="pencil-icon" />,
   Square: () => <div data-testid="square-icon" />,
   Circle: () => <div data-testid="circle-icon" />,
@@ -76,6 +77,11 @@ describe('ToolPanel', () => {
 
     expect(mockSetActiveTool).toHaveBeenCalledWith('add_point');
     expect(mockSetActivePlugin).toHaveBeenCalledWith(null);
+
+    const measureBtn = screen.getByTitle(/measure distance/i);
+    fireEvent.click(measureBtn);
+
+    expect(mockSetActiveTool).toHaveBeenCalledWith('measure');
   });
 
   it('opens export modal and settings modal', () => {
