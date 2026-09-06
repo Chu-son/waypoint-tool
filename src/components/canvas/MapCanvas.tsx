@@ -928,15 +928,34 @@ export function MapCanvas() {
       const resolution = layer.info?.resolution || 0.05;
       const originX = layer.info?.origin?.[0] || 0;
       const originY = layer.info?.origin?.[1] || 0;
+      const originYaw = layer.info?.origin?.[2] || 0;
       
       const w = (width || 1000) * resolution;
       const h = (height || 1000) * resolution;
       
-      // Rough bounding box ignoring yaw for simplicity
-      minX = Math.min(minX, originX);
-      minY = Math.min(minY, originY);
-      maxX = Math.max(maxX, originX + w);
-      maxY = Math.max(maxY, originY + h);
+      if (Math.abs(originYaw) < 1e-6) {
+        minX = Math.min(minX, originX);
+        minY = Math.min(minY, originY);
+        maxX = Math.max(maxX, originX + w);
+        maxY = Math.max(maxY, originY + h);
+      } else {
+        const cosY = Math.cos(originYaw);
+        const sinY = Math.sin(originYaw);
+        const corners: [number, number][] = [
+          [0, 0],
+          [w, 0],
+          [w, h],
+          [0, h],
+        ];
+        corners.forEach(([cx, cy]) => {
+          const wx = originX + cx * cosY - cy * sinY;
+          const wy = originY + cx * sinY + cy * cosY;
+          minX = Math.min(minX, wx);
+          minY = Math.min(minY, wy);
+          maxX = Math.max(maxX, wx);
+          maxY = Math.max(maxY, wy);
+        });
+      }
       hasContent = true;
     });
 

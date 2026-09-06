@@ -195,8 +195,17 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => set((state) => {
     const occSettings = state.occupancySettings || { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 };
+    const rawOrigin = info?.origin;
+    const origin: [number, number, number] = Array.isArray(rawOrigin) && rawOrigin.length >= 2
+      ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
+      : [0, 0, 0];
+    const initialOrigin: [number, number, number] = Array.isArray(info?.initial_origin) && info.initial_origin.length >= 2
+      ? [Number(info.initial_origin[0]) || 0, Number(info.initial_origin[1]) || 0, Number(info.initial_origin[2]) || 0]
+      : [...origin];
     const mergedInfo = {
       ...info,
+      origin,
+      initial_origin: initialOrigin,
       occupied_thresh: typeof info?.occupied_thresh === 'number' ? info.occupied_thresh : occSettings.defaultOccupiedThresh,
       free_thresh: typeof info?.free_thresh === 'number' ? info.free_thresh : occSettings.defaultFreeThresh,
       negate: typeof info?.negate === 'number' ? info.negate : occSettings.defaultNegate,

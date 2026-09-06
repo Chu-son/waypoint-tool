@@ -32,7 +32,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
         {
           id: 'map-1',
           name: 'Main Map',
-          info: { resolution: 0.05, origin: [0, 0, 0] },
+          info: { resolution: 0.05, origin: [0, 0, 0], initial_origin: [0, 0, 0] },
           image_base64: 'data:image/png;base64,dummy',
           width: 800,
           height: 600,

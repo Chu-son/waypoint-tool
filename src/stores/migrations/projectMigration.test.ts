@@ -438,4 +438,46 @@ describe('projectMigration', () => {
     expect(normalized.nodes['gen-2'].plugin_id).toBe('sweep_generator_rs');
     expect(normalized.nodes['gen-3'].plugin_id).toBe('sweep_offset_lines_generator');
   });
+
+  it('normalizes map layer origin and initial_origin properly', () => {
+    const rawData = {
+      map_layers: [
+        {
+          id: 'map-1',
+          name: 'Map 1',
+          info: {
+            origin: [1.5, 2.5, 0.1],
+          },
+        },
+        {
+          id: 'map-2',
+          name: 'Map 2',
+          info: {
+            origin: [5.0, 5.0, 0.0],
+            initial_origin: [0.0, 0.0, 0.0],
+          },
+        },
+        {
+          id: 'map-3',
+          name: 'Map 3',
+          info: {},
+        },
+      ],
+    };
+
+    const normalized = migrateAndNormalizeProjectData(rawData);
+    expect(normalized.map_layers).toHaveLength(3);
+
+    // Map 1: initial_origin should be copied from origin if missing
+    expect(normalized.map_layers[0].info.origin).toEqual([1.5, 2.5, 0.1]);
+    expect(normalized.map_layers[0].info.initial_origin).toEqual([1.5, 2.5, 0.1]);
+
+    // Map 2: initial_origin should be preserved if already present
+    expect(normalized.map_layers[1].info.origin).toEqual([5.0, 5.0, 0.0]);
+    expect(normalized.map_layers[1].info.initial_origin).toEqual([0.0, 0.0, 0.0]);
+
+    // Map 3: fallback to [0, 0, 0]
+    expect(normalized.map_layers[2].info.origin).toEqual([0, 0, 0]);
+    expect(normalized.map_layers[2].info.initial_origin).toEqual([0, 0, 0]);
+  });
 });

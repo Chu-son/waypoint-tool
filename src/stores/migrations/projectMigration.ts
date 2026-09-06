@@ -158,18 +158,33 @@ export function normalizeV1(raw: any): StrictProjectData {
   // 3. マップレイヤー
   const rawMapLayers = data.map_layers ?? data.mapLayers;
   const mapLayersList = Array.isArray(rawMapLayers) ? rawMapLayers : [];
-  const mapLayers = mapLayersList.map((layer: any, index: number) => ({
-    id: layer?.id || uuidv4(),
-    name: layer?.name || `Map Layer ${index + 1}`,
-    info: layer?.info || {},
-    image_base64: layer?.image_base64 || layer?.imageBase64 || '',
-    width: typeof layer?.width === 'number' ? layer.width : 1000,
-    height: typeof layer?.height === 'number' ? layer.height : 1000,
-    visible: typeof layer?.visible === 'boolean' ? layer.visible : true,
-    opacity: typeof layer?.opacity === 'number' ? layer.opacity : defaultMapOpacity,
-    z_index: typeof layer?.z_index === 'number' ? layer.z_index : index,
-    blend_mode: layer?.blend_mode || 'overwrite',
-  }));
+  const mapLayers = mapLayersList.map((layer: any, index: number) => {
+    const rawInfo = (layer?.info && typeof layer.info === 'object') ? layer.info : {};
+    const rawOrigin = rawInfo.origin;
+    const origin: [number, number, number] = Array.isArray(rawOrigin) && rawOrigin.length >= 2
+      ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
+      : [0, 0, 0];
+    const initial_origin: [number, number, number] = Array.isArray(rawInfo.initial_origin) && rawInfo.initial_origin.length >= 2
+      ? [Number(rawInfo.initial_origin[0]) || 0, Number(rawInfo.initial_origin[1]) || 0, Number(rawInfo.initial_origin[2]) || 0]
+      : [...origin];
+    const info = {
+      ...rawInfo,
+      origin,
+      initial_origin,
+    };
+    return {
+      id: layer?.id || uuidv4(),
+      name: layer?.name || `Map Layer ${index + 1}`,
+      info,
+      image_base64: layer?.image_base64 || layer?.imageBase64 || '',
+      width: typeof layer?.width === 'number' ? layer.width : 1000,
+      height: typeof layer?.height === 'number' ? layer.height : 1000,
+      visible: typeof layer?.visible === 'boolean' ? layer.visible : true,
+      opacity: typeof layer?.opacity === 'number' ? layer.opacity : defaultMapOpacity,
+      z_index: typeof layer?.z_index === 'number' ? layer.z_index : index,
+      blend_mode: layer?.blend_mode || 'overwrite',
+    };
+  });
 
   // 4. カスタムレイヤー (edit_layers / generated_layers の吸収)
   let customLayers: CustomLayer[] = [];

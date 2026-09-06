@@ -439,10 +439,23 @@ export interface PluginUnifiedResult {
 
 export type ObjectNode = WaypointNode;
 
+export interface MapLayerInfo {
+  image?: string;
+  resolution?: number;
+  origin?: [number, number, number];
+  initial_origin?: [number, number, number];
+  negate?: number;
+  occupied_thresh?: number;
+  free_thresh?: number;
+  width?: number;
+  height?: number;
+  [key: string]: any;
+}
+
 export type MapLayer = {
   id: string;
   name: string;
-  info: any;
+  info: MapLayerInfo | any;
   imageBase64: string;
   width: number;
   height: number;
@@ -464,7 +477,7 @@ export type ExportRegion = {
 export interface ProjectMapLayer {
   id: string;
   name: string;
-  info: any;
+  info: MapLayerInfo | any;
   image_base64: string;
   width: number;
   height: number;

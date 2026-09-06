@@ -110,14 +110,30 @@ pub fn blend_layers_to_image(
     for layer in sorted_layers {
         let l_w = layer.image.width() as f64;
         let l_h = layer.image.height() as f64;
+        let yaw = layer.origin[2];
+        let has_yaw = yaw.abs() >= 1e-9;
+        let (cos_yaw, sin_yaw) = if has_yaw {
+            (yaw.cos(), yaw.sin())
+        } else {
+            (1.0, 0.0)
+        };
 
         for r in 0..out_h {
             for c in 0..out_w {
                 let world_x = region.x + (c as f64) * output_resolution;
                 let world_y = region.y + ((out_h - 1 - r) as f64) * output_resolution;
 
-                let c_l = ((world_x - layer.origin[0]) / layer.resolution).round() as i32;
-                let r_l = (l_h - 1.0 - (world_y - layer.origin[1]) / layer.resolution).round() as i32;
+                let dx = world_x - layer.origin[0];
+                let dy = world_y - layer.origin[1];
+
+                let (lx, ly) = if has_yaw {
+                    (dx * cos_yaw + dy * sin_yaw, -dx * sin_yaw + dy * cos_yaw)
+                } else {
+                    (dx, dy)
+                };
+
+                let c_l = (lx / layer.resolution).round() as i32;
+                let r_l = (l_h - 1.0 - ly / layer.resolution).round() as i32;
 
                 if c_l < 0 || c_l >= l_w as i32 || r_l < 0 || r_l >= l_h as i32 {
                     continue;
@@ -165,5 +181,54 @@ mod tests {
         assert_eq!(apply_blend_cell(CellValue::Obstacle, CellValue::Free, "merge_free"), CellValue::Free);
         assert_eq!(apply_blend_cell(CellValue::Free, CellValue::Obstacle, "merge_free"), CellValue::Free);
         assert_eq!(apply_blend_cell(CellValue::Unknown, CellValue::Obstacle, "merge_free"), CellValue::Obstacle);
+    }
+
+    #[test]
+    fn test_blend_with_yaw_rotation() {
+        use std::f64::consts::PI;
+
+        // Create a 2x2 image:
+        // row 0: [Obstacle, Free]
+        // row 1: [Free, Free]
+        let mut img = RgbaImage::new(2, 2);
+        // row 0 (top in image coords)
+        img.put_pixel(0, 0, CellValue::Obstacle.to_rgba());
+        img.put_pixel(1, 0, CellValue::Free.to_rgba());
+        // row 1 (bottom in image coords, which is ly=0 in world coords)
+        img.put_pixel(0, 1, CellValue::Free.to_rgba());
+        img.put_pixel(1, 1, CellValue::Free.to_rgba());
+
+        let dyn_img = DynamicImage::ImageRgba8(img);
+
+        // Layer with 90 degree counter-clockwise rotation (PI / 2)
+        // origin at (0, 0, PI/2), resolution = 1.0
+        // When rotated 90 deg CCW:
+        // Bottom-left pixel (c=0, r=1, ly=0, lx=0) is at world (0, 0).
+        // Top-left pixel (c=0, r=0, ly=1, lx=0) has world:
+        // dx = -1 * sin(PI/2) = -1, dy = 1 * cos(PI/2) = 0 -> world (-1, 0)
+        let layer = LayerInput {
+            id: "rot_layer",
+            image: &dyn_img,
+            resolution: 1.0,
+            origin: [0.0, 0.0, PI / 2.0],
+            blend_mode: "overwrite",
+            z_index: 0,
+        };
+
+        let region = RectRegion {
+            x: -2.0,
+            y: 0.0,
+            width: 2.0,
+            height: 2.0,
+        };
+
+        let result = blend_layers_to_image(&[layer], &region, 1.0);
+        assert_eq!(result.width(), 2);
+        assert_eq!(result.height(), 2);
+
+        // World (-1.0, 0.0) corresponds to region x=-2 + 1*1.0 = -1, y=0 (row 1, col 1 in 2x2 output)
+        // Check pixel at (c=1, r=1) which is world (-1.0, 0.0) -> top-left of original image (Obstacle)
+        let px = result.get_pixel(1, 1).0;
+        assert_eq!(classify_pixel(px), CellValue::Obstacle);
     }
 }
