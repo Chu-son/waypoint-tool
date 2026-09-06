@@ -18,6 +18,7 @@ interface AnnotationLayerProps {
   previewObject?: AnnotationObject | null;
   onAnnotationPointerDown?: (e: FederatedPointerEvent, id: string) => void;
   onAnnotationHandlePointerDown?: (e: FederatedPointerEvent, id: string, handleType: string) => void;
+  onAnnotationContextMenu?: (e: FederatedPointerEvent, id: string) => void;
 }
 
 export function parseHexColor(colorStr?: string, fallback = CANVAS_ACCENT_COLOR): number {
@@ -32,6 +33,7 @@ export function AnnotationLayer({
   previewObject,
   onAnnotationPointerDown,
   onAnnotationHandlePointerDown,
+  onAnnotationContextMenu,
 }: AnnotationLayerProps) {
   const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
   const annotationGroups = useAppStore((state) => state.annotationGroups) || {};
@@ -41,6 +43,20 @@ export function AnnotationLayer({
   const showAnnotationLabels = useAppStore((state) => state.showAnnotationLabels);
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
+
+  const handleShapePointerDown = (e: FederatedPointerEvent, id: string) => {
+    if (e.button === 2) {
+      e.stopPropagation();
+      onAnnotationContextMenu?.(e, id);
+    } else {
+      onAnnotationPointerDown?.(e, id);
+    }
+  };
+
+  const handleShapeContextMenu = (e: FederatedPointerEvent, id: string) => {
+    e.stopPropagation();
+    onAnnotationContextMenu?.(e, id);
+  };
 
   const safeScale = Math.max(scale, 0.001);
   const isPlacing = isAnnotationEditMode && activeAnnotationSubTool !== 'select';
@@ -84,7 +100,9 @@ export function AnnotationLayer({
             <pixiGraphics
               eventMode={isInteractive ? 'dynamic' : 'none'}
               cursor={cursor}
-              onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, point.id)}
+              onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, point.id)}
+              onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, point.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, point.id)}
               draw={(g) => {
                 g.clear();
                 // Outer glow / selection outline if selected
@@ -139,7 +157,9 @@ export function AnnotationLayer({
               <pixiGraphics
                 eventMode={isInteractive ? 'dynamic' : 'none'}
                 cursor={cursor}
-                onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, op.id)}
+                onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, op.id)}
+                onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, op.id)}
+                onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, op.id)}
                 draw={(g) => {
                   g.clear();
                   if (isSelected) {
@@ -197,7 +217,9 @@ export function AnnotationLayer({
             <pixiGraphics
               eventMode={isInteractive ? 'dynamic' : 'none'}
               cursor={cursor}
-              onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, line.id)}
+              onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, line.id)}
+              onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, line.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, line.id)}
               draw={(g) => {
                 g.clear();
                 // Broad invisible hit area for easy line selection
@@ -290,7 +312,9 @@ export function AnnotationLayer({
               <pixiGraphics
                 eventMode={isInteractive ? 'dynamic' : 'none'}
                 cursor={cursor}
-                onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, rect.id)}
+                onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, rect.id)}
+                onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, rect.id)}
+                onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, rect.id)}
                 draw={(g) => {
                   g.clear();
                   // Selection outer ring
@@ -375,7 +399,9 @@ export function AnnotationLayer({
             <pixiGraphics
               eventMode={isInteractive ? 'dynamic' : 'none'}
               cursor={cursor}
-              onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, circle.id)}
+              onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, circle.id)}
+              onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, circle.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, circle.id)}
               draw={(g) => {
                 g.clear();
                 // Selection outer ring

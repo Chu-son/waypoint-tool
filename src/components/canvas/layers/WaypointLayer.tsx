@@ -11,9 +11,17 @@ interface WaypointLayerProps {
   lockedWaypointId: string | null;
   onNodePointerDown: (e: FederatedPointerEvent, nodeId: string) => void;
   onNodeHandlePointerDown: (e: FederatedPointerEvent, nodeId: string) => void;
+  onNodeContextMenu?: (e: FederatedPointerEvent, nodeId: string) => void;
 }
 
-export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointerDown, onNodeHandlePointerDown }: WaypointLayerProps) {
+export function WaypointLayer({
+  scale,
+  textStyle,
+  lockedWaypointId,
+  onNodePointerDown,
+  onNodeHandlePointerDown,
+  onNodeContextMenu,
+}: WaypointLayerProps) {
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const nodes = useAppStore(state => state.nodes);
   const insertionTarget = useAppStore(state => state.insertionTarget);
@@ -148,7 +156,22 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
             <pixiGraphics
               eventMode="dynamic"
               cursor={activeTool === 'select' ? 'pointer' : 'default'}
-              onPointerDown={(e: FederatedPointerEvent) => onNodePointerDown(e, node.id)}
+              onPointerDown={(e: FederatedPointerEvent) => {
+                if (e.button === 2) {
+                  e.stopPropagation();
+                  onNodeContextMenu?.(e, node.id);
+                } else {
+                  onNodePointerDown(e, node.id);
+                }
+              }}
+              onRightDown={(e: FederatedPointerEvent) => {
+                e.stopPropagation();
+                onNodeContextMenu?.(e, node.id);
+              }}
+              onRightClick={(e: FederatedPointerEvent) => {
+                e.stopPropagation();
+                onNodeContextMenu?.(e, node.id);
+              }}
               draw={(g) => {
                 g.clear();
                 g.strokeStyle = { width: 2 / safeScale, color: isSelected ? selectedColor : normalColor };
@@ -195,7 +218,22 @@ export function WaypointLayer({ scale, textStyle, lockedWaypointId, onNodePointe
                 <pixiGraphics
                   eventMode="dynamic"
                   cursor={activeTool === 'select' ? 'pointer' : 'default'}
-                  onPointerDown={(e: FederatedPointerEvent) => onNodePointerDown(e, node.id)}
+                  onPointerDown={(e: FederatedPointerEvent) => {
+                    if (e.button === 2) {
+                      e.stopPropagation();
+                      onNodeContextMenu?.(e, node.id);
+                    } else {
+                      onNodePointerDown(e, node.id);
+                    }
+                  }}
+                  onRightDown={(e: FederatedPointerEvent) => {
+                    e.stopPropagation();
+                    onNodeContextMenu?.(e, node.id);
+                  }}
+                  onRightClick={(e: FederatedPointerEvent) => {
+                    e.stopPropagation();
+                    onNodeContextMenu?.(e, node.id);
+                  }}
                   draw={(g) => {
                     g.clear();
                     if (isSelected) {

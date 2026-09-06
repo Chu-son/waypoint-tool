@@ -24,7 +24,8 @@ import { prepareLayersForExport } from '../../utils/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
 import { resolveThemeVariables } from '../../utils/themePresets';
 import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
-import { getPrecedingManualWaypoint } from '../../utils/treeUtils';
+import { getPrecedingManualWaypoint, findNodeParentId } from '../../utils/treeUtils';
+import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 
 import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
 import { CANVAS_ACCENT_COLOR, CANVAS_SURFACE_BASE, CANVAS_SURFACE_BASE_HEX } from './canvasConstants';
@@ -267,6 +268,8 @@ export function MapCanvas() {
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; target: CanvasContextMenuTarget } | null>(null);
+  const lastContextMenuTime = useRef(0);
 
   const screenToWorld = useCallback((screenX: number, screenY: number) => {
     let worldX = (screenX - (position.x + 400)) / scale;
@@ -590,6 +593,18 @@ export function MapCanvas() {
     return () => window.removeEventListener('blur', handleWindowBlur);
   }, []);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const preventContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    el.addEventListener('contextmenu', preventContextMenu, true);
+    return () => {
+      el.removeEventListener('contextmenu', preventContextMenu, true);
+    };
+  }, []);
+
   // Map Edit hooks
   const {
     rectPreview,
@@ -647,6 +662,7 @@ export function MapCanvas() {
   const handleAnnotationPointerDown = useCallback(
     (e: import('pixi.js').FederatedPointerEvent, id: string) => {
       if (useAppStore.getState().isMapEditMode) return;
+      if (e.button === 2) return;
       e.stopPropagation();
       selectAnnotationObjects([id], (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey);
       const rect = containerRef.current?.getBoundingClientRect();
@@ -660,6 +676,101 @@ export function MapCanvas() {
       }
     },
     [selectAnnotationObjects, screenToWorld, handleStartMoveAnnotation]
+  );
+
+  const handleAnnotationContextMenu = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, id: string) => {
+      if (useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      (e.nativeEvent as Event)?.stopPropagation?.();
+
+      const now = Date.now();
+      if (now - lastContextMenuTime.current < 100) return;
+      lastContextMenuTime.current = now;
+
+      const currentSelected = useAppStore.getState().selectedAnnotationIds;
+      if (!currentSelected.includes(id)) {
+        selectAnnotationObjects([id]);
+      }
+
+      const objects = useAppStore.getState().annotationObjects;
+      const groups = useAppStore.getState().annotationGroups;
+      const targetObj = objects[id];
+      const parentId = targetObj?.group_id ?? null;
+      const parentGroup = parentId ? groups[parentId] : null;
+
+      let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
+      let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
+      if ((clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        clientX = rect.left + (e.global?.x ?? 0);
+        clientY = rect.top + (e.global?.y ?? 0);
+      }
+
+      setCanvasContextMenu({
+        x: clientX ?? 0,
+        y: clientY ?? 0,
+        target: {
+          type: 'annotation',
+          id,
+          name: targetObj?.name || undefined,
+          parentContainerId: parentId,
+          parentContainerKind: parentGroup ? 'group' : null,
+          parentContainerName: parentGroup?.name || 'Group',
+        },
+      });
+    },
+    [selectAnnotationObjects]
+  );
+
+  const handleNodeContextMenu = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+      if (isMapEditMode) return;
+      e.stopPropagation();
+      (e.nativeEvent as Event)?.stopPropagation?.();
+
+      const now = Date.now();
+      if (now - lastContextMenuTime.current < 100) return;
+      lastContextMenuTime.current = now;
+
+      const currentSelected = useAppStore.getState().selectedNodeIds;
+      if (!currentSelected.includes(nodeId)) {
+        selectNodes([nodeId]);
+      }
+
+      const allNodes = useAppStore.getState().nodes;
+      const targetNode = allNodes[nodeId];
+      const rootIds = useAppStore.getState().rootNodeIds;
+      const parentId = findNodeParentId(nodeId, rootIds, allNodes);
+      const parentNode = parentId ? allNodes[parentId] : null;
+
+      let parentContainerKind: 'generator' | 'group' | null = null;
+      if (parentNode) {
+        parentContainerKind = parentNode.type === 'generator' ? 'generator' : 'group';
+      }
+
+      let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
+      let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
+      if ((clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        clientX = rect.left + (e.global?.x ?? 0);
+        clientY = rect.top + (e.global?.y ?? 0);
+      }
+
+      setCanvasContextMenu({
+        x: clientX ?? 0,
+        y: clientY ?? 0,
+        target: {
+          type: 'node',
+          id: nodeId,
+          name: targetNode?.name || undefined,
+          parentContainerId: parentId,
+          parentContainerKind,
+          parentContainerName: parentNode?.name || (parentContainerKind === 'generator' ? 'Generator' : 'Group'),
+        },
+      });
+    },
+    [isMapEditMode, selectNodes]
   );
 
   const handleAnnotationHandlePointerDown = useCallback(
@@ -2123,6 +2234,7 @@ export function MapCanvas() {
             previewObject={annotationPreview}
             onAnnotationPointerDown={handleAnnotationPointerDown}
             onAnnotationHandlePointerDown={handleAnnotationHandlePointerDown}
+            onAnnotationContextMenu={handleAnnotationContextMenu}
           />
 
           {/* Render Waypoints (manual root nodes and children of generator nodes) */}
@@ -2130,8 +2242,10 @@ export function MapCanvas() {
             scale={scale} 
             textStyle={textStyle} 
             lockedWaypointId={snapState.lockedWaypointId}
+            onNodeContextMenu={handleNodeContextMenu}
             onNodePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
               if (isMapEditMode) return;
+              if (e.button === 2) return;
               if (activeTool === 'select') {
                 e.stopPropagation();
                 const isModifier = (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey || (e.nativeEvent as any)?.ctrlKey;
@@ -2280,6 +2394,15 @@ export function MapCanvas() {
 
         </pixiContainer>
       </Application>
+
+      {canvasContextMenu && (
+        <CanvasContextMenu
+          x={canvasContextMenu.x}
+          y={canvasContextMenu.y}
+          target={canvasContextMenu.target}
+          onClose={() => setCanvasContextMenu(null)}
+        />
+      )}
     </div>
   );
 }
