@@ -17,8 +17,11 @@ import {
   mapInsertionTarget,
   escapeCollapsedInsertionTarget,
   determineMultiDepthDropTarget,
+  getAncestorIds,
+  getHighlightedContainerIds,
+  getAnnotationParentId,
 } from './treeUtils';
-import { WaypointNode } from '../types/store';
+import { WaypointNode, AnnotationGroup, AnnotationObject } from '../types/store';
 
 describe('treeUtils', () => {
   const nodes: Record<string, WaypointNode> = {
@@ -750,6 +753,80 @@ describe('treeUtils', () => {
         expandedNodes: expanded,
       });
       expect(targetOutermost).toEqual({ parentId: null, index: 1 });
+    });
+  });
+
+  describe('getAncestorIds & getHighlightedContainerIds', () => {
+    const parentMap: Record<string, string | null> = {
+      'root-1': null,
+      'grp-1': null,
+      'wp-1': 'grp-1',
+      'subgrp-1': 'grp-1',
+      'wp-nested': 'subgrp-1',
+      'deep-grp': 'subgrp-1',
+      'wp-deep': 'deep-grp',
+    };
+    const getParent = (id: string) => parentMap[id] ?? null;
+
+    it('returns empty array for root items without ancestors', () => {
+      expect(getAncestorIds('root-1', getParent)).toEqual([]);
+      expect(getAncestorIds('grp-1', getParent)).toEqual([]);
+    });
+
+    it('returns direct parent for single-level child', () => {
+      expect(getAncestorIds('wp-1', getParent)).toEqual(['grp-1']);
+    });
+
+    it('returns all ancestors in bottom-up order for deeply nested item', () => {
+      expect(getAncestorIds('wp-deep', getParent)).toEqual(['deep-grp', 'subgrp-1', 'grp-1']);
+    });
+
+    it('prevents infinite loop on circular parent reference', () => {
+      const circularMap: Record<string, string | null> = {
+        'a': 'b',
+        'b': 'c',
+        'c': 'a',
+      };
+      expect(getAncestorIds('a', (id) => circularMap[id] ?? null)).toEqual(['b', 'c']);
+    });
+
+    it('getHighlightedContainerIds collects unique ancestors from multiple selected ids', () => {
+      const selected = ['wp-1', 'wp-deep'];
+      const highlighted = getHighlightedContainerIds(selected, getParent);
+      expect(Array.from(highlighted)).toEqual(['grp-1', 'deep-grp', 'subgrp-1']);
+    });
+
+    it('returns empty set when no items or only root items are selected', () => {
+      expect(getHighlightedContainerIds([], getParent).size).toBe(0);
+      expect(getHighlightedContainerIds(['root-1'], getParent).size).toBe(0);
+    });
+  });
+
+  describe('getAnnotationParentId', () => {
+    const annotObjects: Record<string, AnnotationObject> = {
+      'obj-1': { id: 'obj-1', type: 'point', name: 'Obj 1', color: '#ff0000', visible: true, labelVisible: true, x: 0, y: 0, group_id: 'grp-a' },
+      'obj-root': { id: 'obj-root', type: 'point', name: 'Obj Root', color: '#ff0000', visible: true, labelVisible: true, x: 0, y: 0 },
+    };
+    const annotGroups: Record<string, AnnotationGroup> = {
+      'grp-a': { id: 'grp-a', type: 'manual_group', name: 'Grp A', visible: true, children_ids: ['obj-1'], parent_id: 'grp-top' },
+      'grp-top': { id: 'grp-top', type: 'manual_group', name: 'Grp Top', visible: true, children_ids: ['grp-a'] },
+    };
+    const rootAnnotIds = ['grp-top', 'obj-root'];
+
+    it('returns group_id for annotation object inside a group', () => {
+      expect(getAnnotationParentId('obj-1', rootAnnotIds, annotGroups, annotObjects)).toBe('grp-a');
+    });
+
+    it('returns null for root annotation object', () => {
+      expect(getAnnotationParentId('obj-root', rootAnnotIds, annotGroups, annotObjects)).toBeNull();
+    });
+
+    it('returns parent_id for child annotation group', () => {
+      expect(getAnnotationParentId('grp-a', rootAnnotIds, annotGroups, annotObjects)).toBe('grp-top');
+    });
+
+    it('returns null for root annotation group', () => {
+      expect(getAnnotationParentId('grp-top', rootAnnotIds, annotGroups, annotObjects)).toBeNull();
     });
   });
 });

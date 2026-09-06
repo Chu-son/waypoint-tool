@@ -13,6 +13,12 @@ export type ElementCopyState = {
   previewNodeId: string | null;
 } | null;
 
+export interface TreeRevealTarget {
+  type: 'node' | 'annotation';
+  id: string;
+  timestamp: number;
+}
+
 export interface LoadingTask {
   id: string;
   message: string;
@@ -36,6 +42,10 @@ export type UISlice = {
   elementCopyState: ElementCopyState;
   setElementCopyState: (state: ElementCopyState) => void;
   clearElementCopyState: () => void;
+  
+  treeRevealTarget: TreeRevealTarget | null;
+  revealInTree: (type: 'node' | 'annotation', id: string) => void;
+  clearTreeRevealTarget: () => void;
   
   leftPanelWidth: number;
   rightPanelWidth: number;
@@ -208,6 +218,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     set({ elementCopyState: null });
   },
 
+  treeRevealTarget: null,
+
   leftPanelActiveTab: 'project',
   rightPanelActiveTab: 'layers',
   leftPanelViewMode: 'tabs',
@@ -349,6 +361,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   }),
 
   setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
+
+  revealInTree: (type, id) => set({
+    isLeftPanelOpen: true,
+    leftPanelActiveTab: 'project',
+    treeRevealTarget: { type, id, timestamp: Date.now() },
+  }),
+  clearTreeRevealTarget: () => set({ treeRevealTarget: null }),
 
   setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
   setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),

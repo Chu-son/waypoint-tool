@@ -93,6 +93,57 @@ export function findNodeParentId(
 }
 
 /**
+ * 汎用的なツリー先祖ID探索関数（親からルートに向かって全先祖IDを収集、循環参照保護付き）
+ */
+export function getAncestorIds(
+  id: string,
+  getParentId: (currId: string) => string | null
+): string[] {
+  const ancestors: string[] = [];
+  const visited = new Set<string>([id]);
+  let curr = getParentId(id);
+  while (curr && !visited.has(curr)) {
+    visited.add(curr);
+    ancestors.push(curr);
+    curr = getParentId(curr);
+  }
+  return ancestors;
+}
+
+/**
+ * 選択された要素群（selectedIds）から、子孫に選択要素を持つすべての親コンテナIDを算出する
+ */
+export function getHighlightedContainerIds(
+  selectedIds: string[],
+  getParentId: (currId: string) => string | null
+): Set<string> {
+  const highlighted = new Set<string>();
+  for (const id of selectedIds) {
+    const ancestors = getAncestorIds(id, getParentId);
+    for (const ancId of ancestors) {
+      highlighted.add(ancId);
+    }
+  }
+  return highlighted;
+}
+
+/**
+ * アノテーション用親ID解決アダプター
+ */
+export function getAnnotationParentId(
+  id: string,
+  rootAnnotationIds: string[],
+  annotationGroups: Record<string, AnnotationGroup>,
+  annotationObjects: Record<string, AnnotationObject>
+): string | null {
+  const obj = annotationObjects[id];
+  if (obj) return obj.group_id ?? null;
+  const grp = annotationGroups[id];
+  if (grp) return grp.parent_id ?? findNodeParentId(id, rootAnnotationIds, annotationGroups);
+  return null;
+}
+
+/**
  * 指定されたノードの階層深度を計算する（Root直下なら 0、その子なら 1...）。
  */
 export function getNodeDepth(
