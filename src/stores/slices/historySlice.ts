@@ -32,7 +32,7 @@ export type HistorySlice = {
   clearHistory: () => void;
 };
 
-const cloneSelection = (sel: ActiveSelection | undefined): ActiveSelection => {
+export const cloneSelection = (sel: ActiveSelection | undefined): ActiveSelection => {
   if (!sel) return { type: 'none' };
   switch (sel.type) {
     case 'none':

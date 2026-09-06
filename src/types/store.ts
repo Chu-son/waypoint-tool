@@ -1,3 +1,17 @@
+import {
+  PipelineRecipeDef,
+  PipelineMetadata,
+  PluginDependencyDef,
+  PythonDependencyDef,
+} from './pipeline';
+
+export type {
+  PipelineRecipeDef,
+  PipelineMetadata,
+  PluginDependencyDef,
+  PythonDependencyDef,
+};
+
 export type Transform = {
   x: number;
   y: number;
@@ -122,6 +136,7 @@ export type WaypointNode = {
   source_execution_id?: string;
   plugin_data?: Record<string, any>;
   baseline_waypoints?: WaypointBaselineItem[];
+  pipeline_metadata?: PipelineMetadata;
 };
 
 // --- Robot Footprint Types ---
@@ -183,13 +198,17 @@ export type PluginManifest = {
   primary_output?: PluginPrimaryOutput;
   version?: string;
   description?: string;
-  type: 'python' | 'wasm';
+  type: 'python' | 'wasm' | 'python_library' | 'pipeline';
   executable: string;
+  module_name?: string;
   inputs: PluginInputDef[];
   needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region' | 'robot_footprint')[];
   properties: OptionDef[];
   icon?: string;
   legacy_ids?: string[];
+  plugin_dependencies?: PluginDependencyDef[];
+  python_dependencies?: PythonDependencyDef[];
+  pipeline?: PipelineRecipeDef;
 };
 
 export type DefaultExportFormat = {
@@ -219,6 +238,7 @@ export interface CustomLayerBase {
   z_index: number;
   blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
   is_reference?: boolean;
+  pipeline_metadata?: PipelineMetadata;
 }
 
 export type EditObjectType = 'rect' | 'circle' | 'freehand' | 'line';
@@ -286,6 +306,7 @@ export interface PluginCustomLayer extends CustomLayerBase {
     occupied_thresh?: number;
     free_thresh?: number;
   };
+  pipeline_metadata?: PipelineMetadata;
 }
 
 export type CustomLayer = ManualCustomLayer | PluginCustomLayer;
@@ -306,6 +327,7 @@ export interface AnnotationBase {
   group_id?: string; // 親グループID（存在する場合）
   source_execution_id?: string;
   plugin_data?: Record<string, any>;
+  pipeline_metadata?: PipelineMetadata;
 }
 
 export interface PointAnnotation extends AnnotationBase {
@@ -365,6 +387,7 @@ export interface AnnotationGroup {
   source_execution_id?: string;
   generator_params?: Record<string, any>;
   plugin_data?: Record<string, any>;
+  pipeline_metadata?: PipelineMetadata;
 }
 
 // --- Unified Plugin Run Result Types ---
