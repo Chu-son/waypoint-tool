@@ -4,7 +4,7 @@ import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
-import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer, EditObject, WaypointNode } from '../../types/store';
+import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer, EditObject, WaypointNode, AnnotationObject } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
 import { FootprintLayer } from './layers/FootprintLayer';
@@ -14,6 +14,8 @@ import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
 import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
 import { AnnotationLayer } from './layers/AnnotationLayer';
+import { MeasureLayer } from './layers/MeasureLayer';
+import { getAnnotationCenter } from '../../stores/slices/measureSlice';
 import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
 import { useMapEditCircle } from './hooks/useMapEditCircle';
@@ -222,7 +224,57 @@ export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { l
   );
 }
 
+export function findNearestObjectCenter(
+  worldX: number,
+  worldY: number,
+  nodes: Record<string, WaypointNode>,
+  annotations: Record<string, AnnotationObject>,
+  scale: number
+): { x: number; y: number; objectId: string; objectName: string; objectType: 'node' | 'annotation' } | null {
+  const threshold = 30 / Math.max(scale, 0.001);
+  let closestDist = threshold;
+  let result: { x: number; y: number; objectId: string; objectName: string; objectType: 'node' | 'annotation' } | null = null;
+
+  for (const node of Object.values(nodes)) {
+    if (!node?.transform) continue;
+    const dist = Math.hypot(node.transform.x - worldX, node.transform.y - worldY);
+    if (dist < closestDist) {
+      closestDist = dist;
+      result = {
+        x: node.transform.x,
+        y: node.transform.y,
+        objectId: node.id,
+        objectName: node.name || node.id,
+        objectType: 'node',
+      };
+    }
+  }
+
+  for (const annot of Object.values(annotations)) {
+    if (!annot || annot.visible === false) continue;
+    const center = getAnnotationCenter(annot);
+    const dist = Math.hypot(center.x - worldX, center.y - worldY);
+    if (dist < closestDist) {
+      closestDist = dist;
+      result = {
+        x: center.x,
+        y: center.y,
+        objectId: annot.id,
+        objectName: annot.name || annot.id,
+        objectType: 'annotation',
+      };
+    }
+  }
+
+  return result;
+}
+
 export function MapCanvas() {
+  const isPixiHandledRef = useRef(false);
+  const [isAltPressed, setIsAltPressed] = useState(false);
+  const [snappedMeasureTarget, setSnappedMeasureTarget] = useState<{ x: number; y: number; objectName: string } | null>(null);
+  const lastWorldPosRef = useRef<{ x: number; y: number } | null>(null);
+
   const activeTool = useAppStore(state => state.activeTool);
   const appMode = useAppStore(state => state.appMode);
   const registerCanvasAbortHandler = useAppStore(state => state.registerCanvasAbortHandler);
@@ -230,6 +282,7 @@ export function MapCanvas() {
   const removeNodes = useAppStore(state => state.removeNodes);
   const selectNodes = useAppStore(state => state.selectNodes);
   const nodes = useAppStore(state => state.nodes);
+  const annotationObjects = useAppStore(state => state.annotationObjects) || {};
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const insertionTarget = useAppStore(state => state.insertionTarget);
   const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
@@ -261,6 +314,10 @@ export function MapCanvas() {
   const setSelectedEditObjectId = useAppStore(state => state.setSelectedEditObjectId);
   const setActiveCustomLayerId = useAppStore(state => state.setActiveCustomLayerId);
   const updateEditObject = useAppStore(state => state.updateEditObject);
+  const commitMeasurePoint = useAppStore((state) => state.commitMeasurePoint);
+  const setMeasureHoverPoint = useAppStore((state) => state.setMeasureHoverPoint);
+  const resetMeasure = useAppStore((state) => state.resetMeasure);
+  const syncMeasureFromSelection = useAppStore((state) => state.syncMeasureFromSelection);
 
   const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
   const [previewInfo, setPreviewInfo] = useState<any>(null);
@@ -268,6 +325,8 @@ export function MapCanvas() {
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
   const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number; target: CanvasContextMenuTarget } | null>(null);
   const lastContextMenuTime = useRef(0);
 
@@ -576,8 +635,17 @@ export function MapCanvas() {
       justAbortedRef.current = true;
       return true;
     }
+    // 10. Measure tool transient point abort
+    if (activeTool === 'measure') {
+      const state = useAppStore.getState();
+      if (state.measureStartPoint && !state.measureEndPoint) {
+        resetMeasure();
+        justAbortedRef.current = true;
+        return true;
+      }
+    }
     return false;
-  }, [updateNodes, removeNodes, removeExportRegion]);
+  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure]);
 
   abortRef.current = abort;
 
@@ -586,12 +654,57 @@ export function MapCanvas() {
   }, [registerCanvasAbortHandler, abort]);
 
   useEffect(() => {
+    if (activeTool === 'measure') {
+      syncMeasureFromSelection();
+    } else {
+      setSnappedMeasureTarget(null);
+    }
+  }, [activeTool, syncMeasureFromSelection]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        setIsAltPressed(true);
+        const state = useAppStore.getState();
+        if (state.activeTool === 'measure' && lastWorldPosRef.current) {
+          const { x, y } = lastWorldPosRef.current;
+          const currentNodes = state.nodes;
+          const currentAnnotations = state.annotationObjects || {};
+          const currentScale = scaleRef.current;
+          const nearest = findNearestObjectCenter(x, y, currentNodes, currentAnnotations, currentScale);
+          setSnappedMeasureTarget(nearest ? { x: nearest.x, y: nearest.y, objectName: nearest.objectName } : null);
+          if (state.measureStartPoint && !state.measureEndPoint && nearest) {
+            setMeasureHoverPoint({ x: nearest.x, y: nearest.y });
+          }
+        }
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        setIsAltPressed(false);
+        setSnappedMeasureTarget(null);
+        const state = useAppStore.getState();
+        if (state.activeTool === 'measure' && lastWorldPosRef.current) {
+          if (state.measureStartPoint && !state.measureEndPoint) {
+            setMeasureHoverPoint(lastWorldPosRef.current);
+          }
+        }
+      }
+    };
     const handleWindowBlur = () => {
+      setIsAltPressed(false);
+      setSnappedMeasureTarget(null);
       abortRef.current?.();
     };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', handleWindowBlur);
-    return () => window.removeEventListener('blur', handleWindowBlur);
-  }, []);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [setMeasureHoverPoint]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -663,6 +776,30 @@ export function MapCanvas() {
     (e: import('pixi.js').FederatedPointerEvent, id: string) => {
       if (useAppStore.getState().isMapEditMode) return;
       if (e.button === 2) return;
+      if (activeTool === 'measure') {
+        const isAlt = (e.nativeEvent as any)?.altKey;
+        if (isAlt) {
+          isPixiHandledRef.current = true;
+          if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+            (e.nativeEvent as any).stopPropagation();
+          }
+          e.stopPropagation();
+          const annot = useAppStore.getState().annotationObjects[id];
+          if (annot) {
+            const center = getAnnotationCenter(annot);
+            commitMeasurePoint({
+              x: center.x,
+              y: center.y,
+              objectId: id,
+              objectName: annot.name || id,
+              objectType: 'annotation',
+            });
+          }
+          return;
+        }
+        // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+        return;
+      }
       e.stopPropagation();
       selectAnnotationObjects([id], (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey);
       const rect = containerRef.current?.getBoundingClientRect();
@@ -1027,6 +1164,11 @@ export function MapCanvas() {
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
 
+    if (isPixiHandledRef.current) {
+      isPixiHandledRef.current = false;
+      return;
+    }
+
     if (isMapEditMode) {
       if (e.button === 1) {
         // Middle click = Pan map
@@ -1205,6 +1347,27 @@ export function MapCanvas() {
       interactionMode.current = 'set_yaw';
       activeNodeId.current = id;
       e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    // Left click + Measure Tool -> Commit measure point (with Alt snap support)
+    else if (e.button === 0 && activeTool === 'measure') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+
+      if (e.altKey || isAltPressed) {
+        const nearest = findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale);
+        if (nearest) {
+          commitMeasurePoint(nearest);
+          return;
+        }
+      }
+
+      commitMeasurePoint({
+        x: worldX,
+        y: worldY,
+        objectType: 'point',
+      });
     }
     // Left click + Add Export Region Tool
     else if (e.button === 0 && activeTool === 'add_export_region' && interactionMode.current === 'none') {
@@ -1449,6 +1612,22 @@ export function MapCanvas() {
     }
 
     setCursorPosition({ x: worldX, y: worldY });
+    lastWorldPosRef.current = { x: worldX, y: worldY };
+
+    if (activeTool === 'measure') {
+      const state = useAppStore.getState();
+      const isAlt = e.altKey || isAltPressed;
+      const nearest = isAlt ? findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale) : null;
+      setSnappedMeasureTarget(nearest ? { x: nearest.x, y: nearest.y, objectName: nearest.objectName } : null);
+
+      if (state.measureStartPoint && !state.measureEndPoint) {
+        if (nearest) {
+          setMeasureHoverPoint({ x: nearest.x, y: nearest.y });
+        } else {
+          setMeasureHoverPoint({ x: worldX, y: worldY });
+        }
+      }
+    }
 
     if (isMapEditMode) {
       setBrushPreviewPos({ x: worldX, y: worldY });
@@ -2265,6 +2444,29 @@ export function MapCanvas() {
             onNodePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
               if (isMapEditMode) return;
               if (e.button === 2) return;
+              if (activeTool === 'measure') {
+                const isAlt = (e.nativeEvent as any)?.altKey;
+                if (isAlt) {
+                  isPixiHandledRef.current = true;
+                  if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+                    (e.nativeEvent as any).stopPropagation();
+                  }
+                  e.stopPropagation();
+                  const node = useAppStore.getState().nodes[nodeId];
+                  if (node?.transform) {
+                    commitMeasurePoint({
+                      x: node.transform.x,
+                      y: node.transform.y,
+                      objectId: nodeId,
+                      objectName: node.name || nodeId,
+                      objectType: 'node',
+                    });
+                  }
+                  return;
+                }
+                // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+                return;
+              }
               if (activeTool === 'select') {
                 e.stopPropagation();
                 const isModifier = (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey || (e.nativeEvent as any)?.ctrlKey;
@@ -2401,6 +2603,13 @@ export function MapCanvas() {
                 }
               }
             }}
+          />
+
+          {/* Render Measure Layer */}
+          <MeasureLayer
+            scale={scale}
+            snappedTarget={snappedMeasureTarget}
+            isAltPressed={isAltPressed}
           />
 
           {/* Render Snapping Guide */}

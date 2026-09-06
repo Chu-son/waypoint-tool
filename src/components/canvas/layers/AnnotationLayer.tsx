@@ -280,11 +280,40 @@ export function AnnotationLayer({
                 />
               </>
             )}
+            {line.showLength && (() => {
+              const dx = line.x2 - line.x1;
+              const dy = line.y2 - line.y1;
+              const len = Math.hypot(dx, dy);
+              const lenText = `${len.toFixed(2)} m`;
+              const textWidth = Math.max(50, lenText.length * 8 + 12);
+              const bw = textWidth / safeScale;
+              const bh = 18 / safeScale;
+              return (
+                <pixiContainer x={midX} y={midY}>
+                  <pixiGraphics
+                    draw={(g) => {
+                      g.clear();
+                      g.fillStyle = { color: 0x0f172a, alpha: 0.85 };
+                      g.strokeStyle = { width: 1.5 / safeScale, color: baseColorHex, alpha: 0.9 };
+                      g.roundRect(-bw / 2, -bh / 2, bw, bh, 4 / safeScale);
+                      g.fill();
+                      g.stroke();
+                    }}
+                  />
+                  <pixiText
+                    text={lenText}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                    style={labelStyle}
+                    scale={{ x: 1 / safeScale, y: -1 / safeScale }}
+                  />
+                </pixiContainer>
+              );
+            })()}
             {showAnnotationLabels && line.labelVisible && line.name && (
               <pixiText
                 text={line.name}
                 x={midX + 6 / safeScale}
-                y={midY + 6 / safeScale}
+                y={midY + (line.showLength ? 14 : 6) / safeScale}
                 style={labelStyle}
                 scale={{ x: 1 / safeScale, y: -1 / safeScale }}
               />
