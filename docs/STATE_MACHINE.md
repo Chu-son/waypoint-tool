@@ -172,7 +172,8 @@ export type AppModeState =
       value: number;
       coordSystem: ElementCopyCoordSystem;
       previewNodeId: string | null;
-    };
+    }
+  | { mode: 'measure' };
 ```
 
 ### 3.1 各モードの詳細仕様
@@ -187,6 +188,7 @@ export type AppModeState =
 | **`export_region_edit`**| なし | エクスポート矩形ツールクリック | ドラッグでエクスポート矩形領域の作成、バウンディングボックス変形 | エクスポート設定 Inspector | 完了 / 他ツール切替 / Esc (Tier 6) |
 | **`plugin_interaction`**| `pluginId`: 要求プラグインID<br>`inputKey`: 対話パラメータキー名 | 外部Pythonプラグインが `interaction_hint` を要求 | ヒントに応じたポインタ座標／方向／図形入力待ち | プラグイン対話入力パネル | 入力確定 / プラグイン中断 / Esc (Tier 6) |
 | **`element_paste`** | `field`: コピー対象 (`x`\|`y`\|`z`\|`yaw`)<br>`value`: コピー値<br>`coordSystem`: 座標系<br>`previewNodeId`: ホバー中ノードID | Inspector で要素コピーボタン押下 | ノードホバーで適用プレビュー表示、クリックで個別適用 | 貼り付け対象ノードの Inspector | 完了 / クリア操作 / Esc (Tier 6) |
+| **`measure`** | なし | `M` キー / TOOLS メジャーアイコンクリック | 2点クリックまたは2オブジェクトクリックで実寸距離[m]を計測、リアルタイム距離バッジ描画、アノテーション保存フラグ | 現在の選択に応じた表示 / 上部バナー | `V` キー / 完了 / Esc (Tier 6) |
 
 ### 3.2 モード遷移の 4フェーズ同期ライフサイクルパイプライン
 

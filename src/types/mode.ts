@@ -38,7 +38,8 @@ export type AppModeState =
       value: number;
       coordSystem: ElementCopyCoordSystem;
       previewNodeId: string | null;
-    };
+    }
+  | { mode: 'measure' };
 
 export type AppModeTransition =
   | { mode: 'select' }
@@ -77,4 +78,5 @@ export type AppModeTransition =
       value: number;
       coordSystem: ElementCopyCoordSystem;
       previewNodeId?: string | null;
-    };
+    }
+  | { mode: 'measure' };

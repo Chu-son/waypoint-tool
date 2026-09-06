@@ -114,6 +114,9 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             previewNodeId: mode.previewNodeId ?? null,
           };
           break;
+        case 'measure':
+          normalizedMode = { mode: 'measure' };
+          break;
       }
 
       // Phase 2: OnExit (現在のモードの終了処理)
@@ -255,6 +258,14 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
               coordSystem: normalizedMode.coordSystem,
               previewNodeId: normalizedMode.previewNodeId,
             };
+            break;
+          case 'measure':
+            updates.activeTool = 'measure';
+            updates.isMapEditMode = false;
+            updates.isAnnotationEditMode = false;
+            updates.activePluginId = null;
+            updates.pluginInteractionData = {};
+            updates.elementCopyState = null;
             break;
         }
 

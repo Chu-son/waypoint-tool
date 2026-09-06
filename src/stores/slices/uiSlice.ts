@@ -28,7 +28,7 @@ export interface LoadingTask {
 }
 
 export type UISlice = {
-  activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region';
+  activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region' | 'measure';
   isSidebarOpen: boolean;
   mouseCenteredZoom: boolean;
   visibleAttributes: string[];
@@ -344,6 +344,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       } else if (tool === 'add_export_region') {
         state.transitionToMode({
           mode: 'export_region_edit',
+        });
+      } else if (tool === 'measure') {
+        state.transitionToMode({
+          mode: 'measure',
         });
       } else {
         state.transitionToMode({ mode: 'select' });

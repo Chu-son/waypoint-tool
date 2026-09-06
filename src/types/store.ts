@@ -327,6 +327,7 @@ export interface LineAnnotation extends AnnotationBase {
   y1: number;
   x2: number;
   y2: number;
+  showLength?: boolean;
 }
 
 export interface RectAnnotation extends AnnotationBase {
@@ -580,7 +581,7 @@ export interface AppState {
   nodes: Record<string, ObjectNode>;
   rootNodeIds: string[];
   selectedNodeIds: string[];
-  activeTool: 'select' | 'add_point' | 'add_rect_sweep' | 'add_export_region';
+  activeTool: 'select' | 'add_point' | 'add_rect_sweep' | 'add_export_region' | 'measure';
   
   // Maps & Layers
   mapLayers: MapLayer[];
