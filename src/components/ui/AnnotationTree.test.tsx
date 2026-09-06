@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnnotationTree } from './AnnotationTree';
 import { useAppStore } from '../../stores/appStore';
-import { PointAnnotation, LineAnnotation } from '../../types/store';
+import { PointAnnotation, LineAnnotation, AnnotationObject, AnnotationGroup } from '../../types/store';
 
 describe('AnnotationTree', () => {
   const mockSelectAnnotationObjects = vi.fn();
@@ -118,4 +118,47 @@ describe('AnnotationTree', () => {
     fireEvent.click(groupOption);
     expect(mockGroupAnnotations).toHaveBeenCalledWith(['point-1', 'line-1']);
   });
+
+  it('highlights parent group and shows dot indicator when child annotation is selected', () => {
+    const childPoint: AnnotationObject = {
+      id: 'child-pt',
+      type: 'point',
+      name: 'Child Annotation',
+      color: '#00ff00',
+      visible: true,
+      labelVisible: true,
+      x: 10,
+      y: 20,
+      group_id: 'grp-roi',
+    };
+    const parentGroup: AnnotationGroup = {
+      id: 'grp-roi',
+      name: 'ROI Group',
+      type: 'manual_group',
+      visible: true,
+      children_ids: ['child-pt'],
+    };
+
+    useAppStore.setState({
+      annotationObjects: { 'child-pt': childPoint },
+      annotationGroups: { 'grp-roi': parentGroup },
+      rootAnnotationIds: ['grp-roi'],
+      selectedAnnotationIds: ['child-pt'], // Child selected!
+    });
+
+    const { container } = render(<AnnotationTree />);
+
+    const grpItem = container.querySelector('[data-tree-item-id="grp-roi"]');
+    expect(grpItem).not.toBeNull();
+
+    // Inner row of group should have parent highlight classes
+    const innerRow = grpItem?.querySelector('div');
+    expect(innerRow?.className).toContain('bg-primary-base/10');
+    expect(innerRow?.className).toContain('border-primary-base/40');
+
+    // Dot indicator should be visible for collapsed group
+    const dot = container.querySelector('span[title="選択中の子要素を含んでいます"]');
+    expect(dot).not.toBeNull();
+  });
 });
+

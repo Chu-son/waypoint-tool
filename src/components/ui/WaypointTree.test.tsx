@@ -705,4 +705,41 @@ describe('WaypointTree', () => {
     // Verify component renders without error and insertion bar is present
     expect(screen.getAllByTestId('grip-vertical-icon')).toHaveLength(3); // 2 nodes + 1 insertion bar
   });
+
+  it('highlights parent group and shows dot indicator when child node is selected', () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: ['grp-1'],
+      nodes: {
+        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'My Group', children_ids: ['wp-child'] },
+        'wp-child': { id: 'wp-child', type: 'manual', name: 'Child Point' },
+      },
+      plugins: {},
+      selectedNodeIds: ['wp-child'], // Child is selected!
+      indexStartIndex: 0,
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
+      selectNodes: mockSelectNodes,
+      duplicateNodes: mockDuplicateNodes,
+      removeNodes: mockRemoveNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
+    }));
+
+    const { container } = render(<WaypointTree />);
+
+    // grp-1 should have data-tree-item-id="grp-1"
+    const grpItem = container.querySelector('[data-tree-item-id="grp-1"]');
+    expect(grpItem).not.toBeNull();
+
+    // The inner row div of grp-1 should have parent highlight classes
+    const innerRow = grpItem?.querySelector('div');
+    expect(innerRow?.className).toContain('bg-primary-base/10');
+    expect(innerRow?.className).toContain('border-primary-base/40');
+
+    // Since it is collapsed, it should also have the dot indicator
+    const dot = container.querySelector('span[title="選択中の子要素を含んでいます"]');
+    expect(dot).not.toBeNull();
+  });
 });
+

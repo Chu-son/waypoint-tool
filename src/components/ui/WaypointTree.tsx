@@ -46,8 +46,11 @@ import {
   isInsertableContainer,
   escapeCollapsedInsertionTarget,
   determineMultiDepthDropTarget,
+  getAncestorIds,
+  getHighlightedContainerIds,
 } from '../../utils/treeUtils';
 import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
+import { useTreeReveal } from '../../hooks/useTreeReveal';
 
 export const INSERTION_BAR_ID = '__insertion_bar__';
 
@@ -123,6 +126,8 @@ interface TreeItemRowProps {
   node: WaypointNode;
   depth: number;
   isSelected: boolean;
+  hasSelectedChild?: boolean;
+  isFlashing?: boolean;
   isAnchor?: boolean;
   isExpanded?: boolean;
   isEditing?: boolean;
@@ -141,6 +146,8 @@ function SortableTreeNodeItem({
   node,
   depth,
   isSelected,
+  hasSelectedChild,
+  isFlashing,
   isAnchor,
   isExpanded,
   isEditing,
@@ -194,7 +201,7 @@ function SortableTreeNodeItem({
   const childCount = node.children_ids?.length || 0;
 
   return (
-    <li ref={setNodeRef} style={style} className="space-y-1 select-none">
+    <li ref={setNodeRef} style={style} data-tree-item-id={id} className="space-y-1 select-none">
       <div
         onClick={onClick}
         onContextMenu={onContextMenu}
@@ -205,7 +212,12 @@ function SortableTreeNodeItem({
             ? isGenerator
               ? 'bg-accent-generator/15 border-accent-generator/50 text-text-base'
               : 'bg-primary-base/15 border-primary-base/50 text-text-base'
+            : hasSelectedChild
+            ? isGenerator
+              ? 'bg-accent-generator/10 border-accent-generator/40 ring-1 ring-accent-generator/25 text-text-base'
+              : 'bg-primary-base/10 border-primary-base/40 ring-1 ring-primary-base/25 text-text-base'
             : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+          isFlashing && 'ring-2 ring-primary-base ring-offset-1 shadow-lg bg-primary-base/25 animate-pulse',
           isAnchor && 'border-accent-anchor/60 bg-accent-anchor/20',
           isAfterInsertion && 'opacity-40 grayscale-[35%] hover:opacity-75'
         )}
@@ -283,6 +295,17 @@ function SortableTreeNodeItem({
                 </span>
               )}
             </div>
+          )}
+
+          {/* Child Selection Dot Indicator for Collapsed Container */}
+          {isContainer && !isExpanded && hasSelectedChild && (
+            <span
+              className={cn(
+                'w-2 h-2 rounded-full shrink-0 animate-pulse ring-2 ring-surface-panel shadow-xs',
+                isGenerator ? 'bg-accent-generator' : 'bg-primary-base'
+              )}
+              title="選択中の子要素を含んでいます"
+            />
           )}
 
           {/* Item Count Badge for Groups/Generators */}
@@ -374,6 +397,25 @@ export function WaypointTree() {
   const afterNodeIds = useMemo(() => {
     return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
   }, [rootNodeIds, nodes, insertionTarget]);
+
+  const getWaypointParentId = React.useCallback(
+    (id: string) => findNodeParentId(id, rootNodeIds, nodes),
+    [rootNodeIds, nodes]
+  );
+
+  const highlightedContainerIds = useMemo(
+    () => getHighlightedContainerIds(selectedNodeIds, getWaypointParentId),
+    [selectedNodeIds, getWaypointParentId]
+  );
+
+  const { flashingId } = useTreeReveal({
+    treeType: 'node',
+    getAncestorIds: React.useCallback(
+      (id: string) => getAncestorIds(id, getWaypointParentId),
+      [getWaypointParentId]
+    ),
+    setExpanded: setExpandedNodes,
+  });
 
   interface DisplayTreeItem {
     id: string;
@@ -656,6 +698,8 @@ export function WaypointTree() {
                 if (!node) return null;
 
                 const isSelected = selectedNodeIds.includes(item.id);
+                const hasSelectedChild = !isSelected && highlightedContainerIds.has(item.id);
+                const isFlashing = flashingId === item.id;
                 const isAnchor = anchorNodeId === item.id;
                 const isExpanded = expandedNodes.has(item.id);
                 const isEditing = editingNodeId === item.id;
@@ -669,6 +713,8 @@ export function WaypointTree() {
                     node={node}
                     depth={item.depth}
                     isSelected={isSelected}
+                    hasSelectedChild={hasSelectedChild}
+                    isFlashing={isFlashing}
                     isAnchor={isAnchor}
                     isExpanded={isExpanded}
                     isEditing={isEditing}

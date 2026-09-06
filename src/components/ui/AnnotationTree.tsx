@@ -43,8 +43,15 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AnnotationObject, AnnotationGroup, AnnotationType } from '../../types/store';
-import { getVisibleAnnotationNodes, computeDragDropPosition } from '../../utils/treeUtils';
+import {
+  getVisibleAnnotationNodes,
+  computeDragDropPosition,
+  getAncestorIds,
+  getHighlightedContainerIds,
+  getAnnotationParentId,
+} from '../../utils/treeUtils';
 import { useTreeItemSelection } from '../../hooks/useTreeItemSelection';
+import { useTreeReveal } from '../../hooks/useTreeReveal';
 
 function getAnnotationIcon(type: AnnotationType) {
   switch (type) {
@@ -87,6 +94,8 @@ interface TreeNodeItemProps {
   group?: AnnotationGroup;
   obj?: AnnotationObject;
   isSelected: boolean;
+  hasSelectedChild?: boolean;
+  isFlashing?: boolean;
   isExpanded?: boolean;
   isEditing?: boolean;
   onToggleExpand?: () => void;
@@ -106,6 +115,8 @@ function SortableAnnotationTreeNode({
   group,
   obj,
   isSelected,
+  hasSelectedChild,
+  isFlashing,
   isExpanded,
   isEditing,
   onToggleExpand,
@@ -146,7 +157,7 @@ function SortableAnnotationTreeNode({
   const childCount = group?.children_ids?.length || 0;
 
   return (
-    <li ref={setNodeRef} style={style} className="space-y-1 select-none">
+    <li ref={setNodeRef} style={style} data-tree-item-id={id} className="space-y-1 select-none">
       <div
         onClick={onClick}
         onContextMenu={onContextMenu}
@@ -155,7 +166,10 @@ function SortableAnnotationTreeNode({
           'group relative flex items-center justify-between gap-1 py-1 pr-1.5 rounded-md text-xs transition-colors cursor-pointer border overflow-hidden',
           isSelected
             ? 'bg-primary-base/15 border-primary-base/50 text-text-base font-medium'
+            : hasSelectedChild
+            ? 'bg-primary-base/10 border-primary-base/40 ring-1 ring-primary-base/25 text-text-base font-medium'
             : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+          isFlashing && 'ring-2 ring-primary-base ring-offset-1 shadow-lg bg-primary-base/25 animate-pulse',
           !isVisible && 'opacity-60 grayscale-[0.3]'
         )}
       >
@@ -228,6 +242,14 @@ function SortableAnnotationTreeNode({
             >
               {group?.name || obj?.name || ''}
             </span>
+          )}
+
+          {/* Child Selection Dot Indicator for Collapsed Container */}
+          {isGroup && !isExpanded && hasSelectedChild && (
+            <span
+              className="w-2 h-2 rounded-full shrink-0 animate-pulse bg-primary-base ring-2 ring-surface-panel shadow-xs"
+              title="選択中の子要素を含んでいます"
+            />
           )}
 
           {/* Badge */}
@@ -360,6 +382,25 @@ export function AnnotationTree() {
     return getVisibleAnnotationNodes(rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups);
   }, [rootAnnotationIds, annotationGroups, annotationObjects, expandedGroups]);
 
+  const getAnnotParentId = React.useCallback(
+    (id: string) => getAnnotationParentId(id, rootAnnotationIds, annotationGroups, annotationObjects),
+    [rootAnnotationIds, annotationGroups, annotationObjects]
+  );
+
+  const highlightedContainerIds = useMemo(
+    () => getHighlightedContainerIds(selectedAnnotationIds, getAnnotParentId),
+    [selectedAnnotationIds, getAnnotParentId]
+  );
+
+  const { flashingId } = useTreeReveal({
+    treeType: 'annotation',
+    getAncestorIds: React.useCallback(
+      (id: string) => getAncestorIds(id, getAnnotParentId),
+      [getAnnotParentId]
+    ),
+    setExpanded: setExpandedGroups,
+  });
+
   const visibleIds = useMemo(() => visibleNodes.map((n) => n.id), [visibleNodes]);
 
   const { handleItemClick, handleItemContextMenu } = useTreeItemSelection({
@@ -487,6 +528,8 @@ export function AnnotationTree() {
 
                   const isGroup = !!group;
                   const isSelected = selectedAnnotationIds.includes(id);
+                  const hasSelectedChild = !isSelected && highlightedContainerIds.has(id);
+                  const isFlashing = flashingId === id;
                   const isExpanded = expandedGroups.has(id);
                   const isEditing = editingId === id;
 
@@ -499,6 +542,8 @@ export function AnnotationTree() {
                       group={group}
                       obj={obj}
                       isSelected={isSelected}
+                      hasSelectedChild={hasSelectedChild}
+                      isFlashing={isFlashing}
                       isExpanded={isExpanded}
                       isEditing={isEditing}
                       onToggleExpand={() => toggleGroupExpand(id)}
