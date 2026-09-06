@@ -7,6 +7,7 @@ export function ThemeInjector() {
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const themeMode = useAppStore((state) => state.themeMode);
+  const themePreset = useAppStore((state) => state.themePreset);
   const appliedVariablesRef = useRef<string[]>([]);
 
   useEffect(() => {
@@ -20,13 +21,11 @@ export function ThemeInjector() {
     root.style.removeProperty('color-scheme');
     appliedVariablesRef.current = [];
 
-    // Custom UI theme takes precedence if specified; otherwise use themeMode ('dark' | 'light')
+    // Resolve active preset: if customUiConfig has theme, use it; else resolve using themePreset and colorScheme: themeMode.
     const activeThemeConfig =
       isCustomUiMode && customUiConfig?.theme
         ? customUiConfig.theme
-        : themeMode === 'light'
-        ? { preset: 'light' as const }
-        : undefined;
+        : { preset: themePreset || 'default', colorScheme: themeMode };
 
     if (activeThemeConfig) {
       const { variables, colorScheme } = resolveThemeVariables(activeThemeConfig);
@@ -76,7 +75,7 @@ export function ThemeInjector() {
         styleEl.remove();
       }
     };
-  }, [customUiConfig, isCustomUiMode, themeMode]);
+  }, [customUiConfig, isCustomUiMode, themeMode, themePreset]);
 
   return null;
 }

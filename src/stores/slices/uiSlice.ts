@@ -1,6 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { v4 as uuidv4 } from 'uuid';
+import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
 
 export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
 export type ElementCopyCoordSystem = 'world' | 'anchor';
@@ -28,6 +29,8 @@ export type UISlice = {
   indexStartIndex: 0 | 1;
   themeMode: 'dark' | 'light';
   setThemeMode: (mode: 'dark' | 'light') => void;
+  themePreset: string;
+  setThemePreset: (preset: string) => void;
   isDirty: boolean;
   decimalPrecision: number;
   elementCopyState: ElementCopyState;
@@ -164,6 +167,18 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   indexStartIndex: 0,
   themeMode: 'dark',
   setThemeMode: (mode: 'dark' | 'light') => set({ themeMode: mode === 'light' ? 'light' : 'dark' }),
+  themePreset: 'default',
+  setThemePreset: (preset: string) => {
+    const normalized =
+      preset === 'roomba'
+        ? 'emerald'
+        : preset === 'dark'
+        ? 'default'
+        : VALID_DARK_THEME_PRESET_IDS.includes(preset)
+        ? preset
+        : 'default';
+    set({ themePreset: normalized });
+  },
   isDirty: false,
   decimalPrecision: 6,
   elementCopyState: null,

@@ -64,6 +64,18 @@ describe('storageMigration', () => {
     expect(migrateStorage({}, 2).themeMode).toBe('dark');
   });
 
+  it('normalizes and preserves themePreset correctly', () => {
+    expect(DEFAULT_STORAGE_STATE.themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: 'emerald' }, 2).themePreset).toBe('emerald');
+    expect(migrateStorage({ themePreset: 'ocean' }, 2).themePreset).toBe('ocean');
+    expect(migrateStorage({ themePreset: 'roomba' }, 2).themePreset).toBe('emerald');
+    expect(migrateStorage({ themePreset: 'dark' }, 2).themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: 'invalid_xyz' }, 2).themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: '' }, 2).themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: null as any }, 2).themePreset).toBe('default');
+    expect(migrateStorage({}, 2).themePreset).toBe('default');
+  });
+
   it('fills missing default properties when partial state is provided', () => {
     const partialState = {
       lastDirectory: '/home/user/maps',

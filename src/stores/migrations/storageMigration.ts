@@ -1,5 +1,6 @@
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 import { DefaultExportFormat, PluginSetting } from '../../types/store';
+import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
 
 export const STORAGE_VERSION = 2;
 
@@ -18,6 +19,7 @@ export interface PersistedStorageState {
   globalPythonPath?: string | null;
   decimalPrecision?: number;
   themeMode?: 'dark' | 'light';
+  themePreset?: string;
   leftPanelViewMode?: 'tabs' | 'split';
   rightPanelViewMode?: 'tabs' | 'split';
   leftPanelWidth?: number;
@@ -44,6 +46,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   globalPythonPath: null,
   decimalPrecision: 6,
   themeMode: 'dark',
+  themePreset: 'default',
   leftPanelViewMode: 'tabs',
   rightPanelViewMode: 'tabs',
   leftPanelWidth: 320,
@@ -114,6 +117,14 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     indexStartIndex: state.indexStartIndex === 1 ? 1 : 0,
     decimalPrecision: typeof state.decimalPrecision === 'number' ? Math.max(0, Math.floor(state.decimalPrecision)) : 6,
     themeMode: state.themeMode === 'light' ? 'light' : 'dark',
+    themePreset: (() => {
+      if (state.themePreset === 'roomba') return 'emerald';
+      if (state.themePreset === 'dark') return 'default';
+      if (typeof state.themePreset === 'string' && VALID_DARK_THEME_PRESET_IDS.includes(state.themePreset)) {
+        return state.themePreset;
+      }
+      return 'default';
+    })(),
     defaultMapOpacity: typeof state.defaultMapOpacity === 'number' ? state.defaultMapOpacity : DEFAULT_MAP_OPACITY,
   };
 }
