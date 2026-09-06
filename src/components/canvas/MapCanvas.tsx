@@ -285,7 +285,6 @@ export function MapCanvas() {
   const annotationObjects = useAppStore(state => state.annotationObjects) || {};
   const rootNodeIds = useAppStore(state => state.rootNodeIds);
   const insertionTarget = useAppStore(state => state.insertionTarget);
-  const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
   const updateNode = useAppStore(state => state.updateNode);
   const updateNodes = useAppStore(state => state.updateNodes);
   const removeExportRegion = useAppStore(state => state.removeExportRegion);
@@ -300,6 +299,7 @@ export function MapCanvas() {
   const plugins = useAppStore(state => state.plugins);
 
   const activeInputIndex = useAppStore(state => state.activeInputIndex);
+  const activePipelineInputRef = useAppStore(state => state.activePipelineInputRef);
   const setCursorPosition = useAppStore(state => state.setCursorPosition);
   const setMapScale = useAppStore(state => state.setMapScale);
   
@@ -1231,36 +1231,35 @@ export function MapCanvas() {
       return;
     }
     
-    // Left click + Select Tool + Generator node selected -> Check rectangle handle hits FIRST (before pan_map)
-    if (e.button === 0 && activeTool === 'select' && selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator') {
-      const selectedNode = nodes[selectedNodeIds[0]];
-      const genPluginId = selectedNode.plugin_id || '';
-      const genPlugin = plugins[genPluginId];
-      const genInputs = genPlugin?.manifest?.inputs || [];
-      
-      if (genInputs.some((inp: any) => inp.type === 'rectangle')) {
+    // Left click + (Select Tool OR Add Generator Tool) -> Check rectangle handle hits FIRST (before pan_map or point generation)
+    if (e.button === 0 && (activeTool === 'select' || activeTool === 'add_generator')) {
+      const interactionData = useAppStore.getState().pluginInteractionData;
+      const rectEntries = Object.entries(interactionData).filter(
+        ([_k, val]) =>
+          val &&
+          typeof val === 'object' &&
+          val.center &&
+          typeof val.width === 'number' &&
+          typeof val.height === 'number'
+      );
+
+      if (rectEntries.length > 0) {
         const rect = containerRef.current.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
         const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-        const hitRadius = 12 / scale;
-        
-        for (const inp of genInputs) {
-          if (inp.type !== 'rectangle') continue;
-          const rKey = inp.name || inp.id;
-          if (!rKey) continue;
-          const existing = useAppStore.getState().pluginInteractionData[rKey];
-          if (!existing?.center) continue;
-          
+        const hitRadius = 14 / scale;
+
+        for (const [rKey, existing] of rectEntries) {
           const { center, width, height, yaw = 0 } = existing;
           const halfW = width / 2;
           const halfH = height / 2;
-          
+
           const dx = worldX - center.x;
           const dy = worldY - center.y;
           const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
           const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-          
+
           // Check rotation handle
           const rotHandleLocalY = halfH + 20 / scale;
           const rotDx = localX;
@@ -1271,7 +1270,7 @@ export function MapCanvas() {
             e.currentTarget.setPointerCapture(e.pointerId);
             return;
           }
-          
+
           // Check corners
           const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
             { cx: -halfW, cy: halfH, corner: 'min' },
@@ -1408,18 +1407,38 @@ export function MapCanvas() {
       const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
 
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
-      const allInputs = activePlugin?.manifest?.inputs || [];
+      let allInputs = activePlugin?.manifest?.inputs || [];
+      if (activePlugin?.manifest?.type === 'pipeline' && activePlugin.manifest?.pipeline?.steps) {
+        const pipelineInputs: any[] = [];
+        for (const step of activePlugin.manifest.pipeline.steps) {
+          const sp = plugins[step.plugin_id];
+          if (sp?.manifest?.inputs) {
+            for (const inp of sp.manifest.inputs) {
+              const k = inp.name || inp.id;
+              const isBound = step.bindings && (step.bindings[k] !== undefined || step.bindings[`inputs.${k}`] !== undefined);
+              if (!isBound) {
+                pipelineInputs.push(inp);
+              }
+            }
+          }
+        }
+        allInputs = pipelineInputs;
+      }
       const hitRadius = 12 / scale;
 
       // FIRST: Check ALL existing rectangles in pluginInteractionData for handle hits (Left-click only)
       if (e.button === 0) {
-        for (const inp of allInputs) {
-          if (inp.type !== 'rectangle') continue;
-          const rKey = inp.name || inp.id;
-          if (!rKey) continue;
-          const existing = useAppStore.getState().pluginInteractionData[rKey];
-          if (!existing?.center) continue;
+        const interactionData = useAppStore.getState().pluginInteractionData;
+        const rectEntries = Object.entries(interactionData).filter(
+          ([_k, val]) =>
+            val &&
+            typeof val === 'object' &&
+            val.center &&
+            typeof val.width === 'number' &&
+            typeof val.height === 'number'
+        );
 
+        for (const [rKey, existing] of rectEntries) {
           const { center, width, height, yaw = 0 } = existing;
           const halfW = width / 2;
           const halfH = height / 2;
@@ -1503,7 +1522,37 @@ export function MapCanvas() {
       }
 
       // THEN: Process the current activeInputIndex input for new interactions (Left click only)
-      const currentInput = allInputs[activeInputIndex];
+      let currentInput = allInputs[activeInputIndex];
+      if (activePlugin?.manifest?.type === 'pipeline') {
+        const recipeSteps = activePlugin.manifest?.pipeline?.steps || [];
+        if (activePipelineInputRef) {
+          const step = recipeSteps.find((s) => s.step_id === activePipelineInputRef.stepId);
+          const stepPlugin = step ? plugins[step.plugin_id] : null;
+          const matching = stepPlugin?.manifest?.inputs?.find((i) => (i.name || i.id) === activePipelineInputRef.inputId);
+          if (matching) {
+            currentInput = matching;
+          }
+        } else {
+          // Fallback: search across pipeline steps for the first unbound input
+          for (const step of recipeSteps) {
+            const stepPlugin = plugins[step.plugin_id];
+            for (const inp of stepPlugin?.manifest?.inputs || []) {
+              const k = inp.name || inp.id;
+              if (!step.bindings || !Object.keys(step.bindings).some((b) => b === k || b === `inputs.${k}`)) {
+                currentInput = inp;
+                useAppStore.getState().setActivePipelineInputRef({ stepId: step.step_id, inputId: k });
+                break;
+              }
+            }
+            if (currentInput) break;
+          }
+        }
+      }
+
+      if (activePlugin?.manifest?.type === 'pipeline' && !currentInput) {
+        return;
+      }
+
       const inputKey = currentInput?.name || currentInput?.id || 'start_point';
       const inputType = currentInput?.type || 'point';
 
@@ -1910,7 +1959,27 @@ export function MapCanvas() {
       
       // Find the active point input key
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
-      const firstInput = activePlugin?.manifest?.inputs?.[activeInputIndex];
+      let firstInput = activePlugin?.manifest?.inputs?.[activeInputIndex];
+      if (activePlugin?.manifest?.type === 'pipeline') {
+        const recipeSteps = activePlugin.manifest?.pipeline?.steps || [];
+        if (activePipelineInputRef) {
+          const step = recipeSteps.find((s) => s.step_id === activePipelineInputRef.stepId);
+          const stepPlugin = step ? plugins[step.plugin_id] : null;
+          firstInput = stepPlugin?.manifest?.inputs?.find((i) => (i.name || i.id) === activePipelineInputRef.inputId);
+        } else {
+          for (const step of recipeSteps) {
+            const stepPlugin = plugins[step.plugin_id];
+            for (const inp of stepPlugin?.manifest?.inputs || []) {
+              const k = inp.name || inp.id;
+              if (!step.bindings || !Object.keys(step.bindings).some((b) => b === k || b === `inputs.${k}`)) {
+                firstInput = inp;
+                break;
+              }
+            }
+            if (firstInput) break;
+          }
+        }
+      }
       const inputKey = firstInput?.name || firstInput?.id || 'start_point';
       
       const pData = useAppStore.getState().pluginInteractionData[inputKey];

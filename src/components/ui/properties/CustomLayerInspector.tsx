@@ -13,6 +13,7 @@ import { FieldLabel } from "../common/FieldLabel";
 import { PluginPropertyEditor } from "../PluginPropertyEditor";
 import { PluginInputEditor } from "../PluginInputEditor";
 import { PluginDataViewer } from "../common/PluginDataViewer";
+import { PipelineInspector } from "./PipelineInspector";
 import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Slash, Bookmark, Code2, Maximize2 } from "lucide-react";
 import { cn } from "../../../utils/cn";
 
@@ -83,6 +84,10 @@ export function CustomLayerInspector() {
 
   // Initialize state on active layer change
   useEffect(() => {
+    if (existingLayer?.pipeline_metadata) {
+      return; // Skip side effects for pipeline-bound layers; PipelineInspector handles its own lifecycle
+    }
+
     if (existingLayer) {
       setLayerName(existingLayer.name);
       setLayerOpacity(existingLayer.opacity ?? 1.0);
@@ -92,7 +97,6 @@ export function CustomLayerInspector() {
       if (existingLayer.type === "plugin") {
         setSelectedPluginId(existingLayer.plugin_id);
         setActivePlugin(existingLayer.plugin_id);
-        setActiveTool("add_generator");
         setParams({ ...existingLayer.params });
 
         clearPluginInteractionData();
@@ -135,10 +139,11 @@ export function CustomLayerInspector() {
 
   // Sync active properties to store for canvas interaction hints
   useEffect(() => {
+    if (existingLayer?.pipeline_metadata) return;
     if (activePlugin && setPluginActiveProperties && (isNewPluginLayer || existingLayer?.type === "plugin")) {
       setPluginActiveProperties(params);
     }
-  }, [params, activePlugin, setPluginActiveProperties, isNewPluginLayer, existingLayer?.type]);
+  }, [params, activePlugin, setPluginActiveProperties, isNewPluginLayer, existingLayer?.type, existingLayer?.pipeline_metadata]);
 
   const handlePluginChange = (pluginId: string) => {
     setSelectedPluginId(pluginId);
@@ -232,6 +237,15 @@ export function CustomLayerInspector() {
       handleClose();
     }
   };
+
+  if (existingLayer?.pipeline_metadata) {
+    return (
+      <PipelineInspector
+        pipelineMetadata={existingLayer.pipeline_metadata}
+        targetCustomLayerId={existingLayer.id}
+      />
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto w-full flex flex-col bg-surface-panel/30 divide-y divide-border-base/30">

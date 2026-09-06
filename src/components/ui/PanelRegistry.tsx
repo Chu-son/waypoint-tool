@@ -8,6 +8,8 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { PluginParamsPanel } from './PluginParamsPanel';
 import { CustomLayerInspector } from './properties/CustomLayerInspector';
 import { AnnotationInspector } from './properties/AnnotationInspector';
+import { PipelineInspector } from './properties/PipelineInspector';
+import { PipelineMetadata } from '../../types/pipeline';
 import { WorkflowPanel } from './WorkflowPanel';
 import { CustomHtmlPanel } from './CustomHtmlPanel';
 import { Box, Puzzle, Layers, Settings2, ListOrdered, Globe, Code } from 'lucide-react';
@@ -26,12 +28,45 @@ function resolveLucideIcon(name: string | undefined, defaultIcon: ReactNode): Re
   return defaultIcon;
 }
 
+export interface PipelineInspectorTarget {
+  pipelineMetadata: PipelineMetadata;
+  targetNodeId?: string;
+  targetCustomLayerId?: string;
+  targetAnnotationGroupId?: string;
+}
+
 export function resolveInspectorComponent(
   appMode?: AppModeState,
   selection?: ActiveSelection,
-  activePlugin?: any
+  activePlugin?: any,
+  pipelineTarget?: PipelineInspectorTarget | null
 ): ReactElement {
-  // 1. Primary mode specific inspector requirements (matching docs/STATE_MACHINE.md §4.2)
+  // 0. Pipeline artifact selection takes highest priority to avoid intermediate inspectors mounting and executing conflicting side effects
+  if (pipelineTarget?.pipelineMetadata) {
+    return (
+      <PipelineInspector
+        pipelineMetadata={pipelineTarget.pipelineMetadata}
+        targetNodeId={pipelineTarget.targetNodeId}
+        targetCustomLayerId={pipelineTarget.targetCustomLayerId}
+        targetAnnotationGroupId={pipelineTarget.targetAnnotationGroupId}
+      />
+    );
+  }
+
+  // 1. Selection-based inspector resolution takes priority when an object is actively selected
+  if (selection?.type === 'custom_layer') {
+    return <CustomLayerInspector />;
+  }
+
+  if (selection?.type === 'annotations') {
+    return <AnnotationInspector />;
+  }
+
+  if (selection?.type === 'nodes') {
+    return <PropertiesPanel />;
+  }
+
+  // 2. Primary mode specific inspector requirements (matching docs/STATE_MACHINE.md §4.2)
   if (appMode?.mode === 'generator_add' || appMode?.mode === 'plugin_interaction') {
     if (activePlugin?.manifest?.category === 'map_layer_generator') {
       return <CustomLayerInspector />;
@@ -47,15 +82,6 @@ export function resolveInspectorComponent(
     return <AnnotationInspector />;
   }
 
-  // 2. Selection-based inspector resolution
-  if (selection?.type === 'custom_layer') {
-    return <CustomLayerInspector />;
-  }
-
-  if (selection?.type === 'annotations') {
-    return <AnnotationInspector />;
-  }
-
   // 3. Default to properties panel (selected waypoint nodes or project settings)
   return <PropertiesPanel />;
 }
@@ -63,21 +89,23 @@ export function resolveInspectorComponent(
 export function useInspectorPanelComponent() {
   const appMode = useAppStore((state) => state.appMode);
   const selection = useAppStore((state) => state.selection);
+  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds) || [];
   const activeTool = useAppStore((state) => state.activeTool);
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const activePluginId = useAppStore((state) => state.activePluginId);
   const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds) || [];
   const plugins = useAppStore((state) => state.plugins) || {};
   const activePlugin = activePluginId ? plugins[activePluginId] : null;
-
-  const effectiveMode: AppModeState =
-    activeTool === 'add_generator' && appMode?.mode !== 'generator_add'
-      ? { mode: 'generator_add', pluginId: activePluginId || '' }
-      : appMode || { mode: 'select' };
+  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const nodes = useAppStore((state) => state.nodes) || {};
+  const annotationGroups = useAppStore((state) => state.annotationGroups) || {};
+  const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
 
   let effectiveSelection: ActiveSelection = selection || { type: 'none' };
   if (effectiveSelection.type === 'none') {
-    if (activeCustomLayerId) {
+    if (selectedNodeIds.length > 0) {
+      effectiveSelection = { type: 'nodes', ids: selectedNodeIds };
+    } else if (activeCustomLayerId) {
       effectiveSelection = {
         type: 'custom_layer',
         layerId: activeCustomLayerId,
@@ -88,7 +116,43 @@ export function useInspectorPanelComponent() {
     }
   }
 
-  return resolveInspectorComponent(effectiveMode, effectiveSelection, activePlugin);
+  // Detect pipeline-bound artifact target
+  let pipelineTarget: PipelineInspectorTarget | null = null;
+  if (effectiveSelection.type === 'custom_layer' && effectiveSelection.layerId) {
+    const layer = customLayers.find((l) => l.id === effectiveSelection.layerId);
+    if (layer?.pipeline_metadata) {
+      pipelineTarget = {
+        pipelineMetadata: layer.pipeline_metadata,
+        targetCustomLayerId: layer.id,
+      };
+    }
+  } else if (effectiveSelection.type === 'nodes' && effectiveSelection.ids.length === 1) {
+    const node = nodes[effectiveSelection.ids[0]];
+    if (node?.pipeline_metadata) {
+      pipelineTarget = {
+        pipelineMetadata: node.pipeline_metadata,
+        targetNodeId: node.id,
+      };
+    }
+  } else if (effectiveSelection.type === 'annotations' && effectiveSelection.ids.length === 1) {
+    const obj = annotationObjects[effectiveSelection.ids[0]];
+    const parentGroup = obj?.group_id ? annotationGroups[obj.group_id] : null;
+    const targetGroup = annotationGroups[effectiveSelection.ids[0]];
+    const metadata = targetGroup?.pipeline_metadata || obj?.pipeline_metadata || parentGroup?.pipeline_metadata;
+    if (metadata) {
+      pipelineTarget = {
+        pipelineMetadata: metadata,
+        targetAnnotationGroupId: targetGroup?.id || parentGroup?.id,
+      };
+    }
+  }
+
+  const effectiveMode: AppModeState =
+    effectiveSelection.type === 'none' && activeTool === 'add_generator' && appMode?.mode !== 'generator_add'
+      ? { mode: 'generator_add', pluginId: activePluginId || '' }
+      : appMode || { mode: 'select' };
+
+  return resolveInspectorComponent(effectiveMode, effectiveSelection, activePlugin, pipelineTarget);
 }
 
 export function resolvePanelTabs(

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { GeneratorNodePanel } from "./properties/GeneratorNodePanel";
+import { PipelineInspector } from "./properties/PipelineInspector";
 import { GroupNodePanel } from "./properties/GroupNodePanel";
 import { IndexGroup } from "./properties/IndexGroup";
 import { TransformGroup } from "./properties/TransformGroup";
@@ -172,6 +173,13 @@ export function PropertiesPanel() {
       else if (copyMenuState.field === "z") anchorRelValForContextMenu = rel.relZ;
       else if (copyMenuState.field === "yaw") anchorRelValForContextMenu = rel.relYaw;
     }
+  }
+
+  // --------------------------------------------------------------------------
+  // PIPELINE GENERATED NODE UI
+  // --------------------------------------------------------------------------
+  if (!isMultiSelection && node?.pipeline_metadata) {
+    return <PipelineInspector pipelineMetadata={node.pipeline_metadata} targetNodeId={node.id} />;
   }
 
   // --------------------------------------------------------------------------

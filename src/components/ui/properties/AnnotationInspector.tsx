@@ -17,6 +17,7 @@ import { ToggleSwitch } from '../common/ToggleSwitch';
 import { PluginPropertyEditor } from '../PluginPropertyEditor';
 import { PluginInputEditor } from '../PluginInputEditor';
 import { PluginDataViewer } from '../common/PluginDataViewer';
+import { PipelineInspector } from './PipelineInspector';
 import {
   Palette,
   Trash2,
@@ -289,12 +290,26 @@ export function AnnotationInspector() {
 
   const selectedId = selectedAnnotationIds[0];
 
+  const targetGroup = annotationGroups[selectedId];
+  const obj = annotationObjects[selectedId];
+  const parentGroup = obj?.group_id ? annotationGroups[obj.group_id] : null;
+  const pipelineMeta =
+    targetGroup?.pipeline_metadata || obj?.pipeline_metadata || parentGroup?.pipeline_metadata;
+
+  if (pipelineMeta) {
+    return (
+      <PipelineInspector
+        pipelineMetadata={pipelineMeta}
+        targetAnnotationGroupId={targetGroup?.id || parentGroup?.id || selectedId}
+      />
+    );
+  }
+
   // If a group is selected, show group inspector
   if (annotationGroups[selectedId]) {
     return <AnnotationGroupPanel group={annotationGroups[selectedId]} />;
   }
 
-  const obj = annotationObjects[selectedId];
   if (!obj) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">

@@ -17,8 +17,15 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
   const plugins = useAppStore(state => state.plugins);
   const activePluginId = useAppStore(state => state.activePluginId);
   const pluginActiveProperties = useAppStore(state => state.pluginActiveProperties);
+  const activeCustomLayerId = useAppStore(state => state.activeCustomLayerId);
+  const activePipelineInputRef = useAppStore(state => state.activePipelineInputRef);
 
-  const shouldRender = activeTool === 'add_generator' || (selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator');
+  const shouldRender =
+    activeTool === 'add_generator' ||
+    Boolean(activePipelineInputRef) ||
+    Boolean(activeCustomLayerId) ||
+    (selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator') ||
+    (selectedNodeIds.length === 1 && Boolean(nodes[selectedNodeIds[0]]?.pipeline_metadata));
   if (!shouldRender) return null;
 
   return (
