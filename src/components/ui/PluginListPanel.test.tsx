@@ -19,6 +19,8 @@ vi.mock('lucide-react', () => ({
   ExternalLink: () => <div data-testid="link-icon" />,
   Zap: () => <div data-testid="zap-icon" />,
   Settings: () => <div data-testid="settings-icon" />,
+  AlertTriangle: () => <div data-testid="alert-triangle-icon" />,
+  Workflow: () => <div data-testid="workflow-icon" />,
 }));
 
 describe('PluginListPanel', () => {
@@ -98,5 +100,57 @@ describe('PluginListPanel', () => {
       pluginSettings: { corrupted: true } as any,
     });
     expect(() => render(<PluginListPanel />)).not.toThrow();
+  });
+
+  it('filters pipelines and renders pipeline badge and dependency issue warning', () => {
+    const pipelinePlugins = {
+      'p-1': {
+        id: 'p-1',
+        manifest: { name: 'Step 1 Plugin', version: '1.0.0', type: 'python', category: 'path' }
+      },
+      'pipeline-test': {
+        id: 'pipeline-test',
+        manifest: {
+          name: 'My Pipeline',
+          type: 'pipeline',
+          pipeline: {
+            steps: [
+              { step_id: 'step1', plugin_id: 'p-1' },
+              { step_id: 'step2', plugin_id: 'missing-plugin' }
+            ]
+          }
+        }
+      }
+    };
+    const settings = [
+      { id: 'p-1', enabled: true },
+      { id: 'pipeline-test', enabled: true }
+    ];
+
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      plugins: pipelinePlugins,
+      pluginSettings: settings,
+      activePluginId: null,
+      activeTool: 'select',
+      setActiveTool: mockSetActiveTool,
+      setActivePlugin: mockSetActivePlugin,
+      setSettingsModalOpen: mockSetSettingsModalOpen,
+      selectNodes: mockSelectNodes,
+      setRightPanelActiveTab: mockSetRightPanelActiveTab,
+      setRightPanelOpen: mockSetRightPanelOpen,
+    }));
+
+    render(<PluginListPanel />);
+
+    // Click Pipelines tab
+    const pipelineTab = screen.getByRole('button', { name: 'Pipelines' });
+    expect(pipelineTab.querySelector('[data-testid="workflow-icon"]')).toBeInTheDocument();
+    fireEvent.click(pipelineTab);
+
+    expect(screen.getByText('My Pipeline')).toBeInTheDocument();
+    expect(screen.queryByText('Step 1 Plugin')).not.toBeInTheDocument();
+    expect(screen.getByText('pipeline')).toBeInTheDocument();
+    // Because 'missing-plugin' is missing, dependency issue indicator is displayed
+    expect(screen.getByText('Issue')).toBeInTheDocument();
   });
 });

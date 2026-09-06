@@ -36,6 +36,12 @@ vi.mock('lucide-react', () => ({
   X: () => <div data-testid="close-icon" />,
   AlertCircle: () => <div data-testid="alert-icon" />,
   RefreshCcw: () => <div data-testid="refresh-icon" />,
+  Workflow: () => <div data-testid="workflow-icon" />,
+  Loader2: () => <div data-testid="loader-icon" />,
+  ChevronDown: () => <div data-testid="chevron-down-icon" />,
+  ChevronRight: () => <div data-testid="chevron-right-icon" />,
+  ArrowRightLeft: () => <div data-testid="arrow-right-left-icon" />,
+  CheckCircle2: () => <div data-testid="check-circle-icon" />,
 }));
 
 describe('PluginParamsPanel', () => {
@@ -254,5 +260,52 @@ describe('PluginParamsPanel', () => {
         ])
       );
     });
+  });
+
+  it('renders PipelineSetupView when active plugin type is pipeline', () => {
+    const pipelinePlugin = {
+      id: 'test-pipe',
+      manifest: {
+        name: 'Combined Pipeline',
+        type: 'pipeline',
+        pipeline: {
+          steps: [
+            { step_id: 's1', plugin_id: 'test-plugin', name: 'Inner Generator' }
+          ]
+        }
+      }
+    };
+
+    const state = {
+      activeTool: 'add_generator',
+      activePluginId: 'test-pipe',
+      plugins: { 'test-pipe': pipelinePlugin, 'test-plugin': mockPlugin },
+      pluginSettings: [{ id: 'test-pipe', enabled: true }],
+      pluginInteractionData: {},
+      activeInputIndex: 0,
+      activePipelineInputRef: null,
+      nodes: {},
+      rootNodeIds: [],
+      selectedNodeIds: [],
+      customLayers: [],
+      annotationGroups: {},
+      decimalPrecision: 2,
+      runWithLoading: async (_: any, fn: any) => await fn(),
+      executePipeline: vi.fn(),
+      setActivePipelineInputRef: vi.fn(),
+      setActiveTool: vi.fn(),
+      setActiveInputIndex: vi.fn(),
+      updatePluginInteractionData: vi.fn(),
+      setPluginActiveProperties: vi.fn(),
+    };
+
+    (useAppStore as any).mockImplementation((selector: any) => selector(state));
+    (useAppStore.getState as any).mockReturnValue(state);
+
+    render(<PluginParamsPanel />);
+
+    expect(screen.getByText('Combined Pipeline')).toBeInTheDocument();
+    expect(screen.getByText('Pipeline Workflow')).toBeInTheDocument();
+    expect(screen.getByText('Inner Generator')).toBeInTheDocument();
   });
 });

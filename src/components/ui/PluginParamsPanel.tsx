@@ -7,6 +7,7 @@ import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
 import { Label } from "./common/Label";
 import { AlertBox } from "./common/AlertBox";
+import { PipelineSetupView } from "./pipeline/PipelineSetupView";
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
@@ -33,7 +34,7 @@ export function PluginParamsPanel() {
 
   useEffect(() => {
     // Reset params when different plugin selected
-    if (plugin) {
+    if (plugin && plugin.manifest.type !== 'pipeline') {
       const initialParams: Record<string, any> = {};
       const inputs = plugin.manifest.inputs || [];
       inputs.forEach((inp) => {
@@ -56,13 +57,13 @@ export function PluginParamsPanel() {
 
   // Sync all param values to the global store so MapCanvas can use them for interaction hints
   useEffect(() => {
-    if (!plugin) return;
+    if (!plugin || plugin.manifest.type === 'pipeline') return;
     useAppStore.getState().setPluginActiveProperties(params);
   }, [params, plugin]);
 
   // Auto-advance to next unset input when current input is completed
   useEffect(() => {
-    if (!plugin || activeTool !== "add_generator") return;
+    if (!plugin || plugin.manifest.type === 'pipeline' || activeTool !== "add_generator") return;
     const inputs = plugin.manifest.inputs || [];
     if (inputs.length <= 1) return;
 
@@ -94,6 +95,10 @@ export function PluginParamsPanel() {
 
   if (activeTool !== "add_generator" || !plugin) {
     return null;
+  }
+
+  if (plugin.manifest.type === "pipeline") {
+    return <PipelineSetupView plugin={plugin} />;
   }
 
   // Handle runtime undefined manifest issues gracefully
