@@ -129,7 +129,7 @@
   - **概要**: 画面左端に配置されるメインツール切り替えバー (Select, Add Waypoint, Export Region, Import/Export/Settings等)。
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/LayerPanel.tsx))
-  - **概要**: ロード中のマップレイヤー管理パネル（表示切り替え、不透明度調整、順序追加・削除）。
+  - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。詳細パラメータは設定トグルボタンによる展開プルダウン内に集約（MapLayer: ロード時YAML基準の相対位置姿勢ΔX/ΔY/ΔYaw編集・クイック回転・リセット、不透明度・ブレンドモード調整、占有閾値設定 / CustomLayer: 不透明度、ブレンドモード、参照レイヤー時の合成除外案内、オブジェクト数表示 / ExportRegion: 領域矩形座標 X/Y/Width/Height の数値編集）。
   - **主要Props**: なし
 - **`ObjectsPanel`** ([`src/components/ui/ObjectsPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ObjectsPanel.tsx))
   - **概要**: ウェイポイントツリー (`WaypointTree`) とアノテーション一覧 (`AnnotationTree`) を統合してホストする左サイドバーのメインオブジェクトパネル。
