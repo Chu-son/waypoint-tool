@@ -84,6 +84,8 @@ Tailwind CSSのクラス文字列を直接JSXに長く書くことは、可読�
 3. **計算されたオフホワイト階層**: 眩しさを抑え長時間の作業負荷を軽減するため、キャンバス基底に `#f7f8f9`、浮き上がるパネルに純白 `#ffffff`、静かなホバーに `#f0f1f4` を採用。
 4. **深いチャコールブラック**: 生の純黒（`#000000`）を避け、`#17171a`（ベーステキスト）および `#686b74`（ミューテッド）で洗練された高級感と高コントラストを両立。
 5. **テーマ切り替えと永続化**: SettingsModal（General タブ）のテーマセレクターから即座に Dark / Light の切り替えが可能であり、Zustand の `persist` ミドルウェアによってローカルストレージへ安全に永続化されます。
+6. **アクセントテーマ自由選択**: ライトモード時もダークモードと同様に各アクセントカラー（Indigo, Emerald, Ocean, Amber, Purple, Midnight）を自由に選択可能です。Linear Light のクリーンな白・オフホワイト階層と、各色に対応したコントラスト最適化済みのホバー色（例: Emerald では `#059669`）が自動合成されます。
+7. **CAD / RViz 方式の高コントラストキャンバス**: UIがライトモードであっても、ROS 2D占有グリッドマップ（空き領域が白 254）や明るいウェイポイントの視認性を最大化するため、キャンバス描画領域は常に視認性の高いダークチャコール（`CANVAS_SURFACE_BASE` = `#090a0c`）を維持します（CAD・RViz・Foxglove・Blender方式）。
 
 ---
 
@@ -131,7 +133,7 @@ Tailwind CSSのクラス文字列を直接JSXに長く書くことは、可読�
 キャンバスレイヤー側の描画色も UI デザイントークンと厳密に同期させるため、[`canvasConstants.ts`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/canvasConstants.ts) で定義された共通定数を使用してください。
 
 - `CANVAS_ACCENT_COLOR` (`0x5e6ad2` / `#5e6ad2`): 選択状態、矩形選択枠、スナップガイド、回転ハンドル
-- `CANVAS_SURFACE_BASE` (`0x090a0c` / `#090a0c`): マップ非ロード時のキャンバス背景
+- `CANVAS_SURFACE_BASE` (`0x090a0c` / `#090a0c`): キャンバス描画領域の背景。ライトモード時もCAD・RVizプロツール同様に高コントラストを維持するためダークチャコールが適用されます。
 - `CANVAS_PREVIEW_COLOR` (`0x8a8f98` / `#8a8f98`): 生成プレビューや下書き状態
 - キャンバスレイヤー内でのハードコード色（`0x3b82f6` や `0x1e293b` 等）の直書きは禁止です。
 
@@ -357,3 +359,42 @@ export function CustomEditOverlay() {
 - モーダル全体は `w-[90vw] max-w-* max-h-[90vh] flex flex-col` を基本とし、ヘッダー・フッターを固定、コンテンツ領域のみを `overflow-y-auto flex-1` とすること。
 - モーダルコンテンツのパディングは固定値（`p-8`）を避け、レスポンシブクラス（`p-4 sm:p-6 md:p-8`）を使用すること。
 - サイドバー付きモーダル（`SettingsModal` 等）は、狭画面でサイドバーとコンテンツが無理なく収まるようにサイドバー幅を `w-40 sm:w-52 md:w-56`、タブボタンを `truncate` に対応させること。
+
+---
+
+## 6. 新規カラーテーマ追加規約 (Linear Style Theme Authoring Guide)
+
+今後開発者やユーザーが新しいテーマを追加・提案する際は、以下の**「Linear Style 5つの黄金律」**に必ず準拠してください。
+
+### 新テーマ追加のための 5 つの黄金律
+
+1. **基底サーフェス彩度制限律 (Saturation < 5%)**:
+   - `surfaceBase` と `surfacePanel` は彩度 (Saturation) を 5% 未満のディープチャコール (明度 3〜8%) に抑えること。画面全体が原色に染まる「ネオンテーマ」やベタ塗りカラー背景は禁止します。
+2. **文字ニュートラル不変律 (Neutral Text Invariance)**:
+   - `textBase` (`#f7f8f8`) および `textMuted` (`#8a8f98`) はすべてのダークテーマで同一のニュートラル値を保つこと。テーマのアクセントカラーを本文テキストに着色（緑文字、紫文字など）してはなりません。
+3. **1px ヘアライン半透明枠線律**:
+   - `borderBase` は原則透過アルファ `rgba(255, 255, 255, 0.08)` を使用し、太いベタ塗り枠線や高彩度の枠線を避けること。
+4. **アクセントコントラスト律 (WCAG AA 準拠)**:
+   - `primaryBase` は `surfaceBase` に対して十分なコントラスト比（4.5:1 以上）を持つこと。ホバー状態はダークモードでは明度を持ち上げ、ライトモードでは明度を深める（暗くする）こと。
+5. **キャンバス・PixiJS 整合性**:
+   - キャンバス描画領域の背景色は、ROSマップ（白領域=254）とのハイコントラストを担保するため常にダークチャコール（`CANVAS_SURFACE_BASE` = `0x090a0c`）を維持します（CAD・RViz方式。`customUiConfig` で明示的に `surfaceBase` が指定された場合を除く）。選択枠・ハンドルは `primaryBase` と調和させること。
+
+### 確定プリセット一覧表
+
+| プリセット名 | 表示名 | メイン色 (Primary) | ホバー色 (Hover) | 基底背景 (surfaceBase) | パネル背景 (surfacePanel) | 枠線 (borderBase) |
+|---|---|---|---|---|---|---|
+| **`default`** | Linear Indigo | `#5e6ad2` | `#6f7be8` | `#090a0c` | `#121316` | `rgba(255, 255, 255, 0.08)` |
+| **`emerald`** (`roomba`) | Emerald | `#10b981` | `#34d399` | `#080c0a` | `#101512` | `rgba(255, 255, 255, 0.08)` |
+| **`ocean`** | Ocean | `#0ea5e9` | `#38bdf8` | `#080a0f` | `#0f131a` | `rgba(255, 255, 255, 0.08)` |
+| **`amber`** | Amber | `#f59e0b` | `#fbbf24` | `#0c0a09` | `#161311` | `rgba(255, 255, 255, 0.08)` |
+| **`purple`** | Purple | `#8b5cf6` | `#a78bfa` | `#09080e` | `#121018` | `rgba(255, 255, 255, 0.08)` |
+| **`midnight`** | Midnight (OLED) | `#06b6d4` | `#22d3ee` | `#000000` | `#0c0c0d` | `rgba(255, 255, 255, 0.08)` |
+| **`light`** | Linear Light | `#5e6ad2` | `#4b55c0` | `#f7f8f9` | `#ffffff` | `#e2e4e8` |
+
+### テーマ追加時のチェックリスト
+- [ ] `src/utils/themePresets.ts` の `THEME_PRESETS` に定義を追加したか
+- [ ] ダークテーマの場合、`DARK_THEME_PRESETS` メタデータ配列に項目を追加したか
+- [ ] `textBase` は `#f7f8f8`、`textMuted` は `#8a8f98` に保たれているか
+- [ ] `borderBase` は `rgba(255, 255, 255, 0.08)` に設定されているか
+- [ ] `src/utils/themePresets.test.ts` でテストを追加・実行したか
+

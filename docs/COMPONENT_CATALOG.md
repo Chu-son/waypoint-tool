@@ -174,7 +174,7 @@
   - **概要**: ツール起動時およびファイルメニューから呼び出せるプロジェクト選択・ウェルカム画面。新規作成、既存プロジェクトを開く、直近開いたプロジェクト一覧のロードを提供。
   - **主要Props**: `isOpen`, `onClose`
 - **`ThemeInjector`** ([`src/components/ui/ThemeInjector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ThemeInjector.tsx))
-  - **概要**: `customUiConfig.theme` に定義されたカラープリセット、カスタムCSS変数、動的 `color-scheme` を DOM の `:root` に注入し、アンマウント時にクリーンアップするインジェクターコンポーネント。
+  - **概要**: `themeMode`（Linear Dark / Light）、アクセントテーマ用プリセット（`themePreset`: Indigo / Emerald / Ocean / Amber / Purple / Midnight）、および Custom UI（`customUiConfig.theme`）のカラープリセット・カスタムCSS変数・`color-scheme` を DOM の `:root` に注入し、アンマウント時にクリーンアップするインジェクターコンポーネント。
   - **主要Props**: なし
 - **`WorkflowPanel`** ([`src/components/ui/WorkflowPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WorkflowPanel.tsx))
   - **概要**: Custom UI モード時にステップバイステップの作業手順をガイドするワークフローパネル。各ステップのアクションボタン、簡易パラメータ、プラグイン入力フォームを表示。
