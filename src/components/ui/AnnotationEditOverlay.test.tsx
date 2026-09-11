@@ -12,7 +12,9 @@ describe('AnnotationEditOverlay', () => {
     vi.clearAllMocks();
     useAppStore.setState({
       isAnnotationEditMode: false,
+      isCustomUiMode: false,
       activeAnnotationSubTool: 'point',
+      allowedAnnotationSubTools: null,
       defaultAnnotationColor: '#3B82F6',
       selectedAnnotationIds: [],
       annotationObjects: {},
@@ -45,6 +47,7 @@ describe('AnnotationEditOverlay', () => {
   it('filters tools when allowedAnnotationSubTools is provided', () => {
     useAppStore.setState({
       isAnnotationEditMode: true,
+      isCustomUiMode: true,
       allowedAnnotationSubTools: ['point', 'rect'],
     });
     render(<AnnotationEditOverlay />);
@@ -54,6 +57,21 @@ describe('AnnotationEditOverlay', () => {
     expect(screen.queryByText('三角 (Oriented)')).not.toBeInTheDocument();
     expect(screen.queryByText('線分 (Line)')).not.toBeInTheDocument();
     expect(screen.queryByText('円形 (Circle)')).not.toBeInTheDocument();
+  });
+
+  it('shows all tools in standard UI when allowedAnnotationSubTools remains set', () => {
+    useAppStore.setState({
+      isAnnotationEditMode: true,
+      isCustomUiMode: false,
+      allowedAnnotationSubTools: ['point'],
+    });
+    render(<AnnotationEditOverlay />);
+    expect(screen.getByText('丸 (Point)')).toBeInTheDocument();
+    expect(screen.getByText('三角 (Oriented)')).toBeInTheDocument();
+    expect(screen.getByText('線分 (Line)')).toBeInTheDocument();
+    expect(screen.getByText('矩形 (Rect)')).toBeInTheDocument();
+    expect(screen.getByText('円形 (Circle)')).toBeInTheDocument();
+    expect(screen.getByText('選択')).toBeInTheDocument();
   });
 
   it('automatically exits annotation edit mode when activeTool is switched to non-select tool', () => {

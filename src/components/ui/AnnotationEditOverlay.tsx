@@ -10,6 +10,7 @@ import { ANNOTATION_COLOR_PRESETS } from '../../utils/colorPresets';
 
 export function AnnotationEditOverlay() {
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
+  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const setAnnotationEditMode = useAppStore((state) => state.setAnnotationEditMode);
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
   const allowedAnnotationSubTools = useAppStore((state) => state.allowedAnnotationSubTools);
@@ -55,7 +56,7 @@ export function AnnotationEditOverlay() {
     { type: 'select', label: '選択', shortLabel: '選択', icon: <MousePointer size={14} /> },
   ];
 
-  const subtools = allowedAnnotationSubTools && allowedAnnotationSubTools.length > 0
+  const subtools = isCustomUiMode && allowedAnnotationSubTools && allowedAnnotationSubTools.length > 0
     ? allSubtools.filter((st) => st.type === 'select' || allowedAnnotationSubTools.includes(st.type))
     : allSubtools;
 
