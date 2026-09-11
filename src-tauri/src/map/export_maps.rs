@@ -4,7 +4,6 @@ use std::fs;
 use std::path::Path;
 use image::{codecs::pnm, ImageEncoder, ExtendedColorType};
 use base64::{engine::general_purpose, Engine as _};
-use crate::models::MapInfo;
 use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
 
 #[derive(Debug, Deserialize)]
@@ -39,10 +38,16 @@ pub struct ExportLayer {
     pub id: String,
     pub name: String,
     pub image_base64: Option<String>,
-    pub info: Option<MapInfo>,
+    pub info: Option<ExportLayerInfo>,
     pub opacity: f64,
     pub blend_mode: String,
     pub z_index: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExportLayerInfo {
+    pub resolution: f64,
+    pub origin: [f64; 3],
 }
 
 pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
@@ -166,4 +171,41 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_options_without_unused_map_info_fields() {
+        let json = r#"
+        {
+            "saveDir": "/tmp/export",
+            "format": "png_only",
+            "mapListFilename": null,
+            "regions": [],
+            "layers": [
+                {
+                    "id": "map-1",
+                    "name": "Map 1",
+                    "image_base64": "data:image/png;base64,AA==",
+                    "info": {
+                        "resolution": 0.05,
+                        "origin": [1.0, 2.0, 0.0]
+                    },
+                    "opacity": 1.0,
+                    "blend_mode": "overwrite",
+                    "z_index": 0
+                }
+            ]
+        }
+        "#;
+
+        let options: ExportMapsOptions = serde_json::from_str(json).unwrap();
+        let info = options.layers[0].info.as_ref().unwrap();
+
+        assert_eq!(info.resolution, 0.05);
+        assert_eq!(info.origin, [1.0, 2.0, 0.0]);
+    }
 }
