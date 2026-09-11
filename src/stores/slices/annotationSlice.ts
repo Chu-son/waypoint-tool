@@ -8,6 +8,10 @@ import {
   getNextSequentialName,
 } from '../../utils/treeUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
+import {
+  resolveMapElementName,
+} from '../../utils/mapElementTreeUtils';
+import { AnnotationClipboardPayload } from '../../utils/mapElementClipboard';
 
 export type AnnotationToolType = 'select' | 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
 
@@ -53,6 +57,7 @@ export interface AnnotationSlice {
   toggleAnnotationGroupVisibility: (groupId: string) => void;
   toggleAnnotationLabelVisibility: (id: string) => void;
   duplicateAnnotations: (ids: string[]) => string[];
+  pasteAnnotations: (payload: AnnotationClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setAnnotationObjects: (objects: AnnotationObject[], groups?: AnnotationGroup[], rootIds?: string[]) => void;
 }
 
@@ -727,7 +732,14 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       const nextGroups = { ...state.annotationGroups };
       const nextRootIds = [...state.rootAnnotationIds];
 
-      // オブジェクトのディープコピー＆オフセット
+      const existingNames = new Set([
+        ...Object.values(state.annotationObjects).map((o) => o.name),
+        ...Object.values(state.annotationGroups).map((g) => g.name),
+      ].filter(Boolean) as string[]);
+
+      const createdObjectIds: string[] = [];
+
+      // オブジェクトのディープコピー（オフセットなし）
       const cloneObject = (origId: string, parentGroupId?: string): AnnotationObject | null => {
         const orig = state.annotationObjects[origId];
         if (!orig) return null;
@@ -736,24 +748,14 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         const dup: AnnotationObject = {
           ...structuredClone(orig),
           id: newId,
-          name: `${orig.name} (Copy)`,
+          name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: true }) || `${orig.name} (Copy)`,
           group_id: parentGroupId,
         };
 
-        if (dup.type === 'point' || dup.type === 'oriented_point') {
-          dup.x += 0.5;
-          dup.y += 0.5;
-        } else if (dup.type === 'line') {
-          dup.x1 += 0.5;
-          dup.y1 += 0.5;
-          dup.x2 += 0.5;
-          dup.y2 += 0.5;
-        } else if (dup.type === 'rect' || dup.type === 'circle') {
-          dup.cx += 0.5;
-          dup.cy += 0.5;
-        }
+        // オフセットは加算せず元座標を維持
 
         nextObjects[newId] = dup;
+        createdObjectIds.push(newId);
         return dup;
       };
 
@@ -780,7 +782,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         const dupGroup: AnnotationGroup = {
           ...structuredClone(orig),
           id: newId,
-          name: `${orig.name} (Copy)`,
+          name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: true }) || `${orig.name} (Copy)`,
           parent_id: parentGroupId,
           children_ids: newChildIds,
         };
@@ -848,6 +850,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         annotationObjects: nextObjects,
         annotationGroups: nextGroups,
         rootAnnotationIds: nextRootIds,
+        annotationOrder: [...state.annotationOrder, ...createdObjectIds],
         selectedAnnotationIds: createdTopLevelIds,
         selection: createdTopLevelIds.length > 0 ? { type: 'annotations', ids: createdTopLevelIds } : { type: 'none' },
         selectedNodeIds: [],
@@ -857,6 +860,136 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
     });
 
     return createdTopLevelIds;
+  },
+
+  pasteAnnotations: (payload: AnnotationClipboardPayload, options?: { asGroup?: boolean }) => {
+    if (!payload || !payload.topLevelIds || payload.topLevelIds.length === 0) return [];
+    get().pushHistorySnapshot();
+
+    let finalTopLevelIds: string[] = [];
+
+    set((state) => {
+      const nextObjects = { ...state.annotationObjects };
+      const nextGroups = { ...state.annotationGroups };
+      let nextRootIds = [...state.rootAnnotationIds];
+
+      const existingNames = new Set([
+        ...Object.values(state.annotationObjects).map((o) => o.name),
+        ...Object.values(state.annotationGroups).map((g) => g.name),
+      ].filter(Boolean) as string[]);
+
+      // 1. 全要素に新規UUIDを発行
+      const idMap = new Map<string, string>();
+      Object.keys(payload.annotationObjects).forEach((oid) => idMap.set(oid, uuidv4()));
+      Object.keys(payload.annotationGroups).forEach((gid) => idMap.set(gid, uuidv4()));
+
+      // 2. オブジェクトのクローン
+      const newObjectIds: string[] = [];
+      Object.entries(payload.annotationObjects).forEach(([oldId, orig]) => {
+        const newId = idMap.get(oldId)!;
+        newObjectIds.push(newId);
+        const newGroupId = orig.group_id ? idMap.get(orig.group_id) : undefined;
+        const cloned: AnnotationObject = {
+          ...structuredClone(orig),
+          id: newId,
+          group_id: newGroupId,
+          name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: false }) || orig.name,
+        };
+        nextObjects[newId] = cloned;
+      });
+
+      // 3. グループのクローン
+      Object.entries(payload.annotationGroups).forEach(([oldId, orig]) => {
+        const newId = idMap.get(oldId)!;
+        const newParentId = orig.parent_id ? idMap.get(orig.parent_id) : undefined;
+        const newChildIds = (orig.children_ids || [])
+          .map((cid) => idMap.get(cid) || cid)
+          .filter(Boolean);
+
+        const cloned: AnnotationGroup = {
+          ...structuredClone(orig),
+          id: newId,
+          parent_id: newParentId,
+          children_ids: newChildIds,
+          name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: false }) || orig.name,
+        };
+        nextGroups[newId] = cloned;
+      });
+
+      let insertTopLevelIds = payload.topLevelIds.map((tid) => idMap.get(tid)!).filter(Boolean);
+
+      // 4. asGroup オプション対応: 新規グループでまとめる
+      if (options?.asGroup) {
+        const newGroupId = uuidv4();
+        const existingGroupNames = Object.values(state.annotationGroups).map((g) => g.name).filter(Boolean);
+        const groupName = getNextSequentialName('Group', existingGroupNames);
+
+        const group: AnnotationGroup = {
+          id: newGroupId,
+          type: 'manual_group',
+          name: groupName,
+          visible: true,
+          children_ids: insertTopLevelIds,
+        };
+
+        // 各トップレベル要素の親を新グループに紐付け
+        insertTopLevelIds.forEach((id) => {
+          if (nextObjects[id]) nextObjects[id].group_id = newGroupId;
+          if (nextGroups[id]) nextGroups[id].parent_id = newGroupId;
+        });
+
+        nextGroups[newGroupId] = group;
+        insertTopLevelIds = [newGroupId];
+      }
+
+      finalTopLevelIds = insertTopLevelIds;
+
+      // 5. 挿入位置の決定
+      // 単一グループ選択中ならそのグループの末尾へ挿入
+      if (state.selectedAnnotationIds.length === 1) {
+        const selId = state.selectedAnnotationIds[0];
+        if (nextGroups[selId]) {
+          const grp = nextGroups[selId];
+          const children = [...(grp.children_ids || []), ...insertTopLevelIds];
+          insertTopLevelIds.forEach((id) => {
+            if (nextObjects[id]) nextObjects[id].group_id = selId;
+            if (nextGroups[id]) nextGroups[id].parent_id = selId;
+          });
+          nextGroups[selId] = { ...grp, children_ids: children };
+        } else if (nextObjects[selId] && nextObjects[selId].group_id && nextGroups[nextObjects[selId].group_id!]) {
+          const parentGid = nextObjects[selId].group_id!;
+          const grp = nextGroups[parentGid];
+          const children = [...(grp.children_ids || [])];
+          const idx = children.indexOf(selId);
+          children.splice(idx !== -1 ? idx + 1 : children.length, 0, ...insertTopLevelIds);
+          insertTopLevelIds.forEach((id) => {
+            if (nextObjects[id]) nextObjects[id].group_id = parentGid;
+            if (nextGroups[id]) nextGroups[id].parent_id = parentGid;
+          });
+          nextGroups[parentGid] = { ...grp, children_ids: children };
+        } else {
+          const idx = nextRootIds.indexOf(selId);
+          nextRootIds.splice(idx !== -1 ? idx + 1 : nextRootIds.length, 0, ...insertTopLevelIds);
+        }
+      } else {
+        // 未選択または複数選択ならルートの末尾へ挿入
+        nextRootIds.push(...insertTopLevelIds);
+      }
+
+      return {
+        annotationObjects: nextObjects,
+        annotationGroups: nextGroups,
+        rootAnnotationIds: nextRootIds,
+        annotationOrder: [...state.annotationOrder, ...newObjectIds],
+        selectedAnnotationIds: finalTopLevelIds,
+        selection: finalTopLevelIds.length > 0 ? { type: 'annotations', ids: finalTopLevelIds } : { type: 'none' },
+        selectedNodeIds: [],
+        activeCustomLayerId: null,
+        isDirty: true,
+      };
+    });
+
+    return finalTopLevelIds;
   },
 
   setAnnotationObjects: (objects: AnnotationObject[], groups?: AnnotationGroup[], rootIds?: string[]) => {

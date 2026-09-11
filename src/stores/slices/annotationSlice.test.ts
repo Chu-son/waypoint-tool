@@ -157,7 +157,7 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
   });
 
   describe('duplicateAnnotations', () => {
-    it('duplicates single and multiple annotation objects with offset and Copy suffix', () => {
+    it('duplicates single and multiple annotation objects without offset (same coordinates) and Copy suffix', () => {
       const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 10, y: 20, visible: true, labelVisible: true };
 
       useAppStore.setState({
@@ -174,11 +174,52 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
 
       const dup = state.annotationObjects[newIds[0]] as PointAnnotation;
       expect(dup.name).toBe('P1 (Copy)');
-      expect(dup.x).toBe(10.5);
-      expect(dup.y).toBe(20.5);
+      expect(dup.x).toBe(10);
+      expect(dup.y).toBe(20);
     });
 
-    it('duplicates a group recursively along with its children', () => {
+    it('pastes annotations preserving coordinates and handles asGroup', () => {
+      useAppStore.setState({
+        annotationObjects: {},
+        annotationGroups: {},
+        rootAnnotationIds: [],
+        selectedAnnotationIds: [],
+        annotationOrder: [],
+      });
+
+      const payload = {
+        elementType: 'annotation' as const,
+        topLevelIds: ['p1', 'p2'],
+        annotationObjects: {
+          p1: { id: 'p1', type: 'point' as const, name: 'P1', x: 12, y: 34, visible: true, labelVisible: true },
+          p2: { id: 'p2', type: 'point' as const, name: 'P2', x: 56, y: 78, visible: true, labelVisible: true },
+        },
+        annotationGroups: {},
+      };
+
+      // 1. Normal paste
+      const normalIds = useAppStore.getState().pasteAnnotations(payload);
+      expect(normalIds).toHaveLength(2);
+      const state1 = useAppStore.getState();
+      expect((state1.annotationObjects[normalIds[0]] as PointAnnotation).x).toBe(12);
+      expect((state1.annotationObjects[normalIds[0]] as PointAnnotation).y).toBe(34);
+      expect(state1.annotationOrder).toEqual(normalIds);
+
+      // 2. Paste as Group
+      const groupResultIds = useAppStore.getState().pasteAnnotations(payload, { asGroup: true });
+      expect(groupResultIds).toHaveLength(1);
+      const groupId = groupResultIds[0];
+      const state2 = useAppStore.getState();
+      const grp = state2.annotationGroups[groupId];
+      expect(grp).toBeDefined();
+      expect(grp.type).toBe('manual_group');
+      expect(grp.name).toBe('Group 1');
+      expect(grp.children_ids).toHaveLength(2);
+      expect(state2.selectedAnnotationIds).toEqual([groupId]);
+      expect(state2.annotationOrder).toHaveLength(4); // 2 from first paste + 2 from second paste
+    });
+
+    it('duplicates a group recursively along with its children and syncs annotationOrder', () => {
       const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true, group_id: 'g1' };
       const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p1'], visible: true };
 
@@ -186,6 +227,7 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
         annotationObjects: { p1 },
         annotationGroups: { g1: grp },
         rootAnnotationIds: ['g1'],
+        annotationOrder: ['p1'],
       });
 
       const newIds = useAppStore.getState().duplicateAnnotations(['g1']);
@@ -203,6 +245,7 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
       expect(dupChild).toBeDefined();
       expect(dupChild.name).toBe('P1 (Copy)');
       expect(dupChild.group_id).toBe(newGroupId);
+      expect(state.annotationOrder).toEqual(['p1', dupChildId]);
     });
   });
 });

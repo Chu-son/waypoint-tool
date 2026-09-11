@@ -15,6 +15,8 @@ import {
   ArrowDownToLine,
   X,
   Target,
+  Scissors,
+  ClipboardPaste,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import {
@@ -341,11 +343,14 @@ export function WaypointTree() {
   const setElementCopyState = useAppStore((state) => state.setElementCopyState);
   const insertionTarget = useAppStore((state) => state.insertionTarget);
   const setInsertionTarget = useAppStore((state) => state.setInsertionTarget);
+  const copySelectedMapElements = useAppStore((state) => state.copySelectedMapElements);
+  const cutSelectedMapElements = useAppStore((state) => state.cutSelectedMapElements);
+  const pasteMapElements = useAppStore((state) => state.pasteMapElements);
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string | null; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -561,6 +566,7 @@ export function WaypointTree() {
   });
 
   const handleContextMenu = (e: React.MouseEvent, nodeId: string) => {
+    e.stopPropagation();
     handleItemContextMenu(e, nodeId);
     setContextMenu({ nodeId, x: e.clientX, y: e.clientY });
   };
@@ -568,7 +574,7 @@ export function WaypointTree() {
   const handleCreateGroup = () => {
     const targetIds = selectedNodeIds.length > 0
       ? selectedNodeIds
-      : contextMenu ? [contextMenu.nodeId] : [];
+      : contextMenu?.nodeId ? [contextMenu.nodeId] : [];
     if (targetIds.length === 0) return;
 
     const newGroupId = groupNodes(targetIds);
@@ -662,7 +668,13 @@ export function WaypointTree() {
   const activeDragNode = activeDragId ? nodes[activeDragId] : null;
 
   return (
-    <div className="w-full flex flex-col space-y-2 relative">
+    <div
+      className="w-full flex flex-col space-y-2 relative min-h-[120px]"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setContextMenu({ nodeId: null, x: e.clientX, y: e.clientY });
+      }}
+    >
       {/* Header Bar */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
@@ -768,12 +780,41 @@ export function WaypointTree() {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           className="fixed z-[9999] bg-surface-panel border border-border-base rounded-xl shadow-xl py-1 min-w-[190px] text-xs text-text-base select-none backdrop-blur-md flex flex-col gap-0.5"
         >
-          {(() => {
-            const targetNode = nodes[contextMenu.nodeId];
+          {contextMenu.nodeId === null ? (
+            <>
+              {/* 貼り付け (Paste) */}
+              <button
+                onClick={() => {
+                  pasteMapElements({ asGroup: false });
+                  setContextMenu(null);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+              >
+                <ClipboardPaste size={13} className="text-primary-base" />
+                <span>貼り付け (Paste)</span>
+              </button>
+
+              {/* グループで貼り付け (Paste as Group) */}
+              <button
+                onClick={() => {
+                  pasteMapElements({ asGroup: true });
+                  setContextMenu(null);
+                }}
+                className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+              >
+                <FolderPlus size={13} className="text-primary-base" />
+                <span>グループで貼り付け</span>
+              </button>
+            </>
+          ) : (() => {
+            const contextNodeId = contextMenu.nodeId;
+            if (!contextNodeId) return null;
+
+            const targetNode = nodes[contextNodeId];
             const isContainer = targetNode?.type === 'generator' || targetNode?.type === 'manual_group' || targetNode?.type === 'group';
             const isInsertable = isInsertableContainer(targetNode);
-            const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextMenu.nodeId);
-            const targetIds = isMultiSelected ? selectedNodeIds : [contextMenu.nodeId];
+            const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextNodeId);
+            const targetIds = isMultiSelected ? selectedNodeIds : [contextNodeId];
 
             return (
               <>
@@ -793,7 +834,7 @@ export function WaypointTree() {
                 {/* 名前を変更 (Rename) */}
                 <button
                   onClick={() => {
-                    setEditingNodeId(contextMenu.nodeId);
+                    setEditingNodeId(contextNodeId);
                     setContextMenu(null);
                   }}
                   className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
@@ -806,7 +847,7 @@ export function WaypointTree() {
                 {isContainer && (
                   <button
                     onClick={() => {
-                      ungroupNode(contextMenu.nodeId);
+                      ungroupNode(contextNodeId);
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
@@ -819,8 +860,8 @@ export function WaypointTree() {
                 {/* 挿入位置に設定 */}
                 <button
                   onClick={() => {
-                    let targetParentId = findNodeParentId(contextMenu.nodeId, rootNodeIds, nodes);
-                    let refNodeId = contextMenu.nodeId;
+                    let targetParentId = findNodeParentId(contextNodeId, rootNodeIds, nodes);
+                    let refNodeId = contextNodeId;
                     while (targetParentId && !isInsertableContainer(nodes[targetParentId])) {
                       refNodeId = targetParentId;
                       targetParentId = findNodeParentId(targetParentId, rootNodeIds, nodes);
@@ -838,8 +879,8 @@ export function WaypointTree() {
                 {isInsertable && (
                   <button
                     onClick={() => {
-                      setInsertionTarget({ parentId: contextMenu.nodeId, index: 0 });
-                      setExpandedNodes((prev) => new Set([...prev, contextMenu.nodeId]));
+                      setInsertionTarget({ parentId: contextNodeId, index: 0 });
+                      setExpandedNodes((prev) => new Set([...prev, contextNodeId]));
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
@@ -850,6 +891,54 @@ export function WaypointTree() {
                 )}
 
                 <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 切り取り (Cut) */}
+                <button
+                  onClick={() => {
+                    cutSelectedMapElements();
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Scissors size={13} className="text-accent-automation" />
+                  <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
+                </button>
+
+                {/* コピー (Copy) */}
+                <button
+                  onClick={() => {
+                    copySelectedMapElements();
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Copy size={13} className="text-accent-automation" />
+                  <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
+                </button>
+
+                {/* 貼り付け (Paste) */}
+                <button
+                  onClick={() => {
+                    pasteMapElements({ asGroup: false });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <ClipboardPaste size={13} className="text-primary-base" />
+                  <span>貼り付け (Paste)</span>
+                </button>
+
+                {/* グループで貼り付け (Paste as Group) */}
+                <button
+                  onClick={() => {
+                    pasteMapElements({ asGroup: true });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <FolderPlus size={13} className="text-primary-base" />
+                  <span>グループで貼り付け</span>
+                </button>
 
                 {/* 複製 (Duplicate) */}
                 <button
@@ -883,7 +972,7 @@ export function WaypointTree() {
                 {/* インスペクターを開く */}
                 <button
                   onClick={() => {
-                    selectNodes([contextMenu.nodeId]);
+                    selectNodes([contextNodeId]);
                     setRightPanelActiveTab('inspector');
                     setRightPanelOpen(true);
                     setContextMenu(null);
@@ -898,17 +987,17 @@ export function WaypointTree() {
                 {!isContainer && !isMultiSelected && (
                   <button
                     onClick={() => {
-                      if (anchorNodeId === contextMenu.nodeId) {
+                      if (anchorNodeId === contextNodeId) {
                         setAnchorNode(null);
                       } else {
-                        setAnchorNode(contextMenu.nodeId);
+                        setAnchorNode(contextNodeId);
                       }
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
                     <Anchor size={13} className="text-accent-anchor" />
-                    <span>{anchorNodeId === contextMenu.nodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
+                    <span>{anchorNodeId === contextNodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
                   </button>
                 )}
 

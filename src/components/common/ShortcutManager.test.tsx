@@ -198,4 +198,26 @@ describe('ShortcutManager', () => {
     
     document.body.removeChild(input);
   });
+
+  it('blocks shortcuts other than Escape when any modal is open (modalStack not empty)', () => {
+    (useAppStore as any).getState = vi.fn().mockReturnValue({
+      modalStack: ['settings'],
+      isSettingsModalOpen: true,
+    });
+    (useAppStore as any).mockReturnValue({
+      selectedNodeIds: ['node-1'],
+      removeNodes: mockRemoveNodes,
+      selectAllNodes: mockSelectAllNodes,
+    });
+    render(<ShortcutManager />);
+
+    // Delete should be blocked
+    fireEvent.keyDown(window, { key: 'Delete' });
+    expect(mockRemoveNodes).not.toHaveBeenCalled();
+
+    // Ctrl+A should be blocked
+    fireEvent.keyDown(window, { key: 'a', ctrlKey: true });
+    expect(mockSelectAllNodes).not.toHaveBeenCalled();
+  });
 });
+

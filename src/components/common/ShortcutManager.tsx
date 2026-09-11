@@ -34,6 +34,10 @@ export function ShortcutManager() {
     showOccupancyHighlight,
     setShowOccupancyHighlight,
     handleGlobalEscape,
+    copySelectedMapElements,
+    cutSelectedMapElements,
+    pasteMapElements,
+    duplicateSelectedMapElements,
   } = useAppStore();
 
   useEffect(() => {
@@ -45,6 +49,35 @@ export function ShortcutManager() {
           (document.activeElement as HTMLElement)?.isContentEditable) &&
         e.key !== "Escape"
       ) {
+        return;
+      }
+
+      // Axis 1: モーダル表示中は Escape 以外のショートカットを遮断（裏の要素の誤操作・誤ペースト等を防止）
+      const currentState = (useAppStore as any).getState?.() || {};
+      const isModalActuallyOpen = (modal: string): boolean => {
+        switch (modal) {
+          case 'settings': return !!currentState.isSettingsModalOpen;
+          case 'export': return !!currentState.isExportModalOpen;
+          case 'import': return !!currentState.isImportModalOpen;
+          case 'export_maps': return !!currentState.isExportMapsModalOpen;
+          case 'shortcuts': return !!currentState.isShortcutsModalOpen;
+          case 'welcome': return !!currentState.isWelcomeModalOpen;
+          case 'plugin_data': return !!currentState.pluginDataModalState?.isOpen;
+          default: return false;
+        }
+      };
+
+      const isAnyModalOpen =
+        (currentState.modalStack || []).some(isModalActuallyOpen) ||
+        !!currentState.isSettingsModalOpen ||
+        !!currentState.isExportModalOpen ||
+        !!currentState.isImportModalOpen ||
+        !!currentState.isExportMapsModalOpen ||
+        !!currentState.isShortcutsModalOpen ||
+        !!currentState.isWelcomeModalOpen ||
+        !!currentState.pluginDataModalState?.isOpen;
+
+      if (isAnyModalOpen && e.key !== "Escape") {
         return;
       }
 
@@ -146,6 +179,22 @@ export function ShortcutManager() {
             e.preventDefault();
             redo();
             break;
+          case "c":
+            e.preventDefault();
+            void copySelectedMapElements?.();
+            break;
+          case "x":
+            e.preventDefault();
+            void cutSelectedMapElements?.();
+            break;
+          case "v":
+            e.preventDefault();
+            void pasteMapElements?.({ asGroup: e.shiftKey });
+            break;
+          case "d":
+            e.preventDefault();
+            duplicateSelectedMapElements?.();
+            break;
           case "h":
             e.preventDefault();
             setShowOccupancyHighlight(!showOccupancyHighlight);
@@ -187,6 +236,10 @@ export function ShortcutManager() {
     showOccupancyHighlight,
     setShowOccupancyHighlight,
     handleGlobalEscape,
+    copySelectedMapElements,
+    cutSelectedMapElements,
+    pasteMapElements,
+    duplicateSelectedMapElements,
   ]);
 
   return null;

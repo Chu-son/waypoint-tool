@@ -50,6 +50,7 @@ describe('TopMenu', () => {
   const mockSetShowGrid = vi.fn();
   const mockSelectAllNodes = vi.fn();
   const mockRemoveNodes = vi.fn();
+  const mockRemoveAnnotationObjects = vi.fn();
   const mockUndo = vi.fn();
   const mockRedo = vi.fn();
   const mockSaveProjectAs = vi.fn();
@@ -58,6 +59,7 @@ describe('TopMenu', () => {
     vi.clearAllMocks();
     (useAppStore as any).mockImplementation((selector: any) => selector({
       selectedNodeIds: [],
+      selectedAnnotationIds: [],
       showPaths: true,
       showGrid: true,
       isDirty: false,
@@ -81,6 +83,7 @@ describe('TopMenu', () => {
       setShowGrid: mockSetShowGrid,
       selectAllNodes: mockSelectAllNodes,
       removeNodes: mockRemoveNodes,
+      removeAnnotationObjects: mockRemoveAnnotationObjects,
       setLeftPanelOpen: vi.fn(),
       setRightPanelOpen: vi.fn(),
       setShowProperties: vi.fn(),
@@ -207,6 +210,36 @@ describe('TopMenu', () => {
     fireEvent.click(screen.getByText('Delete Selected'));
     expect(mockRemoveNodes).toHaveBeenCalledWith(['n1']);
   });
+
+  it('triggers removeAnnotationObjects on Delete Selected when annotations are selected', async () => {
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      selectedNodeIds: [],
+      selectedAnnotationIds: ['annot-1'],
+      showPaths: true,
+      showGrid: true,
+      isDirty: false,
+      currentProjectPath: null,
+      isLeftPanelOpen: true,
+      isRightPanelOpen: true,
+      showProperties: true,
+      historyPast: [],
+      historyFuture: [],
+      undo: mockUndo,
+      redo: mockRedo,
+      removeNodes: mockRemoveNodes,
+      removeAnnotationObjects: mockRemoveAnnotationObjects,
+    }));
+
+    render(<TopMenu />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await waitFor(() => {
+      expect(screen.getByText('Delete Selected')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('Delete Selected'));
+    expect(mockRemoveAnnotationObjects).toHaveBeenCalledWith(['annot-1']);
+  });
+
 
   it('switches menu on hover when one is open', () => {
     render(<TopMenu />);

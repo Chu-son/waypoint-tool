@@ -160,5 +160,30 @@ describe('AnnotationTree', () => {
     const dot = container.querySelector('span[title="選択中の子要素を含んでいます"]');
     expect(dot).not.toBeNull();
   });
+
+  it('shows paste and paste-as-group menu on blank area right-click in AnnotationTree', () => {
+    const mockPasteMapElements = vi.fn();
+    useAppStore.setState({
+      annotationObjects: {},
+      annotationGroups: {},
+      rootAnnotationIds: [],
+      selectedAnnotationIds: [],
+      pasteMapElements: mockPasteMapElements,
+    });
+
+    const { container } = render(<AnnotationTree />);
+
+    const outerContainer = container.firstChild as HTMLElement;
+    fireEvent.contextMenu(outerContainer, { clientX: 150, clientY: 250 });
+
+    const pasteBtn = screen.getByText('貼り付け (Paste)');
+    const pasteGroupBtn = screen.getByText('グループで貼り付け');
+    expect(pasteBtn).toBeInTheDocument();
+    expect(pasteGroupBtn).toBeInTheDocument();
+
+    fireEvent.click(pasteBtn);
+    expect(mockPasteMapElements).toHaveBeenCalledWith({ asGroup: false });
+  });
 });
+
 

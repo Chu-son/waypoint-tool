@@ -19,6 +19,8 @@ vi.mock('lucide-react', () => ({
   ArrowDownToLine: () => <div data-testid="arrow-down-to-line-icon" />,
   X: () => <div data-testid="x-icon" />,
   Target: () => <div data-testid="target-icon" />,
+  Scissors: () => <div data-testid="scissors-icon" />,
+  ClipboardPaste: () => <div data-testid="clipboard-paste-icon" />,
 }));
 
 // Mock Store
@@ -67,6 +69,9 @@ describe('WaypointTree', () => {
       groupNodes: mockGroupNodes,
       ungroupNode: mockUngroupNode,
       renameNode: mockRenameNode,
+      copySelectedMapElements: vi.fn(),
+      cutSelectedMapElements: vi.fn(),
+      pasteMapElements: vi.fn(),
     }));
   });
 
@@ -741,5 +746,46 @@ describe('WaypointTree', () => {
     const dot = container.querySelector('span[title="選択中の子要素を含んでいます"]');
     expect(dot).not.toBeNull();
   });
+
+  it('shows paste and paste-as-group menu on blank area right-click', () => {
+    const mockPasteMapElements = vi.fn();
+    (useAppStore as any).mockImplementation((selector: any) => selector({
+      rootNodeIds: [],
+      nodes: {},
+      plugins: {},
+      selectedNodeIds: [],
+      indexStartIndex: 0,
+      insertionTarget: null,
+      setInsertionTarget: vi.fn(),
+      selectNodes: mockSelectNodes,
+      duplicateNodes: mockDuplicateNodes,
+      removeNodes: mockRemoveNodes,
+      reorderNodes: mockReorderNodes,
+      reorderMultipleNodes: mockReorderMultipleNodes,
+      groupNodes: mockGroupNodes,
+      ungroupNode: mockUngroupNode,
+      renameNode: mockRenameNode,
+      copySelectedMapElements: vi.fn(),
+      cutSelectedMapElements: vi.fn(),
+      pasteMapElements: mockPasteMapElements,
+    }));
+
+    const { container } = render(<WaypointTree />);
+
+    // Right-click on the outer container
+    const outerContainer = container.firstChild as HTMLElement;
+    fireEvent.contextMenu(outerContainer, { clientX: 100, clientY: 200 });
+
+    // Menu should show "貼り付け (Paste)" and "グループで貼り付け"
+    const pasteBtn = screen.getByText('貼り付け (Paste)');
+    const pasteGroupBtn = screen.getByText('グループで貼り付け');
+    expect(pasteBtn).toBeInTheDocument();
+    expect(pasteGroupBtn).toBeInTheDocument();
+
+    // Clicking "貼り付け (Paste)" should call pasteMapElements({ asGroup: false })
+    fireEvent.click(pasteBtn);
+    expect(mockPasteMapElements).toHaveBeenCalledWith({ asGroup: false });
+  });
 });
+
 

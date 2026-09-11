@@ -8,12 +8,13 @@ describe('NodeSlice - duplicateNodes', () => {
       nodes: {},
       rootNodeIds: [],
       selectedNodeIds: [],
+      insertionTarget: null,
       historyPast: [],
       historyFuture: [],
     });
   });
 
-  it('duplicates a single manual waypoint with offset and new id', () => {
+  it('duplicates a single manual waypoint without offset (same coordinates) and new id', () => {
     const original: WaypointNode = {
       id: 'node-1',
       type: 'manual',
@@ -40,10 +41,131 @@ describe('NodeSlice - duplicateNodes', () => {
 
     const duplicated = state.nodes[newId];
     expect(duplicated).toBeDefined();
-    expect(duplicated.transform?.x).toBe(10.5);
-    expect(duplicated.transform?.y).toBe(20.5);
+    expect(duplicated.transform?.x).toBe(10);
+    expect(duplicated.transform?.y).toBe(20);
     expect(duplicated.options?.speed).toBe(1.2);
     expect(duplicated.name).toBe('WP 1 (Copy)');
+  });
+
+  it('pastes waypoints without offset, preserving names if no conflict, or appending (Copy) if conflict', () => {
+    const original: WaypointNode = {
+      id: 'node-1',
+      type: 'manual',
+      name: 'WP 1',
+      transform: { x: 5, y: 15, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    };
+
+    useAppStore.setState({
+      nodes: { 'node-1': original },
+      rootNodeIds: ['node-1'],
+      selectedNodeIds: ['node-1'],
+    });
+
+    const payload = {
+      elementType: 'waypoint' as const,
+      topLevelIds: ['clip-1'],
+      nodes: {
+        'clip-1': {
+          id: 'clip-1',
+          type: 'manual' as const,
+          name: 'WP 1',
+          transform: { x: 50, y: 60, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+        },
+      },
+    };
+
+    const createdIds = useAppStore.getState().pasteWaypoints(payload);
+    expect(createdIds).toHaveLength(1);
+    const newId = createdIds[0];
+    expect(newId).not.toBe('clip-1');
+
+    const state = useAppStore.getState();
+    const pasted = state.nodes[newId];
+    expect(pasted.transform?.x).toBe(50);
+    expect(pasted.transform?.y).toBe(60);
+    // WP 1 already exists, so it should get (Copy)
+    expect(pasted.name).toBe('WP 1 (Copy)');
+  });
+
+  it('pastes waypoints as a new group when asGroup is true', () => {
+    useAppStore.setState({
+      nodes: {},
+      rootNodeIds: [],
+      selectedNodeIds: [],
+    });
+
+    const payload = {
+      elementType: 'waypoint' as const,
+      topLevelIds: ['w1', 'w2'],
+      nodes: {
+        w1: { id: 'w1', type: 'manual' as const, name: 'WP A', transform: { x: 1, y: 2, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        w2: { id: 'w2', type: 'manual' as const, name: 'WP B', transform: { x: 3, y: 4, qx: 0, qy: 0, qz: 0, qw: 1 } },
+      },
+    };
+
+    const createdIds = useAppStore.getState().pasteWaypoints(payload, { asGroup: true });
+    expect(createdIds).toHaveLength(1);
+    const groupId = createdIds[0];
+
+    const state = useAppStore.getState();
+    const groupNode = state.nodes[groupId];
+    expect(groupNode).toBeDefined();
+    expect(groupNode.type).toBe('manual_group');
+    expect(groupNode.name).toBe('Group 1');
+    expect(groupNode.children_ids).toHaveLength(2);
+    expect(state.selectedNodeIds).toContain(groupId);
+  });
+
+  it('keeps insertionTarget null if it was null before pasting with single selection', () => {
+    useAppStore.setState({
+      nodes: {
+        'node-1': { id: 'node-1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } },
+      },
+      rootNodeIds: ['node-1'],
+      selectedNodeIds: ['node-1'],
+      insertionTarget: null,
+    });
+
+    const payload = {
+      elementType: 'waypoint' as const,
+      topLevelIds: ['w1'],
+      nodes: {
+        w1: { id: 'w1', type: 'manual' as const, name: 'Pasted WP', transform: { x: 10, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 } },
+      },
+    };
+
+    useAppStore.getState().pasteWaypoints(payload);
+
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toHaveLength(2);
+    // 元々 null だったので、青いバー（insertionTarget）は出現せず null のままであること
+    expect(state.insertionTarget).toBeNull();
+  });
+
+  it('advances insertionTarget if it was explicitly set before pasting', () => {
+    useAppStore.setState({
+      nodes: {
+        'node-1': { id: 'node-1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        'node-2': { id: 'node-2', type: 'manual', transform: { x: 5, y: 5, qx: 0, qy: 0, qz: 0, qw: 1 } },
+      },
+      rootNodeIds: ['node-1', 'node-2'],
+      selectedNodeIds: [],
+      insertionTarget: { parentId: null, index: 1 },
+    });
+
+    const payload = {
+      elementType: 'waypoint' as const,
+      topLevelIds: ['w1'],
+      nodes: {
+        w1: { id: 'w1', type: 'manual' as const, name: 'Pasted WP', transform: { x: 10, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 } },
+      },
+    };
+
+    useAppStore.getState().pasteWaypoints(payload);
+
+    const state = useAppStore.getState();
+    // 1件挿入されたので index は 1 + 1 = 2 に進む
+    expect(state.insertionTarget).toEqual({ parentId: null, index: 2 });
   });
 
   it('duplicates multiple manual waypoints maintaining order', () => {
@@ -78,8 +200,8 @@ describe('NodeSlice - duplicateNodes', () => {
     // with insertionTarget === null, cloned nodes are appended to root maintaining relative order
     expect(state.rootNodeIds).toEqual(['node-1', 'node-2', 'node-3', dup1, dup2]);
     expect(state.selectedNodeIds).toEqual([dup1, dup2]);
-    expect(state.nodes[dup1].transform?.x).toBe(1.5);
-    expect(state.nodes[dup2].transform?.x).toBe(2.5);
+    expect(state.nodes[dup1].transform?.x).toBe(1);
+    expect(state.nodes[dup2].transform?.x).toBe(2);
   });
 
   it('duplicates generator node along with its child waypoints', () => {
@@ -117,8 +239,8 @@ describe('NodeSlice - duplicateNodes', () => {
     const newChildId = dupGen.children_ids![0];
     expect(newChildId).not.toBe('child-1');
     const dupChild = state.nodes[newChildId];
-    expect(dupChild.transform?.x).toBe(5.5);
-    expect(dupChild.transform?.y).toBe(5.5);
+    expect(dupChild.transform?.x).toBe(5);
+    expect(dupChild.transform?.y).toBe(5);
   });
 
   it('updates multiple nodes simultaneously using updateNodes', () => {

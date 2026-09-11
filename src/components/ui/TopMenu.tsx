@@ -198,6 +198,7 @@ import { PathRouterMenu } from "./PathRouterMenu";
 export function TopMenu() {
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const removeNodes = useAppStore((state) => state.removeNodes);
+  const removeAnnotationObjects = useAppStore((state) => state.removeAnnotationObjects);
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
@@ -235,6 +236,12 @@ export function TopMenu() {
   const redo = useAppStore((state) => state.redo);
   const canUndo = useAppStore((state) => state.historyPast.length > 0);
   const canRedo = useAppStore((state) => state.historyFuture.length > 0);
+  const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds);
+  const copySelectedMapElements = useAppStore((state) => state.copySelectedMapElements);
+  const cutSelectedMapElements = useAppStore((state) => state.cutSelectedMapElements);
+  const pasteMapElements = useAppStore((state) => state.pasteMapElements);
+  const duplicateSelectedMapElements = useAppStore((state) => state.duplicateSelectedMapElements);
+  const hasSelection = (selectedNodeIds && selectedNodeIds.length > 0) || (selectedAnnotationIds && selectedAnnotationIds.length > 0);
 
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
@@ -332,16 +339,27 @@ export function TopMenu() {
           { id: "edit_undo", label: "Undo", action: undo, shortcut: "Ctrl+Z", disabled: !canUndo },
           { id: "edit_redo", label: "Redo", action: redo, shortcut: "Ctrl+Y", disabled: !canRedo },
           { divider: true, label: "" },
+          { id: "edit_cut", label: "Cut", action: () => void cutSelectedMapElements(), shortcut: "Ctrl+X", disabled: !hasSelection },
+          { id: "edit_copy", label: "Copy", action: () => void copySelectedMapElements(), shortcut: "Ctrl+C", disabled: !hasSelection },
+          { id: "edit_paste", label: "Paste", action: () => void pasteMapElements({ asGroup: false }), shortcut: "Ctrl+V" },
+          { id: "edit_paste_as_group", label: "Paste as Group", action: () => void pasteMapElements({ asGroup: true }), shortcut: "Ctrl+Shift+V" },
+          { id: "edit_duplicate", label: "Duplicate", action: () => duplicateSelectedMapElements(), shortcut: "Ctrl+D", disabled: !hasSelection },
+          { divider: true, label: "" },
           { id: "edit_select_all", label: "Select All", action: selectAllNodes, shortcut: "Ctrl+A" },
-          { id: "edit_deselect_all", label: "Deselect All", action: () => useAppStore.setState({ selectedNodeIds: [] }) },
+          { id: "edit_deselect_all", label: "Deselect All", action: () => useAppStore.setState({ selectedNodeIds: [], selectedAnnotationIds: [] }) },
           { divider: true, label: "" },
           {
             id: "edit_delete_selected",
             label: "Delete Selected",
             action: () => {
-              if (selectedNodeIds.length > 0) removeNodes(selectedNodeIds);
+              if (selectedNodeIds.length > 0) {
+                removeNodes(selectedNodeIds);
+              } else if (selectedAnnotationIds.length > 0) {
+                removeAnnotationObjects(selectedAnnotationIds);
+              }
             },
             shortcut: "Del / Backspace",
+            disabled: !hasSelection,
           },
         ],
       },
@@ -459,7 +477,7 @@ export function TopMenu() {
     canUndo, canRedo, selectedNodeIds, showProperties, showPaths, showGrid,
     showFootprints, enableSnapping, isLeftPanelOpen, isRightPanelOpen,
     customUiConfig, isCustomUiMode, customUiPresetType, toggleCustomUiMode, switchToPresetCustomUi, undo, redo, selectAllNodes,
-    removeNodes, setShowProperties, setShowPaths, setShowGrid, setShowFootprints,
+    removeNodes, removeAnnotationObjects, selectedAnnotationIds, setShowProperties, setShowPaths, setShowGrid, setShowFootprints,
     setEnableSnapping, triggerFitToMaps, setLeftPanelOpen, setRightPanelOpen,
     resetWindowLayout, setShortcutsModalOpen, setIsInitialLaunch, setWelcomeModalOpen,
     handleNewProject, handleOpenProject, saveProject, saveProjectAs, setExportModalOpen,

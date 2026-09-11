@@ -20,6 +20,8 @@ import {
   Unlink,
   Code2,
   Edit2,
+  Scissors,
+  ClipboardPaste,
 } from 'lucide-react';
 import { Button } from './common/Button';
 import { cn } from '../../utils/cn';
@@ -342,11 +344,14 @@ export function AnnotationTree() {
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
   const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
+  const copySelectedMapElements = useAppStore((state) => state.copySelectedMapElements);
+  const cutSelectedMapElements = useAppStore((state) => state.cutSelectedMapElements);
+  const pasteMapElements = useAppStore((state) => state.pasteMapElements);
 
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ id: string | null; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -414,6 +419,7 @@ export function AnnotationTree() {
   });
 
   const handleContextMenu = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
     handleItemContextMenu(e, id);
     setContextMenu({ id, x: e.clientX, y: e.clientY });
   };
@@ -421,7 +427,7 @@ export function AnnotationTree() {
   const handleCreateGroup = () => {
     const targetIds = selectedAnnotationIds.length > 0
       ? selectedAnnotationIds
-      : contextMenu ? [contextMenu.id] : [];
+      : contextMenu?.id ? [contextMenu.id] : [];
     if (targetIds.length === 0) return;
 
     const newGroupId = groupAnnotations(targetIds);
@@ -459,7 +465,13 @@ export function AnnotationTree() {
     : null;
 
   return (
-    <div className="w-full flex flex-col space-y-2">
+    <div
+      className="w-full flex flex-col space-y-2 relative min-h-[120px]"
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setContextMenu({ id: null, x: e.clientX, y: e.clientY });
+      }}
+    >
       {/* Header Bar */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2">
@@ -592,12 +604,41 @@ export function AnnotationTree() {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 min-w-[190px] text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
         >
-          {(() => {
-            const isGroup = !!annotationGroups[contextMenu.id];
-            const groupObj = isGroup ? annotationGroups[contextMenu.id] : undefined;
-            const itemObj = !isGroup ? annotationObjects[contextMenu.id] : undefined;
-            const isMultiSelected = selectedAnnotationIds.length > 1 && selectedAnnotationIds.includes(contextMenu.id);
-            const targetIds = isMultiSelected ? selectedAnnotationIds : [contextMenu.id];
+          {contextMenu.id === null ? (
+            <>
+              {/* 貼り付け (Paste) */}
+              <button
+                onClick={() => {
+                  pasteMapElements({ asGroup: false });
+                  setContextMenu(null);
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+              >
+                <ClipboardPaste size={13} className="text-primary-base" />
+                <span>貼り付け (Paste)</span>
+              </button>
+
+              {/* グループで貼り付け (Paste as Group) */}
+              <button
+                onClick={() => {
+                  pasteMapElements({ asGroup: true });
+                  setContextMenu(null);
+                }}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+              >
+                <FolderPlus size={13} className="text-primary-base" />
+                <span>グループで貼り付け</span>
+              </button>
+            </>
+          ) : (() => {
+            const contextId = contextMenu.id;
+            if (!contextId) return null;
+
+            const isGroup = !!annotationGroups[contextId];
+            const groupObj = isGroup ? annotationGroups[contextId] : undefined;
+            const itemObj = !isGroup ? annotationObjects[contextId] : undefined;
+            const isMultiSelected = selectedAnnotationIds.length > 1 && selectedAnnotationIds.includes(contextId);
+            const targetIds = isMultiSelected ? selectedAnnotationIds : [contextId];
 
             return (
               <>
@@ -617,7 +658,7 @@ export function AnnotationTree() {
                 {/* 名前を変更 (Rename) */}
                 <button
                   onClick={() => {
-                    setEditingId(contextMenu.id);
+                    setEditingId(contextId);
                     setContextMenu(null);
                   }}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
@@ -630,7 +671,7 @@ export function AnnotationTree() {
                 {isGroup && (
                   <button
                     onClick={() => {
-                      ungroupAnnotation(contextMenu.id);
+                      ungroupAnnotation(contextId);
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
@@ -641,6 +682,54 @@ export function AnnotationTree() {
                 )}
 
                 <div className="h-px bg-border-base/30 my-0.5" />
+
+                {/* 切り取り (Cut) */}
+                <button
+                  onClick={() => {
+                    cutSelectedMapElements();
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Scissors size={13} className="text-accent-automation" />
+                  <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
+                </button>
+
+                {/* コピー (Copy) */}
+                <button
+                  onClick={() => {
+                    copySelectedMapElements();
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <Copy size={13} className="text-accent-automation" />
+                  <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
+                </button>
+
+                {/* 貼り付け (Paste) */}
+                <button
+                  onClick={() => {
+                    pasteMapElements({ asGroup: false });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <ClipboardPaste size={13} className="text-primary-base" />
+                  <span>貼り付け (Paste)</span>
+                </button>
+
+                {/* グループで貼り付け (Paste as Group) */}
+                <button
+                  onClick={() => {
+                    pasteMapElements({ asGroup: true });
+                    setContextMenu(null);
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                >
+                  <FolderPlus size={13} className="text-primary-base" />
+                  <span>グループで貼り付け</span>
+                </button>
 
                 {/* 複製 (Duplicate) */}
                 <button
@@ -659,7 +748,7 @@ export function AnnotationTree() {
                   onClick={() => {
                     if (isGroup) {
                       openPluginDataModal(
-                        `アノテーショングループ: ${groupObj?.name || 'Group'}`,
+                        `グループ: ${groupObj?.name || 'Group'}`,
                         groupObj?.plugin_data,
                         `プラグイン: ${groupObj?.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`
                       );
@@ -681,7 +770,7 @@ export function AnnotationTree() {
                 {/* インスペクターを開く */}
                 <button
                   onClick={() => {
-                    selectAnnotationObjects([contextMenu.id]);
+                    selectAnnotationObjects([contextId]);
                     setRightPanelActiveTab('inspector');
                     setRightPanelOpen(true);
                     setContextMenu(null);

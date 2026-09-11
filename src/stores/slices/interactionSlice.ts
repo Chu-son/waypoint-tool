@@ -3,6 +3,14 @@ import { AppState } from '../appStore';
 import { AppModeState, AppModeTransition } from '../../types/mode';
 import { ActiveSelection } from '../../types/selection';
 import { ModalType, ModalStack } from '../../types/modal';
+import {
+  writeMapElementsToClipboard,
+  readMapElementsFromClipboard,
+  WaypointClipboardPayload,
+  AnnotationClipboardPayload,
+} from '../../utils/mapElementClipboard';
+import { filterTopLevelIds } from '../../utils/mapElementTreeUtils';
+import { collectDescendantIds, getFlattenedNodeIds } from '../../utils/treeUtils';
 
 export type CanvasAbortHandler = () => boolean;
 
@@ -23,6 +31,12 @@ export interface InteractionSlice {
   pushModal: (modal: ModalType) => void;
   popModal: () => ModalType | undefined;
   closeModal: (modal: ModalType) => void;
+
+  // Map Element Unified Operations
+  copySelectedMapElements: () => Promise<boolean>;
+  cutSelectedMapElements: () => Promise<boolean>;
+  pasteMapElements: (options?: { asGroup?: boolean }) => Promise<boolean>;
+  duplicateSelectedMapElements: () => string[];
 
   // Escape Pipeline & Canvas Delegate Registration
   registerCanvasAbortHandler: (handler: CanvasAbortHandler) => () => void;
@@ -541,6 +555,130 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
 
       // Tier 7: Idle (no-op)
       return false;
+    },
+
+    copySelectedMapElements: async () => {
+      const state = get();
+      if (state.selectedNodeIds.length > 0) {
+        const flatNodeIds = getFlattenedNodeIds(state.rootNodeIds, state.nodes);
+        const topLevelIds = filterTopLevelIds(
+          state.selectedNodeIds,
+          flatNodeIds,
+          (id) => collectDescendantIds(id, state.nodes)
+        );
+        if (topLevelIds.length === 0) return false;
+
+        const targetNodes: Record<string, any> = {};
+        const collect = (id: string) => {
+          const n = state.nodes[id];
+          if (!n) return;
+          targetNodes[id] = n;
+          if (n.children_ids) {
+            n.children_ids.forEach(collect);
+          }
+        };
+        topLevelIds.forEach(collect);
+
+        const payload: WaypointClipboardPayload = {
+          elementType: 'waypoint',
+          topLevelIds,
+          nodes: targetNodes,
+        };
+        return await writeMapElementsToClipboard(payload);
+      }
+
+      if (state.selectedAnnotationIds.length > 0) {
+        const targetObjects: Record<string, any> = {};
+        const targetGroups: Record<string, any> = {};
+
+        // アノテーションのトップレベルIDの抽出
+        const topLevelIds: string[] = [];
+        state.selectedAnnotationIds.forEach((id) => {
+          let isChildOfSelected = false;
+          let curr = id;
+          while (curr) {
+            const parentId = state.annotationObjects[curr]?.group_id || state.annotationGroups[curr]?.parent_id;
+            if (parentId && state.selectedAnnotationIds.includes(parentId)) {
+              isChildOfSelected = true;
+              break;
+            }
+            curr = parentId || '';
+          }
+          if (!isChildOfSelected) {
+            topLevelIds.push(id);
+          }
+        });
+
+        if (topLevelIds.length === 0) return false;
+
+        const collectAnnotation = (id: string) => {
+          if (state.annotationObjects[id]) {
+            targetObjects[id] = state.annotationObjects[id];
+          } else if (state.annotationGroups[id]) {
+            const grp = state.annotationGroups[id];
+            targetGroups[id] = grp;
+            if (grp.children_ids) {
+              grp.children_ids.forEach(collectAnnotation);
+            }
+          }
+        };
+        topLevelIds.forEach(collectAnnotation);
+
+        const payload: AnnotationClipboardPayload = {
+          elementType: 'annotation',
+          topLevelIds,
+          annotationObjects: targetObjects,
+          annotationGroups: targetGroups,
+        };
+        return await writeMapElementsToClipboard(payload);
+      }
+
+      return false;
+    },
+
+    cutSelectedMapElements: async () => {
+      const state = get();
+      const nodeIdsToCut = [...state.selectedNodeIds];
+      const annotIdsToCut = [...state.selectedAnnotationIds];
+
+      const copyOk = await get().copySelectedMapElements();
+      if (!copyOk) return false;
+
+      if (nodeIdsToCut.length > 0) {
+        get().removeNodes(nodeIdsToCut);
+        return true;
+      } else if (annotIdsToCut.length > 0) {
+        get().removeAnnotationObjects(annotIdsToCut);
+        return true;
+      }
+
+      return false;
+    },
+
+    pasteMapElements: async (options?: { asGroup?: boolean }) => {
+      const payload = await readMapElementsFromClipboard();
+      if (!payload) return false;
+
+      if (payload.elementType === 'waypoint') {
+        const created = get().pasteWaypoints(payload, options);
+        return created.length > 0;
+      } else if (payload.elementType === 'annotation') {
+        const created = get().pasteAnnotations(payload, options);
+        return created.length > 0;
+      }
+
+      return false;
+    },
+
+    duplicateSelectedMapElements: () => {
+      const state = get();
+      if (state.selectedNodeIds.length > 0) {
+        return get().duplicateNodes(state.selectedNodeIds);
+      }
+      if (state.selectedAnnotationIds.length > 0) {
+        return get().duplicateAnnotations(state.selectedAnnotationIds);
+      }
+      return [];
     },
   };
 };

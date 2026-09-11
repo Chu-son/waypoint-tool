@@ -56,6 +56,9 @@ describe('App Integration', () => {
       mapLayers: [],
       plugins: {},
       isDirty: false,
+      isWelcomeModalOpen: false,
+      isInitialLaunch: false,
+      modalStack: [],
     });
   });
 

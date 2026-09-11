@@ -567,6 +567,56 @@ describe('interactionSlice', () => {
       unreg2();
     });
   });
+
+  describe('Map Element Unified Operations', () => {
+    it('copies, cuts, pastes, and duplicates waypoint map elements', async () => {
+      const node1 = {
+        id: 'node-1',
+        type: 'manual' as const,
+        name: 'Node 1',
+        transform: { x: 10, y: 20, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+      };
+
+      useAppStore.setState({
+        nodes: { 'node-1': node1 },
+        rootNodeIds: ['node-1'],
+        selectedNodeIds: ['node-1'],
+      });
+
+      // 1. Copy
+      const copyOk = await useAppStore.getState().copySelectedMapElements();
+      expect(copyOk).toBe(true);
+
+      // 2. Paste
+      const pasteOk = await useAppStore.getState().pasteMapElements();
+      expect(pasteOk).toBe(true);
+      const stateAfterPaste = useAppStore.getState();
+      expect(stateAfterPaste.rootNodeIds).toHaveLength(2);
+      const pastedId = stateAfterPaste.selectedNodeIds[0];
+      expect(stateAfterPaste.nodes[pastedId].transform?.x).toBe(10);
+      expect(stateAfterPaste.nodes[pastedId].transform?.y).toBe(20);
+
+      // 3. Cut
+      useAppStore.setState({ selectedNodeIds: [pastedId] });
+      const cutOk = await useAppStore.getState().cutSelectedMapElements();
+      expect(cutOk).toBe(true);
+      const stateAfterCut = useAppStore.getState();
+      expect(stateAfterCut.nodes[pastedId]).toBeUndefined();
+
+      // 4. Paste again
+      const pasteAgainOk = await useAppStore.getState().pasteMapElements({ asGroup: true });
+      expect(pasteAgainOk).toBe(true);
+      const stateAfterGroupPaste = useAppStore.getState();
+      const groupId = stateAfterGroupPaste.selectedNodeIds[0];
+      expect(stateAfterGroupPaste.nodes[groupId]?.type).toBe('manual_group');
+
+      // 5. Duplicate
+      useAppStore.setState({ selectedNodeIds: ['node-1'] });
+      const dupIds = useAppStore.getState().duplicateSelectedMapElements();
+      expect(dupIds).toHaveLength(1);
+      expect(useAppStore.getState().nodes[dupIds[0]].transform?.x).toBe(10);
+    });
+  });
 });
 
 
