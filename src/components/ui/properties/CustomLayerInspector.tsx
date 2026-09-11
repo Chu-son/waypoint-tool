@@ -106,8 +106,10 @@ export function CustomLayerInspector() {
           });
         }
       } else {
-        // Manual layer
-        setActiveTool("select");
+        // Manual layer: マップ編集モード開始直後の呼び出しで isMapEditMode/activeCustomLayerId をリセットしないよう回避
+        if (!isMapEditMode) {
+          setActiveTool("select");
+        }
       }
     } else {
       // New plugin layer creation
@@ -135,7 +137,7 @@ export function CustomLayerInspector() {
       clearPluginInteractionData();
     }
     setErrorInfo(null);
-  }, [activeCustomLayerId]);
+  }, [activeCustomLayerId, isMapEditMode]);
 
   // Sync active properties to store for canvas interaction hints
   useEffect(() => {

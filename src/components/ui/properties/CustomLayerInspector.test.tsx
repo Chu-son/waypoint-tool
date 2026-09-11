@@ -99,6 +99,30 @@ describe('CustomLayerInspector', () => {
     expect(screen.getByText(/rect #1/i)).toBeInTheDocument();
   });
 
+  it('does not exit map edit mode when mounted right after entering edit mode for a manual layer', () => {
+    const manualLayer: ManualCustomLayer = {
+      id: 'manual-1',
+      name: 'Forbidden Area',
+      type: 'manual',
+      visible: true,
+      opacity: 1.0,
+      z_index: 0,
+      blend_mode: 'overwrite',
+      editObjects: [],
+    };
+
+    useAppStore.setState({
+      customLayers: [manualLayer],
+      activeCustomLayerId: 'manual-1',
+      isMapEditMode: true,
+    });
+
+    render(<CustomLayerInspector />);
+
+    expect(useAppStore.getState().isMapEditMode).toBe(true);
+    expect(useAppStore.getState().activeCustomLayerId).toBe('manual-1');
+  });
+
   it('renders existing plugin layer and allows re-generation', async () => {
     const pluginLayer: PluginCustomLayer = {
       id: 'plugin-layer-1',
