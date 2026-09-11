@@ -4,9 +4,10 @@ import { DialogAPI, BackendAPI } from "../../api";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
-import { MousePointer2, Minus, Square, X, Check } from "lucide-react";
+import { MousePointer2, Minus, Square, X, Check, FolderOpen } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { confirmDiscardChanges } from "../../utils/projectGuard";
+import { extractProjectName } from "../../utils/projectUtils";
 import { Kbd } from "./common/Kbd";
 
 import * as LucideIcons from "lucide-react";
@@ -138,6 +139,31 @@ function AppBrand() {
         />
       )}
       <span className="text-[14px]">{brandName}</span>
+    </div>
+  );
+}
+
+function ProjectTitleBadge() {
+  const currentProjectPath = useAppStore((state) => state.currentProjectPath);
+  const isDirty = useAppStore((state) => state.isDirty);
+  const projectName = extractProjectName(currentProjectPath);
+
+  return (
+    <div
+      className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 max-w-[32%] sm:max-w-[42%] md:max-w-[50%] rounded-md text-[12px] font-medium text-text-muted hover:text-text-base hover:bg-surface-hover/60 transition-colors pointer-events-auto cursor-default select-none group"
+      title={currentProjectPath ? `${currentProjectPath}${isDirty ? " (未保存の変更あり)" : ""}` : "未保存のプロジェクト"}
+      data-tauri-drag-region
+      data-testid="project-title-badge"
+    >
+      <FolderOpen size={13} className="shrink-0 text-text-muted/70 group-hover:text-text-base transition-colors" />
+      <span className="truncate text-text-base/90">{projectName}</span>
+      {isDirty && (
+        <span
+          className="w-1.5 h-1.5 rounded-full bg-accent-anchor shrink-0"
+          title="未保存の変更があります"
+          data-testid="dirty-indicator"
+        />
+      )}
     </div>
   );
 }
@@ -468,6 +494,8 @@ export function TopMenu() {
           <PathRouterMenu />
         </div>
       </div>
+
+      <ProjectTitleBadge />
 
       <div className="shrink-0 ml-2">
         <WindowControls onExit={handleExit} />

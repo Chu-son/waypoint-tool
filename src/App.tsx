@@ -36,6 +36,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { DialogAPI, BackendAPI } from "./api";
 import { Button } from "./components/ui/common/Button";
+import { extractProjectName, formatWindowTitle } from "./utils/projectUtils";
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -73,6 +74,9 @@ function App() {
 
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+  const currentProjectPath = useAppStore((state) => state.currentProjectPath);
+  const isDirty = useAppStore((state) => state.isDirty);
+  const getEffectiveBrandName = useAppStore((state) => state.getEffectiveBrandName);
 
   useEffect(() => {
     const initApp = async () => {
@@ -161,15 +165,16 @@ function App() {
     initApp();
   }, []);
 
-  // Update window title if Custom UI title is configured
+  // Update window title based on project name, dirty state, and brand
   useEffect(() => {
     if (!isTauri()) return;
-    if (isCustomUiMode && customUiConfig?.brand?.windowTitle) {
-      getCurrentWindow().setTitle(customUiConfig.brand.windowTitle).catch(() => {});
-    } else {
-      getCurrentWindow().setTitle("Waypoint Tool").catch(() => {});
-    }
-  }, [isCustomUiMode, customUiConfig]);
+    const brandName = (isCustomUiMode && customUiConfig?.brand?.windowTitle)
+      ? customUiConfig.brand.windowTitle
+      : (typeof getEffectiveBrandName === 'function' ? getEffectiveBrandName() : "Waypoint Tool");
+    const projectName = extractProjectName(currentProjectPath);
+    const title = formatWindowTitle(projectName, isDirty, brandName);
+    getCurrentWindow().setTitle(title).catch(() => {});
+  }, [isCustomUiMode, customUiConfig, currentProjectPath, isDirty, getEffectiveBrandName]);
 
   // Initialization moved to ShortcutManager for shortcuts, 
   // though basic initialization remains in App for now.

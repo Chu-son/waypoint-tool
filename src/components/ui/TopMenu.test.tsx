@@ -14,6 +14,7 @@ vi.mock('lucide-react', () => ({
   RefreshCcw: () => <div data-testid="refresh-icon" />,
   ChevronDown: () => <div data-testid="chevrondown-icon" />,
   Check: () => <div data-testid="check-icon" />,
+  FolderOpen: () => <div data-testid="folder-icon" />,
 }));
 
 // Mock Store
@@ -60,6 +61,7 @@ describe('TopMenu', () => {
       showPaths: true,
       showGrid: true,
       isDirty: false,
+      currentProjectPath: null,
       isLeftPanelOpen: true,
       isRightPanelOpen: true,
       showProperties: true,
@@ -219,4 +221,55 @@ describe('TopMenu', () => {
     expect(screen.queryByText(/^Open Project...$/i)).not.toBeInTheDocument();
     expect(screen.getByText(/^Select All$/i)).toBeInTheDocument();
   });
+
+  describe('ProjectTitleBadge in TopMenu', () => {
+    it('displays "Untitled" when currentProjectPath is null and no dirty indicator if not dirty', () => {
+      render(<TopMenu />);
+      expect(screen.getByText('Untitled')).toBeInTheDocument();
+      expect(screen.queryByTestId('dirty-indicator')).not.toBeInTheDocument();
+    });
+
+    it('displays extracted project name when currentProjectPath is set', () => {
+      (useAppStore as any).mockImplementation((selector: any) => selector({
+        selectedNodeIds: [],
+        showPaths: true,
+        showGrid: true,
+        isDirty: false,
+        currentProjectPath: '/path/to/my_route_project.wptroj',
+        isLeftPanelOpen: true,
+        isRightPanelOpen: true,
+        showProperties: true,
+        historyPast: [],
+        historyFuture: [],
+        undo: mockUndo,
+        redo: mockRedo,
+      }));
+
+      render(<TopMenu />);
+      expect(screen.getByText('my_route_project')).toBeInTheDocument();
+      expect(screen.queryByTestId('dirty-indicator')).not.toBeInTheDocument();
+    });
+
+    it('displays dirty indicator when isDirty is true', () => {
+      (useAppStore as any).mockImplementation((selector: any) => selector({
+        selectedNodeIds: [],
+        showPaths: true,
+        showGrid: true,
+        isDirty: true,
+        currentProjectPath: '/path/to/my_route_project.wptroj',
+        isLeftPanelOpen: true,
+        isRightPanelOpen: true,
+        showProperties: true,
+        historyPast: [],
+        historyFuture: [],
+        undo: mockUndo,
+        redo: mockRedo,
+      }));
+
+      render(<TopMenu />);
+      expect(screen.getByText('my_route_project')).toBeInTheDocument();
+      expect(screen.getByTestId('dirty-indicator')).toBeInTheDocument();
+    });
+  });
 });
+

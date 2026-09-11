@@ -9,11 +9,14 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
 }));
 
+const mockSetTitle = vi.fn().mockResolvedValue(undefined);
+
 vi.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
     onCloseRequested: vi.fn().mockResolvedValue(vi.fn()),
     destroy: vi.fn(),
     setDecorations: vi.fn(),
+    setTitle: mockSetTitle,
   }),
 }));
 
@@ -178,5 +181,22 @@ describe('App Integration', () => {
     const state = useAppStore.getState();
     expect(state.nodes['del-node']).toBeUndefined();
     expect(state.rootNodeIds).not.toContain('del-node');
+  });
+
+  it('updates window title with project name and dirty state', async () => {
+    (window as any).__TAURI_INTERNALS__ = {};
+    render(<App />);
+
+    expect(mockSetTitle).toHaveBeenCalledWith('Untitled - Waypoint Tool');
+
+    act(() => {
+      useAppStore.setState({ currentProjectPath: '/path/to/test_mission.wptroj' });
+    });
+    expect(mockSetTitle).toHaveBeenCalledWith('test_mission - Waypoint Tool');
+
+    act(() => {
+      useAppStore.setState({ isDirty: true });
+    });
+    expect(mockSetTitle).toHaveBeenCalledWith('test_mission * - Waypoint Tool');
   });
 });

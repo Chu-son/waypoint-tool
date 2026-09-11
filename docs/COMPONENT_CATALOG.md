@@ -120,7 +120,7 @@
 ## 3. アプリケーション機能パネル & モーダル (`src/components/ui/`)
 
 - **`TopMenu`** ([`src/components/ui/TopMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/TopMenu.tsx))
-  - **概要**: アプリケーション最上部のメニューバー (File, Edit, View, Help) およびプロジェクトタイトル表示。
+  - **概要**: アプリケーション最上部のメニューバー (File, Edit, View, Help)、中央のプロジェクト名表示・未保存状態（`isDirty`）インジケータバッジ、およびウィンドウ操作コントロール。
   - **主要Props**: なし
 - **`PathRouterMenu`** ([`src/components/ui/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PathRouterMenu.tsx))
   - **概要**: トップバーに配置されるパス計算アルゴリズム選択、パラメータ設定、自動再計算トグル用ドロップダウンメニュー。
