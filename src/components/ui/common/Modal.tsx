@@ -6,7 +6,7 @@ import { Panel } from "./Panel";
 export interface ModalProps extends React.HTMLAttributes<HTMLDivElement> {
   isOpen: boolean;
   onClose: () => void;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "full";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "full";
 }
 
 const sizeVariants = {
@@ -15,6 +15,8 @@ const sizeVariants = {
   lg: "max-w-lg w-full",
   xl: "max-w-2xl w-[90vw]",
   "2xl": "max-w-4xl w-[90vw]",
+  "3xl": "max-w-6xl w-[94vw]",
+  "4xl": "max-w-7xl w-[96vw]",
   full: "max-w-[95vw] w-full",
 };
 

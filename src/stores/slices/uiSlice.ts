@@ -64,7 +64,7 @@ export type UISlice = {
   isShortcutsModalOpen: boolean;
   isWelcomeModalOpen: boolean;
   isInitialLaunch: boolean;
-  settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins';
+  settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles';
 
   // Plugin Data Viewer Modal State
   pluginDataModalState: {
@@ -109,7 +109,7 @@ export type UISlice = {
   setShowProperties: (show: boolean) => void;
   resetWindowLayout: () => void;
   
-  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'robot' | 'export' | 'plugins') => void;
+  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles') => void;
   setExportModalOpen: (open: boolean) => void;
   setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;

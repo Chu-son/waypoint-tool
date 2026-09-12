@@ -156,8 +156,11 @@
   - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/SettingsModal.tsx))
-  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `OptionSchemaTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` を保持。
+  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `OptionSchemaTab`, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` を保持。
   - **主要Props**: `isOpen`, `onClose`
+- **`ConditionalStylesTab`** ([`src/components/ui/settings/ConditionalStylesTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/ConditionalStylesTab.tsx))
+  - **概要**: 条件付き書式（Conditional Styles）設定タブ。対象要素（Waypoint, Path, Footprint, Annotation）、ネスト可能なAND/OR条件グループ、スタイルオーバーライド（色、線幅、破線、形状、強制表示、寸法直接参照等）のCRUD、優先順位並び替え、JSONエクスポート/インポートを提供。
+  - **主要Props**: なし
 - **`RobotFootprintTab`** ([`src/components/ui/settings/RobotFootprintTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/RobotFootprintTab.tsx))
   - **概要**: ロボットのフットプリント（円形・矩形・多角形）の定義・寸法設定・ROS Nav2 形式テキスト入出力、およびリアルタイム SVG プレビュー。
   - **主要Props**: なし
@@ -252,3 +255,6 @@
 - **`transformUtils`** ([`src/utils/transformUtils.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/transformUtils.ts))
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
   - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`
+- **`conditionalStyles`** ([`src/utils/conditionalStyles.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/conditionalStyles.ts))
+  - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。
+  - **主要関数**: `resolveWaypointConditionalStyle`, `resolvePathConditionalStyle`, `resolveFootprintConditionalStyle`, `resolveAnnotationConditionalStyle`, `evaluateConditionGroup`, `drawDashedLine`, `parseColorSafe`

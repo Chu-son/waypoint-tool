@@ -455,4 +455,17 @@ describe('SettingsModal UI', () => {
       }
     });
   });
+
+  it('renders and switches to Conditional Styles tab', async () => {
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const condStylesTab = screen.getByText('Conditional Styles');
+    expect(condStylesTab).toBeInTheDocument();
+
+    act(() => {
+      condStylesTab.click();
+    });
+
+    expect(screen.getByText('条件付き書式 (Conditional Styles)')).toBeInTheDocument();
+  });
 });

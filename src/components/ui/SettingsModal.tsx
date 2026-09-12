@@ -6,6 +6,7 @@ import { OptionSchemaTab } from "./settings/OptionSchemaTab";
 import { RobotFootprintTab } from "./settings/RobotFootprintTab";
 import { ExportTemplatesTab } from "./settings/ExportTemplatesTab";
 import { PluginsTab } from "./settings/PluginsTab";
+import { ConditionalStylesTab } from "./settings/ConditionalStylesTab";
 import { Modal, ModalHeader, ModalContent } from "./common/Modal";
 import { Button } from "./common/Button";
 import { cn } from "../../utils/cn";
@@ -16,7 +17,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  type TabType = "general" | "options" | "robot" | "export" | "plugins";
+  type TabType = "general" | "options" | "robot" | "export" | "plugins" | "conditional_styles";
   const [activeTab, setActiveTab] = useState<TabType>("general");
   const modalTabFromStore = useAppStore((state) => state.settingsModalTab);
   const globalPythonPath = useAppStore((state) => state.globalPythonPath);
@@ -42,7 +43,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   }, [isOpen, modalTabFromStore]);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="2xl" className="h-[80vh]">
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" className="h-[85vh]">
       <datalist id="python-envs">
         {pythonEnvs.map((env, i) => (
           <option key={i} value={env} />
@@ -56,10 +57,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       </ModalHeader>
 
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-40 sm:w-52 md:w-56 bg-surface-panel/40 border-r border-border-base/40 p-2 sm:p-3 shrink-0 space-y-1 overflow-y-auto">
+        <div className="w-36 sm:w-44 md:w-48 bg-surface-panel/40 border-r border-border-base/40 p-2 sm:p-2.5 shrink-0 space-y-1 overflow-y-auto">
           {([
             { id: "general", label: "General" },
             { id: "options", label: "Option Schema" },
+            { id: "conditional_styles", label: "Conditional Styles" },
             { id: "robot", label: "Robot Footprint" },
             { id: "export", label: "Export Templates" },
             { id: "plugins", label: "Plugins" },
@@ -85,6 +87,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
             {activeTab === "general" && <GeneralTab />}
             {activeTab === "options" && <OptionSchemaTab />}
+            {activeTab === "conditional_styles" && <ConditionalStylesTab />}
             {activeTab === "robot" && <RobotFootprintTab />}
             {activeTab === "export" && <ExportTemplatesTab />}
             {activeTab === "plugins" && (

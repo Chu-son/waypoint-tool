@@ -207,6 +207,8 @@ export function TopMenu() {
   
   const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
   const setShowOccupancyHighlight = useAppStore((state) => state.setShowOccupancyHighlight);
+  const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
+  const setConditionalStylesEnabled = useAppStore((state) => state.setConditionalStylesEnabled);
 
   const setShowPaths = (v: boolean) => useAppStore.setState({ showPaths: v });
   const setShowGrid = (v: boolean) => useAppStore.setState({ showGrid: v });
@@ -377,6 +379,12 @@ export function TopMenu() {
             checked: showOccupancyHighlight,
             action: () => setShowOccupancyHighlight(!showOccupancyHighlight),
             shortcut: "Ctrl+H",
+          },
+          {
+            id: "view_conditional_styles",
+            label: "Show Conditional Styles",
+            checked: conditionalStylesEnabled,
+            action: () => setConditionalStylesEnabled(!conditionalStylesEnabled),
           },
           { id: "view_snap_waypoint", label: "Snap to Previous Waypoint", checked: enableSnapping, action: () => setEnableSnapping(!enableSnapping) },
           { id: "view_fit_to_map", label: "Fit to Map", action: triggerFitToMaps, shortcut: "Mid D-Click" },
