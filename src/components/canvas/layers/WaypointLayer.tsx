@@ -4,6 +4,78 @@ import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../../../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_HOVER_COLOR } from '../canvasConstants';
+import {
+  parseColorSafe,
+  resolveWaypointConditionalStyle,
+  ResolvedWaypointStyle,
+} from '../../../utils/conditionalStyles';
+import { WaypointShape } from '../../../types/store';
+
+function drawWaypointShape(
+  g: any,
+  shape: WaypointShape,
+  s: number
+) {
+  if (shape === 'circle') {
+    g.circle(0, 0, 6 * s);
+    g.fill();
+    g.stroke();
+    // +X 進行方向ノッチ
+    g.moveTo(5 * s, -3 * s);
+    g.lineTo(10 * s, 0);
+    g.lineTo(5 * s, 3 * s);
+    g.fill();
+    g.stroke();
+  } else if (shape === 'square') {
+    g.rect(-5 * s, -5 * s, 10 * s, 10 * s);
+    g.fill();
+    g.stroke();
+    // +X 進行方向ノッチ
+    g.moveTo(5 * s, -3 * s);
+    g.lineTo(10 * s, 0);
+    g.lineTo(5 * s, 3 * s);
+    g.fill();
+    g.stroke();
+  } else if (shape === 'diamond') {
+    g.moveTo(8 * s, 0);
+    g.lineTo(0, 6 * s);
+    g.lineTo(-8 * s, 0);
+    g.lineTo(0, -6 * s);
+    g.closePath();
+    g.fill();
+    g.stroke();
+    // +X 進行方向ポインター
+    g.moveTo(8 * s, -2 * s);
+    g.lineTo(12 * s, 0);
+    g.lineTo(8 * s, 2 * s);
+    g.fill();
+    g.stroke();
+  } else if (shape === 'star') {
+    const pts: [number, number][] = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 === 0 ? 9 * s : 4 * s;
+      const angle = (i * Math.PI) / 5;
+      pts.push([r * Math.cos(angle), r * Math.sin(angle)]);
+    }
+    g.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) {
+      g.lineTo(pts[i][0], pts[i][1]);
+    }
+    g.closePath();
+    g.fill();
+    g.stroke();
+  } else {
+    // Default Arrow
+    g.moveTo(10 * s, 0);
+    g.lineTo(-5 * s, 5 * s);
+    g.lineTo(-5 * s, -5 * s);
+    g.lineTo(10 * s, 0);
+    g.fill();
+    g.stroke();
+    g.circle(0, 0, 3 * s);
+    g.fill();
+  }
+}
 
 interface WaypointLayerProps {
   scale: number;
@@ -34,6 +106,8 @@ export function WaypointLayer({
   const optionsSchema = useAppStore(state => state.optionsSchema);
   const indexStartIndex = useAppStore(state => state.indexStartIndex);
   const showProperties = useAppStore(state => state.showProperties);
+  const conditionalStyles = useAppStore(state => state.conditionalStyles);
+  const conditionalStylesEnabled = useAppStore(state => state.conditionalStylesEnabled);
 
   const afterNodeIds = useMemo(() => {
     return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
@@ -54,6 +128,21 @@ export function WaypointLayer({
   }
 
   rootNodeIds.forEach(id => traverse(id, false));
+
+  // 条件付き書式のメモ化キャッシュ（ノード・ルール・スキーマ変更時のみ再計算）
+  const resolvedStyleMap = useMemo(() => {
+    const map = new Map<string, ResolvedWaypointStyle>();
+    if (!conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0) {
+      return map;
+    }
+    renderableNodes.forEach(({ node, globalIndex }) => {
+      const style = resolveWaypointConditionalStyle(node, conditionalStyles, conditionalStylesEnabled, optionsSchema, { index: globalIndex });
+      if (style) {
+        map.set(node.id, style);
+      }
+    });
+    return map;
+  }, [renderableNodes, conditionalStyles, conditionalStylesEnabled, optionsSchema]);
 
   // 選択状態・座標・属性ラベル行など、描画とラベル重なり判定の両方で使う値をまとめて1回だけ計算する
   const items = renderableNodes.map(({ node, parentIsGenerator, globalIndex }) => {
@@ -117,6 +206,18 @@ export function WaypointLayer({
       {items.map(({ node, parentIsGenerator, isSelected, isReferenced, isAfter, yaw, px, py, lines }) => {
         const safeScale = Math.max(scale, 0.001);
 
+        const condStyle = resolvedStyleMap.get(node.id);
+
+        let baseColor = parentIsGenerator ? 0x22c55e : 0xffa500;
+        let baseFill = parentIsGenerator ? 0x4ade80 : 0xffd700;
+
+        if (condStyle?.color) {
+          baseColor = parseColorSafe(condStyle.color, baseColor);
+          baseFill = condStyle.fillColor ? parseColorSafe(condStyle.fillColor, baseColor) : baseColor;
+        } else if (condStyle?.fillColor) {
+          baseFill = parseColorSafe(condStyle.fillColor, baseFill);
+        }
+
         const isLocked = lockedWaypointId === node.id;
         const normalColor = isLocked
           ? 0x10b981
@@ -124,9 +225,7 @@ export function WaypointLayer({
           ? 0xfacc15
           : isAfter
           ? 0x94a3b8
-          : parentIsGenerator
-          ? 0x22c55e
-          : 0xffa500;
+          : baseColor;
         const selectedColor = CANVAS_ACCENT_COLOR;
         const normalFill = isLocked
           ? 0x34d399
@@ -134,16 +233,20 @@ export function WaypointLayer({
           ? 0xfef08a
           : isAfter
           ? 0xcbd5e1
-          : parentIsGenerator
-          ? 0x4ade80
-          : 0xffd700;
+          : baseFill;
         const selectedFill = CANVAS_ACCENT_HOVER_COLOR;
+
+        const itemScale = condStyle?.scale ?? 1.0;
+        const itemOpacity = condStyle?.opacity ?? 1.0;
+        const finalAlpha = isAfter ? 0.35 : itemOpacity;
+        const shape: WaypointShape = condStyle?.shape || 'default';
 
         const labelLayout = labelLayoutMap.get(node.id);
         const labelOffsetX = labelLayout ? labelLayout.x : 15 / safeScale;
         const labelOffsetY = labelLayout ? labelLayout.y : -15 / safeScale;
         const labelWidth = labelLayout?.width ?? 0;
         const labelHeight = labelLayout?.height ?? 0;
+        const showLabel = condStyle?.labelVisible !== false;
 
         return (
           <pixiContainer
@@ -151,7 +254,7 @@ export function WaypointLayer({
             x={px}
             y={py}
             rotation={yaw}
-            alpha={isAfter ? 0.35 : 1.0}
+            alpha={finalAlpha}
           >
             <pixiGraphics
               eventMode="dynamic"
@@ -176,20 +279,13 @@ export function WaypointLayer({
                 g.clear();
                 g.strokeStyle = { width: 2 / safeScale, color: isSelected ? selectedColor : normalColor };
                 g.fillStyle = { color: isSelected ? selectedFill : normalFill, alpha: 0.8 };
-                g.moveTo(10 / safeScale, 0);
-                g.lineTo(-5 / safeScale, 5 / safeScale);
-                g.lineTo(-5 / safeScale, -5 / safeScale);
-                g.lineTo(10 / safeScale, 0);
-                g.fill();
-                g.stroke();
-                g.circle(0, 0, 3 / safeScale);
-                g.fill();
+                drawWaypointShape(g, shape, itemScale / safeScale);
               }}
             />
 
             {isSelected && activeTool === 'select' && (
               <pixiGraphics
-                x={25 / safeScale}
+                x={(25 * Math.max(1.0, itemScale)) / safeScale}
                 y={0}
                 eventMode="dynamic"
                 cursor="grab"
@@ -213,7 +309,7 @@ export function WaypointLayer({
               />
             )}
 
-            {lines.length > 0 && (
+            {showLabel && lines.length > 0 && (
               <pixiContainer rotation={-yaw} scale={{ x: 1 / safeScale, y: -1 / safeScale }} x={labelOffsetX} y={labelOffsetY}>
                 <pixiGraphics
                   eventMode="dynamic"

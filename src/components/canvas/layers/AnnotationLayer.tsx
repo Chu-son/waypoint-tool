@@ -11,6 +11,7 @@ import {
 } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
 import { CANVAS_ACCENT_COLOR } from '../canvasConstants';
+import { resolveAnnotationConditionalStyle, parseColorSafe } from '../../../utils/conditionalStyles';
 
 interface AnnotationLayerProps {
   scale: number;
@@ -43,6 +44,9 @@ export function AnnotationLayer({
   const showAnnotationLabels = useAppStore((state) => state.showAnnotationLabels);
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
+  const conditionalStyles = useAppStore((state) => state.conditionalStyles);
+  const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
+  const optionsSchema = useAppStore((state) => state.optionsSchema);
 
   const handleShapePointerDown = (e: FederatedPointerEvent, id: string) => {
     if (e.button === 2) {
@@ -85,9 +89,23 @@ export function AnnotationLayer({
       }
     }
 
+    // Evaluate conditional styles
+    const condStyle = !isPreview
+      ? resolveAnnotationConditionalStyle(obj, conditionalStyles, conditionalStylesEnabled, optionsSchema)
+      : null;
+
+    if (condStyle?.visible === false) {
+      return null;
+    }
+
     const isSelected = !isPreview && selectedAnnotationIds.includes(obj.id);
     const baseColorHex = parseHexColor(obj.color, CANVAS_ACCENT_COLOR);
-    const strokeWidth = (isSelected ? 3.0 : 2.0) / safeScale;
+
+    const strokeColorHex = condStyle?.strokeColor ? parseColorSafe(condStyle.strokeColor, baseColorHex) : baseColorHex;
+    const fillColorHex = condStyle?.fillColor ? parseColorSafe(condStyle.fillColor, baseColorHex) : strokeColorHex;
+    const strokeWidth = (condStyle?.strokeWidth !== undefined ? condStyle.strokeWidth : (isSelected ? 3.0 : 2.0)) / safeScale;
+    const opacity = condStyle?.opacity !== undefined ? condStyle.opacity : 1.0;
+
     const isInteractive = !isPreview;
     const cursor = isPlacing ? 'crosshair' : isInteractive ? 'pointer' : 'default';
 
@@ -111,13 +129,13 @@ export function AnnotationLayer({
                   g.circle(0, 0, radius + 3 / safeScale);
                   g.stroke();
                 }
-                g.fillStyle = { color: baseColorHex, alpha: 0.85 };
-                g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                g.fillStyle = { color: fillColorHex, alpha: 0.85 * opacity };
+                g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                 g.circle(0, 0, radius);
                 g.fill();
                 g.stroke();
                 // Center white dot
-                g.fillStyle = { color: 0xffffff, alpha: 0.9 };
+                g.fillStyle = { color: 0xffffff, alpha: 0.9 * opacity };
                 g.circle(0, 0, 2 / safeScale);
                 g.fill();
               }}
@@ -167,8 +185,8 @@ export function AnnotationLayer({
                     g.circle(0, 0, 16 / safeScale);
                     g.stroke();
                   }
-                  g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
-                  g.fillStyle = { color: baseColorHex, alpha: 0.85 };
+                  g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
+                  g.fillStyle = { color: fillColorHex, alpha: 0.85 * opacity };
                   // Triangle pointing forward (+X)
                   g.moveTo(12 / safeScale, 0);
                   g.lineTo(-6 / safeScale, 6 / safeScale);
@@ -237,13 +255,13 @@ export function AnnotationLayer({
                 }
 
                 // Visible line in chosen color
-                g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                 g.moveTo(line.x1, line.y1);
                 g.lineTo(line.x2, line.y2);
                 g.stroke();
 
                 // End endpoints in chosen color
-                g.fillStyle = { color: baseColorHex, alpha: 1.0 };
+                g.fillStyle = { color: strokeColorHex, alpha: opacity };
                 g.circle(line.x1, line.y1, 4 / safeScale);
                 g.circle(line.x2, line.y2, 4 / safeScale);
                 g.fill();
@@ -294,7 +312,7 @@ export function AnnotationLayer({
                     draw={(g) => {
                       g.clear();
                       g.fillStyle = { color: 0x0f172a, alpha: 0.85 };
-                      g.strokeStyle = { width: 1.5 / safeScale, color: baseColorHex, alpha: 0.9 };
+                      g.strokeStyle = { width: 1.5 / safeScale, color: strokeColorHex, alpha: 0.9 * opacity };
                       g.roundRect(-bw / 2, -bh / 2, bw, bh, 4 / safeScale);
                       g.fill();
                       g.stroke();
@@ -354,12 +372,12 @@ export function AnnotationLayer({
                   }
 
                   // Fill in chosen color
-                  g.fillStyle = { color: baseColorHex, alpha: 0.15 };
+                  g.fillStyle = { color: fillColorHex, alpha: 0.15 * opacity };
                   g.rect(-halfW, -halfH, rect.width, rect.height);
                   g.fill();
 
                   // Stroke in chosen color
-                  g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                  g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                   g.rect(-halfW, -halfH, rect.width, rect.height);
                   g.stroke();
                 }}
@@ -441,12 +459,12 @@ export function AnnotationLayer({
                 }
 
                 // Fill in chosen color
-                g.fillStyle = { color: baseColorHex, alpha: 0.15 };
+                g.fillStyle = { color: fillColorHex, alpha: 0.15 * opacity };
                 g.circle(0, 0, circle.radius);
                 g.fill();
 
                 // Stroke in chosen color
-                g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                 g.circle(0, 0, circle.radius);
                 g.stroke();
               }}
