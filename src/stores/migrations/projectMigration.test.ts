@@ -265,6 +265,8 @@ describe('projectMigration', () => {
       'decimal_precision',
       'conditional_styles',
       'conditional_styles_enabled',
+      'export_profiles',
+      'active_export_profile_id',
       'custom_ui_data',
     ];
 

@@ -136,6 +136,27 @@ describe('projectPersistence roundtrip & strict validation', () => {
       decimal_precision: 4,
       conditional_styles: [],
       conditional_styles_enabled: true,
+      export_profiles: [
+        {
+          id: 'test-profile-1',
+          name: 'Test Profile',
+          description: 'A test profile',
+          outputRootDir: '/tmp/export',
+          conflictResolution: 'backup_file',
+          items: [
+            {
+              id: 'item-1',
+              type: 'waypoint_default',
+              sourceId: '__default_yaml__',
+              relativePathPattern: 'waypoints/{{yyyymmdd}}_test.yaml',
+              mapFormat: 'ros_standard',
+              includeMapImage: false,
+              enabled: true,
+            },
+          ],
+        },
+      ],
+      active_export_profile_id: 'test-profile-1',
       custom_ui_data: {
         workflow_state: {
           current_step_index: 3,
@@ -149,7 +170,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     useAppStore.getState().setProjectData(fullProjectData);
     const saved = buildProjectData(useAppStore.getState());
 
-    // 1. StrictProjectData has all 27 required top-level keys
+    // 1. StrictProjectData has all required top-level keys
     const expectedKeys: (keyof StrictProjectData)[] = [
       'version',
       'root_node_ids',
@@ -179,6 +200,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'decimal_precision',
       'conditional_styles',
       'conditional_styles_enabled',
+      'export_profiles',
+      'active_export_profile_id',
       'custom_ui_data',
     ];
 
@@ -213,6 +236,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.decimal_precision).toBe(4);
     expect(saved.conditional_styles).toEqual(fullProjectData.conditional_styles);
     expect(saved.conditional_styles_enabled).toBe(fullProjectData.conditional_styles_enabled);
+    expect(saved.export_profiles).toEqual(fullProjectData.export_profiles);
+    expect(saved.active_export_profile_id).toBe(fullProjectData.active_export_profile_id);
     expect(saved.custom_ui_data.workflow_state).toEqual(fullProjectData.custom_ui_data.workflow_state);
   });
 
@@ -385,6 +410,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       decimal_precision: 6,
       conditional_styles: [],
       conditional_styles_enabled: true,
+      export_profiles: [],
+      active_export_profile_id: null,
       custom_ui_data: {
         workflow_state: {
           current_step_index: 0,

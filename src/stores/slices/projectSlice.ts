@@ -1,13 +1,16 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, AnnotationObject, RobotFootprint, OccupancySettings, RecentProjectItem, StrictProjectData, ConditionalStyleRule } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, AnnotationObject, RobotFootprint, OccupancySettings, RecentProjectItem, StrictProjectData, ConditionalStyleRule, ExportProfile } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
+import { v4 as uuidv4 } from 'uuid';
 import {
   DEFAULT_ROBOT_FOOTPRINT,
   DEFAULT_OCCUPANCY_SETTINGS,
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
+  DEFAULT_EXPORT_PROFILES,
+  DEFAULT_ACTIVE_EXPORT_PROFILE_ID,
   DEFAULT_CONDITIONAL_STYLES,
   DEFAULT_CONDITIONAL_STYLES_ENABLED,
   migrateAndNormalizeProjectData,
@@ -18,6 +21,8 @@ export {
   DEFAULT_OCCUPANCY_SETTINGS,
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
+  DEFAULT_EXPORT_PROFILES,
+  DEFAULT_ACTIVE_EXPORT_PROFILE_ID,
   DEFAULT_CONDITIONAL_STYLES,
   DEFAULT_CONDITIONAL_STYLES_ENABLED,
 };
@@ -79,6 +84,13 @@ export type ProjectSlice = {
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
   updateDefaultExportFormat: (id: string, updates: Partial<DefaultExportFormat>) => void;
+  exportProfiles: ExportProfile[];
+  activeExportProfileId: string | null;
+  addExportProfile: (profile: ExportProfile) => void;
+  updateExportProfile: (id: string, updates: Partial<ExportProfile>) => void;
+  removeExportProfile: (id: string) => void;
+  setActiveExportProfileId: (id: string | null) => void;
+  duplicateExportProfile: (id: string) => void;
   setProjectData: (data: any) => void;
   
   loadProject: () => Promise<boolean>;
@@ -133,6 +145,8 @@ export function buildProjectData(state: AppState): StrictProjectData {
     decimal_precision: state.decimalPrecision,
     conditional_styles: state.conditionalStyles,
     conditional_styles_enabled: state.conditionalStylesEnabled,
+    export_profiles: state.exportProfiles,
+    active_export_profile_id: state.activeExportProfileId,
     custom_ui_data: {
       workflow_state: {
         current_step_index: state.currentStepIndex,
@@ -177,6 +191,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   syncPathWidthWithFootprint: false,
   conditionalStyles: DEFAULT_CONDITIONAL_STYLES,
   conditionalStylesEnabled: DEFAULT_CONDITIONAL_STYLES_ENABLED,
+  exportProfiles: DEFAULT_EXPORT_PROFILES,
+  activeExportProfileId: DEFAULT_ACTIVE_EXPORT_PROFILE_ID,
   currentProjectPath: null,
 
   setCurrentProjectPath: (path: string | null) => set({ currentProjectPath: path }),
@@ -249,6 +265,47 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     isDirty: true
   })),
 
+  addExportProfile: (profile: ExportProfile) => set((state) => ({
+    exportProfiles: [...state.exportProfiles, profile],
+    activeExportProfileId: profile.id,
+    isDirty: true,
+  })),
+
+  updateExportProfile: (id: string, updates: Partial<ExportProfile>) => set((state) => ({
+    exportProfiles: state.exportProfiles.map((p) => p.id === id ? { ...p, ...updates } : p),
+    isDirty: true,
+  })),
+
+  removeExportProfile: (id: string) => set((state) => {
+    const filtered = state.exportProfiles.filter((p) => p.id !== id);
+    const nextActiveId = state.activeExportProfileId === id
+      ? (filtered[0]?.id ?? null)
+      : state.activeExportProfileId;
+    return {
+      exportProfiles: filtered,
+      activeExportProfileId: nextActiveId,
+      isDirty: true,
+    };
+  }),
+
+  setActiveExportProfileId: (id: string | null) => set({ activeExportProfileId: id }),
+
+  duplicateExportProfile: (id: string) => {
+    const profile = get().exportProfiles.find((p) => p.id === id);
+    if (!profile) return;
+    const newProfile: ExportProfile = {
+      ...profile,
+      id: uuidv4(),
+      name: `${profile.name} (Copy)`,
+      items: profile.items.map((item) => ({ ...item, id: uuidv4() })),
+    };
+    set((state) => ({
+      exportProfiles: [...state.exportProfiles, newProfile],
+      activeExportProfileId: newProfile.id,
+      isDirty: true,
+    }));
+  },
+
   setProjectData: (rawData: any) => {
     get().abortCanvasGestures?.();
     set((state) => {
@@ -319,6 +376,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         decimalPrecision: data.decimal_precision,
         conditionalStyles: data.conditional_styles,
         conditionalStylesEnabled: data.conditional_styles_enabled,
+        exportProfiles: data.export_profiles,
+        activeExportProfileId: data.active_export_profile_id,
         isDirty: false,
       };
     });
@@ -361,6 +420,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         syncPathWidthWithFootprint: false,
         conditionalStyles: DEFAULT_CONDITIONAL_STYLES,
         conditionalStylesEnabled: DEFAULT_CONDITIONAL_STYLES_ENABLED,
+        exportProfiles: DEFAULT_EXPORT_PROFILES,
+        activeExportProfileId: DEFAULT_ACTIVE_EXPORT_PROFILE_ID,
         exportRegions: [],
         optionsSchema: null,
         robotFootprint: DEFAULT_ROBOT_FOOTPRINT,

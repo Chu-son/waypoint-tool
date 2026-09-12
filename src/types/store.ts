@@ -63,6 +63,35 @@ export type ExportTemplate = {
   importMapping?: ImportFieldMapping;
 };
 
+export type ExportTargetType =
+  | 'waypoint_template'
+  | 'waypoint_default'
+  | 'map_region'
+  | 'map_all_regions';
+
+export type ConflictResolution =
+  | 'overwrite'
+  | 'backup_file';
+
+export interface ExportTargetItem {
+  id: string;
+  type: ExportTargetType;
+  sourceId: string;
+  relativePathPattern: string;
+  mapFormat?: 'ros_standard' | 'png_only';
+  includeMapImage?: boolean;
+  enabled: boolean;
+}
+
+export interface ExportProfile {
+  id: string;
+  name: string;
+  description?: string;
+  outputRootDir?: string;
+  conflictResolution: ConflictResolution;
+  items: ExportTargetItem[];
+}
+
 export interface RecentProjectItem {
   path: string;
   name: string;
@@ -685,6 +714,8 @@ export interface StrictProjectData {
   decimal_precision: number;
   conditional_styles: ConditionalStyleRule[];
   conditional_styles_enabled: boolean;
+  export_profiles: ExportProfile[];
+  active_export_profile_id: string | null;
   custom_ui_data: {
     workflow_state?: {
       current_step_index: number;
@@ -711,6 +742,8 @@ export interface AppState {
   optionsSchema: OptionsSchema | null;
   exportTemplates: ExportTemplate[];
   defaultExportFormats: DefaultExportFormat[];
+  exportProfiles: ExportProfile[];
+  activeExportProfileId: string | null;
   globalPythonPath: string;
   
   // Unsaved changes tracker

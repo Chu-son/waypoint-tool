@@ -1,4 +1,4 @@
-import { StrictProjectData, CustomLayer, RobotFootprint, OccupancySettings, DefaultExportFormat, RectangularFootprint, CircularFootprint, ConditionalStyleRule } from '../../types/store';
+import { StrictProjectData, CustomLayer, RobotFootprint, OccupancySettings, DefaultExportFormat, RectangularFootprint, CircularFootprint, ConditionalStyleRule, ExportProfile } from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -22,6 +22,34 @@ export const DEFAULT_EXPORT_FORMATS: DefaultExportFormat[] = [
   { id: '__default_yaml__', name: 'YAML Document', extension: 'yaml', suffix: '_yaml', enabled: true },
   { id: '__default_json__', name: 'JSON Document', extension: 'json', suffix: '_json', enabled: true },
 ];
+
+export const DEFAULT_EXPORT_PROFILES: ExportProfile[] = [
+  {
+    id: 'default_profile',
+    name: '標準エクスポート',
+    description: 'Waypoint YAML と Map PGM/YAML を一括出力する標準構成',
+    conflictResolution: 'backup_file',
+    items: [
+      {
+        id: 'item_default_wp',
+        type: 'waypoint_default',
+        sourceId: '__default_yaml__',
+        relativePathPattern: 'waypoints/{{yyyymmdd}}_waypoints.yaml',
+        enabled: true,
+      },
+      {
+        id: 'item_default_map',
+        type: 'map_all_regions',
+        sourceId: 'all',
+        relativePathPattern: 'Map/{{name}}.pgm',
+        mapFormat: 'ros_standard',
+        enabled: true,
+      },
+    ],
+  },
+];
+
+export const DEFAULT_ACTIVE_EXPORT_PROFILE_ID = 'default_profile';
 
 /**
  * ロボットフットプリントの型別厳格正規化。
@@ -385,6 +413,38 @@ export function normalizeV1(raw: any): StrictProjectData {
     };
   }
 
+  // エクスポートプロファイル
+  const rawExportProfiles = data.export_profiles ?? data.exportProfiles;
+  const exportProfiles: ExportProfile[] = Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0
+    ? rawExportProfiles.map((p: any) => ({
+        id: typeof p.id === 'string' ? p.id : uuidv4(),
+        name: typeof p.name === 'string' ? p.name : 'Untitled Profile',
+        description: typeof p.description === 'string' ? p.description : '',
+        outputRootDir: typeof (p.outputRootDir ?? p.output_root_dir) === 'string' ? (p.outputRootDir ?? p.output_root_dir) : undefined,
+        conflictResolution: p.conflictResolution === 'overwrite' || p.conflict_resolution === 'overwrite' ? 'overwrite' : 'backup_file',
+        items: Array.isArray(p.items)
+          ? p.items.map((item: any) => ({
+              id: typeof item.id === 'string' ? item.id : uuidv4(),
+              type: ['waypoint_template', 'waypoint_default', 'map_region', 'map_all_regions'].includes(item.type)
+                ? item.type
+                : 'waypoint_default',
+              sourceId: typeof (item.sourceId ?? item.source_id) === 'string' ? (item.sourceId ?? item.source_id) : '__default_yaml__',
+              relativePathPattern: typeof (item.relativePathPattern ?? item.relative_path_pattern) === 'string'
+                ? (item.relativePathPattern ?? item.relative_path_pattern)
+                : 'waypoints/{{yyyymmdd}}_waypoints.yaml',
+              mapFormat: item.mapFormat === 'png_only' || item.map_format === 'png_only' ? 'png_only' : 'ros_standard',
+              includeMapImage: Boolean(item.includeMapImage ?? item.include_map_image),
+              enabled: item.enabled !== false,
+            }))
+          : [],
+      }))
+    : [...DEFAULT_EXPORT_PROFILES];
+
+  const rawActiveProfileId = data.active_export_profile_id ?? data.activeExportProfileId;
+  const activeExportProfileId: string | null = typeof rawActiveProfileId === 'string'
+    ? rawActiveProfileId
+    : (exportProfiles[0]?.id ?? null);
+
   return {
     version: 1,
     root_node_ids: rootNodeIds,
@@ -414,6 +474,8 @@ export function normalizeV1(raw: any): StrictProjectData {
     decimal_precision: decimalPrecision,
     conditional_styles: conditionalStyles,
     conditional_styles_enabled: conditionalStylesEnabled,
+    export_profiles: exportProfiles,
+    active_export_profile_id: activeExportProfileId,
     custom_ui_data: customUiData,
   };
 }
