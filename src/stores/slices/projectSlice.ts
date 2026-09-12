@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { OptionsSchema, ExportTemplate, DefaultExportFormat, AnnotationObject, RobotFootprint, OccupancySettings, RecentProjectItem, StrictProjectData } from '../../types/store';
+import { OptionsSchema, ExportTemplate, DefaultExportFormat, AnnotationObject, RobotFootprint, OccupancySettings, RecentProjectItem, StrictProjectData, ConditionalStyleRule } from '../../types/store';
 import { BackendAPI, DialogAPI } from '../../api';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import {
@@ -8,6 +8,8 @@ import {
   DEFAULT_OCCUPANCY_SETTINGS,
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
+  DEFAULT_CONDITIONAL_STYLES,
+  DEFAULT_CONDITIONAL_STYLES_ENABLED,
   migrateAndNormalizeProjectData,
 } from '../migrations/projectMigration';
 
@@ -16,6 +18,8 @@ export {
   DEFAULT_OCCUPANCY_SETTINGS,
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
+  DEFAULT_CONDITIONAL_STYLES,
+  DEFAULT_CONDITIONAL_STYLES_ENABLED,
 };
 
 /**
@@ -49,6 +53,8 @@ export type ProjectSlice = {
   pathWidth: number;
   pathOpacity: number;
   syncPathWidthWithFootprint: boolean;
+  conditionalStyles: ConditionalStyleRule[];
+  conditionalStylesEnabled: boolean;
 
   currentProjectPath: string | null;
   setCurrentProjectPath: (path: string | null) => void;
@@ -63,6 +69,12 @@ export type ProjectSlice = {
   setPathWidth: (width: number) => void;
   setPathOpacity: (opacity: number) => void;
   setSyncPathWidthWithFootprint: (sync: boolean) => void;
+  setConditionalStyles: (rules: ConditionalStyleRule[]) => void;
+  setConditionalStylesEnabled: (enabled: boolean) => void;
+  addConditionalStyleRule: (rule: ConditionalStyleRule) => void;
+  updateConditionalStyleRule: (id: string, updates: Partial<ConditionalStyleRule>) => void;
+  removeConditionalStyleRule: (id: string) => void;
+  reorderConditionalStyleRules: (startIndex: number, endIndex: number) => void;
   addExportTemplate: (template: ExportTemplate) => void;
   updateExportTemplate: (id: string, updates: Partial<ExportTemplate>) => void;
   removeExportTemplate: (id: string) => void;
@@ -119,6 +131,8 @@ export function buildProjectData(state: AppState): StrictProjectData {
     sync_path_width_with_footprint: state.syncPathWidthWithFootprint,
     index_start_index: state.indexStartIndex,
     decimal_precision: state.decimalPrecision,
+    conditional_styles: state.conditionalStyles,
+    conditional_styles_enabled: state.conditionalStylesEnabled,
     custom_ui_data: {
       workflow_state: {
         current_step_index: state.currentStepIndex,
@@ -161,6 +175,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   pathWidth: 0.1,
   pathOpacity: 0.7,
   syncPathWidthWithFootprint: false,
+  conditionalStyles: DEFAULT_CONDITIONAL_STYLES,
+  conditionalStylesEnabled: DEFAULT_CONDITIONAL_STYLES_ENABLED,
   currentProjectPath: null,
 
   setCurrentProjectPath: (path: string | null) => set({ currentProjectPath: path }),
@@ -192,6 +208,26 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
   setPathWidth: (width: number) => set({ pathWidth: width, isDirty: true }),
   setPathOpacity: (opacity: number) => set({ pathOpacity: opacity, isDirty: true }),
   setSyncPathWidthWithFootprint: (sync: boolean) => set({ syncPathWidthWithFootprint: sync, isDirty: true }),
+  setConditionalStyles: (rules: ConditionalStyleRule[]) => set({ conditionalStyles: rules, isDirty: true }),
+  setConditionalStylesEnabled: (enabled: boolean) => set({ conditionalStylesEnabled: enabled, isDirty: true }),
+  addConditionalStyleRule: (rule: ConditionalStyleRule) => set((state) => ({
+    conditionalStyles: [...state.conditionalStyles, rule],
+    isDirty: true,
+  })),
+  updateConditionalStyleRule: (id: string, updates: Partial<ConditionalStyleRule>) => set((state) => ({
+    conditionalStyles: state.conditionalStyles.map((r) => r.id === id ? { ...r, ...updates } : r),
+    isDirty: true,
+  })),
+  removeConditionalStyleRule: (id: string) => set((state) => ({
+    conditionalStyles: state.conditionalStyles.filter((r) => r.id !== id),
+    isDirty: true,
+  })),
+  reorderConditionalStyleRules: (startIndex: number, endIndex: number) => set((state) => {
+    const next = [...state.conditionalStyles];
+    const [removed] = next.splice(startIndex, 1);
+    next.splice(endIndex, 0, removed);
+    return { conditionalStyles: next, isDirty: true };
+  }),
   
   addExportTemplate: (template: ExportTemplate) => set((state) => ({
     exportTemplates: [...state.exportTemplates, template],
@@ -281,6 +317,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         defaultExportFormats: data.default_export_formats,
         indexStartIndex: data.index_start_index,
         decimalPrecision: data.decimal_precision,
+        conditionalStyles: data.conditional_styles,
+        conditionalStylesEnabled: data.conditional_styles_enabled,
         isDirty: false,
       };
     });
@@ -321,6 +359,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         pathWidth: 0.1,
         pathOpacity: 0.7,
         syncPathWidthWithFootprint: false,
+        conditionalStyles: DEFAULT_CONDITIONAL_STYLES,
+        conditionalStylesEnabled: DEFAULT_CONDITIONAL_STYLES_ENABLED,
         exportRegions: [],
         optionsSchema: null,
         robotFootprint: DEFAULT_ROBOT_FOOTPRINT,

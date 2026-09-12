@@ -7,6 +7,8 @@ import {
   DEFAULT_OCCUPANCY_SETTINGS,
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
+  DEFAULT_CONDITIONAL_STYLES,
+  DEFAULT_CONDITIONAL_STYLES_ENABLED,
 } from './projectMigration';
 
 describe('projectMigration', () => {
@@ -22,6 +24,8 @@ describe('projectMigration', () => {
     expect(defaultData.occupancy_settings).toEqual(DEFAULT_OCCUPANCY_SETTINGS);
     expect(defaultData.default_map_opacity).toBe(DEFAULT_MAP_OPACITY);
     expect(defaultData.default_export_formats).toEqual(DEFAULT_EXPORT_FORMATS);
+    expect(defaultData.conditional_styles).toEqual(DEFAULT_CONDITIONAL_STYLES);
+    expect(defaultData.conditional_styles_enabled).toBe(DEFAULT_CONDITIONAL_STYLES_ENABLED);
   });
 
   it('migrates legacy v0 project with edit_layers and generated_layers to custom_layers', () => {
@@ -225,7 +229,7 @@ describe('projectMigration', () => {
     expect(normalized.root_annotation_ids).toEqual(['ann-1', 'ann-2']);
   });
 
-  it('fully populates all 27 StrictProjectData fields when input is { version: 1 } without crashing', () => {
+  it('fully populates all 29 StrictProjectData fields when input is { version: 1 } without crashing', () => {
     const incompleteV1 = { version: 1 };
     let normalized: any;
     expect(() => {
@@ -259,6 +263,8 @@ describe('projectMigration', () => {
       'sync_path_width_with_footprint',
       'index_start_index',
       'decimal_precision',
+      'conditional_styles',
+      'conditional_styles_enabled',
       'custom_ui_data',
     ];
 
@@ -479,5 +485,67 @@ describe('projectMigration', () => {
     // Map 3: fallback to [0, 0, 0]
     expect(normalized.map_layers[2].info.origin).toEqual([0, 0, 0]);
     expect(normalized.map_layers[2].info.initial_origin).toEqual([0, 0, 0]);
+  });
+
+  it('preserves conditional_styles and normalizes annotation options', () => {
+    const rawData = {
+      conditional_styles: [
+        {
+          id: 'rule-1',
+          name: 'Fast Speed Red',
+          targetElement: 'waypoint',
+          enabled: true,
+          stopIfMatched: false,
+          condition: {
+            id: 'g-1',
+            type: 'group',
+            logicalOperator: 'and',
+            children: [
+              {
+                id: 'r-1',
+                type: 'rule',
+                property: 'options.speed',
+                operator: 'greater_than',
+                value: 1.5,
+              },
+            ],
+          },
+          style: {
+            waypoint: {
+              color: '#FF0000',
+              shape: 'star',
+            },
+          },
+        },
+      ],
+      conditional_styles_enabled: false,
+      annotation_objects: [
+        {
+          id: 'ann-1',
+          name: 'Zone A',
+          type: 'rect',
+          visible: true,
+          labelVisible: true,
+          options: { zone_type: 'danger' },
+        },
+        {
+          id: 'ann-2',
+          name: 'Point B',
+          type: 'point',
+          visible: true,
+          labelVisible: false,
+          // options missing
+        },
+      ],
+    };
+
+    const normalized = migrateAndNormalizeProjectData(rawData);
+    expect(normalized.conditional_styles).toHaveLength(1);
+    expect(normalized.conditional_styles[0].name).toBe('Fast Speed Red');
+    expect(normalized.conditional_styles_enabled).toBe(false);
+
+    expect(normalized.annotation_objects).toHaveLength(2);
+    expect(normalized.annotation_objects[0].options).toEqual({ zone_type: 'danger' });
+    expect(normalized.annotation_objects[1].options).toEqual({});
   });
 });

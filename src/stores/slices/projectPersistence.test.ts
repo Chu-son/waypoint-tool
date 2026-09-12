@@ -68,6 +68,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
           visible: true,
           labelVisible: true,
           group_id: 'grp-1',
+          options: {},
         },
       ],
       annotation_groups: {
@@ -133,6 +134,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       sync_path_width_with_footprint: true,
       index_start_index: 1,
       decimal_precision: 4,
+      conditional_styles: [],
+      conditional_styles_enabled: true,
       custom_ui_data: {
         workflow_state: {
           current_step_index: 3,
@@ -174,6 +177,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'sync_path_width_with_footprint',
       'index_start_index',
       'decimal_precision',
+      'conditional_styles',
+      'conditional_styles_enabled',
       'custom_ui_data',
     ];
 
@@ -206,6 +211,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.sync_path_width_with_footprint).toBe(true);
     expect(saved.index_start_index).toBe(1);
     expect(saved.decimal_precision).toBe(4);
+    expect(saved.conditional_styles).toEqual(fullProjectData.conditional_styles);
+    expect(saved.conditional_styles_enabled).toBe(fullProjectData.conditional_styles_enabled);
     expect(saved.custom_ui_data.workflow_state).toEqual(fullProjectData.custom_ui_data.workflow_state);
   });
 
@@ -376,6 +383,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       sync_path_width_with_footprint: false,
       index_start_index: 0,
       decimal_precision: 6,
+      conditional_styles: [],
+      conditional_styles_enabled: true,
       custom_ui_data: {
         workflow_state: {
           current_step_index: 0,

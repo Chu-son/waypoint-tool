@@ -1,4 +1,4 @@
-import { StrictProjectData, CustomLayer, RobotFootprint, OccupancySettings, DefaultExportFormat, RectangularFootprint, CircularFootprint } from '../../types/store';
+import { StrictProjectData, CustomLayer, RobotFootprint, OccupancySettings, DefaultExportFormat, RectangularFootprint, CircularFootprint, ConditionalStyleRule } from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -14,6 +14,9 @@ export const DEFAULT_OCCUPANCY_SETTINGS: OccupancySettings = {
 };
 
 export const DEFAULT_MAP_OPACITY = 0.5;
+
+export const DEFAULT_CONDITIONAL_STYLES: ConditionalStyleRule[] = [];
+export const DEFAULT_CONDITIONAL_STYLES_ENABLED = true;
 
 export const DEFAULT_EXPORT_FORMATS: DefaultExportFormat[] = [
   { id: '__default_yaml__', name: 'YAML Document', extension: 'yaml', suffix: '_yaml', enabled: true },
@@ -255,6 +258,7 @@ export function normalizeV1(raw: any): StrictProjectData {
   const annotationObjects = rawAnnotationList.map((a: any) => ({
     ...a,
     id: a?.id || uuidv4(),
+    options: (a?.options && typeof a.options === 'object' && !Array.isArray(a.options)) ? { ...a.options } : {},
   }));
 
   const rawAnnotationGroups = data.annotation_groups ?? data.annotationGroups;
@@ -342,7 +346,17 @@ export function normalizeV1(raw: any): StrictProjectData {
     ? (data.decimal_precision ?? data.decimalPrecision)
     : 6;
 
-  // 10. カスタムUI & ワークフロー状態 (camelCase 解決とクリーンアップ)
+  // 10. 条件付き書式 (Conditional Styles)
+  const rawConditionalStyles = data.conditional_styles ?? data.conditionalStyles;
+  const conditionalStyles: ConditionalStyleRule[] = Array.isArray(rawConditionalStyles)
+    ? rawConditionalStyles
+    : DEFAULT_CONDITIONAL_STYLES;
+
+  const conditionalStylesEnabled = typeof (data.conditional_styles_enabled ?? data.conditionalStylesEnabled) === 'boolean'
+    ? (data.conditional_styles_enabled ?? data.conditionalStylesEnabled)
+    : DEFAULT_CONDITIONAL_STYLES_ENABLED;
+
+  // 11. カスタムUI & ワークフロー状態 (camelCase 解決とクリーンアップ)
   const rawCustomUi = data.custom_ui_data ?? data.customUiData ?? {};
   const customUiData: Record<string, any> = (rawCustomUi && typeof rawCustomUi === 'object' && !Array.isArray(rawCustomUi))
     ? { ...rawCustomUi }
@@ -398,6 +412,8 @@ export function normalizeV1(raw: any): StrictProjectData {
     sync_path_width_with_footprint: syncPathWidthWithFootprint,
     index_start_index: indexStartIndex,
     decimal_precision: decimalPrecision,
+    conditional_styles: conditionalStyles,
+    conditional_styles_enabled: conditionalStylesEnabled,
     custom_ui_data: customUiData,
   };
 }
