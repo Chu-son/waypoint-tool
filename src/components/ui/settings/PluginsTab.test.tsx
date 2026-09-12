@@ -22,6 +22,7 @@ vi.mock('../../../api', () => ({
     installPipPackages: vi.fn(),
     fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
     updatePluginSdk: vi.fn(),
+    scanCustomPlugins: vi.fn(),
   },
   DialogAPI: {
     ask: vi.fn(),
@@ -255,5 +256,114 @@ describe('PluginsTab', () => {
     });
 
     expect(screen.getByText('scipy@1.10.0')).toBeInTheDocument();
+  });
+
+  it('imports a single plugin folder when Add Folder is used', async () => {
+    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const { DialogAPI, BackendAPI } = await import('../../../api');
+    (DialogAPI.ask as any).mockResolvedValue(true);
+    (DialogAPI.open as any).mockResolvedValue('/path/to/new_plugin');
+    const newPlugin = {
+      id: 'new_plugin',
+      folder_path: '/path/to/new_plugin',
+      is_builtin: false,
+      manifest: { name: 'New Custom Plugin', type: 'python', executable: 'main.py', inputs: [], properties: [] },
+    };
+    (BackendAPI.scanCustomPlugins as any).mockResolvedValue([newPlugin]);
+
+    render(
+      <PluginsTab bundledSdkVersion="1.0.0" globalPythonPath="/usr/bin/python3" />
+    );
+
+    const addFolderBtn = screen.getByRole('button', { name: /Add Folder/i });
+    fireEvent.click(addFolderBtn);
+
+    await waitFor(() => {
+      expect(DialogAPI.open).toHaveBeenCalledWith({
+        multiple: true,
+        directory: true,
+        defaultPath: '/home/user',
+      });
+      expect(BackendAPI.scanCustomPlugins).toHaveBeenCalledWith('/path/to/new_plugin');
+      expect(mockSetPlugins).toHaveBeenCalledWith(
+        expect.objectContaining({ new_plugin: newPlugin })
+      );
+      expect(mockSetPluginSettings).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'new_plugin', path: '/path/to/new_plugin' }),
+        ])
+      );
+      expect(alertMock).toHaveBeenCalledWith("Plugin 'New Custom Plugin' をインポートしました。");
+    });
+    alertMock.mockRestore();
+  });
+
+  it('batch imports multiple plugins when a parent directory is selected', async () => {
+    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const { DialogAPI, BackendAPI } = await import('../../../api');
+    (DialogAPI.ask as any).mockResolvedValue(true);
+    (DialogAPI.open as any).mockResolvedValue('/path/to/plugins_parent');
+    const pluginA = {
+      id: 'plugin_a',
+      folder_path: '/path/to/plugins_parent/plugin_a',
+      is_builtin: false,
+      manifest: { name: 'Plugin A', type: 'python', executable: 'main.py', inputs: [], properties: [] },
+    };
+    const pluginB = {
+      id: 'plugin_b',
+      folder_path: '/path/to/plugins_parent/plugin_b',
+      is_builtin: false,
+      manifest: { name: 'Plugin B', type: 'python', executable: 'main.py', inputs: [], properties: [] },
+    };
+    (BackendAPI.scanCustomPlugins as any).mockResolvedValue([pluginA, pluginB]);
+
+    render(
+      <PluginsTab bundledSdkVersion="1.0.0" globalPythonPath="/usr/bin/python3" />
+    );
+
+    const addFolderBtn = screen.getByRole('button', { name: /Add Folder/i });
+    fireEvent.click(addFolderBtn);
+
+    await waitFor(() => {
+      expect(BackendAPI.scanCustomPlugins).toHaveBeenCalledWith('/path/to/plugins_parent');
+      expect(mockSetPlugins).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plugin_a: pluginA,
+          plugin_b: pluginB,
+        })
+      );
+      expect(mockSetPluginSettings).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'plugin_a', path: '/path/to/plugins_parent/plugin_a' }),
+          expect.objectContaining({ id: 'plugin_b', path: '/path/to/plugins_parent/plugin_b' }),
+        ])
+      );
+      expect(alertMock).toHaveBeenCalledWith(
+        expect.stringContaining('2 個のプラグインを一括インポートしました')
+      );
+    });
+    alertMock.mockRestore();
+  });
+
+  it('shows alert when no plugins are found in selected directory', async () => {
+    const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const { DialogAPI, BackendAPI } = await import('../../../api');
+    (DialogAPI.ask as any).mockResolvedValue(true);
+    (DialogAPI.open as any).mockResolvedValue('/path/to/empty_dir');
+    (BackendAPI.scanCustomPlugins as any).mockResolvedValue([]);
+
+    render(
+      <PluginsTab bundledSdkVersion="1.0.0" globalPythonPath="/usr/bin/python3" />
+    );
+
+    const addFolderBtn = screen.getByRole('button', { name: /Add Folder/i });
+    fireEvent.click(addFolderBtn);
+
+    await waitFor(() => {
+      expect(alertMock).toHaveBeenCalledWith(
+        '指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。'
+      );
+    });
+    alertMock.mockRestore();
   });
 });
