@@ -77,7 +77,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" className="h-[85vh]">
       <ModalHeader
         onClose={onClose}
         icon={<Keyboard size={20} className="text-primary-base" />}
@@ -86,7 +86,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
       
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {shortcuts.map((shortcut, idx) => (
               <ShortcutRow key={idx} action={shortcut.action} keys={shortcut.keys} />
             ))}

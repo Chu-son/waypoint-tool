@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { Panel } from "./Panel";
@@ -44,7 +45,7 @@ export function Modal({
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop */}
       <div 
@@ -66,6 +67,12 @@ export function Modal({
       </Panel>
     </div>
   );
+
+  if (typeof document !== "undefined" && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
 
 export interface ModalHeaderProps extends React.HTMLAttributes<HTMLDivElement> {

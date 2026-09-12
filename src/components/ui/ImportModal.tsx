@@ -157,7 +157,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" className="h-[85vh]">
       <ModalHeader
         onClose={onClose}
         icon={<Upload size={20} className="text-primary-base" />}
