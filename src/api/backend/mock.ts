@@ -67,6 +67,24 @@ export class MockBackendAPI implements IBackendAPI {
     };
   }
 
+  async scanCustomPlugins(path: string): Promise<PluginInstance[]> {
+    console.log('[Mock Backend] scanCustomPlugins called with path:', path);
+    return [
+      {
+        id: 'scanned-plugin-1',
+        folder_path: `${path}/plugin-1`,
+        is_builtin: false,
+        manifest: { name: 'Scanned Plugin 1', description: 'Mock 1', type: 'python', executable: 'main.py', inputs: [], properties: [] }
+      },
+      {
+        id: 'scanned-plugin-2',
+        folder_path: `${path}/plugin-2`,
+        is_builtin: false,
+        manifest: { name: 'Scanned Plugin 2', description: 'Mock 2', type: 'python', executable: 'main.py', inputs: [], properties: [] }
+      }
+    ];
+  }
+
   async runPlugin(
     pluginInstance: PluginInstance,
     _contextData: any,

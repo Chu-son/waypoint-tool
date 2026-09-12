@@ -15,9 +15,8 @@ pub fn fetch_installed_plugins(app: AppHandle) -> Result<Vec<PluginInstance>, St
     manager.scan_plugins()
 }
 
-#[tauri::command]
-pub fn scan_custom_plugin(path: String) -> Result<PluginInstance, String> {
-    let p = std::path::Path::new(&path);
+/// Parse a plugin at the specified directory if it contains a valid `manifest.json`.
+pub fn parse_plugin_at_dir(p: &std::path::Path) -> Result<PluginInstance, String> {
     if !p.is_dir() {
         return Err("Provided path is not a directory.".to_string());
     }
@@ -28,7 +27,7 @@ pub fn scan_custom_plugin(path: String) -> Result<PluginInstance, String> {
     }
 
     let content = std::fs::read_to_string(&manifest_path)
-        .map_err(|e| format!("Failed to read manifest.json: {}", e))?;
+        .map_err(|e| format!("Failed to read manifest.json at {}: {}", manifest_path.display(), e))?;
 
     let manifest: crate::plugins::models::PluginManifest = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
@@ -43,6 +42,97 @@ pub fn scan_custom_plugin(path: String) -> Result<PluginInstance, String> {
         is_builtin: false,
         sdk_version,
     })
+}
+
+#[tauri::command]
+pub fn scan_custom_plugin(path: String) -> Result<PluginInstance, String> {
+    let p = std::path::Path::new(&path);
+    parse_plugin_at_dir(p)
+}
+
+fn scan_dir_for_plugins(
+    dir: &std::path::Path,
+    depth: usize,
+    max_depth: usize,
+    results: &mut Vec<PluginInstance>,
+) {
+    if depth > max_depth {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    let mut entries_vec = Vec::new();
+    for entry in entries.flatten() {
+        entries_vec.push(entry.path());
+    }
+    entries_vec.sort();
+
+    for path in entries_vec {
+        if !path.is_dir() {
+            continue;
+        }
+
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+        // Skip hidden directories and common dependency/build directories
+        if file_name.starts_with('.')
+            || file_name == "node_modules"
+            || file_name == "target"
+            || file_name == "__pycache__"
+            || file_name == "venv"
+            || file_name == ".venv"
+        {
+            continue;
+        }
+
+        let manifest_path = path.join("manifest.json");
+        if manifest_path.exists() {
+            match parse_plugin_at_dir(&path) {
+                Ok(instance) => {
+                    results.push(instance);
+                    // Do not descend further into an already detected plugin directory
+                    continue;
+                }
+                Err(e) => {
+                    eprintln!("[WARN] Failed to parse plugin at {:?}: {}", path, e);
+                }
+            }
+        }
+
+        // Manifest was not present, search child directories
+        scan_dir_for_plugins(&path, depth + 1, max_depth, results);
+    }
+}
+
+/// Scan custom plugins from a directory.
+/// If the directory itself contains `manifest.json`, it returns that single plugin.
+/// Otherwise, it scans subdirectories recursively (up to depth 3) for all plugins.
+#[tauri::command]
+pub fn scan_custom_plugins(path: String) -> Result<Vec<PluginInstance>, String> {
+    let p = std::path::Path::new(&path);
+    if !p.is_dir() {
+        return Err("Provided path is not a directory.".to_string());
+    }
+
+    // 1. Direct manifest check: if path itself contains manifest.json, return it as a single plugin
+    let direct_manifest = p.join("manifest.json");
+    if direct_manifest.exists() {
+        let plugin = parse_plugin_at_dir(p)?;
+        return Ok(vec![plugin]);
+    }
+
+    // 2. Scan subdirectories up to depth 3
+    let mut plugins = Vec::new();
+    scan_dir_for_plugins(p, 1, 3, &mut plugins);
+
+    if plugins.is_empty() {
+        return Err("No valid plugins (manifest.json) found in the selected directory or its subdirectories.".to_string());
+    }
+
+    Ok(plugins)
 }
 
 /// Generate a new plugin scaffold with manifest.json, main.py, and a copy of wpt_plugin.py SDK.
@@ -513,6 +603,97 @@ mod tests {
         let res = scan_custom_plugin(plugin_dir.to_string_lossy().to_string());
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("manifest.json not found"));
+    }
+
+    #[test]
+    fn test_scan_custom_plugins_direct_manifest() {
+        let tmp = TempDir::new().unwrap();
+        let plugin_dir = tmp.path().join("single_plugin");
+        fs::create_dir_all(&plugin_dir).unwrap();
+        let manifest = r#"{
+            "name": "Single Plugin",
+            "type": "python",
+            "executable": "run.py",
+            "inputs": [],
+            "properties": []
+        }"#;
+        fs::write(plugin_dir.join("manifest.json"), manifest).unwrap();
+
+        let res = scan_custom_plugins(plugin_dir.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let plugins = res.unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].id, "single_plugin");
+        assert_eq!(plugins[0].manifest.name, "Single Plugin");
+    }
+
+    #[test]
+    fn test_scan_custom_plugins_subdirectories() {
+        let tmp = TempDir::new().unwrap();
+        let root_dir = tmp.path().join("plugins_bundle");
+        fs::create_dir_all(&root_dir).unwrap();
+
+        // plugin A
+        let p_a = root_dir.join("plugin_a");
+        fs::create_dir_all(&p_a).unwrap();
+        fs::write(p_a.join("manifest.json"), r#"{"name": "Plugin A", "type": "python", "executable": "a.py"}"#).unwrap();
+
+        // plugin B
+        let p_b = root_dir.join("plugin_b");
+        fs::create_dir_all(&p_b).unwrap();
+        fs::write(p_b.join("manifest.json"), r#"{"name": "Plugin B", "type": "python", "executable": "b.py"}"#).unwrap();
+
+        // directory without manifest
+        let other = root_dir.join("not_a_plugin");
+        fs::create_dir_all(&other).unwrap();
+
+        let res = scan_custom_plugins(root_dir.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let plugins = res.unwrap();
+        assert_eq!(plugins.len(), 2);
+        let names: Vec<_> = plugins.iter().map(|p| p.manifest.name.as_str()).collect();
+        assert!(names.contains(&"Plugin A"));
+        assert!(names.contains(&"Plugin B"));
+    }
+
+    #[test]
+    fn test_scan_custom_plugins_nested_and_skips_ignored() {
+        let tmp = TempDir::new().unwrap();
+        let root_dir = tmp.path().join("nested_repo");
+        fs::create_dir_all(&root_dir).unwrap();
+
+        // category/plugin_c
+        let p_c = root_dir.join("category").join("plugin_c");
+        fs::create_dir_all(&p_c).unwrap();
+        fs::write(p_c.join("manifest.json"), r#"{"name": "Plugin C", "type": "python", "executable": "c.py"}"#).unwrap();
+
+        // .venv/ignored_plugin should be skipped
+        let ignored = root_dir.join(".venv").join("ignored_plugin");
+        fs::create_dir_all(&ignored).unwrap();
+        fs::write(ignored.join("manifest.json"), r#"{"name": "Ignored", "type": "python", "executable": "i.py"}"#).unwrap();
+
+        // node_modules/ignored_plugin should be skipped
+        let nm = root_dir.join("node_modules").join("ignored_npm");
+        fs::create_dir_all(&nm).unwrap();
+        fs::write(nm.join("manifest.json"), r#"{"name": "Ignored NPM", "type": "python", "executable": "i.py"}"#).unwrap();
+
+        let res = scan_custom_plugins(root_dir.to_string_lossy().to_string());
+        assert!(res.is_ok());
+        let plugins = res.unwrap();
+        assert_eq!(plugins.len(), 1);
+        assert_eq!(plugins[0].id, "plugin_c");
+        assert_eq!(plugins[0].manifest.name, "Plugin C");
+    }
+
+    #[test]
+    fn test_scan_custom_plugins_none_found() {
+        let tmp = TempDir::new().unwrap();
+        let empty_dir = tmp.path().join("empty_folder");
+        fs::create_dir_all(&empty_dir).unwrap();
+
+        let res = scan_custom_plugins(empty_dir.to_string_lossy().to_string());
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("No valid plugins"));
     }
 
     #[test]

@@ -38,6 +38,7 @@ pub fn run() {
             commands::fetch_installed_plugins,
             commands::run_plugin,
             commands::scan_custom_plugin,
+            commands::scan_custom_plugins,
             commands::get_python_environments,
             commands::scaffold_plugin,
             commands::check_sdk_version,

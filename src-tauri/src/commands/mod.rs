@@ -118,6 +118,7 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         plugins::fetch_installed_plugins,
         plugins::run_plugin,
         plugins::scan_custom_plugin,
+        plugins::scan_custom_plugins,
         plugins::get_python_environments,
         plugins::scaffold_plugin,
         plugins::check_sdk_version,

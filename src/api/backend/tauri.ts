@@ -39,6 +39,10 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('scan_custom_plugin', { path });
   }
 
+  async scanCustomPlugins(path: string): Promise<PluginInstance[]> {
+    return invoke('scan_custom_plugins', { path });
+  }
+
   async runPlugin(
     pluginInstance: PluginInstance,
     contextData: any,

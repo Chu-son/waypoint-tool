@@ -61,6 +61,7 @@ export interface IBackendAPI {
   inferImportMapping(templateContent: string): Promise<ImportFieldMapping>;
   fetchInstalledPlugins(): Promise<PluginInstance[]>;
   scanCustomPlugin(path: string): Promise<PluginInstance>;
+  scanCustomPlugins(path: string): Promise<PluginInstance[]>;
   runPlugin(
     pluginInstance: PluginInstance,
     contextData: any,

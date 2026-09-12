@@ -77,4 +77,20 @@ describe('TauriBackendAPI', () => {
     });
     expect(result).toBe('Successfully installed numpy');
   });
+
+  it('calls scan_custom_plugin with path', async () => {
+    const mockPlugin: any = { id: 'p1' };
+    (invoke as any).mockResolvedValue(mockPlugin);
+    const result = await api.scanCustomPlugin('/path/to/plugin');
+    expect(invoke).toHaveBeenCalledWith('scan_custom_plugin', { path: '/path/to/plugin' });
+    expect(result).toBe(mockPlugin);
+  });
+
+  it('calls scan_custom_plugins with path', async () => {
+    const mockPlugins: any[] = [{ id: 'p1' }, { id: 'p2' }];
+    (invoke as any).mockResolvedValue(mockPlugins);
+    const result = await api.scanCustomPlugins('/path/to/plugins_dir');
+    expect(invoke).toHaveBeenCalledWith('scan_custom_plugins', { path: '/path/to/plugins_dir' });
+    expect(result).toBe(mockPlugins);
+  });
 });
