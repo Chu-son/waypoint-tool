@@ -112,4 +112,12 @@ export class TauriBackendAPI implements IBackendAPI {
   async installPipPackages(pythonPath: string, packages: string[]): Promise<string> {
     return invoke('install_pip_packages', { pythonPath, packages });
   }
+
+  async checkExportConflicts(files: string[]): Promise<string[]> {
+    return invoke('check_export_conflicts', { files });
+  }
+
+  async executeExportPackage(options: any): Promise<any> {
+    return invoke('execute_export_package', { options });
+  }
 }

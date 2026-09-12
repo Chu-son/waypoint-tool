@@ -82,7 +82,48 @@ export interface IBackendAPI {
   checkPythonPackages(pythonPath: string, packages: string[]): Promise<Record<string, boolean>>;
   createVirtualenv(targetDir: string, basePython?: string): Promise<string>;
   installPipPackages(pythonPath: string, packages: string[]): Promise<string>;
+  checkExportConflicts(files: string[]): Promise<string[]>;
+  executeExportPackage(options: ExecuteExportPackageOptions): Promise<ExportResultSummary>;
 }
+
+export type PackageExportWaypointItem = {
+  path: string;
+  waypoints: Record<string, any>[];
+  template?: string;
+  image_data_b64?: string;
+};
+
+export type PackageExportMapItem = {
+  save_path: string;
+  format: 'ros_standard' | 'png_only';
+  region: {
+    name: string;
+    rect: { x: number; y: number; width: number; height: number };
+    layerVisibility: Record<string, boolean>;
+  };
+  layers: {
+    id: string;
+    name: string;
+    image_base64?: string;
+    info?: any;
+    opacity: number;
+    blend_mode: string;
+    z_index: number;
+  }[];
+};
+
+export type ExecuteExportPackageOptions = {
+  root_dir: string;
+  conflict_resolution: 'overwrite' | 'backup_file';
+  session_timestamp: string;
+  waypoint_items: PackageExportWaypointItem[];
+  map_items: PackageExportMapItem[];
+};
+
+export type ExportResultSummary = {
+  exported_files_count: number;
+  backed_up_files: string[];
+};
 
 export interface OpenDialogOptions {
   multiple?: boolean;

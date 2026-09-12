@@ -3,6 +3,18 @@ use std::fs;
 use base64::{engine::general_purpose, Engine as _};
 use crate::{map, io};
 
+pub mod export_pipeline;
+
+#[command]
+pub fn check_export_conflicts(files: Vec<String>) -> Vec<String> {
+    export_pipeline::check_export_conflicts(files)
+}
+
+#[command]
+pub fn execute_export_package(options: export_pipeline::ExportPackageOptions) -> Result<export_pipeline::ExportResultSummary, String> {
+    export_pipeline::execute_export_package(options)
+}
+
 #[command]
 pub fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
     map::load_map(&yaml_path)
@@ -129,7 +141,9 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         load_custom_ui_preset,
         venv::check_python_packages,
         venv::create_virtualenv,
-        venv::install_pip_packages
+        venv::install_pip_packages,
+        check_export_conflicts,
+        execute_export_package
     ]
 }
 

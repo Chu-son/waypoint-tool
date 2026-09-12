@@ -194,4 +194,17 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] installPipPackages called for:', pythonPath, packages);
     return `Successfully installed ${packages.join(', ')}`;
   }
+
+  async checkExportConflicts(files: string[]): Promise<string[]> {
+    console.log('[Mock Backend] checkExportConflicts called for:', files);
+    return files.filter(f => f in this.mockFiles);
+  }
+
+  async executeExportPackage(options: any): Promise<any> {
+    console.log('[Mock Backend] executeExportPackage called with:', options);
+    return {
+      exported_files_count: (options.waypoint_items?.length || 0) + (options.map_items?.length || 0),
+      backed_up_files: [],
+    };
+  }
 }
