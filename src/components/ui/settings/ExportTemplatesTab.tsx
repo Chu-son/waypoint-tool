@@ -1,4 +1,4 @@
-import { Plus, Trash2, Copy, Save, Upload, Download } from "lucide-react";
+import { Plus, Trash2, Copy, Save, Upload, Download, FolderOpen } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "../common/Button";
@@ -355,6 +355,31 @@ export function ExportTemplatesTab() {
           </>
         }
       />
+
+      {/* Export Configuration Info Card */}
+      <div className="bg-primary-base/5 border border-primary-base/25 rounded-xl p-4 flex items-center justify-between gap-4 shadow-xs">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-primary-base">
+              エクスポート構成（プロファイル）の設定について
+            </span>
+          </div>
+          <p className="text-xs text-text-muted">
+            どのテンプレートやマップを、どのフォルダ階層（例: <code>waypoints/&#123;&#123;yyyymmdd&#125;&#125;_waypoints.yaml</code>）や名称・変数で出力するかという構成設定は、エクスポート画面で直接設定・編集・保存できます。
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            useAppStore.setState({ isExportModalOpen: true });
+          }}
+          className="shrink-0 text-xs flex items-center gap-1.5"
+        >
+          <FolderOpen size={14} className="text-primary-base" />
+          エクスポート画面を開く
+        </Button>
+      </div>
 
       <div className="space-y-3">
         <SectionDivider title="Default Formats" />

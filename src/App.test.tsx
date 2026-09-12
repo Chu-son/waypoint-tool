@@ -35,6 +35,8 @@ vi.mock('./api', () => ({
     loadProject: vi.fn(),
     loadOptionsSchema: vi.fn(),
     exportWaypoints: vi.fn(),
+    checkExportConflicts: vi.fn().mockResolvedValue([]),
+    executeExportPackage: vi.fn().mockResolvedValue({ exported_files_count: 0, backed_up_files: [] }),
     loadCustomUiConfig: vi.fn().mockResolvedValue(null),
     loadCustomUiPreset: vi.fn().mockResolvedValue(null),
   },
@@ -201,5 +203,18 @@ describe('App Integration', () => {
       useAppStore.setState({ isDirty: true });
     });
     expect(mockSetTitle).toHaveBeenCalledWith('test_mission * - Waypoint Tool');
+  });
+
+  it('opens ExportModal when clicking Export Waypoints button in ToolPanel', async () => {
+    render(<App />);
+
+    const exportButton = screen.getByTitle('Export Waypoints');
+    expect(exportButton).toBeInTheDocument();
+
+    act(() => {
+      exportButton.click();
+    });
+
+    expect(screen.getByText(/統合エクスポート/)).toBeInTheDocument();
   });
 });

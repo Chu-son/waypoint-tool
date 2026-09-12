@@ -8,6 +8,8 @@ import { PluginListPanel } from "./components/ui/PluginListPanel";
 import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
 import { SettingsModal } from "./components/ui/SettingsModal";
+import { ExportModal } from "./components/ui/ExportModal";
+import { ImportModal } from "./components/ui/ImportModal";
 import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
 import { ExportMapsModal } from "./components/ui/ExportMapsModal";
 import { WelcomeModal } from "./components/ui/WelcomeModal";
@@ -61,6 +63,12 @@ function App() {
   const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
   
+  const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
+  const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
+
+  const isImportModalOpen = useAppStore((state) => state.isImportModalOpen);
+  const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
+
   const isShortcutsModalOpen = useAppStore((state) => state.isShortcutsModalOpen);
   const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
 
@@ -419,6 +427,18 @@ function App() {
         <SettingsModal
           isOpen={isSettingsModalOpen}
           onClose={() => setSettingsModalOpen(false)}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="エクスポート画面の表示中にエラーが発生しました">
+        <ExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+        />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="インポート画面の表示中にエラーが発生しました">
+        <ImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setImportModalOpen(false)}
         />
       </ErrorBoundary>
       <ExportMapsModal />

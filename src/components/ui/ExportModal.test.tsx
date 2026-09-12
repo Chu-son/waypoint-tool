@@ -1,16 +1,20 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExportModal } from './ExportModal';
 import { useAppStore } from '../../stores/appStore';
 
 // Mock Tauri modules
-vi.mock('@tauri-apps/plugin-dialog', () => ({
-  save: vi.fn(),
-}));
-
-vi.mock('../../api/backend', () => ({
+vi.mock('../../api', () => ({
   BackendAPI: {
-    exportWaypoints: vi.fn().mockResolvedValue(undefined),
+    checkExportConflicts: vi.fn().mockResolvedValue([]),
+    executeExportPackage: vi.fn().mockResolvedValue({
+      exported_files_count: 2,
+      backed_up_files: [],
+    }),
+  },
+  DialogAPI: {
+    open: vi.fn().mockResolvedValue('/mock/export/dir'),
+    save: vi.fn().mockResolvedValue('/mock/export/file'),
   },
 }));
 
@@ -22,50 +26,92 @@ describe('ExportModal UI', () => {
       },
       rootNodeIds: ['wp1'],
       selectedNodeIds: [],
+      exportRegions: [
+        { id: 'reg1', name: 'area_1', rect: { x: 0, y: 0, width: 10, height: 10 }, visible: true },
+      ],
       exportTemplates: [],
       defaultExportFormats: [
         { id: '__default_yaml__', name: 'YAML Document', extension: 'yaml', suffix: '_yaml', enabled: true },
-        { id: '__default_json__', name: 'JSON Document', extension: 'json', suffix: '_json', enabled: true },
       ],
+      exportProfiles: [
+        {
+          id: 'test_prof',
+          name: '標準エクスポート',
+          conflictResolution: 'backup_file',
+          outputRootDir: '/mock/export/dir',
+          items: [
+            {
+              id: 'item1',
+              type: 'waypoint_default',
+              sourceId: '__default_yaml__',
+              relativePathPattern: 'waypoints/{{yyyymmdd}}_waypoints.yaml',
+              enabled: true,
+            },
+            {
+              id: 'item2',
+              type: 'map_all_regions',
+              sourceId: 'all',
+              relativePathPattern: 'Map/{{name}}.pgm',
+              mapFormat: 'ros_standard',
+              enabled: true,
+            },
+          ],
+        },
+      ],
+      activeExportProfileId: 'test_prof',
     });
   });
 
-  // --- 要件5: 入出力 ---
-
-  it('displays default export formats (YAML and JSON)', () => {
+  it('renders integrated export modal with profile name, virtual directory tree, and variable chips', () => {
     render(<ExportModal isOpen={true} onClose={vi.fn()} />);
 
-    // ExportModal renders format names as "Name" and metadata as "Standard Format (.ext)"
-    expect(screen.getByText('YAML Document')).toBeInTheDocument();
-    expect(screen.getByText(/Standard Format \(.yaml\)/)).toBeInTheDocument();
-    expect(screen.getByText('JSON Document')).toBeInTheDocument();
-    expect(screen.getByText(/Standard Format \(.json\)/)).toBeInTheDocument();
-  });
+    // Header title
+    expect(screen.getByText('統合エクスポート (Integrated Export)')).toBeInTheDocument();
 
-  it('displays custom templates in the list', () => {
-    useAppStore.setState({
-      exportTemplates: [
-        { id: 'tmpl1', name: 'Custom ROS', extension: 'txt', suffix: '_ros', content: '{{#each waypoints}}...{{/each}}' },
-      ],
-    });
+    // Profile selector and name input
+    expect(screen.getAllByDisplayValue('標準エクスポート').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByPlaceholderText('プロファイル名')).toHaveValue('標準エクスポート');
 
-    render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+    // Tree view title
+    expect(screen.getByText(/Virtual Directory/)).toBeInTheDocument();
 
-    expect(screen.getByText('Custom ROS')).toBeInTheDocument();
-    expect(screen.getByText(/Custom Template \(.txt\)/)).toBeInTheDocument();
-  });
+    // Virtual directory folders
+    expect(screen.getByText('waypoints/')).toBeInTheDocument();
+    expect(screen.getByText('Map/')).toBeInTheDocument();
 
-  // --- 要件10: エクスポートサフィックス ---
+    // Variable chips in the inspector
+    expect(screen.getByText('{{YYYYMMDD}}')).toBeInTheDocument();
+    expect(screen.getByText('{{MM}}')).toBeInTheDocument();
+    expect(screen.getByText('{{mm}}')).toBeInTheDocument();
+    expect(screen.getByText('{{HH}}')).toBeInTheDocument();
+    expect(screen.getByText('{{project_name}}')).toBeInTheDocument();
+    expect(screen.getByText('{{name}}')).toBeInTheDocument();
 
-  it('renders the Export Options heading when open', () => {
-    render(<ExportModal isOpen={true} onClose={vi.fn()} />);
-
-    expect(screen.getByText('Export Waypoints')).toBeInTheDocument();
-    expect(screen.getByText('Desired Output Formats')).toBeInTheDocument();
+    // Conflict resolution options
+    expect(screen.getByText('リネームバックアップ (.bak)')).toBeInTheDocument();
+    expect(screen.getByText('上書き')).toBeInTheDocument();
   });
 
   it('does not render when isOpen is false', () => {
     const { container } = render(<ExportModal isOpen={false} onClose={vi.fn()} />);
     expect(container.innerHTML).toBe('');
+  });
+
+  it('triggers executeExportPackage when clicking the export button', async () => {
+    const mockOnClose = vi.fn();
+    window.alert = vi.fn();
+
+    render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+
+    const exportBtn = screen.getByRole('button', { name: /エクスポート実行/ });
+    expect(exportBtn).not.toBeDisabled();
+
+    fireEvent.click(exportBtn);
+
+    const { BackendAPI } = await import('../../api');
+    await waitFor(() => {
+      expect(BackendAPI.executeExportPackage).toHaveBeenCalled();
+      expect(mockOnClose).toHaveBeenCalled();
+    });
   });
 });

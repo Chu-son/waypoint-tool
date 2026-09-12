@@ -8,8 +8,6 @@ import {
   Ruler,
 } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
-import { ExportModal } from "./ExportModal";
-import { ImportModal } from "./ImportModal";
 import { Panel } from "./common/Panel";
 import { Button } from "./common/Button";
 import { FieldLabel } from "./common/FieldLabel";
@@ -46,9 +44,7 @@ function ToolIconButton({
 
 export function ToolPanel() {
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
-  const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
   const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
-  const isImportModalOpen = useAppStore((state) => state.isImportModalOpen);
   const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
 
   const activeTool = useAppStore((state) => state.activeTool);
@@ -149,15 +145,6 @@ export function ToolPanel() {
           )}
         </div>
       )}
-
-      <ExportModal
-        isOpen={isExportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-      />
-      <ImportModal
-        isOpen={isImportModalOpen}
-        onClose={() => setImportModalOpen(false)}
-      />
     </Panel>
   );
 }

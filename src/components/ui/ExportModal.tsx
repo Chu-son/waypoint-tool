@@ -1,15 +1,40 @@
-import { Save } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import {
+  Save,
+  FolderOpen,
+  Plus,
+  Copy,
+  Trash2,
+  FileText,
+  Map as MapIcon,
+  AlertTriangle,
+  Folder,
+  Image as ImageIcon,
+} from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
-import { DialogAPI } from "../../api";
 import { BackendAPI } from "../../api";
 import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
 import { Button } from "./common/Button";
 import { Checkbox } from "./common/Checkbox";
+import { Input } from "./common/Input";
 import { Label } from "./common/Label";
+import { BrowseInput } from "./common/BrowseInput";
 import { cn } from "../../utils/cn";
-import { OptionCard } from "./common/OptionCard";
-import { getFlattenedWaypointIds } from "../../utils/treeUtils";
+import { v4 as uuidv4 } from "uuid";
+import {
+  ExportProfile,
+  ExportTargetItem,
+  ExportTargetType,
+} from "../../types/store";
+import {
+  resolveExportFiles,
+  buildExportTreePreview,
+  TreeDirectoryNode,
+  TreeFileNode,
+} from "../../utils/exportTemplateEngine";
+import { extractWaypointsForExport } from "../../utils/exportWaypointUtils";
+import { prepareLayersForExport } from "../../utils/mapRasterize";
+import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from "../../stores/migrations/projectMigration";
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -17,274 +42,955 @@ interface ExportModalProps {
 }
 
 export function ExportModal({ isOpen, onClose }: ExportModalProps) {
-  const exportTemplates = useAppStore((state) => state.exportTemplates);
-  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
-  const nodes = useAppStore((state) => state.nodes);
+  const rawExportProfiles = useAppStore((state) => state.exportProfiles);
+  const exportProfiles = Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0
+    ? rawExportProfiles
+    : DEFAULT_EXPORT_PROFILES;
+  const activeExportProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
+  const addExportProfile = useAppStore((state) => state.addExportProfile);
+  const updateExportProfile = useAppStore((state) => state.updateExportProfile);
+  const removeExportProfile = useAppStore((state) => state.removeExportProfile);
+  const setActiveExportProfileId = useAppStore((state) => state.setActiveExportProfileId);
+  const duplicateExportProfile = useAppStore((state) => state.duplicateExportProfile);
+
+  const exportTemplates = useAppStore((state) => state.exportTemplates) || [];
+  const defaultExportFormats = useAppStore((state) => state.defaultExportFormats) || [];
+  const exportRegions = useAppStore((state) => state.exportRegions) || [];
+  const mapLayers = useAppStore((state) => state.mapLayers) || [];
+  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds) || [];
+  const nodes = useAppStore((state) => state.nodes) || {};
+  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
+  const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
-  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
-  const [includeImage, setIncludeImage] = useState(false);
-  const [selectedFormats, setSelectedFormats] = useState<string[]>([
-    "__default_yaml__",
+  // Variable chip inserter input ref (must be called unconditionally before early returns)
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Active profile fallback
+  const activeProfile = useMemo(() => {
+    const found = exportProfiles.find((p) => p.id === activeExportProfileId);
+    const profile = found || exportProfiles[0] || DEFAULT_EXPORT_PROFILES[0];
+    return {
+      ...profile,
+      items: Array.isArray(profile.items) ? profile.items : [],
+    };
+  }, [exportProfiles, activeExportProfileId]);
+
+  // Local state for UI
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [conflictFiles, setConflictFiles] = useState<Set<string>>(new Set());
+  const [sessionDate] = useState<Date>(() => new Date());
+
+  // Derive project name from project path
+  const projectName = useMemo(() => {
+    if (!currentProjectPath) return "untitled";
+    const filename = currentProjectPath.split(/[/\\]/).pop() || "untitled";
+    return filename.replace(/\.wptroj$/i, "");
+  }, [currentProjectPath]);
+
+  // Root directory: profile-specific or fallback to lastDirectory or project parent directory
+  const rootDir = useMemo(() => {
+    if (activeProfile.outputRootDir) return activeProfile.outputRootDir;
+    if (currentProjectPath) {
+      const lastSlash = Math.max(
+        currentProjectPath.lastIndexOf("/"),
+        currentProjectPath.lastIndexOf("\\")
+      );
+      if (lastSlash > -1) return currentProjectPath.substring(0, lastSlash);
+    }
+    return lastDirectory || "";
+  }, [activeProfile.outputRootDir, currentProjectPath, lastDirectory]);
+
+  const handleRootDirChange = (newDir: string) => {
+    updateExportProfile(activeProfile.id, { outputRootDir: newDir });
+    setLastDirectory(newDir);
+  };
+
+  // Resolve files for the tree preview
+  const resolvedFiles = useMemo(() => {
+    return resolveExportFiles(activeProfile.items, {
+      now: sessionDate,
+      projectName,
+      rootDir,
+      availableRegions: exportRegions.map((r) => ({ id: r.id, name: r.name })),
+      templates: exportTemplates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        extension: t.extension,
+      })),
+      defaultFormats: defaultExportFormats.map((f) => ({
+        id: f.id,
+        name: f.name,
+        extension: f.extension,
+      })),
+    });
+  }, [
+    activeProfile.items,
+    sessionDate,
+    projectName,
+    rootDir,
+    exportRegions,
+    exportTemplates,
+    defaultExportFormats,
   ]);
+
+  // Build tree from resolved files
+  const treeNodes = useMemo(() => {
+    return buildExportTreePreview(resolvedFiles);
+  }, [resolvedFiles]);
+
+  // Check conflicts with debounce
+  useEffect(() => {
+    if (!isOpen || resolvedFiles.length === 0 || !rootDir) {
+      setConflictFiles(new Set());
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const fullPaths = resolvedFiles.map((f) => f.fullPath);
+        const existing = await BackendAPI.checkExportConflicts(fullPaths);
+        setConflictFiles(new Set(existing));
+      } catch (err) {
+        console.error("Failed to check export conflicts:", err);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, resolvedFiles, rootDir]);
+
+  // Select first item if none selected
+  useEffect(() => {
+    if (activeProfile.items.length > 0 && !selectedItemId) {
+      setSelectedItemId(activeProfile.items[0].id);
+    }
+  }, [activeProfile.items, selectedItemId]);
 
   if (!isOpen) return null;
 
-  const toggleFormat = (fmtId: string) => {
-    setSelectedFormats((prev) =>
-      prev.includes(fmtId) ? prev.filter((f) => f !== fmtId) : [...prev, fmtId],
-    );
+  // Profile actions
+  const handleAddProfile = () => {
+    const newProfile: ExportProfile = {
+      id: uuidv4(),
+      name: `新規プロファイル ${exportProfiles.length + 1}`,
+      conflictResolution: "backup_file",
+      items: [
+        {
+          id: uuidv4(),
+          type: "waypoint_default",
+          sourceId: "__default_yaml__",
+          relativePathPattern: "waypoints/{{yyyymmdd}}_waypoints.yaml",
+          enabled: true,
+        },
+      ],
+    };
+    addExportProfile(newProfile);
+    setSelectedItemId(newProfile.items[0].id);
   };
 
-  const handleExport = async () => {
-    if (selectedFormats.length === 0) {
-      alert("At least one export format must be selected.");
+  const handleDuplicateProfile = () => {
+    duplicateExportProfile(activeProfile.id);
+  };
+
+  const handleDeleteProfile = () => {
+    if (exportProfiles.length <= 1) {
+      alert("最後のプロファイルは削除できません。");
+      return;
+    }
+    if (confirm(`プロファイル「${activeProfile.name}」を削除しますか？`)) {
+      removeExportProfile(activeProfile.id);
+    }
+  };
+
+  // Item actions
+  const handleAddItem = (type: ExportTargetType) => {
+    let sourceId = "__default_yaml__";
+    let pattern = "waypoints/{{yyyymmdd}}_waypoints.yaml";
+
+    if (type === "map_all_regions") {
+      sourceId = "all";
+      pattern = "Map/{{name}}.pgm";
+    } else if (type === "map_region") {
+      sourceId = exportRegions[0]?.id || "default";
+      pattern = "Map/{{name}}.pgm";
+    }
+
+    const newItem: ExportTargetItem = {
+      id: uuidv4(),
+      type,
+      sourceId,
+      relativePathPattern: pattern,
+      mapFormat: "ros_standard",
+      includeMapImage: false,
+      enabled: true,
+    };
+
+    updateExportProfile(activeProfile.id, {
+      items: [...activeProfile.items, newItem],
+    });
+    setSelectedItemId(newItem.id);
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    const updated = activeProfile.items.filter((i) => i.id !== itemId);
+    updateExportProfile(activeProfile.id, { items: updated });
+    if (selectedItemId === itemId) {
+      setSelectedItemId(updated[0]?.id || null);
+    }
+  };
+
+  const handleToggleItemEnabled = (itemId: string, enabled: boolean) => {
+    const updated = activeProfile.items.map((i) =>
+      i.id === itemId ? { ...i, enabled } : i
+    );
+    updateExportProfile(activeProfile.id, { items: updated });
+  };
+
+  const handleUpdateItem = (itemId: string, updates: Partial<ExportTargetItem>) => {
+    const updated = activeProfile.items.map((i) =>
+      i.id === itemId ? { ...i, ...updates } : i
+    );
+    updateExportProfile(activeProfile.id, { items: updated });
+  };
+
+  // Selected item object
+  const selectedItem = activeProfile.items.find((i) => i.id === selectedItemId);
+
+  // Variable chip inserter
+  const handleInsertVariable = (varName: string) => {
+    if (!selectedItem) return;
+    const currentPattern = selectedItem.relativePathPattern;
+    const input = inputRef.current;
+    if (input) {
+      const start = input.selectionStart || currentPattern.length;
+      const end = input.selectionEnd || currentPattern.length;
+      const newPattern =
+        currentPattern.substring(0, start) +
+        varName +
+        currentPattern.substring(end);
+      handleUpdateItem(selectedItem.id, { relativePathPattern: newPattern });
+      setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(start + varName.length, start + varName.length);
+      }, 0);
+    } else {
+      handleUpdateItem(selectedItem.id, {
+        relativePathPattern: currentPattern + varName,
+      });
+    }
+  };
+
+  // Execute export
+  const handleExecuteExport = async () => {
+    const enabledItems = activeProfile.items.filter((i) => i.enabled);
+    if (enabledItems.length === 0) {
+      alert("エクスポート対象の項目が選択されていません。");
+      return;
+    }
+
+    if (!rootDir) {
+      alert("出力先ルートフォルダを指定してください。");
       return;
     }
 
     try {
-      const savePath = await DialogAPI.save({
-        defaultPath: lastDirectory || undefined,
-      });
+      const hasMapItems = enabledItems.some(
+        (i) => i.type === "map_region" || i.type === "map_all_regions"
+      );
+      const hasMapShot = enabledItems.some((i) => i.includeMapImage);
 
-      if (savePath) {
-        // Remove trailing extension if user typed one, so we can append cleanly
-        let basePath = savePath;
-        const lastDot = basePath.lastIndexOf(".");
-        const lastSlash = Math.max(
-          basePath.lastIndexOf("/"),
-          basePath.lastIndexOf("\\"),
-        );
-        if (lastDot > lastSlash) {
-          basePath = basePath.substring(0, lastDot);
-        }
+      await runWithLoading(
+        {
+          message: "エクスポートを実行中...",
+          detail: `${enabledItems.length} 件の構成を出力中`,
+          blocking: true,
+        },
+        async () => {
+          // 1. Prepare map raster layers if map export is required
+          let preparedLayers: any[] = [];
+          if (hasMapItems) {
+            preparedLayers = await prepareLayersForExport(mapLayers, customLayers);
+          }
 
-        if (lastSlash > -1) setLastDirectory(basePath.substring(0, lastSlash));
-
-        // 1. Flatten all waypoints in depth-first order
-        const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
-
-        // 2. Hydrate and map
-        const waypointsToExport = flatIds
-          .map((id, index) => {
-            const node = nodes[id];
-            if (!node) return null;
-
-            const fullOptions: Record<string, any> = {};
-            if (optionsSchema && optionsSchema.options) {
-              optionsSchema.options.forEach((opt: any) => {
-                fullOptions[opt.name] =
-                  node.options && node.options[opt.name] !== undefined
-                    ? node.options[opt.name]
-                    : opt.default;
-              });
-            }
-            if (node.options) {
-              Object.keys(node.options).forEach((k) => {
-                if (fullOptions[k] === undefined)
-                  fullOptions[k] = node.options![k];
-              });
-            }
-
-            const qx = node.transform?.qx || 0;
-            const qy = node.transform?.qy || 0;
-            const qz = node.transform?.qz || 0;
-            const qw = node.transform?.qw ?? 1;
-            const yawVal = Math.atan2(
-              2.0 * (qw * qz + qx * qy),
-              1.0 - 2.0 * (qy * qy + qz * qz),
-            );
-
-            return {
-              index: index + indexStartIndex,
-              id: node.id,
-              type: node.type,
-              x: node.transform?.x ?? 0,
-              y: node.transform?.y ?? 0,
-              z: node.transform?.z ?? 0,
-              yaw: yawVal,
-              qx,
-              qy,
-              qz,
-              qw,
-              options: fullOptions,
-            };
-          })
-          .filter((n) => n !== null);
-
-        await runWithLoading(
-          {
-            message: "ウェイポイントをエクスポート中...",
-            detail: `${selectedFormats.length} 種類のフォーマットを出力中`,
-            blocking: true,
-          },
-          async () => {
-            // Extract image if requested
-            let imageDataB64 = undefined;
-            if (includeImage) {
-              useAppStore.setState({ shouldFitToMaps: Date.now() });
-              await new Promise((r) => setTimeout(r, 800)); // wait for Pixi
-              const canvas = document.querySelector("canvas");
-              if (canvas) {
-                imageDataB64 = canvas.toDataURL("image/png").split(",")[1];
-              }
-            }
-
-            // Export each selected format
-            for (let i = 0; i < selectedFormats.length; i++) {
-              const formatId = selectedFormats[i];
-
-              let extension = "yaml";
-              let suffix = "";
-              let templateContent = undefined;
-
-              // Check Default Formats first
-              const defaultFormat = useAppStore
-                .getState()
-                .defaultExportFormats.find((f) => f.id === formatId);
-              if (defaultFormat) {
-                extension = defaultFormat.extension;
-                suffix = defaultFormat.suffix;
-              } else {
-                // Check Custom Templates
-                const t = exportTemplates.find((x) => x.id === formatId);
-                if (t) {
-                  templateContent = t.content;
-                  extension = t.extension;
-                  suffix = t.suffix || "";
-                } else {
-                  continue; // Skip invalid
-                }
-              }
-
-              const finalPath = `${basePath}${suffix}.${extension}`;
-
-              // Only send image on the first format to avoid overwriting identical PNGs wastefully
-              await BackendAPI.exportWaypoints(
-                finalPath,
-                waypointsToExport as any[],
-                templateContent,
-                i === 0 ? imageDataB64 : undefined,
-              );
+          // 2. Extract map shot canvas if requested
+          let imageDataB64: string | undefined = undefined;
+          if (hasMapShot) {
+            useAppStore.setState({ shouldFitToMaps: Date.now() });
+            await new Promise((r) => setTimeout(r, 800));
+            const canvas = document.querySelector("canvas");
+            if (canvas) {
+              imageDataB64 = canvas.toDataURL("image/png").split(",")[1];
             }
           }
-        );
 
-        alert("エクスポートが完了しました。");
-        onClose();
-      }
+          // 3. Extract waypoints
+          const extractedWaypoints = extractWaypointsForExport(
+            rootNodeIds,
+            nodes,
+            optionsSchema,
+            indexStartIndex
+          );
+
+          // 4. Resolve package items
+          const waypointItems: any[] = [];
+          const mapItems: any[] = [];
+
+          const timestampStr = `${sessionDate.getFullYear()}${String(
+            sessionDate.getMonth() + 1
+          ).padStart(2, "0")}${String(sessionDate.getDate()).padStart(
+            2,
+            "0"
+          )}_${String(sessionDate.getHours()).padStart(2, "0")}${String(
+            sessionDate.getMinutes()
+          ).padStart(2, "0")}${String(sessionDate.getSeconds()).padStart(2, "0")}`;
+
+          const resolvedTargetFiles = resolveExportFiles(enabledItems, {
+            now: sessionDate,
+            projectName,
+            rootDir,
+            availableRegions: exportRegions.map((r) => ({ id: r.id, name: r.name })),
+            templates: exportTemplates.map((t) => ({
+              id: t.id,
+              name: t.name,
+              extension: t.extension,
+            })),
+            defaultFormats: defaultExportFormats.map((f) => ({
+              id: f.id,
+              name: f.name,
+              extension: f.extension,
+            })),
+          });
+
+          // Group by item
+          for (const item of enabledItems) {
+            if (item.type === "waypoint_template" || item.type === "waypoint_default") {
+              const file = resolvedTargetFiles.find(
+                (f) => f.item.id === item.id && !f.isPairSecondary
+              );
+              if (!file) continue;
+
+              let templateContent: string | undefined = undefined;
+              if (item.type === "waypoint_template") {
+                const t = exportTemplates.find((x) => x.id === item.sourceId);
+                templateContent = t?.content;
+              }
+
+              waypointItems.push({
+                path: file.fullPath,
+                waypoints: extractedWaypoints,
+                template: templateContent,
+                image_data_b64: item.includeMapImage ? imageDataB64 : undefined,
+              });
+            } else if (item.type === "map_all_regions") {
+              const regions = exportRegions.length > 0 ? exportRegions : [];
+              for (const reg of regions) {
+                const primaryFile = resolvedTargetFiles.find(
+                  (f) =>
+                    f.item.id === item.id &&
+                    !f.isPairSecondary &&
+                    f.fileName.startsWith(reg.name)
+                );
+                if (!primaryFile) continue;
+
+                const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, "");
+                mapItems.push({
+                  save_path: basePath,
+                  format: item.mapFormat || "ros_standard",
+                  region: {
+                    name: reg.name,
+                    rect: reg.rect,
+                    layerVisibility: {},
+                  },
+                  layers: preparedLayers,
+                });
+              }
+            } else if (item.type === "map_region") {
+              const reg = exportRegions.find((r) => r.id === item.sourceId);
+              if (!reg) continue;
+
+              const primaryFile = resolvedTargetFiles.find(
+                (f) => f.item.id === item.id && !f.isPairSecondary
+              );
+              if (!primaryFile) continue;
+
+              const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, "");
+              mapItems.push({
+                save_path: basePath,
+                format: item.mapFormat || "ros_standard",
+                region: {
+                  name: reg.name,
+                  rect: reg.rect,
+                  layerVisibility: {},
+                },
+                layers: preparedLayers,
+              });
+            }
+          }
+
+          // 5. Invoke Backend API
+          const result = await BackendAPI.executeExportPackage({
+            root_dir: rootDir,
+            conflict_resolution: activeProfile.conflictResolution,
+            session_timestamp: timestampStr,
+            waypoint_items: waypointItems,
+            map_items: mapItems,
+          });
+
+          let alertMsg = `エクスポートが完了しました。\n出力ファイル数: ${result.exported_files_count} 件`;
+          if (result.backed_up_files && result.backed_up_files.length > 0) {
+            alertMsg += `\nバックアップ作成: ${result.backed_up_files.length} 件 (.bak)`;
+          }
+          alert(alertMsg);
+          onClose();
+        }
+      );
     } catch (err) {
-      console.error("Failed to export waypoints:", err);
-      alert(`エクスポートに失敗しました。\nエラー詳細: ${String(err)}`);
+      console.error("Failed to execute export:", err);
+      alert(`エクスポートに失敗しました:\n${String(err)}`);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" className="h-[85vh]">
       <ModalHeader
         onClose={onClose}
         icon={<Save size={20} className="text-primary-base" />}
-        title="Export Waypoints"
+        title="統合エクスポート (Integrated Export)"
       />
 
-      <ModalContent className="p-0">
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          <div className="space-y-4">
-            <Label className="text-xs font-bold text-text-muted uppercase tracking-widest ml-1 block">
-              Desired Output Formats
-            </Label>
-            <div className="grid grid-cols-1 gap-2 bg-surface-base/30 p-4 rounded-xl border border-border-base/40 shadow-inner">
-              {useAppStore
-                .getState()
-                .defaultExportFormats.filter((f) => f.enabled)
-                .map((f) => (
-                  <FormatSelectRow
-                    key={f.id}
-                    checked={selectedFormats.includes(f.id)}
-                    onChange={() => toggleFormat(f.id)}
-                    title={f.name}
-                    subtitle={`Standard Format (.${f.extension})`}
-                  />
+      <ModalContent className="p-0 flex flex-col flex-1 overflow-hidden">
+        {/* Profile & Root Bar */}
+        <div className="p-4 border-b border-border-base/40 bg-surface-base/60 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 flex-1">
+              <Label className="text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap">
+                プロファイル:
+              </Label>
+              <select
+                value={activeProfile.id}
+                onChange={(e) => setActiveExportProfileId(e.target.value)}
+                className="h-8 text-xs font-semibold px-2 rounded-md bg-surface-panel border border-border-base/40 text-text-base focus:outline-none focus:border-primary-base"
+              >
+                {exportProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
-              {exportTemplates.map((t) => (
-                <FormatSelectRow
-                  key={t.id}
-                  checked={selectedFormats.includes(t.id)}
-                  onChange={() => toggleFormat(t.id)}
-                  title={t.name}
-                  subtitle={
-                    <>
-                      <span>{t.scope === 'local' ? '[Local]' : '[Global]'}</span>
-                      <span>Custom Template (.{t.extension})</span>
-                    </>
-                  }
-                />
-              ))}
+              </select>
+              <Input
+                value={activeProfile.name}
+                onChange={(e) =>
+                  updateExportProfile(activeProfile.id, { name: e.target.value })
+                }
+                placeholder="プロファイル名"
+                className="h-8 text-xs w-48 font-medium"
+              />
             </div>
-            <p className="text-[11px] text-text-muted/80 leading-relaxed px-2">
-              Select multiple formats to generate all simultaneously. Suffixes specified in settings will be automatically appended to filenames.
-            </p>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleAddProfile}
+                title="新規プロファイル追加"
+                className="h-8 px-2 text-xs flex items-center gap-1 text-text-muted hover:text-text-base"
+              >
+                <Plus size={14} />
+                新規
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDuplicateProfile}
+                title="プロファイルを複製"
+                className="h-8 px-2 text-xs flex items-center gap-1 text-text-muted hover:text-text-base"
+              >
+                <Copy size={14} />
+                複製
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDeleteProfile}
+                title="プロファイルを削除"
+                className="h-8 px-2 text-xs flex items-center gap-1 text-text-danger hover:bg-status-danger/10"
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
           </div>
 
-          <div className="pt-6 border-t border-border-base/30">
-            <OptionCard
-              checked={includeImage}
-              onChange={setIncludeImage}
-              title="Include High-Res Map Shot"
-              description="Generates a dedicated `.png` capture highlighting all exported waypoints on top of the map layer."
-            />
+          {/* Root Directory Picker */}
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap">
+              出力ルート:
+            </Label>
+            <div className="flex-1">
+              <BrowseInput
+                value={rootDir}
+                onChange={handleRootDirChange}
+                placeholder="エクスポート先ルートフォルダを選択..."
+                dialogOptions={{ directory: true }}
+                size="sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Pane Main Workspace */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Pane: Tree View */}
+          <div className="w-1/2 border-r border-border-base/40 flex flex-col bg-surface-base/20">
+            <div className="p-3 border-b border-border-base/30 flex items-center justify-between bg-surface-panel/40">
+              <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                <FolderOpen size={14} />
+                出力ツリープレビュー (Virtual Directory)
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="h-6 text-[10px] px-1.5"
+                  onClick={() => {
+                    const allEnabled = activeProfile.items.every((i) => i.enabled);
+                    const updated = activeProfile.items.map((i) => ({
+                      ...i,
+                      enabled: !allEnabled,
+                    }));
+                    updateExportProfile(activeProfile.id, { items: updated });
+                  }}
+                >
+                  {activeProfile.items.every((i) => i.enabled)
+                    ? "全解除"
+                    : "全選択"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-1 text-xs">
+              {activeProfile.items.length === 0 ? (
+                <div className="p-6 text-center text-text-muted/60 text-xs">
+                  エクスポート項目がありません。下部のボタンから追加してください。
+                </div>
+              ) : (
+                renderTreeNodes(treeNodes, selectedItemId, setSelectedItemId, handleToggleItemEnabled, conflictFiles)
+              )}
+            </div>
+
+            {/* Add Item Bar */}
+            <div className="p-2.5 border-t border-border-base/30 bg-surface-panel/30 flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddItem("waypoint_default")}
+                className="flex-1 text-xs h-7 flex items-center justify-center gap-1"
+              >
+                <FileText size={12} className="text-primary-base" />
+                ＋ Waypoint出力
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddItem("map_all_regions")}
+                className="flex-1 text-xs h-7 flex items-center justify-center gap-1"
+              >
+                <MapIcon size={12} className="text-accent-generator" />
+                ＋ マップ領域出力
+              </Button>
+            </div>
+          </div>
+
+          {/* Right Pane: Item Inspector */}
+          <div className="w-1/2 flex flex-col overflow-y-auto p-5 bg-surface-panel/20">
+            {selectedItem ? (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-border-base/30">
+                  <div className="flex items-center gap-2">
+                    {selectedItem.type.startsWith("map") ? (
+                      <MapIcon size={16} className="text-accent-generator" />
+                    ) : (
+                      <FileText size={16} className="text-primary-base" />
+                    )}
+                    <span className="font-bold text-sm text-text-base">
+                      {selectedItem.type.startsWith("map")
+                        ? "マップ出力設定"
+                        : "ウェイポイント出力設定"}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDeleteItem(selectedItem.id)}
+                    className="h-7 text-xs text-text-danger hover:bg-status-danger/10 px-2"
+                  >
+                    <Trash2 size={13} className="mr-1" />
+                    この項目を削除
+                  </Button>
+                </div>
+
+                {/* Source Selection */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-bold text-text-muted">
+                    出力ソース (データ元)
+                  </Label>
+                  {selectedItem.type.startsWith("map") ? (
+                    <div className="flex flex-col gap-2">
+                      <select
+                        value={
+                          selectedItem.type === "map_all_regions"
+                            ? "__all__"
+                            : selectedItem.sourceId
+                        }
+                        onChange={(e) => {
+                          if (e.target.value === "__all__") {
+                            handleUpdateItem(selectedItem.id, {
+                              type: "map_all_regions",
+                              sourceId: "all",
+                            });
+                          } else {
+                            handleUpdateItem(selectedItem.id, {
+                              type: "map_region",
+                              sourceId: e.target.value,
+                            });
+                          }
+                        }}
+                        className="h-8 text-xs rounded-md bg-surface-base border border-border-base/40 text-text-base px-2"
+                      >
+                        <option value="__all__">{"全マップ領域を一括出力 ({{name}}置換)"}</option>
+                        {exportRegions.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            マップ領域: {r.name}
+                          </option>
+                        ))}
+                      </select>
+                      {exportRegions.length === 0 && (
+                        <p className="text-[11px] text-accent-generator/80">
+                          ※ マップ領域が未作成です。ツールバーの「Export Region」ツールで領域を作成してください。
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <select
+                      value={
+                        selectedItem.type === "waypoint_template"
+                          ? `tmpl:${selectedItem.sourceId}`
+                          : `def:${selectedItem.sourceId}`
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val.startsWith("tmpl:")) {
+                          const id = val.replace("tmpl:", "");
+                          handleUpdateItem(selectedItem.id, {
+                            type: "waypoint_template",
+                            sourceId: id,
+                          });
+                        } else {
+                          const id = val.replace("def:", "");
+                          handleUpdateItem(selectedItem.id, {
+                            type: "waypoint_default",
+                            sourceId: id,
+                          });
+                        }
+                      }}
+                      className="h-8 text-xs rounded-md bg-surface-base border border-border-base/40 text-text-base px-2"
+                    >
+                      <optgroup label="標準フォーマット">
+                        {defaultExportFormats.map((f) => (
+                          <option key={f.id} value={`def:${f.id}`}>
+                            {f.name} (.{f.extension})
+                          </option>
+                        ))}
+                      </optgroup>
+                      {exportTemplates.length > 0 && (
+                        <optgroup label="カスタムテンプレート">
+                          {exportTemplates.map((t) => (
+                            <option key={t.id} value={`tmpl:${t.id}`}>
+                              {t.name} (.{t.extension})
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  )}
+                </div>
+
+                {/* Relative Path Pattern */}
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-text-muted">
+                    相対出力パスパターン (サブフォルダ/ファイル名)
+                  </Label>
+                  <Input
+                    ref={inputRef}
+                    value={selectedItem.relativePathPattern}
+                    onChange={(e) =>
+                      handleUpdateItem(selectedItem.id, {
+                        relativePathPattern: e.target.value,
+                      })
+                    }
+                    placeholder="waypoints/{{yyyymmdd}}_waypoints.yaml"
+                    className="h-8 text-xs font-mono"
+                  />
+
+                  {/* Variable Chips */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-text-muted block">
+                        クリックして変数を挿入 (大文字MM=月, 小文字mm=分):
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { var: "{{YYYYMMDD}}", label: "年月日" },
+                        { var: "{{HHmmss}}", label: "時分秒" },
+                        { var: "{{YYYYMMDD_HHmmss}}", label: "日時一括" },
+                        { var: "{{YYYY}}", label: "年" },
+                        { var: "{{MM}}", label: "月" },
+                        { var: "{{dd}}", label: "日" },
+                        { var: "{{HH}}", label: "時" },
+                        { var: "{{mm}}", label: "分" },
+                        { var: "{{ss}}", label: "秒" },
+                        { var: "{{project_name}}", label: "プロジェクト" },
+                        { var: "{{name}}", label: "名称" },
+                      ].map((chip) => (
+                        <button
+                          key={chip.var}
+                          type="button"
+                          onClick={() => handleInsertVariable(chip.var)}
+                          title={`${chip.var} (${chip.label})`}
+                          className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface-panel hover:bg-primary-base/20 border border-border-base/40 hover:border-primary-base/40 text-text-muted hover:text-primary-base transition-colors flex items-center gap-1"
+                        >
+                          <span>{chip.var}</span>
+                          <span className="text-[9px] opacity-60 font-sans">({chip.label})</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Format Options */}
+                {selectedItem.type.startsWith("map") && (
+                  <div className="space-y-1.5 pt-2 border-t border-border-base/30">
+                    <Label className="text-xs font-bold text-text-muted">
+                      マップ出力フォーマット
+                    </Label>
+                    <div className="flex gap-4 text-xs">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`mapFormat-${selectedItem.id}`}
+                          checked={
+                            (selectedItem.mapFormat || "ros_standard") ===
+                            "ros_standard"
+                          }
+                          onChange={() =>
+                            handleUpdateItem(selectedItem.id, {
+                              mapFormat: "ros_standard",
+                            })
+                          }
+                          className="accent-primary-base"
+                        />
+                        ROS Standard (.pgm + .yaml)
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`mapFormat-${selectedItem.id}`}
+                          checked={selectedItem.mapFormat === "png_only"}
+                          onChange={() =>
+                            handleUpdateItem(selectedItem.id, {
+                              mapFormat: "png_only",
+                            })
+                          }
+                          className="accent-primary-base"
+                        />
+                        Image Only (.png)
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* Waypoint High-Res Image Option */}
+                {!selectedItem.type.startsWith("map") && (
+                  <div className="pt-2 border-t border-border-base/30">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs">
+                      <Checkbox
+                        checked={selectedItem.includeMapImage || false}
+                        onChange={(e) =>
+                          handleUpdateItem(selectedItem.id, {
+                            includeMapImage: e.target.checked,
+                          })
+                        }
+                      />
+                      <span className="font-semibold text-text-base">
+                        High-Res Map Shot (.png) を同梱出力
+                      </span>
+                    </label>
+                    <p className="text-[11px] text-text-muted mt-1 ml-6">
+                      ウェイポイントが配置されたキャンバス画像（.png）を同名で出力します。
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-text-muted text-xs">
+                左側のツリーから項目を選択して設定を編集してください。
+              </div>
+            )}
           </div>
         </div>
       </ModalContent>
 
-      <ModalFooter>
-        <Button
-          variant="ghost"
-          onClick={onClose}
-          className="px-6 text-text-muted font-bold"
-        >
-          Cancel
-        </Button>
-        <Button
-          onClick={handleExport}
-          disabled={selectedFormats.length === 0}
-          className={cn(
-            "min-w-40 shadow-lg transition-all",
-            selectedFormats.length > 0 ? "bg-primary-base hover:bg-primary-hover hover:scale-105 active:scale-95 shadow-primary-base/20" : "opacity-50"
+      <ModalFooter className="flex items-center justify-between">
+        {/* Conflict Resolution Strategy */}
+        <div className="flex items-center gap-4 text-xs">
+          <span className="font-bold text-text-muted">既存ファイルの競合:</span>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="conflictResolution"
+              checked={activeProfile.conflictResolution === "backup_file"}
+              onChange={() =>
+                updateExportProfile(activeProfile.id, {
+                  conflictResolution: "backup_file",
+                })
+              }
+              className="accent-primary-base"
+            />
+            リネームバックアップ (.bak)
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name="conflictResolution"
+              checked={activeProfile.conflictResolution === "overwrite"}
+              onChange={() =>
+                updateExportProfile(activeProfile.id, {
+                  conflictResolution: "overwrite",
+                })
+              }
+              className="accent-primary-base"
+            />
+            上書き
+          </label>
+
+          {conflictFiles.size > 0 && (
+            <span className="flex items-center gap-1 text-[11px] font-semibold text-status-warning bg-status-warning/10 px-2 py-0.5 rounded border border-status-warning/30">
+              <AlertTriangle size={12} />
+              {conflictFiles.size} 件の同名ファイルが存在
+            </span>
           )}
-        >
-          <Save size={16} className="mr-2" />
-          Choose Path & Export
-        </Button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" onClick={onClose} className="px-5 text-text-muted font-bold text-xs">
+            キャンセル
+          </Button>
+          <Button
+            onClick={handleExecuteExport}
+            disabled={activeProfile.items.filter((i) => i.enabled).length === 0}
+            className="min-w-36 bg-primary-base hover:bg-primary-hover shadow-lg text-xs font-bold"
+          >
+            <Save size={14} className="mr-1.5" />
+            エクスポート実行 ({activeProfile.items.filter((i) => i.enabled).length}件)
+          </Button>
+        </div>
       </ModalFooter>
     </Modal>
   );
 }
 
-interface FormatSelectRowProps {
-  checked: boolean;
-  onChange: () => void;
-  title: string;
-  subtitle: React.ReactNode;
-}
+/**
+ * ツリーノードの再帰描画
+ */
+function renderTreeNodes(
+  nodes: (TreeDirectoryNode | TreeFileNode)[],
+  selectedItemId: string | null,
+  onSelectItem: (id: string) => void,
+  onToggleEnabled: (id: string, enabled: boolean) => void,
+  conflictFiles: Set<string>,
+  depth = 0
+) {
+  return nodes.map((node) => {
+    if (node.type === "directory") {
+      return (
+        <div key={node.relativePath} className="space-y-0.5">
+          <div
+            className="flex items-center gap-1.5 py-1 px-2 rounded hover:bg-surface-panel/50 text-text-muted select-none"
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          >
+            <Folder size={14} className="text-primary-base/80" />
+            <span className="font-semibold text-text-base">{node.name}/</span>
+          </div>
+          <div>
+            {renderTreeNodes(
+              node.children,
+              selectedItemId,
+              onSelectItem,
+              onToggleEnabled,
+              conflictFiles,
+              depth + 1
+            )}
+          </div>
+        </div>
+      );
+    }
 
-function FormatSelectRow({ checked, onChange, title, subtitle }: FormatSelectRowProps) {
-  return (
-    <label className="flex items-center justify-between p-3 px-4 rounded-lg bg-surface-panel/40 border border-border-base/20 hover:border-primary-base/30 hover:bg-surface-panel/60 transition-all cursor-pointer group">
-      <div className="flex items-center gap-4">
-        <Checkbox checked={checked} onChange={onChange} />
-        <div className="flex flex-col">
-          <span className="text-[14px] font-bold text-text-base group-hover:text-primary-base transition-colors">
-            {title}
+    const isConflict = conflictFiles.has(node.fullPath);
+    const isSelected = selectedItemId === node.item.id;
+
+    return (
+      <div
+        key={node.relativePath}
+        onClick={() => onSelectItem(node.item.id)}
+        className={cn(
+          "flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors select-none group",
+          isSelected
+            ? "bg-primary-base/15 text-primary-base font-semibold border border-primary-base/30"
+            : "hover:bg-surface-panel/40 text-text-base border border-transparent"
+        )}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      >
+        <div className="flex items-center gap-2 overflow-hidden">
+          {!node.isPairSecondary ? (
+            <Checkbox
+              checked={node.item.enabled}
+              onChange={(e) => {
+                e.stopPropagation();
+                onToggleEnabled(node.item.id, e.target.checked);
+              }}
+            />
+          ) : (
+            <div className="w-4" />
+          )}
+
+          {node.name.endsWith(".png") ? (
+            <ImageIcon size={13} className="text-text-muted shrink-0" />
+          ) : node.name.endsWith(".pgm") ? (
+            <MapIcon size={13} className="text-accent-generator shrink-0" />
+          ) : (
+            <FileText size={13} className="text-primary-base shrink-0" />
+          )}
+
+          <span className="font-mono text-[11px] truncate" title={node.fullPath}>
+            {node.name}
           </span>
-          <span className="text-[10px] text-text-muted font-mono uppercase flex items-center gap-2">
-            {subtitle}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {isConflict && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-status-warning/20 text-status-warning font-bold">
+              既存
+            </span>
+          )}
+          <span className="text-[10px] text-text-muted font-normal">
+            {node.sourceLabel}
           </span>
         </div>
       </div>
-    </label>
-  );
+    );
+  });
 }
