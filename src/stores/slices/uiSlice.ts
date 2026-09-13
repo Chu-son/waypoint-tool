@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { v4 as uuidv4 } from 'uuid';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
+import { PanelLayout, DEFAULT_PANEL_LAYOUT } from '../migrations/storageMigration';
 
 export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
 export type ElementCopyCoordSystem = 'world' | 'anchor';
@@ -50,12 +51,18 @@ export type UISlice = {
   leftPanelWidth: number;
   rightPanelWidth: number;
   showProperties: boolean;
+  panelLayout: PanelLayout;
   leftPanelActiveTab: string;
   rightPanelActiveTab: string;
   leftPanelViewMode: 'tabs' | 'split';
   rightPanelViewMode: 'tabs' | 'split';
   isLeftPanelOpen: boolean;
   isRightPanelOpen: boolean;
+
+  moveTabToPanel: (tabId: string, targetPanel: 'left' | 'right') => void;
+  reorderTab: (panel: 'left' | 'right', fromIndex: number, toIndex: number) => void;
+  activateTab: (tabId: string) => void;
+  resetPanelLayout: () => void;
   
   isSettingsModalOpen: boolean;
   isExportModalOpen: boolean;
@@ -220,7 +227,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   treeRevealTarget: null,
 
-  leftPanelActiveTab: 'project',
+  panelLayout: DEFAULT_PANEL_LAYOUT,
+  leftPanelActiveTab: 'waypoints',
   rightPanelActiveTab: 'layers',
   leftPanelViewMode: 'tabs',
   rightPanelViewMode: 'tabs',
@@ -366,12 +374,123 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
 
-  revealInTree: (type, id) => set({
-    isLeftPanelOpen: true,
-    leftPanelActiveTab: 'project',
-    treeRevealTarget: { type, id, timestamp: Date.now() },
-  }),
+  revealInTree: (type, id) => {
+    const targetTab = type === 'node' ? 'waypoints' : 'annotations';
+    get().activateTab(targetTab);
+    set({
+      treeRevealTarget: { type, id, timestamp: Date.now() },
+    });
+  },
   clearTreeRevealTarget: () => set({ treeRevealTarget: null }),
+
+  moveTabToPanel: (tabId, targetPanel) => {
+    const state = get();
+    const currentLayout = state.panelLayout;
+    const sourcePanel = targetPanel === 'left' ? 'right' : 'left';
+    const sourceKey = sourcePanel === 'left' ? 'leftTabs' : 'rightTabs';
+    const targetKey = targetPanel === 'left' ? 'leftTabs' : 'rightTabs';
+
+    if (!currentLayout[sourceKey].includes(tabId)) {
+      return;
+    }
+
+    const nextSourceTabs = currentLayout[sourceKey].filter((t) => t !== tabId);
+    const nextTargetTabs = [...currentLayout[targetKey], tabId];
+
+    const nextLayout: PanelLayout = {
+      ...currentLayout,
+      [sourceKey]: nextSourceTabs,
+      [targetKey]: nextTargetTabs,
+    };
+
+    const updates: Partial<AppState> = {
+      panelLayout: nextLayout,
+      isDirty: true,
+    };
+
+    // 移動先パネルを開き、移動したタブをアクティブにする
+    if (targetPanel === 'left') {
+      updates.isLeftPanelOpen = true;
+      updates.leftPanelActiveTab = tabId;
+    } else {
+      updates.isRightPanelOpen = true;
+      updates.rightPanelActiveTab = tabId;
+    }
+
+    // 移動元パネルのアクティブタブが移動対象だった場合、残りの先頭タブに切り替える
+    if (sourcePanel === 'left') {
+      if (state.leftPanelActiveTab === tabId) {
+        updates.leftPanelActiveTab = nextSourceTabs[0] || '';
+      }
+      if (nextSourceTabs.length === 0) {
+        updates.isLeftPanelOpen = false;
+      }
+    } else {
+      if (state.rightPanelActiveTab === tabId) {
+        updates.rightPanelActiveTab = nextSourceTabs[0] || '';
+      }
+      if (nextSourceTabs.length === 0) {
+        updates.isRightPanelOpen = false;
+      }
+    }
+
+    set(updates as any);
+  },
+
+  reorderTab: (panel, fromIndex, toIndex) => {
+    const state = get();
+    const key = panel === 'left' ? 'leftTabs' : 'rightTabs';
+    const tabs = [...state.panelLayout[key]];
+    if (fromIndex < 0 || fromIndex >= tabs.length || toIndex < 0 || toIndex >= tabs.length || fromIndex === toIndex) {
+      return;
+    }
+    const [moved] = tabs.splice(fromIndex, 1);
+    tabs.splice(toIndex, 0, moved);
+    set({
+      panelLayout: {
+        ...state.panelLayout,
+        [key]: tabs,
+      },
+      isDirty: true,
+    });
+  },
+
+  activateTab: (tabId) => {
+    const state = get();
+    const normalizedTabId = tabId === 'project' ? 'waypoints' : tabId;
+
+    if (state.panelLayout.leftTabs.includes(normalizedTabId)) {
+      set({
+        isLeftPanelOpen: true,
+        leftPanelActiveTab: normalizedTabId,
+      });
+    } else if (state.panelLayout.rightTabs.includes(normalizedTabId)) {
+      set({
+        isRightPanelOpen: true,
+        rightPanelActiveTab: normalizedTabId,
+      });
+    } else {
+      // 未知またはカスタムタブの場合は現在右パネルで開く
+      set({
+        isRightPanelOpen: true,
+        rightPanelActiveTab: normalizedTabId,
+      });
+    }
+  },
+
+  resetPanelLayout: () => {
+    set({
+      panelLayout: {
+        leftTabs: [...DEFAULT_PANEL_LAYOUT.leftTabs],
+        rightTabs: [...DEFAULT_PANEL_LAYOUT.rightTabs],
+      },
+      leftPanelActiveTab: 'waypoints',
+      rightPanelActiveTab: 'layers',
+      isLeftPanelOpen: true,
+      isRightPanelOpen: true,
+      isDirty: true,
+    });
+  },
 
   setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
   setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
@@ -383,17 +502,16 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setRightPanelWidth: (width) => set({ rightPanelWidth: width, isDirty: true }),
   setShowProperties: (show) => set({ showProperties: show, isDirty: true }),
   
-  resetWindowLayout: () => set({
-    isLeftPanelOpen: true,
-    isRightPanelOpen: true,
-    leftPanelViewMode: 'tabs',
-    rightPanelViewMode: 'tabs',
-    leftPanelActiveTab: 'project',
-    rightPanelActiveTab: 'layers',
-    leftPanelWidth: 280,
-    rightPanelWidth: 320,
-    isDirty: true
-  }),
+  resetWindowLayout: () => {
+    get().resetPanelLayout();
+    set({
+      leftPanelViewMode: 'tabs',
+      rightPanelViewMode: 'tabs',
+      leftPanelWidth: 280,
+      rightPanelWidth: 320,
+      isDirty: true,
+    });
+  },
 
   setSettingsModalOpen: (open, tab) => {
     if (open) {

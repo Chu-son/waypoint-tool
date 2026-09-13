@@ -12,8 +12,12 @@ describe('storageMigration', () => {
     expect(migrateStorage(undefined, 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage('corrupt', 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage(12345, 0)).toEqual(DEFAULT_STORAGE_STATE);
-    expect(STORAGE_VERSION).toBe(2);
+    expect(STORAGE_VERSION).toBe(3);
     expect(DEFAULT_STORAGE_STATE.pluginSettings).toEqual([]);
+    expect(DEFAULT_STORAGE_STATE.panelLayout).toEqual({
+      leftTabs: ['waypoints', 'annotations', 'plugins'],
+      rightTabs: ['layers', 'inspector'],
+    });
   });
 
   it('promotes defaultExportFormats string array to object array on v0 migration', () => {
@@ -116,4 +120,39 @@ describe('storageMigration', () => {
     const migrated = migrateStorage(state, 2);
     expect(migrated.pluginSettings).toEqual(validSettings);
   });
+
+  it('migrates v2 state to v3 with panelLayout normalization and project tab expansion', () => {
+    const v2StateWithProject = {
+      panelLayout: {
+        leftTabs: ['project', 'plugins'],
+        rightTabs: ['layers', 'inspector'],
+      },
+      leftPanelActiveTab: 'project',
+      rightPanelActiveTab: 'inspector',
+    };
+    const migrated = migrateStorage(v2StateWithProject, 2);
+    expect(migrated.panelLayout).toEqual({
+      leftTabs: ['waypoints', 'annotations', 'plugins'],
+      rightTabs: ['layers', 'inspector'],
+    });
+    expect(migrated.leftPanelActiveTab).toBe('waypoints');
+    expect(migrated.rightPanelActiveTab).toBe('inspector');
+  });
+
+  it('ensures missing builtin tabs are supplemented in panelLayout', () => {
+    const partialLayoutState = {
+      panelLayout: {
+        leftTabs: ['waypoints'],
+        rightTabs: ['inspector'],
+      },
+    };
+    const migrated = migrateStorage(partialLayoutState, 2);
+    expect(migrated.panelLayout).toBeDefined();
+    expect(migrated.panelLayout!.leftTabs).toContain('waypoints');
+    expect(migrated.panelLayout!.leftTabs).toContain('annotations');
+    expect(migrated.panelLayout!.leftTabs).toContain('plugins');
+    expect(migrated.panelLayout!.rightTabs).toContain('inspector');
+    expect(migrated.panelLayout!.rightTabs).toContain('layers');
+  });
 });
+

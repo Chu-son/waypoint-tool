@@ -45,6 +45,17 @@ export interface InteractionSlice {
   handleGlobalEscape: () => boolean;
 }
 
+function applyInspectorTabUpdates(state: AppState, updates: Partial<AppState>) {
+  const isLeft = state.panelLayout?.leftTabs?.includes('inspector');
+  if (isLeft) {
+    updates.leftPanelActiveTab = 'inspector';
+    updates.isLeftPanelOpen = true;
+  } else {
+    updates.rightPanelActiveTab = 'inspector';
+    updates.isRightPanelOpen = true;
+  }
+}
+
 export const createInteractionSlice: StateCreator<AppState, [], [], InteractionSlice> = (set, get) => {
   const canvasAbortHandlers = new Set<CanvasAbortHandler>();
   const transitionListeners = new Set<ModeTransitionListener>();
@@ -182,7 +193,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activeTool = 'add_generator';
             updates.isMapEditMode = false;
             updates.isAnnotationEditMode = false;
-            updates.rightPanelActiveTab = 'inspector';
+            applyInspectorTabUpdates(state, updates);
             updates.elementCopyState = null;
             updates.selectedAnnotationIds = [];
             updates.selectedEditObjectId = null;
@@ -198,7 +209,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.isAnnotationEditMode = true;
             updates.activeAnnotationSubTool = normalizedMode.subTool;
             updates.isMapEditMode = false;
-            updates.rightPanelActiveTab = 'inspector';
+            applyInspectorTabUpdates(state, updates);
             updates.elementCopyState = null;
             updates.selectedNodeIds = [];
             updates.activeCustomLayerId = null;
@@ -226,7 +237,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.mapEditFillValue = normalizedMode.fillValue;
             updates.mapEditBrushSize = normalizedMode.brushSize;
             updates.isAnnotationEditMode = false;
-            updates.rightPanelActiveTab = 'inspector';
+            applyInspectorTabUpdates(state, updates);
             updates.elementCopyState = null;
             break;
           case 'export_region_edit':
@@ -324,7 +335,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
             if (selection.ids.length > 0) {
-              updates.rightPanelActiveTab = 'inspector';
+              applyInspectorTabUpdates(state, updates);
             }
             if (state.elementCopyState) {
               const targetId = selection.ids.length === 1 ? selection.ids[0] : null;
@@ -337,7 +348,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
             if (selection.ids.length > 0) {
-              updates.rightPanelActiveTab = 'inspector';
+              applyInspectorTabUpdates(state, updates);
             }
             break;
           case 'custom_layer':
@@ -345,7 +356,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.selectedAnnotationIds = [];
             updates.activeCustomLayerId = selection.layerId;
             updates.selectedEditObjectId = selection.selectedObjectId;
-            updates.rightPanelActiveTab = 'inspector';
+            applyInspectorTabUpdates(state, updates);
             break;
         }
 

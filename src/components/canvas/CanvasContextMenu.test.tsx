@@ -45,7 +45,7 @@ describe('CanvasContextMenu', () => {
       expect.objectContaining({ type: 'node', id: 'wp-1' })
     );
     expect(useAppStore.getState().isLeftPanelOpen).toBe(true);
-    expect(useAppStore.getState().leftPanelActiveTab).toBe('project');
+    expect(useAppStore.getState().leftPanelActiveTab).toBe('waypoints');
     expect(mockOnClose).toHaveBeenCalled();
   });
 

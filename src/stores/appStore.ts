@@ -59,6 +59,9 @@ export const useAppStore = create<AppState>()(
         mapEditFillValue: state.mapEditFillValue,
         mapEditBrushSize: state.mapEditBrushSize,
         mapEditSubTool: state.mapEditSubTool,
+        panelLayout: state.panelLayout,
+        leftPanelActiveTab: state.leftPanelActiveTab,
+        rightPanelActiveTab: state.rightPanelActiveTab,
       }),
     }
   )
