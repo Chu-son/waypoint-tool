@@ -162,8 +162,11 @@
   - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/SettingsModal.tsx))
-  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `OptionSchemaTab`, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` を保持。
+  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` の7タブを保持。
   - **主要Props**: `isOpen`, `onClose`
+- **`AppearanceTab`** ([`src/components/ui/settings/AppearanceTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/AppearanceTab.tsx))
+  - **概要**: 外観・表示設定タブ。テーマモード（Light/Dark）、アクセントカラープリセット、マップ透過度、パス外観（色・透過度・幅同期）、ROS占有グリッド閾値（障害物・フリー・ネゲート）の設定を提供。
+  - **主要Props**: なし
 - **`ConditionalStylesTab`** ([`src/components/ui/settings/ConditionalStylesTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/ConditionalStylesTab.tsx))
   - **概要**: 条件付き書式（Conditional Styles）設定タブ。対象要素（Waypoint, Path, Footprint, Annotation）、ネスト可能なAND/OR条件グループ、スタイルオーバーライド（色、線幅、破線、形状、強制表示、寸法直接参照等）のCRUD、優先順位並び替え、JSONエクスポート/インポートを提供。
   - **主要Props**: なし
@@ -171,8 +174,14 @@
   - **概要**: ロボットのフットプリント（円形・矩形・多角形）の定義・寸法設定・ROS Nav2 形式テキスト入出力、およびリアルタイム SVG プレビュー。
   - **主要Props**: なし
 - **`TabSectionHeader`** ([`src/components/ui/settings/TabSectionHeader.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/TabSectionHeader.tsx))
-  - **概要**: 設定モーダル内の各設定タブ専用ヘッダー部品。
-  - **主要Props**: `title`, `subtitle`, `actions`
+  - **概要**: 設定モーダル内の各設定タブ専用共通ヘッダー部品。タイトル、説明、アイコン、バッジ、右上アクションをサポート。
+  - **主要Props**: `title`, `subtitle`, `icon`, `badge`, `actions`
+- **`SettingsSection`** ([`src/components/ui/settings/SettingsSection.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/SettingsSection.tsx))
+  - **概要**: 設定項目を論理的なグループにまとめるセクションカード部品。ヘッダー（タイトル、説明、アイコン、右上アクション）とコンテンツスロットを提供。
+  - **主要Props**: `title`, `description`, `icon`, `actions`, `children`
+- **`SettingsRow`** ([`src/components/ui/settings/SettingsRow.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/SettingsRow.tsx))
+  - **概要**: 左側ラベル・説明と右側コントロールを均一に配置する設定行部品。水平・垂直レイアウトをサポート。
+  - **主要Props**: `label`, `labelRight`, `description`, `children`, `vertical`
 - **`PathRouterMenu`** ([`src/components/ui/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PathRouterMenu.tsx))
   - **概要**: トップバーに常駐するパス計算・ルーター設定ポップアップメニュー。経路補間アルゴリズム（直線 / Dijkstra等）の選択、パラメータ設定、自動再計算トグル、パス色・透過度・線幅・Footprint幅同期などの表示設定を提供。
   - **主要Props**: なし
