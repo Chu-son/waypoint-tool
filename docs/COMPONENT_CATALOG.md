@@ -11,8 +11,8 @@
   - **概要**: モード操作時（コピー、領域選択等）にキャンバス上部に浮遊表示されるバナー通知・アクションUI。
   - **主要Props**: `icon`, `title`, `subtitle`, `valueDisplay`, `statusText`, `actions`
 - **`PanelContainer`** ([`src/components/ui/PanelContainer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PanelContainer.tsx))
-  - **概要**: 左右サイドパネル（インスペクターやツリー）を格納し、タブ切り替えおよび上下分割・リサイズを制御するコンテナ。
-  - **主要Props**: なし（`useAppStore` からパネルレイアウト状態を直接制御）
+  - **概要**: 左右サイドパネルを格納し、タブ切り替え、上下分割、タブ右クリックによる反対パネルへの移動（左右ドッキング）・順序並び替え、レイアウト初期化を制御するコンテナ。
+  - **主要Props**: `panels`, `activeTabId`, `onTabChange`, `viewMode`, `onViewModeChange`, `side`, `onMoveTabToPanel`, `onReorderTab`, `onResetLayout`, `onClose`, `closeIcon`
 - **`NumericInput`** ([`src/components/ui/NumericInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/NumericInput.tsx))
   - **概要**: 数値編集用インプット。ドラッグによる値変更やステップ増減、フォーカス外確定をサポート。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`
@@ -129,10 +129,16 @@
   - **概要**: 画面左端に配置されるメインツール切り替えバー (Select, Add Waypoint, Export Region, Import/Export/Settings等)。
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/LayerPanel.tsx))
-  - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。詳細パラメータは設定トグルボタンによる展開プルダウン内に集約（MapLayer: ロード時YAML基準の相対位置姿勢ΔX/ΔY/ΔYaw編集・クイック回転・リセット、不透明度・ブレンドモード調整、占有閾値設定 / CustomLayer: 不透明度、ブレンドモード、参照レイヤー時の合成除外案内、オブジェクト数表示 / ExportRegion: 領域矩形座標 X/Y/Width/Height の数値編集）。
+  - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
+  - **主要Props**: なし
+- **`WaypointTreePanel`** ([`src/components/ui/WaypointTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WaypointTreePanel.tsx))
+  - **概要**: ウェイポイントツリー (`WaypointTree`) を単独でフルハイト表示する専用パネルコンポーネント。
+  - **主要Props**: なし
+- **`AnnotationTreePanel`** ([`src/components/ui/AnnotationTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationTreePanel.tsx))
+  - **概要**: アノテーション一覧 (`AnnotationTree`) を単独でフルハイト表示する専用パネルコンポーネント。
   - **主要Props**: なし
 - **`ObjectsPanel`** ([`src/components/ui/ObjectsPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ObjectsPanel.tsx))
-  - **概要**: ウェイポイントツリー (`WaypointTree`) とアノテーション一覧 (`AnnotationTree`) を統合してホストする左サイドバーのメインオブジェクトパネル。
+  - **概要**: ウェイポイントツリー (`WaypointTree`) とアノテーション一覧 (`AnnotationTree`) を統合してホストするレガシー/互換用オブジェクトパネル。
   - **主要Props**: なし
 - **`WaypointTree`** ([`src/components/ui/WaypointTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WaypointTree.tsx))
   - **概要**: 全 Waypoint / ジェネレーター要素を階層表示・ドラッグ＆ドロップで並び替えるツリーペイン。Shiftキーによる範囲選択、不連続選択を含む複数ノードの一括ドラッグ並び替え（連続化配置 & DragOverlayによるスタックカード視覚表示）、右クリックコンテキストメニュー（単一/複数選択項目の一括複製・一括削除・アンカー設定・内部プロパティ表示・Explode）に対応。
