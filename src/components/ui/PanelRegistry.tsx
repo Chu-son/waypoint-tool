@@ -2,6 +2,8 @@ import { ReactNode, ReactElement } from 'react';
 import { PanelTab } from './PanelContainer';
 import { CustomUiPanelTabDef } from '../../types/customUi';
 import { ObjectsPanel } from './ObjectsPanel';
+import { WaypointTreePanel } from './WaypointTreePanel';
+import { AnnotationTreePanel } from './AnnotationTreePanel';
 import { PluginListPanel } from './PluginListPanel';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -12,7 +14,7 @@ import { PipelineInspector } from './properties/PipelineInspector';
 import { PipelineMetadata } from '../../types/pipeline';
 import { WorkflowPanel } from './WorkflowPanel';
 import { CustomHtmlPanel } from './CustomHtmlPanel';
-import { Box, Puzzle, Layers, Settings2, ListOrdered, Globe, Code } from 'lucide-react';
+import { Box, Puzzle, Layers, Settings2, ListOrdered, Globe, Code, Bookmark } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
@@ -155,6 +157,60 @@ export function useInspectorPanelComponent() {
   return resolveInspectorComponent(effectiveMode, effectiveSelection, activePlugin, pipelineTarget);
 }
 
+export function resolveBuiltinPanelTab(
+  id: string,
+  customTitle?: string,
+  customIcon?: string,
+  inspectorComponent?: ReactNode
+): PanelTab | null {
+  switch (id) {
+    case 'waypoints':
+      return {
+        id: 'waypoints',
+        title: customTitle || 'Waypoints',
+        icon: resolveLucideIcon(customIcon, <ListOrdered size={14} />),
+        component: <WaypointTreePanel />,
+      };
+    case 'annotations':
+      return {
+        id: 'annotations',
+        title: customTitle || 'Annotations',
+        icon: resolveLucideIcon(customIcon, <Bookmark size={14} />),
+        component: <AnnotationTreePanel />,
+      };
+    case 'project':
+      return {
+        id: 'project',
+        title: customTitle || 'Objects',
+        icon: resolveLucideIcon(customIcon, <Box size={14} />),
+        component: <ObjectsPanel />,
+      };
+    case 'plugins':
+      return {
+        id: 'plugins',
+        title: customTitle || 'Plugins',
+        icon: resolveLucideIcon(customIcon, <Puzzle size={14} />),
+        component: <PluginListPanel />,
+      };
+    case 'layers':
+      return {
+        id: 'layers',
+        title: customTitle || 'Layers',
+        icon: resolveLucideIcon(customIcon, <Layers size={14} />),
+        component: <LayerPanel />,
+      };
+    case 'inspector':
+      return {
+        id: 'inspector',
+        title: customTitle || 'Inspector',
+        icon: resolveLucideIcon(customIcon, <Settings2 size={14} />),
+        component: inspectorComponent || <PropertiesPanel />,
+      };
+    default:
+      return null;
+  }
+}
+
 export function resolvePanelTabs(
   tabsDef: CustomUiPanelTabDef[] | undefined,
   fallbackTabs: PanelTab[],
@@ -166,43 +222,16 @@ export function resolvePanelTabs(
 
   return tabsDef.map((tab) => {
     if (tab.type === 'builtin') {
-      switch (tab.id) {
-        case 'project':
-          return {
-            id: 'project',
-            title: tab.title || 'Objects',
-            icon: resolveLucideIcon(tab.icon, <Box size={14} />),
-            component: <ObjectsPanel />,
-          };
-        case 'plugins':
-          return {
-            id: 'plugins',
-            title: tab.title || 'Plugins',
-            icon: resolveLucideIcon(tab.icon, <Puzzle size={14} />),
-            component: <PluginListPanel />,
-          };
-        case 'layers':
-          return {
-            id: 'layers',
-            title: tab.title || 'Layers',
-            icon: resolveLucideIcon(tab.icon, <Layers size={14} />),
-            component: <LayerPanel />,
-          };
-        case 'inspector':
-          return {
-            id: 'inspector',
-            title: tab.title || 'Inspector',
-            icon: resolveLucideIcon(tab.icon, <Settings2 size={14} />),
-            component: inspectorComponent || <PropertiesPanel />,
-          };
-        default:
-          return {
-            id: tab.id,
-            title: tab.title || tab.id,
-            icon: resolveLucideIcon(tab.icon, <Box size={14} />),
-            component: <div className="p-4 text-xs text-text-muted">Unknown panel: {tab.id}</div>,
-          };
+      const builtinTab = resolveBuiltinPanelTab(tab.id, tab.title, tab.icon, inspectorComponent);
+      if (builtinTab) {
+        return builtinTab;
       }
+      return {
+        id: tab.id,
+        title: tab.title || tab.id,
+        icon: resolveLucideIcon(tab.icon, <Box size={14} />),
+        component: <div className="p-4 text-xs text-text-muted">Unknown panel: {tab.id}</div>,
+      };
     }
 
     if (tab.type === 'workflow') {

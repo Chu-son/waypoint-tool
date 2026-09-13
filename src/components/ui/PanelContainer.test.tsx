@@ -154,4 +154,73 @@ describe('PanelContainer', () => {
       expect(handleClose).toHaveBeenCalledTimes(1);
     }
   });
+
+  it('opens context menu on tab right click and triggers onMoveTabToPanel', () => {
+    const handleMove = vi.fn();
+    const handleReorder = vi.fn();
+
+    render(
+      <PanelContainer
+        panels={samplePanels}
+        activeTabId="tab1"
+        onTabChange={vi.fn()}
+        viewMode="tabs"
+        onViewModeChange={vi.fn()}
+        side="left"
+        onMoveTabToPanel={handleMove}
+        onReorderTab={handleReorder}
+      />
+    );
+
+    const tab1Btn = screen.getByText('Waypoints').closest('button');
+    expect(tab1Btn).toBeDefined();
+    fireEvent.contextMenu(tab1Btn!, { clientX: 100, clientY: 100 });
+
+    const moveMenuItem = screen.getByText('Move to Right Panel');
+    expect(moveMenuItem).toBeDefined();
+    fireEvent.click(moveMenuItem);
+    expect(handleMove).toHaveBeenCalledWith('tab1', 'right');
+  });
+
+  it('triggers onResetLayout from overflow menu', () => {
+    const handleReset = vi.fn();
+    const { container } = render(
+      <PanelContainer
+        panels={samplePanels}
+        activeTabId="tab1"
+        onTabChange={vi.fn()}
+        viewMode="tabs"
+        onViewModeChange={vi.fn()}
+        side="left"
+        onResetLayout={handleReset}
+      />
+    );
+
+    const menuButtons = container.querySelectorAll('button');
+    const menuButton = Array.from(menuButtons).find(btn => !btn.textContent);
+    expect(menuButton).toBeDefined();
+    fireEvent.click(menuButton!);
+
+    const resetItem = screen.getByText('Reset Panel Layout');
+    expect(resetItem).toBeDefined();
+    fireEvent.click(resetItem);
+    expect(handleReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders empty state when no panels are docked', () => {
+    render(
+      <PanelContainer
+        panels={[]}
+        activeTabId=""
+        onTabChange={vi.fn()}
+        viewMode="tabs"
+        onViewModeChange={vi.fn()}
+        side="left"
+      />
+    );
+
+    expect(screen.getByText('No tabs docked')).toBeDefined();
+    expect(screen.getByText(/No tabs docked in this panel/)).toBeDefined();
+  });
 });
+

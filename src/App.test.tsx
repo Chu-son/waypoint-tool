@@ -68,7 +68,8 @@ describe('App Integration', () => {
     render(<App />);
 
     // Validate main structural elements are mounted
-    expect(screen.getByText('Objects')).toBeInTheDocument();
+    expect(screen.getAllByText('Waypoints')[0]).toBeInTheDocument();
+    expect(screen.getByText('Annotations')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByTestId('mock-map-canvas')).toBeInTheDocument();
     
@@ -143,9 +144,10 @@ describe('App Integration', () => {
 
   // --- 要件8: UIレイアウト ---
 
-  it('renders the Project panel', async () => {
+  it('renders the Waypoints and Annotations panels', async () => {
     render(<App />);
-    expect(screen.getByText('Objects')).toBeInTheDocument();
+    expect(screen.getAllByText('Waypoints')[0]).toBeInTheDocument();
+    expect(screen.getByText('Annotations')).toBeInTheDocument();
   });
 
   it('switches between Inspector and Layers tabs', async () => {

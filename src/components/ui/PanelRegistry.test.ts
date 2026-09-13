@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { resolvePanelTabs, useInspectorPanelComponent, resolveInspectorComponent } from './PanelRegistry';
+import { resolvePanelTabs, useInspectorPanelComponent, resolveInspectorComponent, resolveBuiltinPanelTab } from './PanelRegistry';
 import { PanelTab } from './PanelContainer';
 import { PluginParamsPanel } from './PluginParamsPanel';
 import { CustomLayerInspector } from './properties/CustomLayerInspector';
@@ -11,8 +11,8 @@ import { useAppStore } from '../../stores/appStore';
 
 describe('PanelRegistry', () => {
   const fallbackTabs: PanelTab[] = [
-    { id: 'project', title: 'Waypoints', component: null as any },
-    { id: 'plugins', title: 'Plugins', component: null as any },
+    { id: 'waypoints', title: 'Waypoints', component: null as any },
+    { id: 'annotations', title: 'Annotations', component: null as any },
   ];
 
   it('returns fallback tabs when tabsDef is undefined or empty', () => {
@@ -23,17 +23,33 @@ describe('PanelRegistry', () => {
   it('resolves builtin tabs with custom titles', () => {
     const tabs = resolvePanelTabs(
       [
-        { type: 'builtin', id: 'project', title: 'Custom Waypoints' },
+        { type: 'builtin', id: 'waypoints', title: 'Custom Waypoints' },
+        { type: 'builtin', id: 'annotations', title: 'Custom Annotations' },
+        { type: 'builtin', id: 'project', title: 'Custom Objects' },
         { type: 'builtin', id: 'layers', title: 'Custom Layers' },
       ],
       fallbackTabs
     );
 
-    expect(tabs.length).toBe(2);
-    expect(tabs[0].id).toBe('project');
+    expect(tabs.length).toBe(4);
+    expect(tabs[0].id).toBe('waypoints');
     expect(tabs[0].title).toBe('Custom Waypoints');
-    expect(tabs[1].id).toBe('layers');
-    expect(tabs[1].title).toBe('Custom Layers');
+    expect(tabs[1].id).toBe('annotations');
+    expect(tabs[1].title).toBe('Custom Annotations');
+    expect(tabs[2].id).toBe('project');
+    expect(tabs[2].title).toBe('Custom Objects');
+    expect(tabs[3].id).toBe('layers');
+    expect(tabs[3].title).toBe('Custom Layers');
+  });
+
+  it('resolveBuiltinPanelTab resolves all builtin tab types', () => {
+    expect(resolveBuiltinPanelTab('waypoints')?.title).toBe('Waypoints');
+    expect(resolveBuiltinPanelTab('annotations')?.title).toBe('Annotations');
+    expect(resolveBuiltinPanelTab('layers')?.title).toBe('Layers');
+    expect(resolveBuiltinPanelTab('plugins')?.title).toBe('Plugins');
+    expect(resolveBuiltinPanelTab('inspector')?.title).toBe('Inspector');
+    expect(resolveBuiltinPanelTab('project')?.title).toBe('Objects');
+    expect(resolveBuiltinPanelTab('unknown_id')).toBeNull();
   });
 
   it('resolves workflow tab', () => {

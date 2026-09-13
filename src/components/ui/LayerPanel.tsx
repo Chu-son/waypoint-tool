@@ -224,6 +224,7 @@ export function LayerPanel() {
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
+  const [isExportRegionsOpen, setIsExportRegionsOpen] = useState(true);
   const [contextMenu, setContextMenu] = useState<{
     type: "custom" | "map";
     id: string;
@@ -501,10 +502,25 @@ export function LayerPanel() {
         {(exportRegions || []).length > 0 && (
           <div className="space-y-4 pt-4 border-t border-border-base/20">
             <div className="flex items-center justify-between ml-1 mb-2">
-              <FieldLabel className="flex items-center gap-2 flex-1">
-                Export Regions
-                <div className="h-px flex-1 bg-border-base/20" />
-              </FieldLabel>
+              <button
+                onClick={() => setIsExportRegionsOpen(!isExportRegionsOpen)}
+                className="flex items-center gap-1.5 flex-1 text-left cursor-pointer group select-none py-0.5"
+              >
+                <ChevronDown
+                  size={13}
+                  className={cn(
+                    "text-text-muted group-hover:text-text-base transition-transform shrink-0",
+                    !isExportRegionsOpen && "-rotate-90"
+                  )}
+                />
+                <FieldLabel className="flex items-center gap-2 flex-1 cursor-pointer">
+                  Export Regions
+                  <span className="text-[10px] font-normal text-text-muted bg-surface-hover/80 px-1.5 py-0.2 rounded-full">
+                    {exportRegions.length}
+                  </span>
+                  <div className="h-px flex-1 bg-border-base/20" />
+                </FieldLabel>
+              </button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -518,7 +534,7 @@ export function LayerPanel() {
                 {exportRegions.every(r => r.visible) ? <Eye size={14} /> : <EyeOff size={14} />}
               </Button>
             </div>
-            {exportRegions.map((region, index) => (
+            {isExportRegionsOpen && exportRegions.map((region, index) => (
               <RegionCard
                 key={region.id}
                 region={region}

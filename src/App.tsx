@@ -2,9 +2,6 @@ import "./App.css";
 import { useEffect, useCallback, useMemo } from "react";
 import { ToolPanel } from "./components/ui/ToolPanel";
 import { TopMenu } from "./components/ui/TopMenu";
-import { ObjectsPanel } from "./components/ui/ObjectsPanel";
-import { LayerPanel } from "./components/ui/LayerPanel";
-import { PluginListPanel } from "./components/ui/PluginListPanel";
 import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
 import { MapCanvas } from "./components/canvas/MapCanvas";
 import { SettingsModal } from "./components/ui/SettingsModal";
@@ -24,15 +21,11 @@ import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoading
 import { ShortcutManager } from "./components/common/ShortcutManager";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 import { ThemeInjector } from "./components/ui/ThemeInjector";
-import { resolvePanelTabs, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
+import { resolvePanelTabs, resolveBuiltinPanelTab, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
 import { useAppStore } from "./stores/appStore";
 import { 
   ChevronLeft, 
   ChevronRight, 
-  Layers, 
-  Box, 
-  Puzzle, 
-  Settings2 
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
@@ -46,6 +39,7 @@ import { PluginInstance } from "./types/store";
 
 function App() {
   // Sidebar States from Store
+  const panelLayout = useAppStore((state) => state.panelLayout);
   const leftPanelActiveTab = useAppStore((state) => state.leftPanelActiveTab);
   const rightPanelActiveTab = useAppStore((state) => state.rightPanelActiveTab);
   const leftPanelViewMode = useAppStore((state) => state.leftPanelViewMode);
@@ -53,6 +47,9 @@ function App() {
   const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
 
+  const moveTabToPanel = useAppStore((state) => state.moveTabToPanel);
+  const reorderTab = useAppStore((state) => state.reorderTab);
+  const resetPanelLayout = useAppStore((state) => state.resetPanelLayout);
   const setLeftPanelActiveTab = useAppStore((state) => state.setLeftPanelActiveTab);
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setLeftPanelViewMode = useAppStore((state) => state.setLeftPanelViewMode);
@@ -274,35 +271,17 @@ function App() {
 
   const inspectorComponent = useInspectorPanelComponent();
 
-  const defaultLeftPanels: PanelTab[] = useMemo(() => [
-    {
-      id: "project",
-      title: "Objects",
-      icon: <Box size={14} />,
-      component: <ObjectsPanel />
-    },
-    {
-      id: "plugins",
-      title: "Plugins",
-      icon: <Puzzle size={14} />,
-      component: <PluginListPanel />
-    }
-  ], []);
+  const defaultLeftPanels: PanelTab[] = useMemo(() => {
+    return (panelLayout?.leftTabs || [])
+      .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
+      .filter((tab): tab is PanelTab => tab !== null);
+  }, [panelLayout?.leftTabs, inspectorComponent]);
 
-  const defaultRightPanels: PanelTab[] = useMemo(() => [
-    {
-      id: "layers",
-      title: "Layers",
-      icon: <Layers size={14} />,
-      component: <LayerPanel />
-    },
-    {
-      id: "inspector",
-      title: "Inspector",
-      icon: <Settings2 size={14} />,
-      component: inspectorComponent,
-    },
-  ], [inspectorComponent]);
+  const defaultRightPanels: PanelTab[] = useMemo(() => {
+    return (panelLayout?.rightTabs || [])
+      .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
+      .filter((tab): tab is PanelTab => tab !== null);
+  }, [panelLayout?.rightTabs, inspectorComponent]);
 
   const leftPanels = useMemo(() => {
     if (isCustomUiMode && customUiConfig?.layout?.leftPanel?.tabs) {
@@ -328,7 +307,7 @@ function App() {
         <ToolPanel />
 
         {/* Left Panel */}
-        {isLeftPanelOpen && (
+        {isLeftPanelOpen && leftPanels.length > 0 && (
           <>
             <div
               style={{ width: leftWidth }}
@@ -343,6 +322,10 @@ function App() {
                   onViewModeChange={setLeftPanelViewMode}
                   onClose={() => setLeftPanelOpen(false)}
                   closeIcon={<ChevronLeft size={16} />}
+                  side="left"
+                  onMoveTabToPanel={moveTabToPanel}
+                  onReorderTab={reorderTab}
+                  onResetLayout={resetPanelLayout}
                 />
               </ErrorBoundary>
             </div>
@@ -363,12 +346,13 @@ function App() {
           <BackgroundLoadingBadge />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
-            {!isLeftPanelOpen ? (
+            {(!isLeftPanelOpen && leftPanels.length > 0) ? (
               <Button
                 variant="secondary"
                 size="icon"
                 onClick={() => setLeftPanelOpen(true)}
                 className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                title="Open Left Panel"
               >
                 <ChevronRight size={16} />
               </Button>
@@ -376,12 +360,13 @@ function App() {
               <div />
             )}
 
-            {!isRightPanelOpen ? (
+            {(!isRightPanelOpen && rightPanels.length > 0) ? (
               <Button
                 variant="secondary"
                 size="icon"
                 onClick={() => setRightPanelOpen(true)}
                 className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                title="Open Right Panel"
               >
                 <ChevronLeft size={16} />
               </Button>
@@ -396,7 +381,7 @@ function App() {
         </div>
 
         {/* Right Panel */}
-        {isRightPanelOpen && (
+        {isRightPanelOpen && rightPanels.length > 0 && (
           <>
             {/* Dragger */}
             <div
@@ -416,6 +401,10 @@ function App() {
                   onViewModeChange={setRightPanelViewMode}
                   onClose={() => setRightPanelOpen(false)}
                   closeIcon={<ChevronRight size={16} />}
+                  side="right"
+                  onMoveTabToPanel={moveTabToPanel}
+                  onReorderTab={reorderTab}
+                  onResetLayout={resetPanelLayout}
                 />
               </ErrorBoundary>
             </div>
