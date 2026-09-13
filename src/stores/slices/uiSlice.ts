@@ -71,7 +71,7 @@ export type UISlice = {
   isShortcutsModalOpen: boolean;
   isWelcomeModalOpen: boolean;
   isInitialLaunch: boolean;
-  settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles';
+  settingsModalTab: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles';
 
   // Plugin Data Viewer Modal State
   pluginDataModalState: {
@@ -116,7 +116,7 @@ export type UISlice = {
   setShowProperties: (show: boolean) => void;
   resetWindowLayout: () => void;
   
-  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles') => void;
+  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles') => void;
   setExportModalOpen: (open: boolean) => void;
   setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;
@@ -182,7 +182,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   mouseCenteredZoom: true,
   visibleAttributes: [],
   indexStartIndex: 0,
-  themeMode: 'dark',
+  themeMode: 'light',
   setThemeMode: (mode: 'dark' | 'light') => set({ themeMode: mode === 'light' ? 'light' : 'dark' }),
   themePreset: 'default',
   setThemePreset: (preset: string) => {

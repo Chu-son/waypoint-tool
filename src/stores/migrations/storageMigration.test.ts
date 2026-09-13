@@ -64,8 +64,8 @@ describe('storageMigration', () => {
   it('normalizes themeMode to dark or light correctly', () => {
     expect(migrateStorage({ themeMode: 'light' }, 2).themeMode).toBe('light');
     expect(migrateStorage({ themeMode: 'dark' }, 2).themeMode).toBe('dark');
-    expect(migrateStorage({ themeMode: 'unknown' }, 2).themeMode).toBe('dark');
-    expect(migrateStorage({}, 2).themeMode).toBe('dark');
+    expect(migrateStorage({ themeMode: 'unknown' }, 2).themeMode).toBe('light');
+    expect(migrateStorage({}, 2).themeMode).toBe('light');
   });
 
   it('normalizes and preserves themePreset correctly', () => {

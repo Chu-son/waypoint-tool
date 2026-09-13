@@ -60,7 +60,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   pluginSettings: [],
   globalPythonPath: null,
   decimalPrecision: 6,
-  themeMode: 'dark',
+  themeMode: 'light',
   themePreset: 'default',
   leftPanelViewMode: 'tabs',
   rightPanelViewMode: 'tabs',
@@ -160,7 +160,7 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     pluginSettings: Array.isArray(state.pluginSettings) ? state.pluginSettings : DEFAULT_STORAGE_STATE.pluginSettings,
     indexStartIndex: state.indexStartIndex === 1 ? 1 : 0,
     decimalPrecision: typeof state.decimalPrecision === 'number' ? Math.max(0, Math.floor(state.decimalPrecision)) : 6,
-    themeMode: state.themeMode === 'light' ? 'light' : 'dark',
+    themeMode: state.themeMode === 'dark' ? 'dark' : 'light',
     themePreset: (() => {
       if (state.themePreset === 'roomba') return 'emerald';
       if (state.themePreset === 'dark') return 'default';
