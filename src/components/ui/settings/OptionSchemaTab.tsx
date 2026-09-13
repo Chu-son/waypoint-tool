@@ -1,4 +1,4 @@
-import { Plus, Save, Trash2, Upload, Download } from "lucide-react";
+import { Plus, Save, Trash2, Upload, Download, Database } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { OptionDef, OptionsSchema } from "../../../types/store";
@@ -159,6 +159,7 @@ export function OptionSchemaTab() {
       <TabSectionHeader
         title="Waypoint Options Schema"
         subtitle="Define custom properties that can be attached to waypoints."
+        icon={Database}
         actions={
           <>
             <Button

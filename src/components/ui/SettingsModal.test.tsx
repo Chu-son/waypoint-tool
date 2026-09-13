@@ -128,9 +128,15 @@ describe('SettingsModal UI', () => {
     expect(useAppStore.getState().globalPythonPath).toBe('/usr/bin/python3');
   });
 
-  it('allows switching color theme between dark and light on the General tab', async () => {
+  it('allows switching color theme between dark and light on the Appearance tab', async () => {
     useAppStore.setState({ themeMode: 'dark', isCustomUiMode: false, customUiConfig: null });
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Click Appearance tab
+    const appearanceTab = screen.getByRole('button', { name: /Appearance/i });
+    act(() => {
+      appearanceTab.click();
+    });
 
     const lightBtn = screen.getByRole('button', { name: /Light \(Linear Light\)/i });
     const darkBtn = screen.getByRole('button', { name: /Dark \(Linear Dark\)/i });
@@ -156,9 +162,15 @@ describe('SettingsModal UI', () => {
     expect(lightBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('allows selecting accent theme presets with visual chips on General tab in both dark and light modes', async () => {
+  it('allows selecting accent theme presets with visual chips on Appearance tab in both dark and light modes', async () => {
     useAppStore.setState({ themeMode: 'dark', themePreset: 'default', isCustomUiMode: false, customUiConfig: null });
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Click Appearance tab
+    const appearanceTab = screen.getByRole('button', { name: /Appearance/i });
+    act(() => {
+      appearanceTab.click();
+    });
 
     // Presets should be visible in dark mode
     const indigoBtn = screen.getByRole('button', { name: /^Indigo$/i });
@@ -208,13 +220,19 @@ describe('SettingsModal UI', () => {
     expect(screen.getByRole('button', { name: /^Ocean$/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('shows overriding notice when Custom UI theme is active on General tab', async () => {
+  it('shows overriding notice when Custom UI theme is active on Appearance tab', async () => {
     useAppStore.setState({
       themeMode: 'dark',
       isCustomUiMode: true,
       customUiConfig: { theme: { preset: 'ocean' } } as any,
     });
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    // Click Appearance tab
+    const appearanceTab = screen.getByRole('button', { name: /Appearance/i });
+    act(() => {
+      appearanceTab.click();
+    });
 
     expect(
       screen.getByText(/Custom UI theme is active and overriding default appearance/i)
@@ -466,6 +484,6 @@ describe('SettingsModal UI', () => {
       condStylesTab.click();
     });
 
-    expect(screen.getByText('条件付き書式 (Conditional Styles)')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Conditional Styles/i })).toBeInTheDocument();
   });
 });

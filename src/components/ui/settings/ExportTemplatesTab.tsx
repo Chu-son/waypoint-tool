@@ -1,4 +1,4 @@
-import { Plus, Trash2, Copy, Save, Upload, Download, FolderOpen } from "lucide-react";
+import { Plus, Trash2, Copy, Save, Upload, Download, FolderOpen, FileCode } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "../common/Button";
@@ -336,6 +336,7 @@ export function ExportTemplatesTab() {
       <TabSectionHeader
         title="Custom Export Templates"
         subtitle="Define Handlebars templates for custom waypoint export formats."
+        icon={FileCode}
         actions={
           <>
             <Button

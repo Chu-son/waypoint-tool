@@ -7,7 +7,7 @@ import { NumericInput } from "../NumericInput";
 import { FormField } from "../common/FormField";
 import { FieldLabel } from "../common/FieldLabel";
 import { TabSectionHeader } from "./TabSectionHeader";
-import { Save, Plus, Trash2, RotateCcw, Copy, Check } from "lucide-react";
+import { Save, Plus, Trash2, RotateCcw, Copy, Check, Bot } from "lucide-react";
 import { cn } from "../../../utils/cn";
 import { DEFAULT_ROBOT_FOOTPRINT } from "../../../stores/slices/projectSlice";
 
@@ -118,6 +118,7 @@ export function RobotFootprintTab() {
       <TabSectionHeader
         title="Robot Footprint Settings"
         subtitle="Define the robot's physical dimensions for canvas visualization and plugin collision checking."
+        icon={Bot}
         actions={
           <>
             <Button

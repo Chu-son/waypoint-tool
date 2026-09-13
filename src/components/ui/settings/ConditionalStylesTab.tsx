@@ -950,8 +950,9 @@ export function ConditionalStylesTab() {
       {/* Header & Global Master Controls */}
       <div className="space-y-3 pb-4 border-b border-border-base/40">
         <TabSectionHeader
-          title="条件付き書式 (Conditional Styles)"
-          subtitle="特定のオプションや属性条件に応じて、ウェイポイント・パス・フットプリント・アノテーションの表示を動的にオーバーレイ装飾します。"
+          title="Conditional Styles"
+          subtitle="Dynamically decorate waypoints, paths, footprints, and annotations based on custom options and conditions."
+          icon={Sparkles}
         />
 
         {/* Master Control Bar */}

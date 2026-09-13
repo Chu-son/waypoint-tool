@@ -66,6 +66,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
       <TabSectionHeader
         title="Installed Plugins"
         subtitle="Manage Generator plugins order and visibility on the Tool Panel."
+        icon={Puzzle}
         actions={
           <>
             <Button

@@ -49,7 +49,7 @@ describe('ConditionalStylesTab', () => {
   it('renders correctly with existing rules and master toggle', () => {
     render(<ConditionalStylesTab />);
 
-    expect(screen.getByText('条件付き書式 (Conditional Styles)')).toBeInTheDocument();
+    expect(screen.getByText('Conditional Styles')).toBeInTheDocument();
     expect(screen.getByText('充電ステーション強調')).toBeInTheDocument();
     expect(screen.getByText('ルール設定 (Rule Details)')).toBeInTheDocument();
   });
