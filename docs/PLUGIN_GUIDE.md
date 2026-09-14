@@ -233,6 +233,36 @@ class PathFollowerPlugin(PluginGenerator):
 - `distance_transform(grid)`: 高速ユークリッド距離変換 (EDT) ヘルパー。
 - `gaussian_blur(grid, sigma)`: 分離可能 2D ガウシアン平滑化フィルタ。
 
+### 7) 大規模データ向け最適化（列指向ウェイポイントと透過的一時ファイルオフロード）
+
+数千点〜数十万点を超える大規模なウェイポイント群や高解像度マップを扱うプラグイン向けに、高速かつ安全なデータ通信機構が提供されています。
+
+#### ① 列指向ウェイポイント出力 (`add_columnar_waypoints`)
+点数が極めて多い場合、従来の辞書配列（`[{"transform": ...}, ...]`）の代わりに入力配列を列指向（Columnar）形式で渡すことで、キー文字列の重複を排除し、メモリ消費量と転送サイズを最大80%削減できます。
+
+```python
+from wpt_plugin import PluginGenerator, PluginResult
+
+class LargeCoverageGenerator(PluginGenerator):
+    def generate(self, context):
+        res = PluginResult()
+        
+        # 10,000点などの大量座標
+        xs = [float(i) * 0.05 for i in range(10000)]
+        ys = [math.sin(float(i) * 0.05) for i in range(10000)]
+        yaws = [0.0] * 10000
+
+        # 列指向で追加（本体アプリが自動的にウェイポイントツリーへ安全に展開します）
+        res.add_columnar_waypoints(x=xs, y=ys, yaw=yaws, name="Large Route")
+        return res
+```
+
+#### ② 透過的一時ファイルオフロード (Transparent Temp File Offloading)
+本体ツールおよび Python SDK は、入出力の JSON ペイロードが閾値（256 KB）を超える場合、OS 標準のテンポラリディレクトリ（`/tmp` や `AppData/Local/Temp`）のファイルを介して安全にデータをやり取りします。
+- **パイプバッファ上限（OS Pipe Buffer）の回避**: OS の匿名パイプ容量（通常 64 KB）による詰まりやデッドロックが原理的に発生しません。
+- **プラグイン側の対応不要**: Python SDK（`run_from_stdin` / `load_context_from_stdin`）がファイル参照を透過的に解決・書き出すため、プラグイン作者は特別なファイル操作を記述する必要はありません。
+- **自動クリーンアップ**: 読み込み完了後、一時ファイルはツール本体によって直ちに安全に削除されます。
+
 ## 6. プラグインの登録
 
 1. アプリの Settings > Plugins タブを開きます。
