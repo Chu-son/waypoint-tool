@@ -361,6 +361,104 @@ class TestPluginGeneratorUnified(unittest.TestCase):
         self.assertEqual(gen.get_selected_points({"selected_points": None}), [])
         self.assertEqual(gen.get_selected_points({"selected_points": []}), [])
 
+    def test_columnar_waypoints_generation(self):
+        res = PluginResult()
+        res.add_columnar_waypoints(
+            x=[1.0, 2.0, 3.0],
+            y=[4.0, 5.0, 6.0],
+            yaw=[0.0, 1.0, 2.0],
+            names=["WP1", "WP2", "WP3"],
+            name="Columnar Group"
+        )
+        d = res.to_dict()
+        self.assertIn("waypoints", d)
+        wp = d["waypoints"]
+        self.assertTrue(wp.get("columnar"))
+        self.assertEqual(wp.get("count"), 3)
+        self.assertEqual(wp.get("x"), [1.0, 2.0, 3.0])
+        self.assertEqual(wp.get("y"), [4.0, 5.0, 6.0])
+        self.assertEqual(wp.get("yaw"), [0.0, 1.0, 2.0])
+        self.assertEqual(wp.get("names"), ["WP1", "WP2", "WP3"])
+        self.assertEqual(wp.get("name"), "Columnar Group")
+
+    def test_payload_file_ref_input_resolution(self):
+        import tempfile
+        from wpt_plugin.core import PAYLOAD_FILE_REF_KEY
+
+        # Write context to a temp file
+        real_context = {
+            "properties": {"test_key": "large_val"},
+            "interaction_data": {"pt": {"x": 10.0, "y": 20.0}}
+        }
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", encoding="utf-8") as f:
+            json.dump(real_context, f)
+            temp_path = f.name
+
+        try:
+            # Pass payload ref via stdin
+            ref_input = {PAYLOAD_FILE_REF_KEY: temp_path}
+            old_stdin, old_stdout = sys.stdin, sys.stdout
+            sys.stdin = io.StringIO(json.dumps(ref_input))
+            sys.stdout = captured = io.StringIO()
+            try:
+                class EchoContextPlugin(PluginGenerator):
+                    def generate(self, ctx):
+                        self.last_ctx = ctx
+                        res = PluginResult()
+                        res.set_plugin_data({"echoed_key": ctx.get("properties", {}).get("test_key")})
+                        return res
+
+                plugin = EchoContextPlugin()
+                plugin.run_from_stdin()
+            finally:
+                sys.stdin, sys.stdout = old_stdin, old_stdout
+
+            result = json.loads(captured.getvalue())
+            self.assertEqual(result.get("plugin_data", {}).get("echoed_key"), "large_val")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    def test_payload_file_ref_large_output_offload(self):
+        from wpt_plugin.core import PAYLOAD_FILE_REF_KEY
+
+        class LargeOutputPlugin(PluginGenerator):
+            def generate(self, ctx):
+                # Generate 10,000 points to exceed 256 KB threshold
+                res = PluginResult()
+                waypoints = [
+                    self.make_waypoint(float(i), float(i), 0.0, options={"index": i, "padding": "x" * 50})
+                    for i in range(5000)
+                ]
+                res.add_waypoints(waypoints, name="Large Test")
+                return res
+
+        old_stdin, old_stdout = sys.stdin, sys.stdout
+        sys.stdin = io.StringIO(json.dumps({}))
+        sys.stdout = captured = io.StringIO()
+        try:
+            plugin = LargeOutputPlugin()
+            plugin.run_from_stdin()
+        finally:
+            sys.stdin, sys.stdout = old_stdin, old_stdout
+
+        output_str = captured.getvalue().strip()
+        parsed = json.loads(output_str)
+
+        # Output must be offloaded to temp file
+        self.assertIn(PAYLOAD_FILE_REF_KEY, parsed)
+        temp_file = parsed[PAYLOAD_FILE_REF_KEY]
+        self.assertTrue(os.path.exists(temp_file))
+
+        try:
+            with open(temp_file, "r", encoding="utf-8") as f:
+                large_data = json.load(f)
+            self.assertIn("waypoints", large_data)
+            self.assertEqual(len(large_data["waypoints"]["items"]), 5000)
+        finally:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+
 
 if __name__ == '__main__':
     unittest.main()
