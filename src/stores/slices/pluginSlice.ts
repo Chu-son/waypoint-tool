@@ -164,6 +164,48 @@ function resolveBindingExpression(
   return expr;
 }
 
+export interface ParsedWaypointsResult {
+  items: any[];
+  pluginData?: Record<string, any>;
+  groupName?: string;
+}
+
+export function extractWaypointsFromRawResult(rawResult: any): ParsedWaypointsResult {
+  let items: any[] = [];
+  let pluginData: Record<string, any> | undefined = undefined;
+  let groupName: string | undefined = undefined;
+
+  if (rawResult && rawResult.waypoints) {
+    const wp = rawResult.waypoints;
+    if (wp.columnar) {
+      const count = wp.count ?? (Array.isArray(wp.x) ? wp.x.length : 0);
+      items = new Array(count);
+      for (let i = 0; i < count; i++) {
+        items[i] = {
+          x: wp.x?.[i] ?? 0,
+          y: wp.y?.[i] ?? 0,
+          z: wp.z?.[i] ?? 0,
+          yaw: wp.yaw?.[i] ?? 0,
+          name: wp.names?.[i],
+          options: wp.options?.[i],
+        };
+      }
+      pluginData = wp.plugin_data;
+      groupName = wp.name;
+    } else if (Array.isArray(wp)) {
+      items = wp;
+    } else if (wp.items && Array.isArray(wp.items)) {
+      items = wp.items;
+      pluginData = wp.plugin_data;
+      groupName = wp.name;
+    }
+  } else if (Array.isArray(rawResult) && rawResult.length > 0 && (rawResult[0].transform || rawResult[0].x !== undefined)) {
+    items = rawResult;
+  }
+
+  return { items, pluginData, groupName };
+}
+
 export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (set, get) => ({
   plugins: {},
   pluginSettings: [],
@@ -355,22 +397,8 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 1. Waypoint Output Handling
       // ----------------------------------------------------
-      let waypointItems: any[] | null = null;
-      let waypointPluginData: Record<string, any> | undefined = undefined;
-      let waypointGroupName: string | undefined = undefined;
-
-      if (rawResult && rawResult.waypoints) {
-        if (Array.isArray(rawResult.waypoints)) {
-          waypointItems = rawResult.waypoints;
-        } else if (rawResult.waypoints.items && Array.isArray(rawResult.waypoints.items)) {
-          waypointItems = rawResult.waypoints.items;
-          waypointPluginData = rawResult.waypoints.plugin_data;
-          waypointGroupName = rawResult.waypoints.name;
-        }
-      } else if (Array.isArray(rawResult) && rawResult.length > 0 && (rawResult[0].transform || rawResult[0].x !== undefined)) {
-        // Direct list of waypoints
-        waypointItems = rawResult;
-      }
+      const { items: waypointItems, pluginData: waypointPluginData, groupName: waypointGroupName } =
+        extractWaypointsFromRawResult(rawResult);
 
       if (waypointItems && waypointItems.length > 0) {
         const baselineWaypoints: WaypointBaselineItem[] = waypointItems.map((wp) => {
@@ -1071,21 +1099,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           });
 
           // Waypoints output
-          if (rawResult?.waypoints) {
-            if (Array.isArray(rawResult.waypoints)) {
-              rawWaypoints = rawResult.waypoints;
-            } else if (rawResult.waypoints.items && Array.isArray(rawResult.waypoints.items)) {
-              rawWaypoints = rawResult.waypoints.items;
-              waypointPluginData = rawResult.waypoints.plugin_data;
-              waypointGroupName = rawResult.waypoints.name;
-            }
-          } else if (
-            Array.isArray(rawResult) &&
-            rawResult.length > 0 &&
-            (rawResult[0].transform || rawResult[0].x !== undefined)
-          ) {
-            rawWaypoints = rawResult;
-          }
+          const extractedWp = extractWaypointsFromRawResult(rawResult);
+          rawWaypoints = extractedWp.items;
+          waypointPluginData = extractedWp.pluginData;
+          waypointGroupName = extractedWp.groupName;
 
           // Annotations output
           if (rawResult?.annotations) {
@@ -1547,7 +1564,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         contextData.robot_footprint = robotFootprint;
       }
 
-      const layersToPass = await prepareLayersForExport(mapLayers || [], customLayers || []);
+      const needsOccupancyGrid = plugin.manifest.needs?.some(
+        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+      );
+
+      const layersToPass = needsOccupancyGrid
+        ? await prepareLayersForExport(mapLayers || [], customLayers || [])
+        : undefined;
 
       const result = await BackendAPI.runPlugin(
         plugin,

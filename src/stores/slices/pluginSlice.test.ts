@@ -103,6 +103,43 @@ describe('pluginSlice - executeGeneratorPlugin placement & history atomicity', (
     expect(undoneState.nodes[genId]).toBeUndefined();
     expect(undoneState.rootNodeIds).toEqual(['wp-0', 'wp-1', 'wp-2']);
   });
+
+  it('supports columnar waypoints format seamlessly', async () => {
+    (BackendAPI.runPlugin as any).mockResolvedValueOnce({
+      waypoints: {
+        columnar: true,
+        count: 3,
+        x: [1.0, 2.0, 3.0],
+        y: [4.0, 5.0, 6.0],
+        yaw: [0.0, 1.57, 3.14],
+        names: ['Col 1', 'Col 2', 'Col 3'],
+        plugin_data: { test: 123 },
+        name: 'Columnar Path',
+      },
+    });
+
+    const res = await useAppStore.getState().executeGeneratorPlugin({
+      plugin: dummyPlugin,
+      properties: {},
+    });
+
+    expect(res.success).toBe(true);
+    const state = useAppStore.getState();
+    const parentId = res.parentWaypointId!;
+    expect(state.nodes[parentId]).toBeDefined();
+    expect(state.nodes[parentId].name).toBe('Columnar Path');
+    expect(state.nodes[parentId].children_ids).toHaveLength(3);
+
+    const child0 = state.nodes[state.nodes[parentId].children_ids![0]];
+    expect(child0.name).toBe('Col 1');
+    expect(child0.transform?.x).toBe(1.0);
+    expect(child0.transform?.y).toBe(4.0);
+
+    const child1 = state.nodes[state.nodes[parentId].children_ids![1]];
+    expect(child1.name).toBe('Col 2');
+    expect(child1.transform?.x).toBe(2.0);
+    expect(child1.transform?.y).toBe(5.0);
+  });
 });
 
 describe('pluginSlice - executePipeline', () => {
