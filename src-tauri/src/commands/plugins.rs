@@ -347,6 +347,51 @@ pub fn collect_python_library_paths(app: Option<&AppHandle>) -> Vec<std::path::P
     paths
 }
 
+pub const PAYLOAD_FILE_REF_KEY: &str = "__wpt_payload_ref__";
+pub const PAYLOAD_OFFLOAD_THRESHOLD_BYTES: usize = 256 * 1024; // 256 KB
+
+pub fn safe_log_snippet(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{} ... [truncated, total {} bytes]", &s[..max_len], s.len())
+    }
+}
+
+pub fn validate_payload_temp_path(file_ref: &str) -> Result<std::path::PathBuf, String> {
+    let path = std::path::Path::new(file_ref);
+    if !path.exists() || !path.is_file() {
+        return Err(format!("Payload file does not exist or is not a regular file: {}", file_ref));
+    }
+
+    // 1. Validate file name pattern: must start with 'wpt_out_' and end with '.json'
+    let file_name = path.file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| "Invalid file name in payload reference".to_string())?;
+
+    if !file_name.starts_with("wpt_out_") || !file_name.ends_with(".json") {
+        return Err(format!(
+            "Security Error: Payload file name does not match expected pattern (wpt_out_*.json): {}",
+            file_name
+        ));
+    }
+
+    // 2. Validate directory boundary: must be located inside OS temp directory
+    let canonical_path = path.canonicalize()
+        .map_err(|e| format!("Failed to canonicalize payload path: {}", e))?;
+    let canonical_temp = std::env::temp_dir().canonicalize()
+        .map_err(|e| format!("Failed to canonicalize temp directory: {}", e))?;
+
+    if !canonical_path.starts_with(&canonical_temp) {
+        return Err(format!(
+            "Security Error: Payload file is located outside temporary directory: {:?}",
+            canonical_path
+        ));
+    }
+
+    Ok(canonical_path)
+}
+
 pub fn run_plugin_sync(
     plugin_instance: PluginInstance,
     context_json: String,
@@ -381,7 +426,7 @@ pub fn run_plugin_sync(
         let safe_python_path = build_safe_python_path(&library_paths);
         
         println!("[DEBUG/RUST] Executing plugin: {} with cmd: {}", plugin_instance.manifest.executable, py_cmd);
-        println!("[DEBUG/RUST] Using Context JSON: {}", context_json);
+        println!("[DEBUG/RUST] Using Context JSON: {}", safe_log_snippet(&context_json, 512));
         if !safe_python_path.is_empty() {
             println!("[DEBUG/RUST] Using safe PYTHONPATH: {}", safe_python_path);
         }
@@ -445,11 +490,37 @@ pub fn run_plugin_sync(
         let enriched_json = serde_json::to_string(&context)
             .map_err(|e| format!("Failed to serialize context: {}", e))?;
 
+        let mut _in_temp_file = None;
+        let final_stdin_bytes = if enriched_json.len() >= PAYLOAD_OFFLOAD_THRESHOLD_BYTES {
+            // Offload large input context to temp file
+            let mut temp_file = tempfile::Builder::new()
+                .prefix("wpt_in_")
+                .suffix(".json")
+                .tempfile()
+                .map_err(|e| format!("Failed to create input temp file: {}", e))?;
+
+            use std::io::Write;
+            temp_file.write_all(enriched_json.as_bytes())
+                .map_err(|e| format!("Failed to write input temp file: {}", e))?;
+            temp_file.flush()
+                .map_err(|e| format!("Failed to flush input temp file: {}", e))?;
+
+            let temp_path = temp_file.path().to_string_lossy().to_string();
+            println!("[DEBUG/RUST] Context size ({} bytes) exceeds threshold. Offloaded to temp file: {}", enriched_json.len(), temp_path);
+
+            let ref_obj = serde_json::json!({
+                PAYLOAD_FILE_REF_KEY: temp_path
+            });
+            _in_temp_file = Some(temp_file);
+            ref_obj.to_string().into_bytes()
+        } else {
+            enriched_json.into_bytes()
+        };
+
         let stdin_handle = if let Some(mut stdin) = child.stdin.take() {
-            let json_bytes = enriched_json.into_bytes();
             Some(std::thread::spawn(move || {
                 use std::io::Write;
-                let _ = stdin.write_all(&json_bytes);
+                let _ = stdin.write_all(&final_stdin_bytes);
             }))
         } else {
             None
@@ -462,22 +533,44 @@ pub fn run_plugin_sync(
             let _ = handle.join();
         }
 
+        // Ensure input temp file is dropped and removed
+        drop(_in_temp_file);
+
         if !output.status.success() {
             let err_str = String::from_utf8_lossy(&output.stderr);
-            println!("[DEBUG/RUST] Execution Failed stderror:\n{}", err_str);
+            println!("[DEBUG/RUST] Execution Failed stderr:\n{}", safe_log_snippet(&err_str, 1024));
             return Err(format!("Plugin execution failed:\n{}", err_str));
         }
 
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         let stderr_str = String::from_utf8_lossy(&output.stderr);
-        println!("[DEBUG/RUST] Execution Success stdout:\n{}", stdout_str);
-        println!("[DEBUG/RUST] Execution Success stderr:\n{}", stderr_str);
+        println!("[DEBUG/RUST] Execution Success stdout: {}", safe_log_snippet(&stdout_str, 512));
+        if !stderr_str.trim().is_empty() {
+            println!("[DEBUG/RUST] Execution Success stderr: {}", safe_log_snippet(&stderr_str, 512));
+        }
         
-        let result: serde_json::Value = serde_json::from_str(&stdout_str)
+        let trimmed_stdout = stdout_str.trim();
+        let parsed_initial: serde_json::Value = serde_json::from_str(trimmed_stdout)
             .map_err(|e| {
                 println!("[DEBUG/RUST] JSON Parse Error: {}", e);
-                format!("Failed to parse plugin output as JSON: {}\nOutput was:\n{}", e, stdout_str)
+                format!("Failed to parse plugin output as JSON: {}\nOutput was:\n{}", e, safe_log_snippet(trimmed_stdout, 1024))
             })?;
+
+        // Check if stdout returned a temp file reference payload
+        let result = if let Some(file_ref) = parsed_initial.get(PAYLOAD_FILE_REF_KEY).and_then(|v| v.as_str()) {
+            let valid_path = validate_payload_temp_path(file_ref)?;
+            println!("[DEBUG/RUST] Loading offloaded result from temp file: {:?}", valid_path);
+            let content = std::fs::read_to_string(&valid_path)
+                .map_err(|e| format!("Failed to read payload file {:?}: {}", valid_path, e))?;
+
+            // Cleanup the temp file safely
+            let _ = std::fs::remove_file(&valid_path);
+
+            serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse offloaded payload from {:?}: {}", valid_path, e))?
+        } else {
+            parsed_initial
+        };
 
         Ok(result)
     } else if plugin_instance.manifest.plugin_type == "wasm" {
@@ -864,5 +957,80 @@ mod tests {
         let res = run_plugin_sync(p, "{}".to_string(), None, None, None);
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("does not specify an executable"));
+    }
+
+    #[test]
+    fn test_safe_log_snippet() {
+        let short_str = "hello world";
+        assert_eq!(safe_log_snippet(short_str, 50), "hello world");
+
+        let long_str = "a".repeat(100);
+        let snippet = safe_log_snippet(&long_str, 10);
+        assert!(snippet.contains("... [truncated, total 100 bytes]"));
+        assert!(snippet.starts_with("aaaaaaaaaa"));
+    }
+
+    #[test]
+    fn test_run_plugin_sync_resolves_temp_file_ref_and_cleans_up() {
+        let tmp = TempDir::new().unwrap();
+        let plugin_dir = tmp.path().join("test_file_ref_plugin");
+        fs::create_dir_all(&plugin_dir).unwrap();
+
+        let manifest = r#"{
+            "name": "File Ref Test",
+            "type": "python",
+            "executable": "main.py",
+            "inputs": [],
+            "properties": []
+        }"#;
+        fs::write(plugin_dir.join("manifest.json"), manifest).unwrap();
+
+        // Python script that creates a temp file with large payload and returns __wpt_payload_ref__
+        let py_script = r#"
+import sys
+import json
+import tempfile
+
+with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", prefix="wpt_out_", encoding="utf-8") as f:
+    json.dump({"result_key": "large_value_success", "waypoints": [{"x": 1.0, "y": 2.0}]}, f)
+    temp_path = f.name
+
+print(json.dumps({"__wpt_payload_ref__": temp_path}))
+"#;
+        fs::write(plugin_dir.join("main.py"), py_script).unwrap();
+
+        let p = parse_plugin_at_dir(&plugin_dir).unwrap();
+        let res = run_plugin_sync(p, "{}".to_string(), None, None, None);
+        assert!(res.is_ok(), "Expected run_plugin_sync to succeed, got: {:?}", res.err());
+
+        let val = res.unwrap();
+        assert_eq!(val["result_key"], "large_value_success");
+        assert_eq!(val["waypoints"][0]["x"], 1.0);
+    }
+
+    #[test]
+    fn test_validate_payload_temp_path_rejects_outside_temp_dir() {
+        let current_dir = std::env::current_dir().unwrap();
+        let outside_file = current_dir.join("wpt_out_outside_test.json");
+        fs::write(&outside_file, "{}").unwrap();
+
+        let res = validate_payload_temp_path(outside_file.to_str().unwrap());
+        let _ = fs::remove_file(&outside_file);
+
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("Security Error"));
+    }
+
+    #[test]
+    fn test_validate_payload_temp_path_rejects_invalid_file_name() {
+        let temp_dir = std::env::temp_dir();
+        let invalid_file = temp_dir.join("not_wpt_out_malicious.json");
+        fs::write(&invalid_file, "{}").unwrap();
+
+        let res = validate_payload_temp_path(invalid_file.to_str().unwrap());
+        let _ = fs::remove_file(&invalid_file);
+
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("Security Error: Payload file name does not match expected pattern"));
     }
 }
