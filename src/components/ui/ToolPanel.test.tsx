@@ -1,100 +1,29 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { ToolPanel } from './ToolPanel';
-import { useAppStore } from '../../stores/appStore';
-
-// Mock Lucide icons
-vi.mock('lucide-react', () => ({
-  MousePointer2: () => <div data-testid="select-icon" />,
-  Hand: () => <div data-testid="hand-icon" />,
-  Plus: () => <div data-testid="add-icon" />,
-  Download: () => <div data-testid="download-icon" />,
-  Upload: () => <div data-testid="upload-icon" />,
-  Settings: () => <div data-testid="settings-icon" />,
-  MoreHorizontal: () => <div data-testid="more-icon" />,
-  Puzzle: () => <div data-testid="puzzle-icon" />,
-  Sparkles: () => <div data-testid="sparkles-icon" />,
-  Map: () => <div data-testid="map-icon" />,
-  PenTool: () => <div data-testid="pentool-icon" />,
-  Wand2: () => <div data-testid="wand-icon" />,
-  Image: () => <div data-testid="image-icon" />,
-  Crop: () => <div data-testid="crop-icon" />,
-  Ruler: () => <div data-testid="ruler-icon" />,
-  Pencil: () => <div data-testid="pencil-icon" />,
-  Square: () => <div data-testid="square-icon" />,
-  Circle: () => <div data-testid="circle-icon" />,
-}));
-
-// Mock Store
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: vi.fn(),
-}));
-
-// Mock Child Components
-vi.mock('./ExportModal', () => ({
-  ExportModal: ({ isOpen }: any) => (isOpen ? <div data-testid="export-modal" /> : null),
-}));
-vi.mock('./ImportModal', () => ({
-  ImportModal: ({ isOpen }: any) => (isOpen ? <div data-testid="import-modal" /> : null),
-}));
+import { renderWithStore } from '../../test/render';
+import { getAppState, PAST_WELCOME } from '../../test/store';
 
 describe('ToolPanel', () => {
-  const mockSetActiveTool = vi.fn();
-  const mockSetActivePlugin = vi.fn();
-  const mockSetExportModalOpen = vi.fn();
-  const mockSetImportModalOpen = vi.fn();
-  const mockSetSettingsModalOpen = vi.fn();
+  it('switches between the add-waypoint and measure tools', () => {
+    renderWithStore(<ToolPanel />, PAST_WELCOME);
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        activeTool: 'select',
-        activePluginId: null,
-        plugins: {},
-        pluginSettings: [],
-        isExportModalOpen: false,
-        isImportModalOpen: false,
-        isMapEditMode: false,
-        mapEditSubTool: 'rect',
-        mapEditFillValue: 0,
-        mapEditBrushSize: 10,
-        setMapEditMode: vi.fn(),
-        setMapEditSubTool: vi.fn(),
-        setMapEditFillValue: vi.fn(),
-        setMapEditBrushSize: vi.fn(),
-        setActiveTool: mockSetActiveTool,
-        setActivePlugin: mockSetActivePlugin,
-        setExportModalOpen: mockSetExportModalOpen,
-        setImportModalOpen: mockSetImportModalOpen,
-        setSettingsModalOpen: mockSetSettingsModalOpen,
-      }),
-    );
+    fireEvent.click(screen.getByTitle(/add waypoint/i));
+    expect(getAppState().activeTool).toBe('add_point');
+    expect(getAppState().activePluginId).toBeNull();
+
+    fireEvent.click(screen.getByTitle(/measure distance/i));
+    expect(getAppState().activeTool).toBe('measure');
   });
 
-  it('renders basic tools and handles switching', () => {
-    render(<ToolPanel />);
-    const addBtn = screen.getByTitle(/add waypoint/i);
-    fireEvent.click(addBtn);
+  it('opens the export dialog and the settings dialog', () => {
+    renderWithStore(<ToolPanel />, PAST_WELCOME);
 
-    expect(mockSetActiveTool).toHaveBeenCalledWith('add_point');
-    expect(mockSetActivePlugin).toHaveBeenCalledWith(null);
+    fireEvent.click(screen.getByTitle(/export waypoints/i));
+    expect(getAppState().isExportModalOpen).toBe(true);
 
-    const measureBtn = screen.getByTitle(/measure distance/i);
-    fireEvent.click(measureBtn);
-
-    expect(mockSetActiveTool).toHaveBeenCalledWith('measure');
-  });
-
-  it('opens export modal and settings modal', () => {
-    render(<ToolPanel />);
-
-    const exportBtn = screen.getByTitle(/export waypoints/i);
-    fireEvent.click(exportBtn);
-    expect(mockSetExportModalOpen).toHaveBeenCalledWith(true);
-
-    const settingsBtn = screen.getByTitle(/settings/i);
-    fireEvent.click(settingsBtn);
-    expect(mockSetSettingsModalOpen).toHaveBeenCalledWith(true, 'general');
+    fireEvent.click(screen.getByTitle(/settings/i));
+    expect(getAppState().isSettingsModalOpen).toBe(true);
+    expect(getAppState().settingsModalTab).toBe('general');
   });
 });
