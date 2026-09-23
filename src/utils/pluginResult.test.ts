@@ -1,5 +1,51 @@
 import { describe, it, expect } from 'vitest';
-import { extractWaypointsFromRawResult } from './pluginResult';
+import {
+  extractAnnotationsFromRawResult,
+  extractCustomLayerItems,
+  extractWaypointsFromRawResult,
+  pluginWaypointTransform,
+} from './pluginResult';
+import { quaternionToYaw } from './transformUtils';
+
+describe('pluginWaypointTransform', () => {
+  it('builds the orientation from yaw when no quaternion is given', () => {
+    const t = pluginWaypointTransform({ x: 1, y: 2, yaw: Math.PI / 2 });
+    expect(t).toMatchObject({ x: 1, y: 2, z: 0 });
+    expect(quaternionToYaw(t)).toBeCloseTo(Math.PI / 2);
+  });
+
+  it('prefers an explicit quaternion over yaw', () => {
+    expect(pluginWaypointTransform({ x: 0, y: 0, yaw: 1, qz: 0, qw: 1 })).toMatchObject({ qz: 0, qw: 1 });
+  });
+
+  it('copies an explicit transform', () => {
+    const transform = { x: 3, y: 4, qx: 0, qy: 0, qz: 0, qw: 1 };
+    const t = pluginWaypointTransform({ transform });
+    expect(t).toEqual(transform);
+    expect(t).not.toBe(transform);
+  });
+});
+
+describe('extractCustomLayerItems', () => {
+  it('reads a custom_layers list or a single bare layer', () => {
+    expect(extractCustomLayerItems({ custom_layers: [{ name: 'a' }] })).toEqual([{ name: 'a' }]);
+    const bare = { image_base64: 'x', info: {} };
+    expect(extractCustomLayerItems(bare)).toEqual([bare]);
+    expect(extractCustomLayerItems({ waypoints: [] })).toEqual([]);
+  });
+});
+
+describe('extractAnnotationsFromRawResult', () => {
+  it('reads an annotations list or the grouped form', () => {
+    expect(extractAnnotationsFromRawResult({ annotations: [{ type: 'point' }] }).items).toEqual([{ type: 'point' }]);
+    expect(
+      extractAnnotationsFromRawResult({
+        annotations: { name: 'Zones', items: [{ type: 'rect' }], plugin_data: { n: 1 } },
+      }),
+    ).toEqual({ items: [{ type: 'rect' }], groupName: 'Zones', pluginData: { n: 1 } });
+    expect(extractAnnotationsFromRawResult(null).items).toEqual([]);
+  });
+});
 
 describe('extractWaypointsFromRawResult', () => {
   it('expands column-oriented output into one item per waypoint', () => {

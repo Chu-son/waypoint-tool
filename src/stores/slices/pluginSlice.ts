@@ -6,9 +6,7 @@ import {
   PluginCustomLayer,
   AnnotationGroup,
   AnnotationObject,
-  WaypointBaselineItem,
   GeneratorStash,
-  Transform,
   WaypointNode,
   PipelineMetadata,
   InsertionTarget,
@@ -21,7 +19,13 @@ import { findNodeParentId } from '../../utils/treeUtils';
 import { cloneSelection } from './historySlice';
 import { resolvePythonPath } from '../../utils/pythonPath';
 import { resolveBindingExpression } from '../../utils/pluginBindings';
-import { extractWaypointsFromRawResult } from '../../utils/pluginResult';
+import {
+  extractAnnotationsFromRawResult,
+  extractCustomLayerItems,
+  extractWaypointsFromRawResult,
+  pluginWaypointTransform,
+  toBaselineWaypoints,
+} from '../../utils/pluginResult';
 import { v4 as uuidv4 } from 'uuid';
 
 export type PluginPlacement = { type: 'replace_ids'; ids: string[] } | { type: 'use_insertion_target' };
@@ -263,33 +267,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       } = extractWaypointsFromRawResult(rawResult);
 
       if (waypointItems && waypointItems.length > 0) {
-        const baselineWaypoints: WaypointBaselineItem[] = waypointItems.map((wp) => {
-          let qx = wp.qx ?? 0,
-            qy = wp.qy ?? 0,
-            qz = wp.qz ?? 0,
-            qw = wp.qw ?? 1;
-          if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-            const halfYaw = wp.yaw / 2.0;
-            qz = Math.sin(halfYaw);
-            qw = Math.cos(halfYaw);
-          }
-          const transform: Transform = wp.transform
-            ? { ...wp.transform }
-            : {
-                x: wp.x ?? 0,
-                y: wp.y ?? 0,
-                z: wp.z ?? 0,
-                qx,
-                qy,
-                qz,
-                qw,
-              };
-          return {
-            transform,
-            options: wp.options ? { ...wp.options } : undefined,
-            name: wp.name,
-          };
-        });
+        const baselineWaypoints = toBaselineWaypoints(waypointItems);
 
         let parentId = targetParentWaypointId;
         if (!parentId && existingExecutionId) {
@@ -361,33 +339,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         const waypointsToInstantiate = stashToApply ? applyGeneratorStash(waypointItems, stashToApply) : waypointItems;
 
         // Add child waypoint nodes in a single atomic batch
-        const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => {
-          let qx = wp.qx ?? 0,
-            qy = wp.qy ?? 0,
-            qz = wp.qz ?? 0,
-            qw = wp.qw ?? 1;
-          if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-            const halfYaw = wp.yaw / 2.0;
-            qz = Math.sin(halfYaw);
-            qw = Math.cos(halfYaw);
-          }
-
-          return {
-            id: uuidv4(),
-            type: 'manual' as const,
-            name: wp.name,
-            transform: wp.transform || {
-              x: wp.x ?? 0,
-              y: wp.y ?? 0,
-              z: wp.z ?? 0,
-              qx,
-              qy,
-              qz,
-              qw,
-            },
-            options: wp.options || {},
-          };
-        });
+        const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => ({
+          id: uuidv4(),
+          type: 'manual' as const,
+          name: wp.name,
+          transform: pluginWaypointTransform(wp),
+          options: wp.options || {},
+        }));
 
         if (childNodes.length > 0) {
           store.addNodes(childNodes, parentId);
@@ -397,15 +355,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 2. Custom Layer Output Handling
       // ----------------------------------------------------
-      let layerList: any[] = [];
-      if (rawResult && rawResult.custom_layers && Array.isArray(rawResult.custom_layers)) {
-        layerList = rawResult.custom_layers;
-      } else if (rawResult && rawResult.image_base64 && rawResult.info) {
-        // Direct single layer output
-        layerList = [rawResult];
-      }
-
-      layerList.forEach((layerItem) => {
+      extractCustomLayerItems(rawResult).forEach((layerItem) => {
         let existingLayerId = targetCustomLayerId;
         if (!existingLayerId && existingExecutionId) {
           const found = store.customLayers.find(
@@ -457,21 +407,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 3. Annotation Output Handling
       // ----------------------------------------------------
-      let annotationItems: any[] | null = null;
-      let annotationPluginData: Record<string, any> | undefined = undefined;
-      let annotationGroupName: string | undefined = undefined;
+      const {
+        items: annotationItems,
+        pluginData: annotationPluginData,
+        groupName: annotationGroupName,
+      } = extractAnnotationsFromRawResult(rawResult);
 
-      if (rawResult && rawResult.annotations) {
-        if (Array.isArray(rawResult.annotations)) {
-          annotationItems = rawResult.annotations;
-        } else if (rawResult.annotations.items && Array.isArray(rawResult.annotations.items)) {
-          annotationItems = rawResult.annotations.items;
-          annotationPluginData = rawResult.annotations.plugin_data;
-          annotationGroupName = rawResult.annotations.name;
-        }
-      }
-
-      if (annotationItems && annotationItems.length > 0) {
+      if (annotationItems.length > 0) {
         let groupId = targetAnnotationGroupId;
         if (!groupId && existingExecutionId) {
           const found = Object.values(store.annotationGroups).find(
@@ -908,14 +850,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
           // 8. Process outputs
           // Custom Layers output
-          let rawLayers: any[] = [];
-          if (rawResult?.custom_layers && Array.isArray(rawResult.custom_layers)) {
-            rawLayers = rawResult.custom_layers;
-          } else if (rawResult?.image_base64 && rawResult?.info) {
-            rawLayers = [rawResult];
-          }
-
-          constructedLayers = rawLayers.map((layerItem, idx) => {
+          constructedLayers = extractCustomLayerItems(rawResult).map((layerItem, idx) => {
             return {
               id: layerItem.id || uuidv4(),
               name: layerItem.name || `${stepName || targetPlugin.manifest.name} Layer`,
@@ -943,14 +878,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           waypointGroupName = extractedWp.groupName;
 
           // Annotations output
-          if (rawResult?.annotations) {
-            if (Array.isArray(rawResult.annotations)) {
-              rawAnnotations = rawResult.annotations;
-            } else if (rawResult.annotations.items && Array.isArray(rawResult.annotations.items)) {
-              rawAnnotations = rawResult.annotations.items;
-              annotationPluginData = rawResult.annotations.plugin_data;
-              annotationGroupName = rawResult.annotations.name;
-            }
+          const extractedAnnotations = extractAnnotationsFromRawResult(rawResult);
+          if (extractedAnnotations.items.length > 0) {
+            rawAnnotations = extractedAnnotations.items;
+            annotationPluginData = extractedAnnotations.pluginData;
+            annotationGroupName = extractedAnnotations.groupName;
           }
         }
 
@@ -1039,33 +971,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               }
             }
 
-            const baselineWaypoints: WaypointBaselineItem[] = rawWaypoints.map((wp) => {
-              let qx = wp.qx ?? 0,
-                qy = wp.qy ?? 0,
-                qz = wp.qz ?? 0,
-                qw = wp.qw ?? 1;
-              if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-                const halfYaw = wp.yaw / 2.0;
-                qz = Math.sin(halfYaw);
-                qw = Math.cos(halfYaw);
-              }
-              const transform: Transform = wp.transform
-                ? { ...wp.transform }
-                : {
-                    x: wp.x ?? 0,
-                    y: wp.y ?? 0,
-                    z: wp.z ?? 0,
-                    qx,
-                    qy,
-                    qz,
-                    qw,
-                  };
-              return {
-                transform,
-                options: wp.options ? { ...wp.options } : undefined,
-                name: wp.name,
-              };
-            });
+            const baselineWaypoints = toBaselineWaypoints(rawWaypoints);
 
             const waypointsToInstantiate = stashToApply
               ? applyGeneratorStash(rawWaypoints, stashToApply)
@@ -1103,33 +1009,14 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               store.addNodes([generatorNode]);
             }
 
-            const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => {
-              let qx = wp.qx ?? 0,
-                qy = wp.qy ?? 0,
-                qz = wp.qz ?? 0,
-                qw = wp.qw ?? 1;
-              if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-                const halfYaw = wp.yaw / 2.0;
-                qz = Math.sin(halfYaw);
-                qw = Math.cos(halfYaw);
-              }
-              return {
-                id: uuidv4(),
-                type: 'manual' as const,
-                name: wp.name,
-                transform: wp.transform || {
-                  x: wp.x ?? 0,
-                  y: wp.y ?? 0,
-                  z: wp.z ?? 0,
-                  qx,
-                  qy,
-                  qz,
-                  qw,
-                },
-                options: wp.options || {},
-                pipeline_metadata: pipelineMetadata,
-              };
-            });
+            const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => ({
+              id: uuidv4(),
+              type: 'manual' as const,
+              name: wp.name,
+              transform: pluginWaypointTransform(wp),
+              options: wp.options || {},
+              pipeline_metadata: pipelineMetadata,
+            }));
             if (childNodes.length > 0) {
               store.addNodes(childNodes, parentId);
             }
