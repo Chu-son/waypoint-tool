@@ -4,14 +4,7 @@ import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  ProjectMapLayer,
-  ManualCustomLayer,
-  PluginCustomLayer,
-  EditObject,
-  WaypointNode,
-  AnnotationObject,
-} from '../../types/store';
+import { ManualCustomLayer, EditObject, WaypointNode } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
 import { FootprintLayer } from './layers/FootprintLayer';
@@ -32,12 +25,13 @@ import { useAnnotationEdit } from './hooks/useAnnotationEdit';
 import { prepareLayersForExport } from '../../services/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
 import { resolveThemeVariables } from '../../utils/themePresets';
-import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
+import { hexStringToNumber } from '../../utils/colorUtils';
 import { getPrecedingManualWaypoint, findNodeParentId } from '../../utils/treeUtils';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
-
-import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
+import { MapLayerSprite } from './MapLayerSprite';
+import { getFallbackGridColors } from './utils/canvasTheme';
+import { findNearestObjectCenter } from './utils/hitTest';
 import { CANVAS_ACCENT_COLOR, CANVAS_SURFACE_BASE, CANVAS_SURFACE_BASE_HEX } from './canvasConstants';
 
 extend({
@@ -46,252 +40,6 @@ extend({
   Graphics,
   Text,
 });
-
-/**
- * Resolves colors for the canvas fallback grid texture when no maps are loaded.
- * Under Option A (CAD / RViz approach), in light mode the viewport maintains high-contrast
- * dark charcoal styling (#121316 background, hairline grid lines, muted text) unless
- * customUiConfig explicitly defines custom surface colors.
- */
-export function getFallbackGridColors(
-  resolvedTheme: { variables: Record<string, string>; colorScheme: 'dark' | 'light' },
-  hasExplicitCustomSurface: boolean,
-): { bg: string; grid: string; text: string } {
-  const isCadDarkViewport = resolvedTheme.colorScheme === 'light' && !hasExplicitCustomSurface;
-  return {
-    bg: isCadDarkViewport ? '#121316' : resolvedTheme.variables['--color-surface-panel'] || '#121316',
-    grid: isCadDarkViewport ? 'rgba(255, 255, 255, 0.08)' : resolvedTheme.variables['--color-border-base'] || '#334155',
-    text: isCadDarkViewport ? '#8a8f98' : resolvedTheme.variables['--color-text-muted'] || '#94a3b8',
-  };
-}
-
-export function MapLayerSprite({
-  layer,
-  scale,
-  textStyle,
-  overrideTexture,
-}: {
-  layer: ProjectMapLayer | PluginCustomLayer | any;
-  scale: number;
-  textStyle: TextStyle;
-  overrideTexture?: Texture | null;
-}) {
-  const [texture, setTexture] = useState<Texture | null>(overrideTexture || null);
-  const [imgSize, setImgSize] = useState({
-    w: overrideTexture ? overrideTexture.width : 0,
-    h: overrideTexture ? overrideTexture.height : 0,
-  });
-  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
-  const occupancyHighlightAlpha = useAppStore((state) => state.occupancyHighlightAlpha);
-  const customUiConfig = useAppStore((state) => state.customUiConfig);
-  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
-  const themeMode = useAppStore((state) => state.themeMode);
-  const themePreset = useAppStore((state) => state.themePreset);
-
-  const occThresh = layer.info?.occupied_thresh ?? 0.65;
-  const freeThresh = layer.info?.free_thresh ?? 0.25;
-  const negate = layer.info?.negate ?? 0;
-
-  const resolvedTheme = useMemo(() => {
-    if (isCustomUiMode && customUiConfig?.theme) {
-      return resolveThemeVariables(customUiConfig.theme);
-    }
-    return resolveThemeVariables({
-      preset: themePreset || 'default',
-      colorScheme: themeMode,
-    });
-  }, [isCustomUiMode, customUiConfig, themeMode, themePreset]);
-
-  const freeColorVec = useMemo(
-    () => hexStringToVec3(resolvedTheme.variables['--color-occupancy-free'], [0.0627, 0.7255, 0.5059]),
-    [resolvedTheme],
-  );
-  const obstacleColorVec = useMemo(
-    () => hexStringToVec3(resolvedTheme.variables['--color-occupancy-obstacle'], [0.9373, 0.2667, 0.2667]),
-    [resolvedTheme],
-  );
-  const unknownColorVec = useMemo(
-    () => hexStringToVec3(resolvedTheme.variables['--color-occupancy-unknown'], [0.6588, 0.3333, 0.9686]),
-    [resolvedTheme],
-  );
-
-  const highlightFilter = useMemo(() => {
-    if (!showOccupancyHighlight) return null;
-    try {
-      return new OccupancyHighlightFilter({
-        occupiedThresh: occThresh,
-        freeThresh: freeThresh,
-        negate: negate,
-        alpha: occupancyHighlightAlpha,
-        freeColor: freeColorVec,
-        obstacleColor: obstacleColorVec,
-        unknownColor: unknownColorVec,
-      });
-    } catch {
-      return null;
-    }
-  }, [showOccupancyHighlight, freeColorVec, obstacleColorVec, unknownColorVec]);
-
-  useEffect(() => {
-    if (highlightFilter) {
-      highlightFilter.updateUniforms({
-        occupiedThresh: occThresh,
-        freeThresh: freeThresh,
-        negate: negate,
-        alpha: occupancyHighlightAlpha,
-        freeColor: freeColorVec,
-        obstacleColor: obstacleColorVec,
-        unknownColor: unknownColorVec,
-      });
-    }
-  }, [
-    highlightFilter,
-    occThresh,
-    freeThresh,
-    negate,
-    occupancyHighlightAlpha,
-    freeColorVec,
-    obstacleColorVec,
-    unknownColorVec,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      if (highlightFilter && !highlightFilter.destroyed) {
-        highlightFilter.destroy();
-      }
-    };
-  }, [highlightFilter]);
-
-  useEffect(() => {
-    if (overrideTexture) {
-      setTexture(overrideTexture);
-      setImgSize({ w: overrideTexture.width, h: overrideTexture.height });
-      return;
-    }
-    let cancelled = false;
-    if (layer.image_base64) {
-      const src = layer.image_base64.startsWith('data:')
-        ? layer.image_base64
-        : `data:image/png;base64,${layer.image_base64}`;
-      const img = new Image();
-      img.onload = () => {
-        if (cancelled) return;
-        const newTexture = Texture.from(img);
-        setTexture(newTexture);
-        setImgSize({ w: img.width, h: img.height });
-      };
-      img.onerror = (err) => {
-        console.error(`[MapLayerSprite] Failed to load image for layer "${layer.name}":`, err);
-      };
-      img.src = src;
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [layer.image_base64, layer.name, overrideTexture]);
-
-  // Clean up the previous texture safely without nulling shared TextureSource style
-  useEffect(() => {
-    return () => {
-      if (texture && !texture.destroyed && !overrideTexture) {
-        texture.destroy(false);
-      }
-    };
-  }, [texture, overrideTexture]);
-
-  if (
-    !texture ||
-    texture.destroyed ||
-    !texture.source ||
-    texture.source.destroyed ||
-    !texture.source.style ||
-    !layer.visible
-  ) {
-    return null;
-  }
-
-  // Extract metadata (with safe fallbacks)
-  const { resolution = 0.05, origin = [0, 0, 0] } = layer.info || {};
-  const [ox, oy, oyaw] = origin;
-  const yaw = oyaw || 0;
-
-  // Render the map aligned to ROS origin
-  // Anchor [0, 1] means the bottom-left of the image maps to the exact (ox, oy).
-  // Y scale is inverted so that the image draws right-side up inside the Y-inverted Pixi Container.
-  // Top-left Y calculation: Origin is bottom-left, so we add height * resolution
-  // We must also account for the map's yaw rotation (yaw).
-  const h = imgSize.h || (texture ? texture.height : 0) || ('height' in layer ? layer.height : layer.info?.height) || 0;
-  const H = h * resolution;
-  const topLeftX = ox - H * Math.sin(yaw);
-  const topLeftY = oy + H * Math.cos(yaw);
-
-  return (
-    <pixiContainer>
-      <pixiSprite
-        key={texture.uid || layer.id}
-        texture={texture}
-        anchor={{ x: 0, y: 1 }}
-        x={ox}
-        y={oy}
-        rotation={yaw}
-        scale={{ x: resolution, y: -resolution }}
-        alpha={layer.opacity}
-        filters={highlightFilter ? [highlightFilter] : undefined}
-      />
-      {/* Top-Left Map Layer Name */}
-      <pixiContainer x={topLeftX} y={topLeftY} scale={{ x: 1 / scale, y: -1 / scale }}>
-        <pixiText text={layer.name || 'Map Layer'} style={textStyle} anchor={{ x: 0, y: 1 }} x={4} y={-4} />
-      </pixiContainer>
-    </pixiContainer>
-  );
-}
-
-export function findNearestObjectCenter(
-  worldX: number,
-  worldY: number,
-  nodes: Record<string, WaypointNode>,
-  annotations: Record<string, AnnotationObject>,
-  scale: number,
-): { x: number; y: number; objectId: string; objectName: string; objectType: 'node' | 'annotation' } | null {
-  const threshold = 30 / Math.max(scale, 0.001);
-  let closestDist = threshold;
-  let result: { x: number; y: number; objectId: string; objectName: string; objectType: 'node' | 'annotation' } | null =
-    null;
-
-  for (const node of Object.values(nodes)) {
-    if (!node?.transform) continue;
-    const dist = Math.hypot(node.transform.x - worldX, node.transform.y - worldY);
-    if (dist < closestDist) {
-      closestDist = dist;
-      result = {
-        x: node.transform.x,
-        y: node.transform.y,
-        objectId: node.id,
-        objectName: node.name || node.id,
-        objectType: 'node',
-      };
-    }
-  }
-
-  for (const annot of Object.values(annotations)) {
-    if (!annot || annot.visible === false) continue;
-    const center = getAnnotationCenter(annot);
-    const dist = Math.hypot(center.x - worldX, center.y - worldY);
-    if (dist < closestDist) {
-      closestDist = dist;
-      result = {
-        x: center.x,
-        y: center.y,
-        objectId: annot.id,
-        objectName: annot.name || annot.id,
-        objectType: 'annotation',
-      };
-    }
-  }
-
-  return result;
-}
 
 export function MapCanvas() {
   const isPixiHandledRef = useRef(false);

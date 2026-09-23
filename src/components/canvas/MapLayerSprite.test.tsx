@@ -1,6 +1,6 @@
 import { render, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { MapLayerSprite } from './MapCanvas';
+import { MapLayerSprite } from './MapLayerSprite';
 import { TextStyle, Texture } from 'pixi.js';
 
 // Mock @pixi/react
