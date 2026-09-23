@@ -242,6 +242,8 @@ function SortableTreeNodeItem({
                 e.stopPropagation();
                 onToggleExpand?.();
               }}
+              aria-label={isExpanded ? 'Collapse' : 'Expand'}
+              aria-expanded={!!isExpanded}
               className="p-0.5 hover:bg-surface-hover rounded text-text-muted hover:text-text-base transition-transform shrink-0"
             >
               <ChevronRight
