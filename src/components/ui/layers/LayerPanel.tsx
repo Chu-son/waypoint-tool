@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { useClickOutside } from '../../../hooks/useClickOutside';
+import { useState } from 'react';
+import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '../common/ContextMenu';
 import {
   Eye,
   EyeOff,
@@ -263,8 +263,6 @@ export function LayerPanel() {
     x: number;
     y: number;
   } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  useClickOutside(menuRef, () => setContextMenu(null));
 
   const handleLoadMap = async () => {
     try {
@@ -573,11 +571,7 @@ export function LayerPanel() {
 
       {/* Layer Context Menu */}
       {contextMenu && (
-        <div
-          ref={menuRef}
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 w-52 text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
-        >
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)}>
           {contextMenu.type === 'custom' &&
             (() => {
               const layer = customLayers.find((l) => l.id === contextMenu.id);
@@ -587,92 +581,78 @@ export function LayerPanel() {
 
               return (
                 <>
-                  {/* 内部プロパティ / インスペクター表示 */}
                   {!isManual ? (
                     <>
-                      <button
-                        onClick={() => {
+                      <ContextMenuItem
+                        icon={<Code2 size={13} className="text-accent-automation" />}
+                        onSelect={() =>
                           openPluginDataModal(
                             `カスタムレイヤー: ${layer.name}`,
                             layer.plugin_data,
                             `プラグイン: ${layer.plugin_id || 'Unknown'} • 内部メタデータ (Read-only)`,
-                          );
-                          setContextMenu(null);
-                        }}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                          )
+                        }
                       >
-                        <Code2 size={13} className="text-accent-automation" />
-                        <span>内部プロパティを表示</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
+                        内部プロパティを表示
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        icon={<Settings2 size={13} className="text-text-muted" />}
+                        onSelect={() => {
                           selectNodes([]);
                           setActiveCustomLayerId(layer.id);
                           setRightPanelActiveTab('inspector');
                           setRightPanelOpen(true);
-                          setContextMenu(null);
                         }}
-                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                       >
-                        <Settings2 size={13} className="text-text-muted" />
-                        <span>パラメータ編集 / 再生成</span>
-                      </button>
+                        パラメータ編集 / 再生成
+                      </ContextMenuItem>
                     </>
                   ) : (
-                    <button
-                      onClick={() => {
+                    <ContextMenuItem
+                      icon={<Pencil size={13} className="text-primary-base" />}
+                      onSelect={() => {
                         selectNodes([]);
                         setActiveCustomLayerId(layer.id);
                         setMapEditMode(!isEditing);
                         setRightPanelActiveTab('inspector');
                         setRightPanelOpen(true);
-                        setContextMenu(null);
                       }}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                     >
-                      <Pencil size={13} className="text-primary-base" />
-                      <span>{isEditing ? 'ベクター編集を終了' : 'ベクター編集を開始'}</span>
-                    </button>
+                      {isEditing ? 'ベクター編集を終了' : 'ベクター編集を開始'}
+                    </ContextMenuItem>
                   )}
-
-                  {/* 参照レイヤー切り替え */}
-                  <button
-                    onClick={() => {
-                      updateCustomLayer(layer.id, { is_reference: !layer.is_reference });
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  <ContextMenuItem
+                    icon={
+                      <Bookmark
+                        size={13}
+                        className={
+                          layer.is_reference ? 'fill-accent-reference text-accent-reference' : 'text-text-muted'
+                        }
+                      />
+                    }
+                    onSelect={() => updateCustomLayer(layer.id, { is_reference: !layer.is_reference })}
                   >
-                    <Bookmark
-                      size={13}
-                      className={layer.is_reference ? 'fill-accent-reference text-accent-reference' : 'text-text-muted'}
-                    />
-                    <span>{layer.is_reference ? '参照レイヤー解除' : '参照レイヤーに設定'}</span>
-                  </button>
-
-                  {/* 表示 / 非表示 */}
-                  <button
-                    onClick={() => {
-                      updateCustomLayer(layer.id, { visible: !layer.visible });
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    {layer.is_reference ? '参照レイヤー解除' : '参照レイヤーに設定'}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={
+                      layer.visible ? (
+                        <EyeOff size={13} className="text-text-muted" />
+                      ) : (
+                        <Eye size={13} className="text-text-base" />
+                      )
+                    }
+                    onSelect={() => updateCustomLayer(layer.id, { visible: !layer.visible })}
                   >
-                    {layer.visible ? (
-                      <EyeOff size={13} className="text-text-muted" />
-                    ) : (
-                      <Eye size={13} className="text-text-base" />
-                    )}
-                    <span>{layer.visible ? '非表示にする' : '表示する'}</span>
-                  </button>
+                    {layer.visible ? '非表示にする' : '表示する'}
+                  </ContextMenuItem>
 
-                  <div className="h-px bg-border-base/30 my-0.5" />
+                  <ContextMenuSeparator />
 
-                  {/* 削除 */}
-                  <button
-                    onClick={async () => {
-                      setContextMenu(null);
+                  <ContextMenuItem
+                    tone="danger"
+                    icon={<Trash2 size={13} />}
+                    onSelect={async () => {
                       const confirmed = await DialogAPI.ask(`Remove custom layer '${layer.name}'?`, {
                         title: 'Remove Custom Layer',
                         kind: 'warning',
@@ -685,11 +665,9 @@ export function LayerPanel() {
                         }
                       }
                     }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
                   >
-                    <Trash2 size={13} />
-                    <span>削除 (Delete)</span>
-                  </button>
+                    削除 (Delete)
+                  </ContextMenuItem>
                 </>
               );
             })()}
@@ -701,40 +679,31 @@ export function LayerPanel() {
 
               return (
                 <>
-                  {/* 編集対象マップに設定 */}
-                  <button
-                    onClick={() => {
-                      setActiveMapLayerId(layer.id);
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  <ContextMenuItem
+                    icon={<Crop size={13} className="text-primary-base" />}
+                    onSelect={() => setActiveMapLayerId(layer.id)}
                   >
-                    <Crop size={13} className="text-primary-base" />
-                    <span>編集対象マップに設定</span>
-                  </button>
-
-                  {/* 表示 / 非表示 */}
-                  <button
-                    onClick={() => {
-                      updateMapLayer(layer.id, { visible: !layer.visible });
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    編集対象マップに設定
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={
+                      layer.visible ? (
+                        <EyeOff size={13} className="text-text-muted" />
+                      ) : (
+                        <Eye size={13} className="text-text-base" />
+                      )
+                    }
+                    onSelect={() => updateMapLayer(layer.id, { visible: !layer.visible })}
                   >
-                    {layer.visible ? (
-                      <EyeOff size={13} className="text-text-muted" />
-                    ) : (
-                      <Eye size={13} className="text-text-base" />
-                    )}
-                    <span>{layer.visible ? '非表示にする' : '表示する'}</span>
-                  </button>
+                    {layer.visible ? '非表示にする' : '表示する'}
+                  </ContextMenuItem>
 
-                  <div className="h-px bg-border-base/30 my-0.5" />
+                  <ContextMenuSeparator />
 
-                  {/* 削除 */}
-                  <button
-                    onClick={async () => {
-                      setContextMenu(null);
+                  <ContextMenuItem
+                    tone="danger"
+                    icon={<Trash2 size={13} />}
+                    onSelect={async () => {
                       const confirmed = await DialogAPI.ask(`Remove map layer '${layer.name}'?`, {
                         title: 'Remove Map',
                         kind: 'warning',
@@ -746,15 +715,13 @@ export function LayerPanel() {
                         }
                       }
                     }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
                   >
-                    <Trash2 size={13} />
-                    <span>削除 (Delete)</span>
-                  </button>
+                    削除 (Delete)
+                  </ContextMenuItem>
                 </>
               );
             })()}
-        </div>
+        </ContextMenu>
       )}
     </div>
   );
