@@ -29,7 +29,7 @@ import { useMapEditCircle } from './hooks/useMapEditCircle';
 import { useMapEditFreehand } from './hooks/useMapEditFreehand';
 import { useMapEditLine } from './hooks/useMapEditLine';
 import { useAnnotationEdit } from './hooks/useAnnotationEdit';
-import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { prepareLayersForExport } from '../../services/mapRasterize';
 import { computePointsBoundingBox } from '../../utils/geometry';
 import { resolveThemeVariables } from '../../utils/themePresets';
 import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';

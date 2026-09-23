@@ -60,17 +60,36 @@ export default tseslint.config(
     },
   },
   {
-    // Layering: pure utilities must not depend on the store or UI.
+    // Layering: types and pure utilities sit at the bottom (docs/ARCHITECTURE.md §1.1).
     files: ['src/utils/**/*.ts', 'src/types/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
     rules: {
-      'no-restricted-imports': [
-        'warn',
+      'no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
         {
           patterns: [
             {
-              group: ['**/stores/**', '**/components/**'],
-              message: 'utils/types must not depend on stores or components.',
+              group: ['**/stores/**', '**/components/**', '**/services/**', '**/hooks/**', '**/api', '@tauri-apps/*'],
+              message: 'types/ and utils/ must stay pure: no store, service, API, hook or component imports.',
+              allowTypeImports: true,
             },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Layering: services orchestrate stores and APIs but never reach into the UI.
+    files: ['src/services/**/*.ts'],
+    ignores: ['src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['**/components/**', '**/hooks/**'], message: 'services/ must not depend on UI code.' },
+            { group: ['@tauri-apps/*'], message: 'Access Tauri only through the adapters in src/api.' },
           ],
         },
       ],

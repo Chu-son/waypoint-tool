@@ -14,7 +14,7 @@ import {
   InsertionTarget,
 } from '../../types/store';
 import { BackendAPI } from '../../api';
-import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
+import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../services/mapRasterize';
 import { applyGeneratorStash, computeGeneratorStash } from '../../utils/generatorStashUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';

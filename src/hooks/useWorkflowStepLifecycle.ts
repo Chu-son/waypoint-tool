@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { StepLifecycle, WorkflowStep } from '../types/customUi';
-import { executeWorkflowAction } from '../utils/workflowActions';
+import { executeWorkflowAction } from '../services/workflowActions';
 
 async function applyStepLifecycle(lifecycle: StepLifecycle | undefined) {
   if (!lifecycle) return;

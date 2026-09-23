@@ -6,7 +6,7 @@ import { useAppStore } from '../../stores/appStore';
 import { MousePointer2, Plus, FolderOpen, Clock, FileText } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { cn } from '../../utils/cn';
-import { confirmDiscardChanges } from '../../utils/projectGuard';
+import { confirmDiscardChanges } from '../../services/projectGuard';
 
 export interface WelcomeModalProps {
   isOpen: boolean;

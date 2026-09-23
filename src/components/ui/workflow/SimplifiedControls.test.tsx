@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SimplifiedControls } from './SimplifiedControls';
 import { useAppStore } from '../../../stores/appStore';
-import * as workflowActions from '../../../utils/workflowActions';
+import * as workflowActions from '../../../services/workflowActions';
 
 describe('SimplifiedControls', () => {
   beforeEach(() => {

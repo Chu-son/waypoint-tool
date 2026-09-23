@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
 import { normalizeProjectData } from './projectSlice';
-import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { prepareLayersForExport } from '../../services/mapRasterize';
 import { ProjectMapLayer } from '../../types/store';
 
 describe('Custom Layers Reference Flag', () => {

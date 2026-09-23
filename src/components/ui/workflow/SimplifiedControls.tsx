@@ -7,7 +7,7 @@ import {
   WorkflowPluginInputConfig,
 } from '../../../types/customUi';
 import { useAppStore } from '../../../stores/appStore';
-import { executeWorkflowAction } from '../../../utils/workflowActions';
+import { executeWorkflowAction } from '../../../services/workflowActions';
 import { Button } from '../common/Button';
 import { FormField } from '../common/FormField';
 import { ToggleSwitch } from '../common/ToggleSwitch';

@@ -6,7 +6,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getVersion } from '@tauri-apps/api/app';
 import { MousePointer2, Minus, Square, X, Check, FolderOpen } from 'lucide-react';
 import { cn } from '../../utils/cn';
-import { confirmDiscardChanges } from '../../utils/projectGuard';
+import { confirmDiscardChanges } from '../../services/projectGuard';
 import { extractProjectName } from '../../utils/projectUtils';
 import { Kbd } from './common/Kbd';
 

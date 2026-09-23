@@ -29,7 +29,7 @@ import {
   TreeFileNode,
 } from '../../utils/exportTemplateEngine';
 import { extractWaypointsForExport } from '../../utils/exportWaypointUtils';
-import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { prepareLayersForExport } from '../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../stores/migrations/projectMigration';
 
 interface ExportModalProps {

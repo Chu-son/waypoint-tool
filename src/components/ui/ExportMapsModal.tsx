@@ -9,7 +9,7 @@ import { Input } from './common/Input';
 import { OptionCard } from './common/OptionCard';
 import { FieldLabel } from './common/FieldLabel';
 import { EmptyState } from './common/EmptyState';
-import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { prepareLayersForExport } from '../../services/mapRasterize';
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);

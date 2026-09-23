@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { TextStyle, FederatedPointerEvent } from 'pixi.js';
-import { computeLabelOffsets, LabelCandidate } from '../../../utils/labelLayout';
+import { computeLabelOffsets, LabelCandidate } from '../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_HOVER_COLOR } from '../canvasConstants';
 import {

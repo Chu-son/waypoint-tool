@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { confirmDiscardChanges } from '../../utils/projectGuard';
+import { confirmDiscardChanges } from '../../services/projectGuard';
 
 export function ShortcutManager() {
   const {

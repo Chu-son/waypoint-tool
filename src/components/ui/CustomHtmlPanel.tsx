@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CustomUiPanelTabDef } from '../../types/customUi';
 import { BackendAPI } from '../../api';
-import { executeWorkflowAction } from '../../utils/workflowActions';
+import { executeWorkflowAction } from '../../services/workflowActions';
 import { useAppStore } from '../../stores/appStore';
 
 interface CustomHtmlPanelProps {
