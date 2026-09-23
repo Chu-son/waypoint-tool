@@ -2,6 +2,14 @@ import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent } from 'pixi.js';
 import { CanvasHandle } from '../common/CanvasHandle';
 import { quaternionToYaw } from '../../../utils/transformUtils';
+import {
+  CANVAS_CONTRAST_COLOR,
+  CANVAS_HIT_AREA_COLOR,
+  CANVAS_LABEL_BG_ALT,
+  CANVAS_PLUGIN_HINT_COLOR,
+  CANVAS_PLUGIN_INPUT_COLOR,
+  CANVAS_PLUGIN_INPUT_LIGHT_COLOR,
+} from '../canvasConstants';
 
 interface PluginLayerProps {
   scale: number;
@@ -58,10 +66,10 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
               <pixiGraphics
                 draw={(g) => {
                   g.clear();
-                  g.fillStyle = { color: 0xec4899, alpha: 0.1 };
+                  g.fillStyle = { color: CANVAS_PLUGIN_INPUT_COLOR, alpha: 0.1 };
                   g.rect(-halfW, -halfH, width, height);
                   g.fill();
-                  g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
+                  g.strokeStyle = { width: 2 / safeScale, color: CANVAS_PLUGIN_INPUT_COLOR };
                   const dashLen = 8 / safeScale;
                   const sides = [
                     [-halfW, -halfH, halfW, -halfH],
@@ -97,7 +105,7 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                   y={cy}
                   scale={scale}
                   type="square"
-                  colorHex={0xec4899}
+                  colorHex={CANVAS_PLUGIN_INPUT_COLOR}
                   cursor="grab"
                   onPointerDown={(e: FederatedPointerEvent) => onRectDragCornerDown(e, key, corner)}
                 />
@@ -115,22 +123,22 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                     onPointerDown={(e: FederatedPointerEvent) => onRectRotationDown(e, key)}
                     draw={(g) => {
                       g.clear();
-                      g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
+                      g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_PLUGIN_INPUT_COLOR };
                       g.moveTo(0, stemLen);
                       g.lineTo(0, 0);
                       g.stroke();
 
-                      g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                      g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                       g.circle(0, 0, 15 / safeScale);
                       g.fill();
 
-                      g.fillStyle = { color: 0xffffff, alpha: 0.9 };
-                      g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
+                      g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 0.9 };
+                      g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_PLUGIN_INPUT_COLOR };
                       g.circle(0, 0, handleR);
                       g.fill();
                       g.stroke();
 
-                      g.strokeStyle = { width: 1.2 / safeScale, color: 0xec4899 };
+                      g.strokeStyle = { width: 1.2 / safeScale, color: CANVAS_PLUGIN_INPUT_COLOR };
                       const arcR = handleR * 0.55;
                       const arcSteps = 10;
                       for (let i = 0; i < arcSteps; i++) {
@@ -145,7 +153,7 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                       const tipX = Math.cos(lastAngle) * arcR;
                       const tipY = Math.sin(lastAngle) * arcR;
                       const aSize = 2 / safeScale;
-                      g.fillStyle = { color: 0xec4899, alpha: 1 };
+                      g.fillStyle = { color: CANVAS_PLUGIN_INPUT_COLOR, alpha: 1 };
                       g.moveTo(tipX, tipY);
                       g.lineTo(tipX + aSize, tipY - aSize * 0.5);
                       g.lineTo(tipX - aSize * 0.3, tipY - aSize);
@@ -210,8 +218,8 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                     y={cy}
                     draw={(g) => {
                       g.clear();
-                      g.fillStyle = { color: 0xf97316, alpha: 0.9 };
-                      g.strokeStyle = { width: 1 / safeScale, color: 0xf97316 };
+                      g.fillStyle = { color: CANVAS_PLUGIN_HINT_COLOR, alpha: 0.9 };
+                      g.strokeStyle = { width: 1 / safeScale, color: CANVAS_PLUGIN_HINT_COLOR };
                       const tipX = dirX;
                       const tipY = dirY;
                       const perpX = -Math.sin(angle) * triSize;
@@ -257,8 +265,8 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                         rotation={yaw}
                         draw={(g) => {
                           g.clear();
-                          g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
-                          g.fillStyle = { color: 0xf472b6, alpha: 0.8 };
+                          g.strokeStyle = { width: 2 / safeScale, color: CANVAS_PLUGIN_INPUT_COLOR };
+                          g.fillStyle = { color: CANVAS_PLUGIN_INPUT_LIGHT_COLOR, alpha: 0.8 };
                           g.moveTo(12 / safeScale, 0);
                           g.lineTo(-4 / safeScale, 4 / safeScale);
                           g.lineTo(-4 / safeScale, -4 / safeScale);
@@ -274,13 +282,13 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                       draw={(g) => {
                         g.clear();
                         // Outer halo
-                        g.fillStyle = { color: 0xec4899, alpha: 0.25 };
+                        g.fillStyle = { color: CANVAS_PLUGIN_INPUT_COLOR, alpha: 0.25 };
                         g.circle(0, 0, 8 / safeScale);
                         g.fill();
 
                         // Inner solid circle
-                        g.fillStyle = { color: 0xec4899, alpha: 0.9 };
-                        g.strokeStyle = { width: 1.5 / safeScale, color: 0xffffff };
+                        g.fillStyle = { color: CANVAS_PLUGIN_INPUT_COLOR, alpha: 0.9 };
+                        g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_CONTRAST_COLOR };
                         g.circle(0, 0, 4.5 / safeScale);
                         g.fill();
                         g.stroke();
@@ -292,8 +300,8 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                       <pixiGraphics
                         draw={(g) => {
                           g.clear();
-                          g.fillStyle = { color: 0x1e293b, alpha: 0.85 };
-                          g.strokeStyle = { width: 1, color: 0xec4899 };
+                          g.fillStyle = { color: CANVAS_LABEL_BG_ALT, alpha: 0.85 };
+                          g.strokeStyle = { width: 1, color: CANVAS_PLUGIN_INPUT_COLOR };
                           g.roundRect(-4, -4, 16, 12, 3);
                           g.fill();
                           g.stroke();
@@ -333,8 +341,8 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
             rotation={yaw}
             draw={(g) => {
               g.clear();
-              g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
-              g.fillStyle = { color: 0xf472b6, alpha: 0.8 };
+              g.strokeStyle = { width: 2 / safeScale, color: CANVAS_PLUGIN_INPUT_COLOR };
+              g.fillStyle = { color: CANVAS_PLUGIN_INPUT_LIGHT_COLOR, alpha: 0.8 };
               g.moveTo(10 / safeScale, 0);
               g.lineTo(-5 / safeScale, 5 / safeScale);
               g.lineTo(-5 / safeScale, -5 / safeScale);

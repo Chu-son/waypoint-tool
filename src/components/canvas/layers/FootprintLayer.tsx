@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { RobotFootprint } from '../../../types/store';
 import { quaternionToYaw } from '../../../utils/transformUtils';
 import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { CANVAS_FOOTPRINT_SELECTED_COLOR, CANVAS_MUTED_COLOR } from '../canvasConstants';
 import {
   parseColorSafe,
   resolveFootprintConditionalStyle,
@@ -74,12 +75,16 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
         const px = isFinite(transform.x) ? transform.x : 0;
         const py = isFinite(transform.y) ? transform.y : 0;
 
-        const baseStroke = condStyle?.strokeColor ? parseColorSafe(condStyle.strokeColor, 0x94a3b8) : 0x94a3b8;
-        const baseFill = condStyle?.fillColor ? parseColorSafe(condStyle.fillColor, 0x94a3b8) : 0x94a3b8;
+        const baseStroke = condStyle?.strokeColor
+          ? parseColorSafe(condStyle.strokeColor, CANVAS_MUTED_COLOR)
+          : CANVAS_MUTED_COLOR;
+        const baseFill = condStyle?.fillColor
+          ? parseColorSafe(condStyle.fillColor, CANVAS_MUTED_COLOR)
+          : CANVAS_MUTED_COLOR;
 
-        const strokeColor = isSelected ? 0x38bdf8 : baseStroke;
+        const strokeColor = isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseStroke;
         const strokeWidth = isSelected ? 1.5 / safeScale : (condStyle?.strokeWidth ?? 1.0) / safeScale;
-        const fillColor = isSelected ? 0x38bdf8 : baseFill;
+        const fillColor = isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseFill;
         const fillAlpha = isSelected ? 0.18 : (condStyle?.fillAlpha ?? 0.05);
 
         return (

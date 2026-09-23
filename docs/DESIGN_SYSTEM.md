@@ -144,7 +144,8 @@ Tailwind CSSのクラス文字列を直接JSXに長く書くことは、可読�
 - `CANVAS_ACCENT_COLOR` (`0x5e6ad2` / `#5e6ad2`): 選択状態、矩形選択枠、スナップガイド、回転ハンドル
 - `CANVAS_SURFACE_BASE` (`0x090a0c` / `#090a0c`): キャンバス描画領域の背景。ライトモード時もCAD・RVizプロツール同様に高コントラストを維持するためダークチャコールが適用されます。
 - `CANVAS_PREVIEW_COLOR` (`0x8a8f98` / `#8a8f98`): 生成プレビューや下書き状態
-- キャンバスレイヤー内でのハードコード色（`0x3b82f6` や `0x1e293b` 等）の直書きは禁止です。
+- 要素色（意味ベースの名前）: `CANVAS_HIT_AREA_COLOR`（alpha 0.001 のヒット領域）、`CANVAS_CONTRAST_COLOR`（ハンドル塗り・中心ドット）、`CANVAS_LABEL_BG(_ALT)`、`CANVAS_MUTED_COLOR/FILL`（挿入位置以降・既定フットプリント）、`CANVAS_AXIS_X/Y_COLOR`、`CANVAS_EXPORT_REGION_COLOR`、`CANVAS_MEASURE(_LIGHT)_COLOR`、`CANVAS_ANNOTATION_HIGHLIGHT_COLOR`、`CANVAS_FOOTPRINT_SELECTED_COLOR`、`CANVAS_PLUGIN_INPUT(_LIGHT)_COLOR`、`CANVAS_PLUGIN_HINT_COLOR`、`WAYPOINT_COLORS`（manual / generated / locked / referenced / afterInsertion の stroke・fill）
+- キャンバスレイヤー内でのハードコード色（`0x3b82f6` や `0x1e293b` 等）の直書きは禁止です。ESLint（`no-restricted-syntax`）が `src/components/canvas/` 配下の 6 桁 hex リテラルをエラーにします。新しい色が必要な場合は、用途を表す名前で `canvasConstants.ts` に追加してください。
 
 ---
 

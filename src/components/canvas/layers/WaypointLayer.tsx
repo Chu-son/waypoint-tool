@@ -4,7 +4,13 @@ import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { quaternionToYaw } from '../../../utils/transformUtils';
-import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_HOVER_COLOR } from '../canvasConstants';
+import {
+  CANVAS_ACCENT_COLOR,
+  CANVAS_ACCENT_HOVER_COLOR,
+  CANVAS_CONTRAST_COLOR,
+  CANVAS_HIT_AREA_COLOR,
+  WAYPOINT_COLORS,
+} from '../canvasConstants';
 import {
   parseColorSafe,
   resolveWaypointConditionalStyle,
@@ -205,8 +211,9 @@ export function WaypointLayer({
 
         const condStyle = resolvedStyleMap.get(node.id);
 
-        let baseColor = parentIsGenerator ? 0x22c55e : 0xffa500;
-        let baseFill = parentIsGenerator ? 0x4ade80 : 0xffd700;
+        const base = parentIsGenerator ? WAYPOINT_COLORS.generated : WAYPOINT_COLORS.manual;
+        let baseColor: number = base.stroke;
+        let baseFill: number = base.fill;
 
         if (condStyle?.color) {
           baseColor = parseColorSafe(condStyle.color, baseColor);
@@ -216,9 +223,16 @@ export function WaypointLayer({
         }
 
         const isLocked = lockedWaypointId === node.id;
-        const normalColor = isLocked ? 0x10b981 : isReferenced ? 0xfacc15 : isAfter ? 0x94a3b8 : baseColor;
+        const stateColors = isLocked
+          ? WAYPOINT_COLORS.locked
+          : isReferenced
+            ? WAYPOINT_COLORS.referenced
+            : isAfter
+              ? WAYPOINT_COLORS.afterInsertion
+              : null;
+        const normalColor = stateColors ? stateColors.stroke : baseColor;
         const selectedColor = CANVAS_ACCENT_COLOR;
-        const normalFill = isLocked ? 0x34d399 : isReferenced ? 0xfef08a : isAfter ? 0xcbd5e1 : baseFill;
+        const normalFill = stateColors ? stateColors.fill : baseFill;
         const selectedFill = CANVAS_ACCENT_HOVER_COLOR;
 
         const itemScale = condStyle?.scale ?? 1.0;
@@ -271,12 +285,12 @@ export function WaypointLayer({
                 onPointerDown={(e: FederatedPointerEvent) => onNodeHandlePointerDown(e, node.id)}
                 draw={(g) => {
                   g.clear();
-                  g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                  g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                   g.circle(0, 0, 15 / safeScale);
                   g.fill();
 
                   g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ACCENT_COLOR };
-                  g.fillStyle = { color: 0xffffff, alpha: 0.9 };
+                  g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 0.9 };
                   g.circle(0, 0, 4 / safeScale);
                   g.fill();
                   g.stroke();
@@ -320,7 +334,7 @@ export function WaypointLayer({
                       g.fillStyle = { color: selectedFill, alpha: 0.25 };
                       g.strokeStyle = { width: 1.5, color: selectedColor };
                     } else {
-                      g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                      g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                     }
                     g.rect(0, -labelHeight, labelWidth, labelHeight);
                     g.fill();

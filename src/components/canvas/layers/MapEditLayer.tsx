@@ -2,7 +2,7 @@ import { FederatedPointerEvent } from 'pixi.js';
 import { ManualCustomLayer, EditObject } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
 import { computePointsBoundingBox } from '../../../utils/geometry';
-import { CANVAS_ACCENT_COLOR, CANVAS_PREVIEW_COLOR } from '../canvasConstants';
+import { CANVAS_ACCENT_COLOR, CANVAS_HIT_AREA_COLOR, CANVAS_PREVIEW_COLOR } from '../canvasConstants';
 
 interface SingleLayerProps {
   scale: number;
@@ -238,7 +238,7 @@ function renderSingleEditObject(
           draw={(g) => {
             g.clear();
             // Invisible broad stroke for easy hit test
-            g.strokeStyle = { width: 14 / safeScale, color: 0xffffff, alpha: 0.001 };
+            g.strokeStyle = { width: 14 / safeScale, color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
             g.moveTo(obj.x1, obj.y1);
             g.lineTo(obj.x2, obj.y2);
             g.stroke();

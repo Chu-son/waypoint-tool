@@ -10,7 +10,13 @@ import {
   CircleAnnotation,
 } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
-import { CANVAS_ACCENT_COLOR } from '../canvasConstants';
+import {
+  CANVAS_ACCENT_COLOR,
+  CANVAS_ANNOTATION_HIGHLIGHT_COLOR,
+  CANVAS_CONTRAST_COLOR,
+  CANVAS_HIT_AREA_COLOR,
+  CANVAS_LABEL_BG,
+} from '../canvasConstants';
 import { resolveAnnotationConditionalStyle, parseColorSafe } from '../../../utils/conditionalStyles';
 
 interface AnnotationLayerProps {
@@ -126,7 +132,7 @@ export function AnnotationLayer({
                 g.clear();
                 // Outer glow / selection outline if selected
                 if (isSelected) {
-                  g.strokeStyle = { width: 2 / safeScale, color: 0x60a5fa, alpha: 0.9 };
+                  g.strokeStyle = { width: 2 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.9 };
                   g.circle(0, 0, radius + 3 / safeScale);
                   g.stroke();
                 }
@@ -136,7 +142,7 @@ export function AnnotationLayer({
                 g.fill();
                 g.stroke();
                 // Center white dot
-                g.fillStyle = { color: 0xffffff, alpha: 0.9 * opacity };
+                g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 0.9 * opacity };
                 g.circle(0, 0, 2 / safeScale);
                 g.fill();
               }}
@@ -182,7 +188,7 @@ export function AnnotationLayer({
                 draw={(g) => {
                   g.clear();
                   if (isSelected) {
-                    g.strokeStyle = { width: 2 / safeScale, color: 0x60a5fa, alpha: 0.8 };
+                    g.strokeStyle = { width: 2 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.8 };
                     g.circle(0, 0, 16 / safeScale);
                     g.stroke();
                   }
@@ -242,14 +248,18 @@ export function AnnotationLayer({
               draw={(g) => {
                 g.clear();
                 // Broad invisible hit area for easy line selection
-                g.strokeStyle = { width: 14 / safeScale, color: 0xffffff, alpha: 0.001 };
+                g.strokeStyle = { width: 14 / safeScale, color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                 g.moveTo(line.x1, line.y1);
                 g.lineTo(line.x2, line.y2);
                 g.stroke();
 
                 // Selection glow if selected
                 if (isSelected) {
-                  g.strokeStyle = { width: strokeWidth + 3 / safeScale, color: 0x60a5fa, alpha: 0.6 };
+                  g.strokeStyle = {
+                    width: strokeWidth + 3 / safeScale,
+                    color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR,
+                    alpha: 0.6,
+                  };
                   g.moveTo(line.x1, line.y1);
                   g.lineTo(line.x2, line.y2);
                   g.stroke();
@@ -313,7 +323,7 @@ export function AnnotationLayer({
                     <pixiGraphics
                       draw={(g) => {
                         g.clear();
-                        g.fillStyle = { color: 0x0f172a, alpha: 0.85 };
+                        g.fillStyle = { color: CANVAS_LABEL_BG, alpha: 0.85 };
                         g.strokeStyle = { width: 1.5 / safeScale, color: strokeColorHex, alpha: 0.9 * opacity };
                         g.roundRect(-bw / 2, -bh / 2, bw, bh, 4 / safeScale);
                         g.fill();
@@ -368,7 +378,7 @@ export function AnnotationLayer({
                   g.clear();
                   // Selection outer ring
                   if (isSelected) {
-                    g.strokeStyle = { width: 1.5 / safeScale, color: 0x60a5fa, alpha: 0.8 };
+                    g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.8 };
                     g.rect(
                       -halfW - 3 / safeScale,
                       -halfH - 3 / safeScale,
@@ -460,7 +470,7 @@ export function AnnotationLayer({
                 g.clear();
                 // Selection outer ring
                 if (isSelected) {
-                  g.strokeStyle = { width: 1.5 / safeScale, color: 0x60a5fa, alpha: 0.8 };
+                  g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.8 };
                   g.circle(0, 0, circle.radius + 3 / safeScale);
                   g.stroke();
                 }

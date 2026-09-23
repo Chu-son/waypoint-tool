@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent, TextStyle } from 'pixi.js';
+import { CANVAS_CONTRAST_COLOR, CANVAS_EXPORT_REGION_COLOR, CANVAS_HIT_AREA_COLOR } from '../canvasConstants';
 
 interface ExportRegionLayerProps {
   scale: number;
@@ -26,8 +27,8 @@ export function ExportRegionLayer({ scale, textStyle, onRegionDragDown, onRegion
       exportRegions.forEach((region) => {
         if (!region.visible) return;
 
-        g.fillStyle = { color: 0x10b981, alpha: 0.1 };
-        g.strokeStyle = { width: lineWidth, color: 0x10b981, alpha: 0.8 };
+        g.fillStyle = { color: CANVAS_EXPORT_REGION_COLOR, alpha: 0.1 };
+        g.strokeStyle = { width: lineWidth, color: CANVAS_EXPORT_REGION_COLOR, alpha: 0.8 };
         g.rect(region.rect.x, region.rect.y, region.rect.width, region.rect.height);
         g.fill();
         g.stroke();
@@ -68,7 +69,7 @@ export function ExportRegionLayer({ scale, textStyle, onRegionDragDown, onRegion
                 onPointerDown={(e: FederatedPointerEvent) => onRegionDragDown(e, region.id)}
                 draw={(g) => {
                   g.clear();
-                  g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                  g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                   g.rect(x, y, w, h);
                   g.fill();
                 }}
@@ -83,13 +84,13 @@ export function ExportRegionLayer({ scale, textStyle, onRegionDragDown, onRegion
                   draw={(g) => {
                     g.clear();
                     // Hit area
-                    g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                    g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                     g.rect(handle.cx - halfSize * 2, handle.cy - halfSize * 2, handleSize * 2, handleSize * 2);
                     g.fill();
 
                     // Visible handle
-                    g.fillStyle = { color: 0xffffff, alpha: 1 };
-                    g.strokeStyle = { width: 1.5 / scale, color: 0x10b981 };
+                    g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 1 };
+                    g.strokeStyle = { width: 1.5 / scale, color: CANVAS_EXPORT_REGION_COLOR };
                     g.rect(handle.cx - halfSize, handle.cy - halfSize, handleSize, handleSize);
                     g.fill();
                     g.stroke();

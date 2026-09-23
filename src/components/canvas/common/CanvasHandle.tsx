@@ -1,5 +1,5 @@
 import { FederatedPointerEvent } from 'pixi.js';
-import { CANVAS_ACCENT_COLOR } from '../canvasConstants';
+import { CANVAS_ACCENT_COLOR, CANVAS_CONTRAST_COLOR, CANVAS_HIT_AREA_COLOR } from '../canvasConstants';
 
 interface CanvasHandleProps {
   x: number;
@@ -35,13 +35,13 @@ export function CanvasHandle({
       draw={(g) => {
         g.clear();
         // Invisible hit target area for easy pointer capture
-        g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+        g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
         g.circle(0, 0, hitRadius);
         g.fill();
 
         // Visible handle graphic
         g.strokeStyle = { width: strokeWidth, color: colorHex };
-        g.fillStyle = { color: 0xffffff, alpha: 0.95 };
+        g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 0.95 };
         if (type === 'square') {
           g.rect(-shapeSize / 2, -shapeSize / 2, shapeSize, shapeSize);
         } else {

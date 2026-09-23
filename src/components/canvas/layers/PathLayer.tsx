@@ -5,6 +5,7 @@ import { getFlattenedWaypointIds, getNodesAfterInsertionTarget } from '../../../
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 import { getFootprintWidth } from '../../../utils/footprint';
 import { resolvePathConditionalStyle, parseColorSafe, drawDashedLine } from '../../../utils/conditionalStyles';
+import { CANVAS_MUTED_COLOR } from '../canvasConstants';
 
 export function PathLayer({ scale }: { scale: number }) {
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
@@ -151,7 +152,7 @@ export function PathLayer({ scale }: { scale: number }) {
 
           g.strokeStyle = {
             width,
-            color: isAfter ? 0x94a3b8 : color,
+            color: isAfter ? CANVAS_MUTED_COLOR : color,
             alpha: isAfter ? opacity * 0.1 : opacity * 0.35,
             cap: 'round',
             join: 'round',
@@ -174,7 +175,7 @@ export function PathLayer({ scale }: { scale: number }) {
 
           g.strokeStyle = {
             width: centerWidth,
-            color: isAfter ? 0x94a3b8 : color,
+            color: isAfter ? CANVAS_MUTED_COLOR : color,
             alpha: isAfter ? opacity * 0.25 : opacity,
             cap: 'round',
             join: 'round',

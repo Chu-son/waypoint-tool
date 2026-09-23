@@ -96,6 +96,20 @@ export default tseslint.config(
     },
   },
   {
+    // Design system: canvas colors come from canvasConstants.ts (docs/DESIGN_SYSTEM.md).
+    files: ['src/components/canvas/**/*.{ts,tsx}'],
+    ignores: ['src/components/canvas/canvasConstants.ts', 'src/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[raw=/^0x[0-9a-fA-F]{6}$/]',
+          message: 'Use a named color from canvas/canvasConstants.ts instead of a hex literal.',
+        },
+      ],
+    },
+  },
+  {
     // Tests: assert behaviour with the real store, not a mocked one (docs/TESTING.md).
     files: ['src/**/*.test.{ts,tsx}'],
     rules: {
