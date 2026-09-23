@@ -1,3 +1,4 @@
+import { useMeasureAltSnap } from './hooks/useMeasureAltSnap';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
@@ -48,10 +49,6 @@ extend({
 
 export function MapCanvas() {
   const isPixiHandledRef = useRef(false);
-  const [isAltPressed, setIsAltPressed] = useState(false);
-  const [snappedMeasureTarget, setSnappedMeasureTarget] = useState<{ x: number; y: number; objectName: string } | null>(
-    null,
-  );
   const lastWorldPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const activeTool = useAppStore((state) => state.activeTool);
@@ -209,6 +206,11 @@ export function MapCanvas() {
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
 
   const abortRef = useRef<() => boolean>(() => false);
+  const { isAltPressed, snappedMeasureTarget, setSnappedMeasureTarget } = useMeasureAltSnap({
+    lastWorldPosRef,
+    scaleRef,
+    abortRef,
+  });
 
   const abort = useCallback((): boolean => {
     // 1. Dragging node(s): rollback initial positions & cancel transaction
@@ -354,51 +356,6 @@ export function MapCanvas() {
       setSnappedMeasureTarget(null);
     }
   }, [activeTool, syncMeasureFromSelection]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        setIsAltPressed(true);
-        const state = useAppStore.getState();
-        if (state.activeTool === 'measure' && lastWorldPosRef.current) {
-          const { x, y } = lastWorldPosRef.current;
-          const currentNodes = state.nodes;
-          const currentAnnotations = state.annotationObjects || {};
-          const currentScale = scaleRef.current;
-          const nearest = findNearestObjectCenter(x, y, currentNodes, currentAnnotations, currentScale);
-          setSnappedMeasureTarget(nearest ? { x: nearest.x, y: nearest.y, objectName: nearest.objectName } : null);
-          if (state.measureStartPoint && !state.measureEndPoint && nearest) {
-            setMeasureHoverPoint({ x: nearest.x, y: nearest.y });
-          }
-        }
-      }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt') {
-        setIsAltPressed(false);
-        setSnappedMeasureTarget(null);
-        const state = useAppStore.getState();
-        if (state.activeTool === 'measure' && lastWorldPosRef.current) {
-          if (state.measureStartPoint && !state.measureEndPoint) {
-            setMeasureHoverPoint(lastWorldPosRef.current);
-          }
-        }
-      }
-    };
-    const handleWindowBlur = () => {
-      setIsAltPressed(false);
-      setSnappedMeasureTarget(null);
-      abortRef.current?.();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleWindowBlur);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleWindowBlur);
-    };
-  }, [setMeasureHoverPoint]);
 
   useEffect(() => {
     const el = containerRef.current;
