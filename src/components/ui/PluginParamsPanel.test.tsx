@@ -1,312 +1,95 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { PluginParamsPanel } from './PluginParamsPanel';
-import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
+import { renderWithStore } from '../../test/render';
+import { getAppState } from '../../test/store';
+import { makeMapLayer, makePlugin } from '../../test/fixtures';
+import type { AppState } from '../../stores/appStore';
+import type { PluginInstance, PluginSetting } from '../../types/store';
 
-// Mock the store
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: Object.assign(vi.fn(), {
-    getState: vi.fn(),
-    setState: vi.fn(),
-    subscribe: vi.fn(),
-  }),
-}));
+const generator = makePlugin('test-plugin', {
+  name: 'Test Generator',
+  description: 'A test plugin',
+  inputs: [{ id: 'in-1', name: 'start', type: 'point', label: 'Start Point', required: true }],
+  properties: [{ name: 'count', type: 'integer', default: 5, label: 'Count' }],
+});
 
-// Mock the API
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn(),
-  },
-  DialogAPI: {
-    ask: vi.fn(),
-    open: vi.fn(),
-  },
-}));
-
-// Mock uuid
-vi.mock('uuid', () => ({
-  v4: () => 'new-uuid',
-}));
-
-// Mock lucide-react to avoid icon rendering issues in tests
-vi.mock('lucide-react', () => ({
-  Play: () => <div data-testid="play-icon" />,
-  Settings2: () => <div data-testid="settings-icon" />,
-  X: () => <div data-testid="close-icon" />,
-  AlertCircle: () => <div data-testid="alert-icon" />,
-  RefreshCcw: () => <div data-testid="refresh-icon" />,
-  Workflow: () => <div data-testid="workflow-icon" />,
-  Loader2: () => <div data-testid="loader-icon" />,
-  ChevronDown: () => <div data-testid="chevron-down-icon" />,
-  ChevronRight: () => <div data-testid="chevron-right-icon" />,
-  ArrowRightLeft: () => <div data-testid="arrow-right-left-icon" />,
-  CheckCircle2: () => <div data-testid="check-circle-icon" />,
-}));
+function renderPanel(active: PluginInstance, state: Partial<AppState> = {}, others: PluginInstance[] = []) {
+  const all = [active, ...others];
+  return renderWithStore(<PluginParamsPanel />, {
+    activeTool: 'add_generator',
+    activePluginId: active.id,
+    plugins: Object.fromEntries(all.map((p) => [p.id, p])),
+    pluginSettings: all.map((p, order) => ({ id: p.id, enabled: true, order }) as PluginSetting),
+    ...state,
+  });
+}
 
 describe('PluginParamsPanel', () => {
-  const mockPlugin = {
-    id: 'test-plugin',
-    manifest: {
-      name: 'Test Generator',
-      description: 'A test plugin',
-      type: 'python',
-      inputs: [{ id: 'in-1', name: 'start', type: 'point', label: 'Start Point', required: true }],
-      properties: [{ name: 'count', type: 'integer', default: 5, label: 'Count' }],
-    },
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        activeTool: 'add_generator',
-        activePluginId: 'test-plugin',
-        plugins: { 'test-plugin': mockPlugin },
-        pluginSettings: [{ id: 'test-plugin', enabled: true }],
-        pluginInteractionData: {},
-        activeInputIndex: 0,
-        nodes: {},
-        selectedNodeIds: [],
-        decimalPrecision: 2,
-        runWithLoading: async (_: any, fn: any) => await fn(),
-      }),
-    );
-
-    (useAppStore.getState as any).mockReturnValue({
-      addNode: vi.fn(),
-      selectNodes: vi.fn(),
-      setActiveTool: vi.fn(),
-      setPluginActiveProperties: vi.fn(),
-      reloadPlugins: vi.fn(),
-      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
-        const layers = params.plugin.manifest.needs?.includes('occupancy_grid')
-          ? [{ id: 'm1', visible: true }]
-          : undefined;
-        await BackendAPI.runPlugin(
-          params.plugin,
-          { properties: params.properties, interaction_data: params.interactionData },
-          'python3',
-          layers as any,
-        );
-        return { success: true, executionId: 'exec-1', parentWaypointId: 'p-1', customLayerIds: [] };
-      }),
-    });
-  });
-
-  it('renders nothing if activeTool is not add_generator', () => {
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        activeTool: 'select',
-        activePluginId: 'test-plugin',
-        plugins: { 'test-plugin': mockPlugin },
-      }),
-    );
-    const { container } = render(<PluginParamsPanel />);
+  it('renders nothing unless the generator tool is active', () => {
+    const { container } = renderPanel(generator, { activeTool: 'select' });
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders plugin name and inputs correctly', () => {
-    render(<PluginParamsPanel />);
+  it('shows the plugin name, inputs and properties', () => {
+    renderPanel(generator);
     expect(screen.getByText('Test Generator')).toBeInTheDocument();
     expect(screen.getByText('Start Point')).toBeInTheDocument();
     expect(screen.getByText('Count')).toBeInTheDocument();
   });
 
-  it('disables generate button if script requires selection but none is present', () => {
-    const pluginWithSelect = {
-      ...mockPlugin,
-      manifest: { ...mockPlugin.manifest, needs: ['selected_points'] },
-    };
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        activeTool: 'add_generator',
-        activePluginId: 'test-plugin',
-        plugins: { 'test-plugin': pluginWithSelect },
-        selectedNodeIds: [],
-        pluginInteractionData: {},
-        pluginSettings: [],
-        activeInputIndex: 0,
-      }),
-    );
-
-    render(<PluginParamsPanel />);
-    const executeBtn = screen.getByRole('button', { name: /generate path/i });
-    expect(executeBtn).toBeDisabled();
+  it('disables generation when the plugin needs selected points but none are selected', () => {
+    renderPanel(makePlugin('test-plugin', { ...generator.manifest, needs: ['selected_points'] }));
+    expect(screen.getByRole('button', { name: /generate path/i })).toBeDisabled();
   });
 
-  it('calls BackendAPI.runPlugin and adds nodes on success', async () => {
-    const mockAddNode = vi.fn();
-    const mockSelectNodes = vi.fn();
-    const mockSetActiveTool = vi.fn();
+  it('runs the plugin and adds the generated waypoints under a new generator node', async () => {
+    const runPlugin = vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue([{ x: 10, y: 20, yaw: 0 }]);
+    renderPanel(generator, { pluginInteractionData: { start: { x: 1, y: 1 } } });
 
-    (useAppStore.getState as any).mockReturnValue({
-      addNode: mockAddNode,
-      removeNodes: vi.fn(),
-      reorderNodes: vi.fn(),
-      rootNodeIds: [],
-      selectNodes: mockSelectNodes,
-      setActiveTool: mockSetActiveTool,
-      setPluginActiveProperties: vi.fn(),
-      runInHistoryTransaction: (fn: () => void) => fn(),
-      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
-        await BackendAPI.runPlugin(
-          params.plugin,
-          { properties: params.properties, interaction_data: params.interactionData },
-          'python3',
-        );
-        mockAddNode();
-        mockSelectNodes(['new-uuid']);
-        mockSetActiveTool('select');
-        return { success: true, executionId: 'exec-1', parentWaypointId: 'new-uuid', customLayerIds: [] };
-      }),
+    fireEvent.click(screen.getByText('Generate Path'));
+
+    await waitFor(() => expect(getAppState().rootNodeIds).toHaveLength(1));
+    expect(runPlugin.mock.calls[0][1]).toMatchObject({
+      properties: { count: 5 },
+      interaction_data: { start: { x: 1, y: 1 } },
     });
-
-    (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 10, y: 20, yaw: 0 }]);
-
-    render(<PluginParamsPanel />);
-    const executeBtn = screen.getByText('Generate Path');
-    fireEvent.click(executeBtn);
-
-    await waitFor(() => {
-      expect(BackendAPI.runPlugin).toHaveBeenCalled();
-    });
-
-    expect(mockAddNode).toHaveBeenCalled();
-    expect(mockSelectNodes).toHaveBeenCalledWith(['new-uuid']);
-    expect(mockSetActiveTool).toHaveBeenCalledWith('select');
+    const { nodes, rootNodeIds } = getAppState();
+    const created = nodes[rootNodeIds[0]];
+    expect(created.type).toBe('generator');
+    expect(created.plugin_id).toBe('test-plugin');
+    expect(nodes[created.children_ids![0]].transform).toMatchObject({ x: 10, y: 20 });
   });
 
-  it('calls reloadPlugins when reload button is clicked', async () => {
-    const mockReloadPlugins = vi.fn();
-    (useAppStore.getState as any).mockReturnValue({
-      reloadPlugins: mockReloadPlugins,
-      setPluginActiveProperties: vi.fn(),
-    });
+  it('reloads the installed plugins', async () => {
+    const fetchInstalled = vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([generator]);
+    renderPanel(generator);
 
-    render(<PluginParamsPanel />);
-    const reloadBtn = screen.getByTitle('Reload Plugin');
-    fireEvent.click(reloadBtn);
+    fireEvent.click(screen.getByTitle('Reload Plugin'));
 
-    expect(mockReloadPlugins).toHaveBeenCalled();
+    await waitFor(() => expect(fetchInstalled).toHaveBeenCalled());
   });
 
-  it('passes prepared merged layers to runPlugin when plugin needs occupancy_grid', async () => {
-    const occPlugin = {
-      id: 'occ-plugin',
-      manifest: {
-        name: 'Occ Generator',
-        description: 'Needs grid',
-        type: 'python',
-        needs: ['occupancy_grid'],
-        inputs: [],
-        properties: [],
-      },
-    };
+  it('sends the visible map layers to plugins that need the occupancy grid', async () => {
+    const runPlugin = vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue([{ x: 1, y: 2, yaw: 0 }]);
+    const occPlugin = makePlugin('occ-plugin', { name: 'Occ Generator', needs: ['occupancy_grid'] });
+    renderPanel(occPlugin, { mapLayers: [makeMapLayer('m1', { image_base64: 'b64' })] });
 
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        activeTool: 'add_generator',
-        activePluginId: 'occ-plugin',
-        plugins: { 'occ-plugin': occPlugin },
-        pluginSettings: [],
-        globalPythonPath: '',
-        pluginInteractionData: {},
-        activeInputIndex: 0,
-        nodes: {},
-        mapLayers: [
-          {
-            id: 'm1',
-            name: 'Map',
-            visible: true,
-            opacity: 1,
-            z_index: 0,
-            image_base64: 'b64',
-            info: { resolution: 0.05, origin: [0, 0, 0] },
-          },
-        ],
-        customLayers: [],
-        selectedNodeIds: [],
-        decimalPrecision: 4,
-        runWithLoading: async (_: any, fn: any) => await fn(),
-      }),
-    );
+    fireEvent.click(screen.getByText('Generate Path'));
 
-    (useAppStore.getState as any).mockReturnValue({
-      addNode: vi.fn(),
-      removeNodes: vi.fn(),
-      reorderNodes: vi.fn(),
-      rootNodeIds: [],
-      selectNodes: vi.fn(),
-      setActiveTool: vi.fn(),
-      setPluginActiveProperties: vi.fn(),
-      runInHistoryTransaction: (fn: () => void) => fn(),
-      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
-        await BackendAPI.runPlugin(
-          params.plugin,
-          { properties: params.properties, interaction_data: params.interactionData },
-          'python3',
-          [{ id: 'm1', visible: true }] as any,
-        );
-        return { success: true, executionId: 'exec-1', parentWaypointId: 'p-1', customLayerIds: [] };
-      }),
-    });
-
-    (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 1, y: 2, yaw: 0 }]);
-
-    render(<PluginParamsPanel />);
-    const executeBtn = screen.getByText('Generate Path');
-    fireEvent.click(executeBtn);
-
-    await waitFor(() => {
-      expect(BackendAPI.runPlugin).toHaveBeenCalledWith(
-        occPlugin,
-        expect.anything(),
-        'python3',
-        expect.arrayContaining([expect.objectContaining({ id: 'm1', visible: true })]),
-      );
-    });
+    await waitFor(() => expect(runPlugin).toHaveBeenCalled());
+    const layersSent = runPlugin.mock.calls[0][3];
+    expect(layersSent).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'm1', visible: true })]));
   });
 
-  it('renders PipelineSetupView when active plugin type is pipeline', () => {
-    const pipelinePlugin = {
-      id: 'test-pipe',
-      manifest: {
-        name: 'Combined Pipeline',
-        type: 'pipeline',
-        pipeline: {
-          steps: [{ step_id: 's1', plugin_id: 'test-plugin', name: 'Inner Generator' }],
-        },
-      },
-    };
-
-    const state = {
-      activeTool: 'add_generator',
-      activePluginId: 'test-pipe',
-      plugins: { 'test-pipe': pipelinePlugin, 'test-plugin': mockPlugin },
-      pluginSettings: [{ id: 'test-pipe', enabled: true }],
-      pluginInteractionData: {},
-      activeInputIndex: 0,
-      activePipelineInputRef: null,
-      nodes: {},
-      rootNodeIds: [],
-      selectedNodeIds: [],
-      customLayers: [],
-      annotationGroups: {},
-      decimalPrecision: 2,
-      runWithLoading: async (_: any, fn: any) => await fn(),
-      executePipeline: vi.fn(),
-      setActivePipelineInputRef: vi.fn(),
-      setActiveTool: vi.fn(),
-      setActiveInputIndex: vi.fn(),
-      updatePluginInteractionData: vi.fn(),
-      setPluginActiveProperties: vi.fn(),
-    };
-
-    (useAppStore as any).mockImplementation((selector: any) => selector(state));
-    (useAppStore.getState as any).mockReturnValue(state);
-
-    render(<PluginParamsPanel />);
+  it('shows the pipeline setup for pipeline plugins', () => {
+    const pipeline = makePlugin('test-pipe', {
+      name: 'Combined Pipeline',
+      type: 'pipeline',
+      pipeline: { steps: [{ step_id: 's1', plugin_id: 'test-plugin', name: 'Inner Generator' }] } as any,
+    });
+    renderPanel(pipeline, {}, [generator]);
 
     expect(screen.getByText('Combined Pipeline')).toBeInTheDocument();
     expect(screen.getByText('Pipeline Workflow')).toBeInTheDocument();
