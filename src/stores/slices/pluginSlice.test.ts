@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { BackendAPI } from '../../api';
+import { BackendAPI, DialogAPI } from '../../api';
 import { PluginInstance, WaypointNode } from '../../types/store';
 
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn(),
-    fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
-  },
-  DialogAPI: {
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
+// Stub the IPC boundary; individual tests set runPlugin's result.
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(undefined);
+  vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([]);
+  vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+});
 
 describe('pluginSlice - executeGeneratorPlugin placement & history atomicity', () => {
   const dummyPlugin: PluginInstance = {

@@ -3,21 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CustomLayerInspector } from './CustomLayerInspector';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance, ManualCustomLayer, PluginCustomLayer } from '../../../types/store';
-import { BackendAPI } from '../../../api';
+import { BackendAPI, DialogAPI } from '../../../api';
 
-vi.mock('../../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn().mockResolvedValue({
-      name: 'Generated Overlay',
-      image_base64: 'data:image/png;base64,mock',
-      info: { resolution: 0.05, origin: [0, 0, 0] },
-      blend_mode: 'overwrite',
-    }),
-  },
-  DialogAPI: {
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue({
+    name: 'Generated Overlay',
+    image_base64: 'data:image/png;base64,mock',
+    info: { resolution: 0.05, origin: [0, 0, 0] },
+    blend_mode: 'overwrite',
+  });
+  vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+});
 
 describe('CustomLayerInspector', () => {
   const mockPlugin: PluginInstance = {

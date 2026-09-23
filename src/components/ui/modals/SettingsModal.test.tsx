@@ -2,23 +2,19 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SettingsModal } from './SettingsModal';
 import { useAppStore } from '../../../stores/appStore';
+import { BackendAPI, DialogAPI } from '../../../api';
 
-// Mock dynamic imports used inside SettingsModal
-vi.mock('../../../api', () => ({
-  BackendAPI: {
-    getPythonEnvironments: vi.fn().mockResolvedValue([]),
-    loadOptionsSchema: vi.fn(),
-    scanCustomPlugin: vi.fn(),
-    checkSdkVersion: vi.fn().mockResolvedValue('1.0.0'),
-    readImageBase64: vi.fn(),
-    scaffoldPlugin: vi.fn(),
-    fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
-  },
-  DialogAPI: {
-    open: vi.fn(),
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
+// Stub the IPC / dialog boundary. Tests override individual results as needed.
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'getPythonEnvironments').mockResolvedValue([]);
+  vi.spyOn(BackendAPI, 'checkSdkVersion').mockResolvedValue('1.0.0');
+  vi.spyOn(BackendAPI, 'readImageBase64').mockResolvedValue('');
+  vi.spyOn(BackendAPI, 'scaffoldPlugin');
+  vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([]);
+  vi.spyOn(DialogAPI, 'open').mockResolvedValue(null);
+  vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+  vi.spyOn(DialogAPI, 'message').mockResolvedValue();
+});
 
 describe('SettingsModal UI', () => {
   beforeEach(() => {

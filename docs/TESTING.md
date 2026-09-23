@@ -39,7 +39,7 @@ it('Delete removes the selected waypoints', () => {
 
 | 対象 | 方法 |
 |---|---|
-| Tauri IPC / ファイルダイアログ | `vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(...)` / `vi.spyOn(DialogAPI, 'ask')`。jsdom では `src/api` が自動で Mock 実装を選ぶため `vi.mock('../../api')` は不要 |
+| Tauri IPC / ファイルダイアログ / ウィンドウ操作 | `vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(...)` / `vi.spyOn(DialogAPI, 'ask')` / `vi.spyOn(AppAPI, 'forceExit')`。jsdom では `src/api` が自動で Mock 実装を選ぶ。**`vi.mock('../../api')` によるモジュール全体の差し替えは禁止**（ESLint error。API にメソッドが増えるたびに壊れ、未定義メソッド呼び出しが unhandled error になるため） |
 | PixiJS（WebGL） | `vi.mock('pixi.js', () => import('../../test/mocks/pixi').then((m) => m.pixiJsMock))`（`@pixi/react` も同様） |
 | ブラウザ API（`alert` / `confirm` / クリップボード等） | `vi.spyOn(window, 'confirm')` など。クリップボードは user-event が提供するスタブを使う |
 | 時刻・乱数 | 必要な場合のみ `vi.useFakeTimers()` 等 |

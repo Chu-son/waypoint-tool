@@ -4,12 +4,11 @@ import { normalizeProjectData } from './projectSlice';
 import { BackendAPI } from '../../api';
 import { PluginCustomLayer } from '../../types/store';
 
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn(),
-    fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
-  },
-}));
+// Stub the IPC boundary; individual tests set runPlugin's result.
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(undefined);
+  vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([]);
+});
 
 describe('customLayers and pathCalculator in appStore', () => {
   beforeEach(() => {

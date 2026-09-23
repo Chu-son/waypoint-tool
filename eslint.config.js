@@ -107,6 +107,11 @@ export default tseslint.config(
             "CallExpression[callee.object.name='vi'][callee.property.name='mock'][arguments.0.value=/stores\\/appStore$/]",
           message: 'Do not mock the app store in tests; reset the real store with resetAppStore() instead.',
         },
+        {
+          selector: "CallExpression[callee.object.name='vi'][callee.property.name='mock'][arguments.0.value=/\\/api$/]",
+          message:
+            'Do not replace the whole api module; stub the methods you need with vi.spyOn(BackendAPI | DialogAPI | AppAPI, ...).',
+        },
       ],
     },
   },
