@@ -1,280 +1,95 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { GeneratorNodePanel } from './GeneratorNodePanel';
-import { useAppStore } from '../../../stores/appStore';
-import { WaypointNode, PluginInstance } from '../../../types/store';
-import { yawToQuaternion } from '../../../utils/transformUtils';
+import { BackendAPI } from '../../../api';
+import { renderWithStore } from '../../../test/render';
+import { getAppState } from '../../../test/store';
+import { makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../../test/fixtures';
+import { quaternionToYaw } from '../../../utils/transformUtils';
 
-vi.mock('../../../stores/appStore', () => ({
-  useAppStore: Object.assign(vi.fn(), {
-    getState: vi.fn(),
-  }),
-}));
+const CONFLICT_TITLE = '手動変更の検知 - 再生成の確認';
+const plugin = makePlugin('test-gen', { name: 'Test Generator', category: 'waypoint_generator' });
+
+/** A generator whose single generated waypoint (baseline 1, 2, yaw 0) now sits at `current`. */
+function renderGenerator(current = makeTransform(1, 2, 0)) {
+  const generator = makeWaypoint('gen-1', {
+    type: 'generator',
+    plugin_id: 'test-gen',
+    transform: undefined,
+    children_ids: ['child-1'],
+    baseline_waypoints: [{ transform: makeTransform(1, 2, 0) }],
+  });
+  return renderWithStore(<GeneratorNodePanel node={generator} />, {
+    ...waypointTree([generator, makeWaypoint('child-1', { transform: current })]),
+    plugins: { [plugin.id]: plugin },
+  });
+}
+
+const generatedChild = () => {
+  const { nodes } = getAppState();
+  const [id] = nodes['gen-1'].children_ids ?? [];
+  return nodes[id];
+};
 
 describe('GeneratorNodePanel', () => {
-  const mockPlugin: PluginInstance = {
-    id: 'test-gen',
-    manifest: {
-      name: 'Test Generator',
-      version: '1.0.0',
-      description: 'Test plugin',
-      category: 'waypoint_generator',
-      type: 'python',
-      executable: 'main.py',
-      properties: [],
-      inputs: [],
-    },
-    folder_path: '/path/to/plugin',
-    is_builtin: false,
-  };
-
-  const mockExecute = vi.fn().mockResolvedValue({
-    success: true,
-    executionId: 'exec-1',
-    parentWaypointId: 'gen-1',
-    customLayerIds: [],
-  });
-
-  const mockRunWithLoading = vi.fn().mockImplementation(async (_opts, fn) => {
-    return await fn();
-  });
-
   beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore.getState as any).mockReturnValue({
-      setPluginActiveProperties: vi.fn(),
-      executeGeneratorPlugin: mockExecute,
-    });
+    vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue([{ x: 1, y: 2, yaw: 0 }]);
   });
 
-  it('renders plugin missing warning when plugin is not in store', () => {
-    const generatorNode: WaypointNode = {
-      id: 'gen-1',
-      type: 'generator',
-      plugin_id: 'missing-plugin',
-    };
-
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        plugins: {},
-        explodeGenerator: vi.fn(),
-        openPluginDataModal: vi.fn(),
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: {},
-        nodes: {},
-        decimalPrecision: 2,
-        runWithLoading: mockRunWithLoading,
-      }),
-    );
-
-    render(<GeneratorNodePanel node={generatorNode} />);
+  it('warns when the generator plugin is not loaded', () => {
+    const orphan = makeWaypoint('gen-1', { type: 'generator', plugin_id: 'missing-plugin' });
+    renderWithStore(<GeneratorNodePanel node={orphan} />, waypointTree([orphan]));
     expect(screen.getByText('プラグイン未ロード')).toBeInTheDocument();
   });
 
-  it('directly regenerates when there are no manual modifications', async () => {
-    const baselineT = { x: 1, y: 2, z: 0, ...yawToQuaternion(0) };
-    const generatorNode: WaypointNode = {
-      id: 'gen-1',
-      type: 'generator',
-      plugin_id: 'test-gen',
-      children_ids: ['child-1'],
-      baseline_waypoints: [{ transform: baselineT }],
-    };
-
-    const childNode: WaypointNode = {
-      id: 'child-1',
-      type: 'manual',
-      transform: { ...baselineT },
-    };
-
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        plugins: { 'test-gen': mockPlugin },
-        explodeGenerator: vi.fn(),
-        openPluginDataModal: vi.fn(),
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: {},
-        nodes: { 'gen-1': generatorNode, 'child-1': childNode },
-        decimalPrecision: 2,
-        runWithLoading: mockRunWithLoading,
-      }),
-    );
-
-    render(<GeneratorNodePanel node={generatorNode} />);
-
-    const regenBtn = screen.getByText('Re-Generate Path');
-    fireEvent.click(regenBtn);
-
-    await waitFor(() => {
-      expect(mockExecute).toHaveBeenCalledTimes(1);
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.objectContaining({
-          plugin: mockPlugin,
-          stashToApply: undefined,
-        }),
-      );
-    });
-
-    // Conflict modal should NOT appear
-    expect(screen.queryByText('手動変更の検知 - 再生成の確認')).not.toBeInTheDocument();
-  });
-
-  it('opens conflict modal when manual modifications exist and applies stash when requested', async () => {
-    const baselineT = { x: 1, y: 2, z: 0, ...yawToQuaternion(0) };
-    const modifiedT = { x: 1.5, y: 2.2, z: 0, ...yawToQuaternion(0.3) };
-
-    const generatorNode: WaypointNode = {
-      id: 'gen-1',
-      type: 'generator',
-      plugin_id: 'test-gen',
-      children_ids: ['child-1'],
-      baseline_waypoints: [{ transform: baselineT }],
-    };
-
-    const childNode: WaypointNode = {
-      id: 'child-1',
-      type: 'manual',
-      transform: modifiedT,
-    };
-
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        plugins: { 'test-gen': mockPlugin },
-        explodeGenerator: vi.fn(),
-        openPluginDataModal: vi.fn(),
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: {},
-        nodes: { 'gen-1': generatorNode, 'child-1': childNode },
-        decimalPrecision: 2,
-        runWithLoading: mockRunWithLoading,
-      }),
-    );
-
-    render(<GeneratorNodePanel node={generatorNode} />);
-
-    // Click Re-Generate Path
-    fireEvent.click(screen.getByText('Re-Generate Path'));
-
-    // Conflict modal should appear
-    expect(await screen.findByText('手動変更の検知 - 再生成の確認')).toBeInTheDocument();
-    expect(screen.getByText('1 箇所')).toBeInTheDocument();
-
-    // Execute has not been called yet (cancelled/paused for user choice)
-    expect(mockExecute).not.toHaveBeenCalled();
-
-    // Click "スタッシュして適用"
-    fireEvent.click(screen.getByText('スタッシュして適用'));
-
-    await waitFor(() => {
-      expect(mockExecute).toHaveBeenCalledTimes(1);
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.objectContaining({
-          plugin: mockPlugin,
-          stashToApply: expect.objectContaining({
-            0: expect.objectContaining({
-              index: 0,
-              hasTransformDiff: true,
-              deltaX: expect.closeTo(0.5),
-              deltaY: expect.closeTo(0.2),
-            }),
-          }),
-        }),
-      );
-    });
-  });
-
-  it('discards modifications when requested from conflict modal', async () => {
-    const baselineT = { x: 1, y: 2, z: 0, ...yawToQuaternion(0) };
-    const modifiedT = { x: 2.0, y: 2.0, z: 0, ...yawToQuaternion(0) };
-
-    const generatorNode: WaypointNode = {
-      id: 'gen-1',
-      type: 'generator',
-      plugin_id: 'test-gen',
-      children_ids: ['child-1'],
-      baseline_waypoints: [{ transform: baselineT }],
-    };
-
-    const childNode: WaypointNode = {
-      id: 'child-1',
-      type: 'manual',
-      transform: modifiedT,
-    };
-
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        plugins: { 'test-gen': mockPlugin },
-        explodeGenerator: vi.fn(),
-        openPluginDataModal: vi.fn(),
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: {},
-        nodes: { 'gen-1': generatorNode, 'child-1': childNode },
-        decimalPrecision: 2,
-        runWithLoading: mockRunWithLoading,
-      }),
-    );
-
-    render(<GeneratorNodePanel node={generatorNode} />);
+  it('regenerates immediately when the generated waypoints were not edited', async () => {
+    renderGenerator();
 
     fireEvent.click(screen.getByText('Re-Generate Path'));
-    expect(await screen.findByText('手動変更の検知 - 再生成の確認')).toBeInTheDocument();
 
-    // Click "編集を破棄して再生成"
-    fireEvent.click(screen.getByText('編集を破棄して再生成'));
-
-    await waitFor(() => {
-      expect(mockExecute).toHaveBeenCalledTimes(1);
-      expect(mockExecute).toHaveBeenCalledWith(
-        expect.objectContaining({
-          plugin: mockPlugin,
-          stashToApply: undefined,
-        }),
-      );
-    });
+    await waitFor(() => expect(getAppState().nodes['child-1']).toBeUndefined());
+    expect(BackendAPI.runPlugin).toHaveBeenCalledTimes(1);
+    expect(generatedChild().transform).toMatchObject({ x: 1, y: 2 });
+    expect(screen.queryByText(CONFLICT_TITLE)).not.toBeInTheDocument();
   });
 
-  it('cancels regeneration when cancelled from conflict modal', async () => {
-    const baselineT = { x: 1, y: 2, z: 0, ...yawToQuaternion(0) };
-    const modifiedT = { x: 2.0, y: 2.0, z: 0, ...yawToQuaternion(0) };
+  describe('when generated waypoints were edited by hand', () => {
+    it('asks before regenerating, and can re-apply the edits to the new result', async () => {
+      renderGenerator(makeTransform(1.5, 2.2, 0.3));
 
-    const generatorNode: WaypointNode = {
-      id: 'gen-1',
-      type: 'generator',
-      plugin_id: 'test-gen',
-      children_ids: ['child-1'],
-      baseline_waypoints: [{ transform: baselineT }],
-    };
+      fireEvent.click(screen.getByText('Re-Generate Path'));
+      expect(await screen.findByText(CONFLICT_TITLE)).toBeInTheDocument();
+      expect(screen.getByText('1 箇所')).toBeInTheDocument();
+      expect(BackendAPI.runPlugin).not.toHaveBeenCalled();
 
-    const childNode: WaypointNode = {
-      id: 'child-1',
-      type: 'manual',
-      transform: modifiedT,
-    };
+      fireEvent.click(screen.getByText('スタッシュして適用'));
 
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        plugins: { 'test-gen': mockPlugin },
-        explodeGenerator: vi.fn(),
-        openPluginDataModal: vi.fn(),
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: {},
-        nodes: { 'gen-1': generatorNode, 'child-1': childNode },
-        decimalPrecision: 2,
-        runWithLoading: mockRunWithLoading,
-      }),
-    );
-
-    render(<GeneratorNodePanel node={generatorNode} />);
-
-    fireEvent.click(screen.getByText('Re-Generate Path'));
-    expect(await screen.findByText('手動変更の検知 - 再生成の確認')).toBeInTheDocument();
-
-    // Click "再生成を中断 (キャンセル)"
-    fireEvent.click(screen.getByText('再生成を中断 (キャンセル)'));
-
-    await waitFor(() => {
-      expect(screen.queryByText('手動変更の検知 - 再生成の確認')).not.toBeInTheDocument();
+      await waitFor(() => expect(getAppState().nodes['child-1']).toBeUndefined());
+      const { transform } = generatedChild();
+      expect(transform?.x).toBeCloseTo(1.5);
+      expect(transform?.y).toBeCloseTo(2.2);
+      expect(quaternionToYaw(transform)).toBeCloseTo(0.3);
     });
-    expect(mockExecute).not.toHaveBeenCalled();
+
+    it('can discard the edits and regenerate from scratch', async () => {
+      renderGenerator(makeTransform(2, 2, 0));
+
+      fireEvent.click(screen.getByText('Re-Generate Path'));
+      fireEvent.click(await screen.findByText('編集を破棄して再生成'));
+
+      await waitFor(() => expect(getAppState().nodes['child-1']).toBeUndefined());
+      expect(generatedChild().transform).toMatchObject({ x: 1, y: 2 });
+    });
+
+    it('can cancel, keeping the edited waypoints', async () => {
+      renderGenerator(makeTransform(2, 2, 0));
+
+      fireEvent.click(screen.getByText('Re-Generate Path'));
+      fireEvent.click(await screen.findByText('再生成を中断 (キャンセル)'));
+
+      await waitFor(() => expect(screen.queryByText(CONFLICT_TITLE)).not.toBeInTheDocument());
+      expect(BackendAPI.runPlugin).not.toHaveBeenCalled();
+      expect(getAppState().nodes['child-1'].transform).toMatchObject({ x: 2, y: 2 });
+    });
   });
 });
