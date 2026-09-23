@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance } from '../../../types/store';
 import { extractPipelineParameters } from '../../../utils/pipelineParameterExtractor';
-import { PluginInputEditor } from '../PluginInputEditor';
-import { PluginPropertyEditor } from '../PluginPropertyEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
+import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
 import { Button } from '../common/Button';
 import { AlertBox } from '../common/AlertBox';
 import {

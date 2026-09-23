@@ -1,6 +1,6 @@
 import React from 'react';
 import { Label } from '../common/Label';
-import { NumericInput } from '../NumericInput';
+import { NumericInput } from '../common/NumericInput';
 import { cn } from '../../../utils/cn';
 
 interface TransformFieldProps {

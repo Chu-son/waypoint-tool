@@ -17,8 +17,8 @@ import { Select } from '../common/Select';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { Button } from '../common/Button';
 import { ToggleSwitch } from '../common/ToggleSwitch';
-import { PluginPropertyEditor } from '../PluginPropertyEditor';
-import { PluginInputEditor } from '../PluginInputEditor';
+import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { PluginDataViewer } from '../common/PluginDataViewer';
 import { PipelineInspector } from './PipelineInspector';
 import {

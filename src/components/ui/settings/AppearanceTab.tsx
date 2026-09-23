@@ -7,7 +7,7 @@ import { Slider } from '../common/Slider';
 import { Button } from '../common/Button';
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 import { ACCENT_THEME_PRESETS } from '../../../utils/themePresets';
-import { NumericInput } from '../NumericInput';
+import { NumericInput } from '../common/NumericInput';
 import { Moon, Sun, Palette, SlidersHorizontal, Map as MapIcon } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { TabSectionHeader } from './TabSectionHeader';

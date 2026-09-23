@@ -1,27 +1,31 @@
 import './App.css';
 import { useEffect, useCallback, useMemo } from 'react';
-import { ToolPanel } from './components/ui/ToolPanel';
-import { TopMenu } from './components/ui/TopMenu';
-import { PanelContainer, PanelTab } from './components/ui/PanelContainer';
+import { ToolPanel } from './components/ui/shell/ToolPanel';
+import { TopMenu } from './components/ui/shell/TopMenu';
+import { PanelContainer, PanelTab } from './components/ui/shell/PanelContainer';
 import { MapCanvas } from './components/canvas/MapCanvas';
-import { SettingsModal } from './components/ui/SettingsModal';
-import { ExportModal } from './components/ui/ExportModal';
-import { ImportModal } from './components/ui/ImportModal';
-import { KeyboardShortcutsModal } from './components/ui/KeyboardShortcutsModal';
-import { ExportMapsModal } from './components/ui/ExportMapsModal';
-import { WelcomeModal } from './components/ui/WelcomeModal';
-import { PluginDataModal } from './components/ui/PluginDataModal';
-import { StatusBar } from './components/ui/StatusBar';
-import { ElementCopyOverlay } from './components/ui/ElementCopyOverlay';
-import { MapEditOverlay } from './components/ui/MapEditOverlay';
-import { AnnotationEditOverlay } from './components/ui/AnnotationEditOverlay';
-import { MeasureOverlay } from './components/ui/MeasureOverlay';
+import { SettingsModal } from './components/ui/modals/SettingsModal';
+import { ExportModal } from './components/ui/modals/ExportModal';
+import { ImportModal } from './components/ui/modals/ImportModal';
+import { KeyboardShortcutsModal } from './components/ui/modals/KeyboardShortcutsModal';
+import { ExportMapsModal } from './components/ui/modals/ExportMapsModal';
+import { WelcomeModal } from './components/ui/modals/WelcomeModal';
+import { PluginDataModal } from './components/ui/modals/PluginDataModal';
+import { StatusBar } from './components/ui/shell/StatusBar';
+import { ElementCopyOverlay } from './components/ui/overlays/ElementCopyOverlay';
+import { MapEditOverlay } from './components/ui/overlays/MapEditOverlay';
+import { AnnotationEditOverlay } from './components/ui/overlays/AnnotationEditOverlay';
+import { MeasureOverlay } from './components/ui/overlays/MeasureOverlay';
 import { LoadingOverlay } from './components/ui/common/LoadingOverlay';
 import { BackgroundLoadingBadge } from './components/ui/common/BackgroundLoadingBadge';
 import { ShortcutManager } from './components/common/ShortcutManager';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
-import { ThemeInjector } from './components/ui/ThemeInjector';
-import { resolvePanelTabs, resolveBuiltinPanelTab, useInspectorPanelComponent } from './components/ui/PanelRegistry';
+import { ThemeInjector } from './components/ui/shell/ThemeInjector';
+import {
+  resolvePanelTabs,
+  resolveBuiltinPanelTab,
+  useInspectorPanelComponent,
+} from './components/ui/shell/PanelRegistry';
 import { useAppStore } from './stores/appStore';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AppAPI, DialogAPI, BackendAPI } from './api';

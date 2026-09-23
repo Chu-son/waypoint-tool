@@ -14,9 +14,9 @@ import { ToggleSwitch } from '../common/ToggleSwitch';
 import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
-import { NumericInput } from '../NumericInput';
+import { NumericInput } from '../common/NumericInput';
 import { DynamicIcon } from '../../common/DynamicIcon';
-import { PluginInputEditor } from '../PluginInputEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { Loader2 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 

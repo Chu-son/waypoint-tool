@@ -1,4 +1,4 @@
-import { NumericInput } from '../NumericInput';
+import { NumericInput } from './NumericInput';
 import { FieldLabel } from './FieldLabel';
 import { cn } from '../../../utils/cn';
 

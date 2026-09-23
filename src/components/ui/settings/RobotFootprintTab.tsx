@@ -3,7 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { RobotFootprint, CircularFootprint, RectangularFootprint, PolygonFootprint } from '../../../types/store';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
-import { NumericInput } from '../NumericInput';
+import { NumericInput } from '../common/NumericInput';
 import { FormField } from '../common/FormField';
 import { FieldLabel } from '../common/FieldLabel';
 import { TabSectionHeader } from './TabSectionHeader';
