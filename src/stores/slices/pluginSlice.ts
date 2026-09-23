@@ -20,6 +20,8 @@ import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';
 import { cloneSelection } from './historySlice';
 import { resolvePythonPath } from '../../utils/pythonPath';
+import { resolveBindingExpression } from '../../utils/pluginBindings';
+import { extractWaypointsFromRawResult } from '../../utils/pluginResult';
 import { v4 as uuidv4 } from 'uuid';
 
 export type PluginPlacement = { type: 'replace_ids'; ids: string[] } | { type: 'use_insertion_target' };
@@ -95,129 +97,6 @@ export type PluginSlice = {
 
 let recalculateTimer: any = null;
 let currentCalculationRequestId = 0;
-
-function getPathValue(obj: any, path: string): any {
-  if (!obj || !path) return undefined;
-  const tokens = path.match(/[^.[\]]+/g) || [];
-  let current = obj;
-  for (const token of tokens) {
-    if (current == null) return undefined;
-    if (current[token] !== undefined) {
-      current = current[token];
-    } else if (current.raw && current.raw[token] !== undefined) {
-      current = current.raw[token];
-    } else {
-      return undefined;
-    }
-  }
-  return current;
-}
-
-function resolveBindingExpression(
-  expr: string,
-  stepOutputs: Record<string, any>,
-  manualInputs: Record<string, Record<string, any>>,
-): any {
-  if (expr.startsWith('$steps.')) {
-    const rest = expr.slice(7);
-    const dotIndex = rest.indexOf('.');
-    if (dotIndex === -1) {
-      const stepId = rest;
-      return stepOutputs[stepId]?.raw;
-    }
-    const stepId = rest.slice(0, dotIndex);
-    const path = rest.slice(dotIndex + 1);
-
-    const stepOut = stepOutputs[stepId];
-    if (!stepOut) {
-      throw new Error(`Referenced step "${stepId}" output was not found for binding "${expr}".`);
-    }
-
-    const val = getPathValue(stepOut, path);
-    if (val === undefined) {
-      if (path.startsWith('inputs.') || path.startsWith('inputs[')) {
-        return undefined;
-      }
-      throw new Error(
-        `Binding "${expr}" could not be resolved: path "${path}" in step "${stepId}" evaluated to undefined.`,
-      );
-    }
-
-    return val;
-  }
-
-  if (expr.startsWith('$inputs.')) {
-    const key = expr.slice(8);
-    for (const sInputs of Object.values(manualInputs)) {
-      if (sInputs[key] !== undefined) {
-        return sInputs[key];
-      }
-    }
-    return undefined;
-  }
-
-  if (manualInputs[expr] !== undefined) {
-    return manualInputs[expr];
-  }
-  for (const sInputs of Object.values(manualInputs)) {
-    if (sInputs[expr] !== undefined) {
-      return sInputs[expr];
-    }
-  }
-
-  // If it looks like an identifier rather than a literal value, do not return it as a raw string if missing
-  if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expr)) {
-    return undefined;
-  }
-
-  return expr;
-}
-
-export interface ParsedWaypointsResult {
-  items: any[];
-  pluginData?: Record<string, any>;
-  groupName?: string;
-}
-
-export function extractWaypointsFromRawResult(rawResult: any): ParsedWaypointsResult {
-  let items: any[] = [];
-  let pluginData: Record<string, any> | undefined = undefined;
-  let groupName: string | undefined = undefined;
-
-  if (rawResult && rawResult.waypoints) {
-    const wp = rawResult.waypoints;
-    if (wp.columnar) {
-      const count = wp.count ?? (Array.isArray(wp.x) ? wp.x.length : 0);
-      items = new Array(count);
-      for (let i = 0; i < count; i++) {
-        items[i] = {
-          x: wp.x?.[i] ?? 0,
-          y: wp.y?.[i] ?? 0,
-          z: wp.z?.[i] ?? 0,
-          yaw: wp.yaw?.[i] ?? 0,
-          name: wp.names?.[i],
-          options: wp.options?.[i],
-        };
-      }
-      pluginData = wp.plugin_data;
-      groupName = wp.name;
-    } else if (Array.isArray(wp)) {
-      items = wp;
-    } else if (wp.items && Array.isArray(wp.items)) {
-      items = wp.items;
-      pluginData = wp.plugin_data;
-      groupName = wp.name;
-    }
-  } else if (
-    Array.isArray(rawResult) &&
-    rawResult.length > 0 &&
-    (rawResult[0].transform || rawResult[0].x !== undefined)
-  ) {
-    items = rawResult;
-  }
-
-  return { items, pluginData, groupName };
-}
 
 export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (set, get) => ({
   plugins: {},
