@@ -1,17 +1,11 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { invoke } from '@tauri-apps/api/core';
 import { TopMenu } from './TopMenu';
-import { BackendAPI, DialogAPI } from '../../api';
+import { AppAPI, BackendAPI, DialogAPI } from '../../api';
 import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
 import { makePointAnnotation, makeWaypoint, waypointTree } from '../../test/fixtures';
 import type { AppState } from '../../stores/appStore';
-
-// Window/process control still talks to Tauri directly (to be moved behind src/api).
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
-vi.mock('@tauri-apps/api/app', () => ({ getVersion: vi.fn().mockResolvedValue('0.0.1') }));
-vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ setDecorations: vi.fn() }) }));
 
 const renderMenu = (state: Partial<AppState> = {}) => renderWithStore(<TopMenu />, { ...PAST_WELCOME, ...state });
 
@@ -61,14 +55,26 @@ describe('TopMenu', () => {
 
     it('Exit does not quit when the user keeps unsaved changes', async () => {
       const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      const forceExit = vi.spyOn(AppAPI, 'forceExit');
       renderMenu({ isDirty: true });
 
       openMenu('File');
       fireEvent.click(screen.getByText('Exit'));
 
       await waitFor(() => expect(ask).toHaveBeenCalled());
-      expect(invoke).not.toHaveBeenCalledWith('force_exit');
+      expect(forceExit).not.toHaveBeenCalled();
       expect(getAppState().isDirty).toBe(true);
+    });
+
+    it('Exit quits after the user agrees to discard unsaved changes', async () => {
+      vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+      const forceExit = vi.spyOn(AppAPI, 'forceExit').mockResolvedValue();
+      renderMenu({ isDirty: true });
+
+      openMenu('File');
+      fireEvent.click(screen.getByText('Exit'));
+
+      await waitFor(() => expect(forceExit).toHaveBeenCalledTimes(1));
     });
   });
 

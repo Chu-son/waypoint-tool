@@ -47,7 +47,7 @@ export default tseslint.config(
     ignores: ['src/api/**'],
     rules: {
       'no-restricted-imports': [
-        'warn',
+        'error',
         {
           patterns: [
             {

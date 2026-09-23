@@ -2,25 +2,12 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { WelcomeModal } from './WelcomeModal';
 import { useAppStore } from '../../stores/appStore';
-
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    loadProject: vi.fn(),
-  },
-  DialogAPI: {
-    open: vi.fn(),
-    save: vi.fn(),
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
-
-vi.mock('@tauri-apps/api/app', () => ({
-  getVersion: vi.fn().mockResolvedValue('0.1.0'),
-}));
+import { BackendAPI, DialogAPI } from '../../api';
+import { resetAppStore } from '../../test/store';
 
 describe('WelcomeModal UI', () => {
   beforeEach(() => {
-    useAppStore.setState({
+    resetAppStore({
       isWelcomeModalOpen: true,
       isInitialLaunch: true,
       isDirty: false,
@@ -28,7 +15,7 @@ describe('WelcomeModal UI', () => {
       rootNodeIds: ['node-1'],
       nodes: { 'node-1': { id: 'node-1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } } },
     });
-    vi.clearAllMocks();
+    vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
   });
 
   it('renders welcome modal correctly on initial launch without close button', async () => {
@@ -79,9 +66,8 @@ describe('WelcomeModal UI', () => {
   });
 
   it('handles "プロジェクトを開く..." successfully', async () => {
-    const { DialogAPI, BackendAPI } = await import('../../api');
-    vi.mocked(DialogAPI.open).mockResolvedValue('/path/to/project.wptroj');
-    vi.mocked(BackendAPI.loadProject).mockResolvedValue({
+    vi.spyOn(DialogAPI, 'open').mockResolvedValue('/path/to/project.wptroj');
+    vi.spyOn(BackendAPI, 'loadProject').mockResolvedValue({
       root_node_ids: ['loaded-1'],
       nodes: { 'loaded-1': { id: 'loaded-1', type: 'manual' } },
     } as any);
@@ -104,8 +90,7 @@ describe('WelcomeModal UI', () => {
   });
 
   it('renders recent projects and loads project when clicked', async () => {
-    const { BackendAPI } = await import('../../api');
-    vi.mocked(BackendAPI.loadProject).mockResolvedValue({
+    vi.spyOn(BackendAPI, 'loadProject').mockResolvedValue({
       root_node_ids: ['recent-node'],
       nodes: { 'recent-node': { id: 'recent-node', type: 'manual' } },
     } as any);
@@ -134,9 +119,8 @@ describe('WelcomeModal UI', () => {
   });
 
   it('confirms discarding changes when isDirty is true', async () => {
-    const { DialogAPI } = await import('../../api');
     useAppStore.setState({ isDirty: true });
-    vi.mocked(DialogAPI.ask).mockResolvedValue(false); // User cancels
+    vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false); // User cancels
 
     render(<WelcomeModal isOpen={true} onClose={vi.fn()} />);
 

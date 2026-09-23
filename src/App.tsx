@@ -24,13 +24,9 @@ import { ThemeInjector } from './components/ui/ThemeInjector';
 import { resolvePanelTabs, resolveBuiltinPanelTab, useInspectorPanelComponent } from './components/ui/PanelRegistry';
 import { useAppStore } from './stores/appStore';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { invoke } from '@tauri-apps/api/core';
-import { DialogAPI, BackendAPI } from './api';
+import { AppAPI, DialogAPI, BackendAPI } from './api';
 import { Button } from './components/ui/common/Button';
 import { extractProjectName, formatWindowTitle } from './utils/projectUtils';
-
-const isTauri = () => '__TAURI_INTERNALS__' in window;
 
 import { PluginInstance } from './types/store';
 
@@ -164,7 +160,6 @@ function App() {
 
   // Update window title based on project name, dirty state, and brand
   useEffect(() => {
-    if (!isTauri()) return;
     const brandName =
       isCustomUiMode && customUiConfig?.brand?.windowTitle
         ? customUiConfig.brand.windowTitle
@@ -173,20 +168,14 @@ function App() {
           : 'Waypoint Tool';
     const projectName = extractProjectName(currentProjectPath);
     const title = formatWindowTitle(projectName, isDirty, brandName);
-    getCurrentWindow()
-      .setTitle(title)
-      .catch(() => {});
+    AppAPI.setWindowTitle(title).catch(() => {});
   }, [isCustomUiMode, customUiConfig, currentProjectPath, isDirty, getEffectiveBrandName]);
 
   // Initialization moved to ShortcutManager for shortcuts,
   // though basic initialization remains in App for now.
 
   useEffect(() => {
-    if (!isTauri()) return;
-    const unlistenPromise = getCurrentWindow().onCloseRequested(async (event) => {
-      // Completely intercept the closing event to bypass tauri-plugin-window-state race conditions
-      event.preventDefault();
-
+    const unlistenPromise = AppAPI.onCloseRequested(async () => {
       if (useAppStore.getState().isDirty) {
         const confirmed = await DialogAPI.ask('未保存の変更があります。保存せずに終了してもよろしいですか？', {
           title: '終了の確認',
@@ -202,14 +191,13 @@ function App() {
       useAppStore.getState().setIsDirty(false);
       try {
         // Explicitly trigger window state saving before we force destroy
-        const { saveWindowState, StateFlags } = await import('@tauri-apps/plugin-window-state');
-        await saveWindowState(StateFlags.ALL);
+        await AppAPI.saveWindowState();
       } catch (err) {
         console.error('Failed to save window state', err);
       }
 
       setTimeout(() => {
-        invoke('force_exit');
+        void AppAPI.forceExit();
       }, 50);
     });
 

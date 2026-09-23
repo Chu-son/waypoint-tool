@@ -4,7 +4,7 @@ import { Button } from './common/Button';
 import { EmptyState } from './common/EmptyState';
 import { useAppStore } from '../../stores/appStore';
 import { MousePointer2, Plus, FolderOpen, Clock, FileText } from 'lucide-react';
-import { getVersion } from '@tauri-apps/api/app';
+import { AppAPI } from '../../api';
 import { cn } from '../../utils/cn';
 import { confirmDiscardChanges } from '../../services/projectGuard';
 
@@ -25,7 +25,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const [version, setVersion] = useState<string>('');
 
   useEffect(() => {
-    getVersion()
+    AppAPI.getVersion()
       .then((v) => setVersion(v))
       .catch(() => setVersion(''));
   }, []);

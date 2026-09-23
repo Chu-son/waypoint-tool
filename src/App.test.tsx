@@ -3,63 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import App from './App';
 import { BackendAPI, DialogAPI } from './api';
 import { useAppStore } from './stores/appStore';
+import { resetAppStore, PAST_WELCOME } from './test/store';
 
-// Mock Tauri specific modules
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
-}));
-
-const mockSetTitle = vi.fn().mockResolvedValue(undefined);
-
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({
-    onCloseRequested: vi.fn().mockResolvedValue(vi.fn()),
-    destroy: vi.fn(),
-    setDecorations: vi.fn(),
-    setTitle: mockSetTitle,
-  }),
-}));
-
-// Mock the backend API
-vi.mock('./api', () => ({
-  DialogAPI: {
-    open: vi.fn(),
-    ask: vi.fn().mockResolvedValue(true),
-  },
-  BackendAPI: {
-    fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
-    loadROSMap: vi.fn(),
-    saveProject: vi.fn(),
-    loadProject: vi.fn(),
-    loadOptionsSchema: vi.fn(),
-    exportWaypoints: vi.fn(),
-    checkExportConflicts: vi.fn().mockResolvedValue([]),
-    executeExportPackage: vi.fn().mockResolvedValue({ exported_files_count: 0, backed_up_files: [] }),
-    loadCustomUiConfig: vi.fn().mockResolvedValue(null),
-    loadCustomUiPreset: vi.fn().mockResolvedValue(null),
-  },
-}));
-
-// Mock the canvas element because PixiJS uses WebGL, which jsdom doesn't support well
-vi.mock('./components/canvas/MapCanvas', () => ({
-  MapCanvas: () => <div data-testid="mock-map-canvas">Mocked Canvas Volume</div>,
-}));
+// PixiJS needs WebGL, which jsdom lacks.
+vi.mock('@pixi/react', () => import('./test/mocks/pixi').then((m) => m.pixiReactMock));
+vi.mock('pixi.js', () => import('./test/mocks/pixi').then((m) => m.pixiJsMock));
 
 describe('App Integration', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    useAppStore.setState({
-      nodes: {},
-      rootNodeIds: [],
-      selectedNodeIds: [],
-      activeTool: 'select',
-      mapLayers: [],
-      plugins: {},
-      isDirty: false,
-      isWelcomeModalOpen: false,
-      isInitialLaunch: false,
-      modalStack: [],
-    });
+    resetAppStore(PAST_WELCOME);
+    vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([]);
   });
 
   it('renders the main application layout', async () => {
@@ -69,7 +22,7 @@ describe('App Integration', () => {
     expect(screen.getAllByText('Waypoints')[0]).toBeInTheDocument();
     expect(screen.getByText('Annotations')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
-    expect(screen.getByTestId('mock-map-canvas')).toBeInTheDocument();
+    expect(screen.getByTestId('pixi-app')).toBeInTheDocument();
 
     // The default right panel tab is 'Inspector'
     expect(screen.getByText('Inspector')).toBeInTheDocument();
@@ -83,7 +36,7 @@ describe('App Integration', () => {
 
   it('handles loading a map file', async () => {
     // Mock open dialog specifically for this test
-    (DialogAPI.open as any).mockResolvedValueOnce('map.yaml');
+    vi.spyOn(DialogAPI, 'open').mockResolvedValueOnce('map.yaml');
 
     // Make the backend mock map load
     const mockedMapData = {
@@ -99,7 +52,7 @@ describe('App Integration', () => {
       width: 100,
       height: 100,
     };
-    (BackendAPI.loadROSMap as any).mockResolvedValue(mockedMapData);
+    vi.spyOn(BackendAPI, 'loadROSMap').mockResolvedValue(mockedMapData as any);
 
     render(<App />);
 
@@ -196,20 +149,19 @@ describe('App Integration', () => {
   });
 
   it('updates window title with project name and dirty state', async () => {
-    (window as any).__TAURI_INTERNALS__ = {};
     render(<App />);
 
-    expect(mockSetTitle).toHaveBeenCalledWith('Untitled - Waypoint Tool');
+    await waitFor(() => expect(document.title).toBe('Untitled - Waypoint Tool'));
 
     act(() => {
       useAppStore.setState({ currentProjectPath: '/path/to/test_mission.wptroj' });
     });
-    expect(mockSetTitle).toHaveBeenCalledWith('test_mission - Waypoint Tool');
+    await waitFor(() => expect(document.title).toBe('test_mission - Waypoint Tool'));
 
     act(() => {
       useAppStore.setState({ isDirty: true });
     });
-    expect(mockSetTitle).toHaveBeenCalledWith('test_mission * - Waypoint Tool');
+    await waitFor(() => expect(document.title).toBe('test_mission * - Waypoint Tool'));
   });
 
   it('opens ExportModal when clicking Export Waypoints button in ToolPanel', async () => {

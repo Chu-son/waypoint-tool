@@ -1,9 +1,6 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
-import { DialogAPI, BackendAPI } from '../../api';
-import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { getVersion } from '@tauri-apps/api/app';
+import { AppAPI, DialogAPI, BackendAPI } from '../../api';
 import { MousePointer2, Minus, Square, X, Check, FolderOpen } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { confirmDiscardChanges } from '../../services/projectGuard';
@@ -169,13 +166,13 @@ function WindowControls({ onExit }: { onExit: () => void }) {
   return (
     <div className="flex items-center ml-auto">
       <button
-        onClick={() => getCurrentWindow().minimize()}
+        onClick={() => void AppAPI.minimizeWindow()}
         className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md"
       >
         <Minus size={16} />
       </button>
       <button
-        onClick={() => getCurrentWindow().toggleMaximize()}
+        onClick={() => void AppAPI.toggleMaximizeWindow()}
         className="p-1 hover:bg-surface-hover text-text-muted transition-colors rounded-md mx-1"
       >
         <Square size={14} />
@@ -277,7 +274,7 @@ export function TopMenu() {
       if (!confirmed) return;
     }
     useAppStore.getState().setIsDirty(false);
-    invoke('force_exit');
+    void AppAPI.forceExit();
   };
 
   const handleLoadCustomUiConfigFile = async () => {
@@ -470,7 +467,7 @@ export function TopMenu() {
         label: 'Help',
         options: [
           { id: 'help_shortcuts', label: 'Keyboard Shortcuts', action: () => setShortcutsModalOpen(true) },
-          { id: 'help_devtools', label: 'Developer Tools', action: () => invoke('open_devtools') },
+          { id: 'help_devtools', label: 'Developer Tools', action: () => void AppAPI.openDevtools() },
           { divider: true, label: '' },
           ...(isCustomUiMode
             ? [
@@ -519,7 +516,7 @@ export function TopMenu() {
                 ? `About ${customUiConfig.brand.about.title}`
                 : 'About Waypoint Tool',
             action: async () => {
-              const version = await getVersion();
+              const version = await AppAPI.getVersion();
               if (isCustomUiMode && customUiConfig?.brand?.about) {
                 const about = customUiConfig.brand.about;
                 alert(
