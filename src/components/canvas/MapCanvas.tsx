@@ -36,7 +36,7 @@ import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { MapLayerSprite } from './MapLayerSprite';
 import { getFallbackGridColors } from './utils/canvasTheme';
-import { findNearestObjectCenter } from './utils/hitTest';
+import { findNearestObjectCenter, hitTestRectHandles } from './utils/hitTest';
 import { CANVAS_ACCENT_COLOR } from './canvasConstants';
 
 extend({
@@ -113,6 +113,12 @@ export function MapCanvas() {
     (screenX: number, screenY: number) => viewportScreenToWorld(screenX, screenY, { scale, position }),
     [position, scale],
   );
+
+  /** World coordinates under a pointer / mouse event on the viewport. */
+  const eventToWorld = (e: { clientX: number; clientY: number }) => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    return screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  };
 
   const applyViewport = useCallback(
     (viewport: Viewport) => {
@@ -793,10 +799,7 @@ export function MapCanvas() {
         return;
       }
       if (e.button === 0 && interactionMode.current === 'none') {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const worldPos = screenToWorld(mouseX, mouseY);
+        const worldPos = eventToWorld(e);
 
         if (mapEditSubTool === 'rect') {
           handleRectDrawStart(worldPos);
@@ -825,10 +828,7 @@ export function MapCanvas() {
         return;
       }
       if (e.button === 0 && interactionMode.current === 'none') {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const worldPos = screenToWorld(mouseX, mouseY);
+        const worldPos = eventToWorld(e);
 
         if (activeAnnotationSubTool !== 'select') {
           handleAnnotationDrawStart(worldPos);
@@ -848,63 +848,17 @@ export function MapCanvas() {
 
     // Left click + (Select Tool OR Add Generator Tool) -> Check rectangle handle hits FIRST (before pan_map or point generation)
     if (e.button === 0 && (activeTool === 'select' || activeTool === 'add_generator')) {
-      const interactionData = useAppStore.getState().pluginInteractionData;
-      const rectEntries = Object.entries(interactionData).filter(
-        ([_k, val]) =>
-          val &&
-          typeof val === 'object' &&
-          val.center &&
-          typeof val.width === 'number' &&
-          typeof val.height === 'number',
-      );
-
-      if (rectEntries.length > 0) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-        const hitRadius = 14 / scale;
-
-        for (const [rKey, existing] of rectEntries) {
-          const { center, width, height, yaw = 0 } = existing;
-          const halfW = width / 2;
-          const halfH = height / 2;
-
-          const dx = worldX - center.x;
-          const dy = worldY - center.y;
-          const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-          const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-
-          // Check rotation handle
-          const rotHandleLocalY = halfH + 20 / scale;
-          const rotDx = localX;
-          const rotDy = localY - rotHandleLocalY;
-          if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
-            rectInputKey.current = rKey;
-            interactionMode.current = 'set_rect_rotation';
-            e.currentTarget.setPointerCapture(e.pointerId);
-            return;
-          }
-
-          // Check corners
-          const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
-            { cx: -halfW, cy: halfH, corner: 'min' },
-            { cx: halfW, cy: -halfH, corner: 'max' },
-            { cx: halfW, cy: halfH, corner: 'topRight' },
-            { cx: -halfW, cy: -halfH, corner: 'bottomLeft' },
-          ];
-          for (const c of cornersMap) {
-            const cdx = localX - c.cx;
-            const cdy = localY - c.cy;
-            if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
-              rectInputKey.current = rKey;
-              rectDragCorner.current = c.corner;
-              interactionMode.current = 'drag_rect_corner';
-              e.currentTarget.setPointerCapture(e.pointerId);
-              return;
-            }
-          }
+      const hit = hitTestRectHandles(useAppStore.getState().pluginInteractionData, eventToWorld(e), scale);
+      if (hit) {
+        rectInputKey.current = hit.key;
+        if (hit.handle === 'corner') {
+          rectDragCorner.current = hit.corner;
+          interactionMode.current = 'drag_rect_corner';
+        } else {
+          interactionMode.current = 'set_rect_rotation';
         }
+        e.currentTarget.setPointerCapture(e.pointerId);
+        return;
       }
     }
 
@@ -926,10 +880,7 @@ export function MapCanvas() {
       (activeTool === 'select' || appMode?.mode === 'select') &&
       interactionMode.current === 'none'
     ) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const worldPos = screenToWorld(mouseX, mouseY);
+      const worldPos = eventToWorld(e);
 
       marqueeOrigin.current = worldPos;
       setMarqueeBox({ x1: worldPos.x, y1: worldPos.y, x2: worldPos.x, y2: worldPos.y });
@@ -946,10 +897,7 @@ export function MapCanvas() {
     }
     // Left click + Add Point Tool -> Create Node and start setting Yaw
     else if (e.button === 0 && activeTool === 'add_point') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const id = uuidv4();
       useAppStore.getState().beginHistoryTransaction();
@@ -973,10 +921,7 @@ export function MapCanvas() {
     }
     // Left click + Measure Tool -> Commit measure point (with Alt snap support)
     else if (e.button === 0 && activeTool === 'measure') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       if (e.altKey || isAltPressed) {
         const nearest = findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale);
@@ -994,10 +939,7 @@ export function MapCanvas() {
     }
     // Left click + Add Export Region Tool
     else if (e.button === 0 && activeTool === 'add_export_region' && interactionMode.current === 'none') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const id = uuidv4();
 
@@ -1025,10 +967,7 @@ export function MapCanvas() {
     }
     // Click (Left or Right) + Add Generator Tool -> Define interaction input based on active plugin type
     else if ((e.button === 0 || e.button === 2) && activeTool === 'add_generator') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
       let allInputs = activePlugin?.manifest?.inputs || [];
@@ -1049,67 +988,10 @@ export function MapCanvas() {
         }
         allInputs = pipelineInputs;
       }
+      // Rectangle handles were already hit-tested above for left clicks.
       const hitRadius = 12 / scale;
 
-      // FIRST: Check ALL existing rectangles in pluginInteractionData for handle hits (Left-click only)
-      if (e.button === 0) {
-        const interactionData = useAppStore.getState().pluginInteractionData;
-        const rectEntries = Object.entries(interactionData).filter(
-          ([_k, val]) =>
-            val &&
-            typeof val === 'object' &&
-            val.center &&
-            typeof val.width === 'number' &&
-            typeof val.height === 'number',
-        );
-
-        for (const [rKey, existing] of rectEntries) {
-          const { center, width, height, yaw = 0 } = existing;
-          const halfW = width / 2;
-          const halfH = height / 2;
-
-          // Convert mouse world coordinates to rectangle local space
-          const dx = worldX - center.x;
-          const dy = worldY - center.y;
-
-          // Inverse rotation (by -yaw)
-          const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-          const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-
-          // Check rotation handle (above top of rect on screen = +halfH in Y-up world)
-          const rotHandleLocalY = halfH + 20 / scale;
-          const rotDx = localX - 0;
-          const rotDy = localY - rotHandleLocalY;
-          if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
-            rectInputKey.current = rKey;
-            interactionMode.current = 'set_rect_rotation';
-            e.currentTarget.setPointerCapture(e.pointerId);
-            return;
-          }
-
-          // Check corners in local space (Y-up: +Y = screen top)
-          const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
-            { cx: -halfW, cy: halfH, corner: 'min' }, // top-left on screen
-            { cx: halfW, cy: -halfH, corner: 'max' }, // bottom-right on screen
-            { cx: halfW, cy: halfH, corner: 'topRight' }, // top-right on screen
-            { cx: -halfW, cy: -halfH, corner: 'bottomLeft' }, // bottom-left on screen
-          ];
-
-          for (const c of cornersMap) {
-            const cdx = localX - c.cx;
-            const cdy = localY - c.cy;
-            if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
-              rectInputKey.current = rKey;
-              rectDragCorner.current = c.corner;
-              interactionMode.current = 'drag_rect_corner';
-              e.currentTarget.setPointerCapture(e.pointerId);
-              return;
-            }
-          }
-        }
-      }
-
-      // SECOND: Check ALL existing points in pluginInteractionData for point hits (Move on Left, Remove on Right)
+      // Check ALL existing points in pluginInteractionData for point hits (Move on Left, Remove on Right)
       for (const inp of allInputs) {
         if (inp.type !== 'points' && inp.type !== 'point_list') continue;
         const pKey = inp.name || inp.id;
@@ -1435,26 +1317,17 @@ export function MapCanvas() {
     }
 
     if (interactionMode.current === ('draw_annotation' as any)) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const curWorldPos = screenToWorld(mouseX, mouseY);
+      const curWorldPos = eventToWorld(e);
       handleAnnotationDrawMove(curWorldPos);
       return;
     }
     if (interactionMode.current === ('move_annotation' as any)) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const curWorldPos = screenToWorld(mouseX, mouseY);
+      const curWorldPos = eventToWorld(e);
       handleMoveAnnotationMove(curWorldPos);
       return;
     }
     if (interactionMode.current === ('transform_annotation' as any)) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const curWorldPos = screenToWorld(mouseX, mouseY);
+      const curWorldPos = eventToWorld(e);
       handleTransformAnnotationMove(curWorldPos);
       return;
     }
@@ -1514,10 +1387,7 @@ export function MapCanvas() {
         }
       }
     } else if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const node = useAppStore.getState().nodes[activeNodeId.current];
       if (node && node.transform) {
@@ -1543,10 +1413,7 @@ export function MapCanvas() {
         }
       }
     } else if (interactionMode.current === 'drag_points_item') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = pointsInputKey.current;
       const idx = pointsItemIndex.current;
@@ -1557,10 +1424,7 @@ export function MapCanvas() {
         useAppStore.getState().updatePluginInteractionData(key, next);
       }
     } else if (interactionMode.current === 'set_yaw_points_item') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = pointsInputKey.current;
       const idx = pointsItemIndex.current;
@@ -1584,10 +1448,7 @@ export function MapCanvas() {
         }
       }
     } else if (interactionMode.current === 'set_yaw_plugin') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       // Find the active point input key
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
@@ -1631,10 +1492,7 @@ export function MapCanvas() {
         }
       }
     } else if (interactionMode.current === 'draw_rect') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = rectInputKey.current;
       const current = useAppStore.getState().pluginInteractionData[key];
@@ -1650,10 +1508,7 @@ export function MapCanvas() {
         });
       }
     } else if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const current = useAppStore.getState().pluginInteractionData['__export_region_origin'];
       if (current && current.x !== undefined) {
@@ -1721,10 +1576,7 @@ export function MapCanvas() {
         });
       }
     } else if (interactionMode.current === 'drag_rect_corner') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = rectInputKey.current;
       const current = useAppStore.getState().pluginInteractionData[key];
@@ -1785,10 +1637,7 @@ export function MapCanvas() {
         });
       }
     } else if (interactionMode.current === 'set_rect_rotation') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = rectInputKey.current;
       const current = useAppStore.getState().pluginInteractionData[key];

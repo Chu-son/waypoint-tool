@@ -276,6 +276,45 @@ describe('MapCanvas tools', () => {
     it.todo('clears the selection when empty space is clicked without dragging');
   });
 
+  describe('rectangle plugin input', () => {
+    const areaPlugin = makePlugin('gen', {
+      inputs: [{ id: 'area', name: 'area', label: 'Area', type: 'rectangle', required: true }],
+    });
+    const area = { center: { x: 0, y: 0 }, width: 200, height: 100, yaw: 0 };
+
+    // Selecting a plugin clears its interaction data, so place the rectangle afterwards.
+    const activateWithArea = (tool: AppState['activeTool']) =>
+      act(() => {
+        getAppState().setActivePlugin('gen');
+        getAppState().setActiveTool(tool);
+        getAppState().updatePluginInteractionData('area', area);
+      });
+
+    it.each(['select', 'add_generator'] as const)('resizes the rectangle by dragging a corner (%s tool)', (tool) => {
+      const { pointer } = renderCanvas({ plugins: { gen: areaPlugin } });
+      activateWithArea(tool);
+
+      pointer.down(100, -50); // bottom-right corner on screen
+      pointer.move(150, -80);
+      pointer.up(150, -80);
+
+      const resized = getAppState().pluginInteractionData.area;
+      expect(resized.width).toBeGreaterThan(200);
+      expect(resized.height).toBeGreaterThan(100);
+    });
+
+    it('rotates the rectangle with the handle above its top edge', () => {
+      const { pointer } = renderCanvas({ plugins: { gen: areaPlugin } });
+      activateWithArea('add_generator');
+
+      pointer.down(0, 70); // 50 (half height) + 20 px handle offset at zoom 1
+      pointer.move(-70, 0);
+      pointer.up(-70, 0);
+
+      expect(getAppState().pluginInteractionData.area.yaw).not.toBe(0);
+    });
+  });
+
   describe('generator input', () => {
     it('records a clicked point for the active plugin input', () => {
       const plugin = makePlugin('gen', {
