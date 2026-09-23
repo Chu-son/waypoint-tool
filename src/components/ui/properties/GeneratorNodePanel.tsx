@@ -7,8 +7,9 @@ import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { PluginDataViewer } from '../common/PluginDataViewer';
 import { GeneratorRegenerateConflictModal } from '../modals/GeneratorRegenerateConflictModal';
 import { detectGeneratorModifications, computeGeneratorStash } from '../../../utils/generatorStashUtils';
-import { Play, Settings2, RefreshCcw, BoxSelect, Code2, Maximize2 } from 'lucide-react';
+import { Play, Settings2, RefreshCcw, BoxSelect } from 'lucide-react';
 import { WaypointNode, GeneratorModificationSummary, GeneratorStash } from '../../../types/store';
+import { InternalPropertiesSection } from './InternalPropertiesSection';
 
 interface GeneratorNodePanelProps {
   node: WaypointNode;
@@ -18,7 +19,6 @@ interface GeneratorNodePanelProps {
 export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
   const plugins = useAppStore((state) => state.plugins);
   const explodeGenerator = useAppStore((state) => state.explodeGenerator);
-  const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
   const updatePluginInteractionData = useAppStore((state) => state.updatePluginInteractionData);
   const pluginInteractionData = useAppStore((state) => state.pluginInteractionData);
   const nodes = useAppStore((state) => state.nodes);
@@ -139,42 +139,12 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
           })}
 
           {/* Internal Properties (Read-only Metadata) */}
-          <div className="space-y-2 pt-3 border-t border-border-base/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Code2 size={13} className="text-accent-automation" />
-                <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
-              </div>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
-                Read-only
-              </span>
-            </div>
-
-            {node.plugin_data && Object.keys(node.plugin_data).length > 0 ? (
-              <div className="space-y-1.5">
-                <PluginDataViewer data={node.plugin_data} title="Waypoint Plugin Data" defaultExpanded={true} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    openPluginDataModal(
-                      `ジェネレーター: ${plugin?.manifest.name || 'Waypoint Generator'}`,
-                      node.plugin_data,
-                      `ノードID: ${node.id} • 内部メタデータ (Read-only)`,
-                    )
-                  }
-                  className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
-                >
-                  <Maximize2 size={11} />
-                  <span>全画面ダイアログで開く</span>
-                </Button>
-              </div>
-            ) : (
-              <p className="text-[10px] text-text-muted/60 bg-surface-base/30 p-2 rounded-lg border border-border-base/20 italic">
-                内部プロパティ（plugin_data）はありません。
-              </p>
-            )}
-          </div>
+          <InternalPropertiesSection
+            data={node.plugin_data}
+            viewerTitle="Waypoint Plugin Data"
+            modalTitle={`ジェネレーター: ${plugin?.manifest.name || 'Waypoint Generator'}`}
+            modalSubtitle={`ノードID: ${node.id} • 内部メタデータ (Read-only)`}
+          />
 
           <div className="pt-4 mt-6 border-t border-border-base space-y-2">
             <Button variant="primary" disabled={isExecuting} onClick={handleRegenerateClick} className="w-full gap-2">

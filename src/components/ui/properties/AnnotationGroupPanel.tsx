@@ -6,8 +6,8 @@ import { Input } from '../common/Input';
 import { Button } from '../common/Button';
 import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
 import { PluginInputEditor } from '../plugins/PluginInputEditor';
-import { PluginDataViewer } from '../common/PluginDataViewer';
-import { Trash2, Wand2, Folder, Unlink, RefreshCcw, Code2, Maximize2 } from 'lucide-react';
+import { Trash2, Wand2, Folder, Unlink, RefreshCcw } from 'lucide-react';
+import { InternalPropertiesSection } from './InternalPropertiesSection';
 
 export function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
   const plugins = useAppStore((state) => state.plugins);
@@ -167,44 +167,12 @@ export function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
       )}
 
       {/* Internal Properties (Read-only Metadata) */}
-      <div className="space-y-2 pt-3 border-t border-border-base/40">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <Code2 size={13} className="text-accent-automation" />
-            <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
-          </div>
-          <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
-            Read-only
-          </span>
-        </div>
-
-        {group.plugin_data && Object.keys(group.plugin_data).length > 0 ? (
-          <div className="space-y-1.5">
-            <PluginDataViewer data={group.plugin_data} title="Annotation Group Plugin Data" defaultExpanded={true} />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                useAppStore
-                  .getState()
-                  .openPluginDataModal(
-                    `アノテーショングループ: ${group.name}`,
-                    group.plugin_data,
-                    `プラグイン: ${group.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`,
-                  )
-              }
-              className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
-            >
-              <Maximize2 size={11} />
-              <span>全画面ダイアログで開く</span>
-            </Button>
-          </div>
-        ) : (
-          <p className="text-[10px] text-text-muted/60 bg-surface-base/30 p-2 rounded-lg border border-border-base/20 italic">
-            内部プロパティ（plugin_data）はありません。
-          </p>
-        )}
-      </div>
+      <InternalPropertiesSection
+        data={group.plugin_data}
+        viewerTitle="Annotation Group Plugin Data"
+        modalTitle={`アノテーショングループ: ${group.name}`}
+        modalSubtitle={`プラグイン: ${group.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`}
+      />
 
       {/* Group Operations */}
       <div className="space-y-2 pt-2 border-t border-border-base/30">

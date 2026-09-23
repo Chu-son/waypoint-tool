@@ -121,6 +121,9 @@
 - **`PropertySectionHeader`** ([`src/components/ui/properties/PropertySectionHeader.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/PropertySectionHeader.tsx))
   - **概要**: 属性パネル内の可視性トグル付きセクションヘッダー部品。
   - **主要Props**: `title`, `isVisible`, `onToggleVisible`, `toggleTitle`
+- **`InternalPropertiesSection`** ([`src/components/ui/properties/InternalPropertiesSection.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/InternalPropertiesSection.tsx))
+  - **概要**: プラグイン生成要素の `plugin_data` を読み取り専用で表示し、全画面ダイアログ (`openPluginDataModal`) を開く「内部プロパティ」セクション。GeneratorNodePanel / CustomLayerInspector / AnnotationInspector / AnnotationGroupPanel で共用。
+  - **主要Props**: `data`, `viewerTitle`, `modalTitle`, `modalSubtitle`, `hideWhenEmpty`
 
 
 ---

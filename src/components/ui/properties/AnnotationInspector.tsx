@@ -12,25 +12,13 @@ import { Input } from '../common/Input';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { Button } from '../common/Button';
 import { ToggleSwitch } from '../common/ToggleSwitch';
-import { PluginDataViewer } from '../common/PluginDataViewer';
 import { PipelineInspector } from './PipelineInspector';
-import {
-  Palette,
-  Trash2,
-  CircleDot,
-  Navigation,
-  Minus,
-  Square,
-  Circle,
-  Eye,
-  Tag,
-  Code2,
-  Maximize2,
-} from 'lucide-react';
+import { Palette, Trash2, CircleDot, Navigation, Minus, Square, Circle, Eye, Tag } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState';
 import { ANNOTATION_COLOR_PRESETS, DEFAULT_ANNOTATION_COLOR } from '../../../utils/colorPresets';
 import { AnnotationGroupPanel } from './AnnotationGroupPanel';
 import { AnnotationCustomOptionsGroup } from './AnnotationCustomOptionsGroup';
+import { InternalPropertiesSection } from './InternalPropertiesSection';
 
 export function AnnotationInspector() {
   const selectedAnnotationIds = useAppStore((state) => state.selectedAnnotationIds) || [];
@@ -413,39 +401,13 @@ export function AnnotationInspector() {
         <AnnotationCustomOptionsGroup obj={obj} />
 
         {/* Internal Properties (Read-only Metadata) */}
-        {obj.plugin_data && Object.keys(obj.plugin_data).length > 0 && (
-          <div className="space-y-2 pt-3 border-t border-border-base/40">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Code2 size={13} className="text-accent-automation" />
-                <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
-              </div>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
-                Read-only
-              </span>
-            </div>
-            <div className="space-y-1.5">
-              <PluginDataViewer data={obj.plugin_data} title="Annotation Plugin Data" defaultExpanded={true} />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  useAppStore
-                    .getState()
-                    .openPluginDataModal(
-                      `アノテーション: ${obj.name}`,
-                      obj.plugin_data,
-                      `タイプ: ${obj.type} • 内部メタデータ (Read-only)`,
-                    )
-                }
-                className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
-              >
-                <Maximize2 size={11} />
-                <span>全画面ダイアログで開く</span>
-              </Button>
-            </div>
-          </div>
-        )}
+        <InternalPropertiesSection
+          data={obj.plugin_data}
+          viewerTitle="Annotation Plugin Data"
+          modalTitle={`アノテーション: ${obj.name}`}
+          modalSubtitle={`タイプ: ${obj.type} • 内部メタデータ (Read-only)`}
+          hideWhenEmpty
+        />
       </div>
     </div>
   );
