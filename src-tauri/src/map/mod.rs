@@ -77,9 +77,7 @@ mod tests {
 
         // 2. Create the YAML file
         let yaml_path = dir.path().join("map.yaml");
-        let yaml_content = format!(
-            "image: dummy_map.png\nresolution: 0.05\norigin: [-10.0, -10.0, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196"
-        );
+        let yaml_content = "image: dummy_map.png\nresolution: 0.05\norigin: [-10.0, -10.0, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196".to_string();
         let mut file = File::create(&yaml_path).unwrap();
         file.write_all(yaml_content.as_bytes()).unwrap();
 
@@ -99,9 +97,7 @@ mod tests {
     fn test_load_map_missing_image() {
         let dir = tempdir().unwrap();
         let yaml_path = dir.path().join("map.yaml");
-        let yaml_content = format!(
-            "image: does_not_exist.png\nresolution: 0.05\norigin: [0, 0, 0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196"
-        );
+        let yaml_content = "image: does_not_exist.png\nresolution: 0.05\norigin: [0, 0, 0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196".to_string();
         let mut file = File::create(&yaml_path).unwrap();
         file.write_all(yaml_content.as_bytes()).unwrap();
 

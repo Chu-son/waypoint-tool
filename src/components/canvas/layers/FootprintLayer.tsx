@@ -23,27 +23,30 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   const conditionalStyles = useAppStore((state) => state.conditionalStyles);
   const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
 
-  if (!robotFootprint) return null;
-
   // Collect all renderable nodes (same logic as WaypointLayer)
-  const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
-  const renderableNodes = flatIds
-    .map(id => nodes[id])
-    .filter(node => node && node.transform)
-    .map(node => ({ node }));
-
-  const safeScale = Math.max(scale, 0.001);
+  const renderableNodes = useMemo(
+    () =>
+      getFlattenedWaypointIds(rootNodeIds, nodes)
+        .map(id => nodes[id])
+        .filter(node => node && node.transform)
+        .map(node => ({ node })),
+    [rootNodeIds, nodes],
+  );
 
   // 条件付き書式のメモ化キャッシュ
   const resolvedFpMap = useMemo(() => {
     const map = new Map<string, ResolvedFootprintStyle>();
-    if (!conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0) return map;
+    if (!robotFootprint || !conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0) return map;
     renderableNodes.forEach(({ node }, idx) => {
       const style = resolveFootprintConditionalStyle(node, robotFootprint, conditionalStyles, conditionalStylesEnabled, optionsSchema, { index: idx });
       if (style) map.set(node.id, style);
     });
     return map;
   }, [renderableNodes, robotFootprint, conditionalStyles, conditionalStylesEnabled, optionsSchema]);
+
+  if (!robotFootprint) return null;
+
+  const safeScale = Math.max(scale, 0.001);
 
   return (
     <>

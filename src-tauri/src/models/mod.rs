@@ -80,6 +80,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::approx_constant)] // The literal mirrors a legacy file value, not the constant.
     fn test_transform_deserialize_legacy_yaw() {
         let json = r#"{"x": 3.0, "y": 4.0, "yaw": 1.5707963}"#;
         let t: Transform = serde_json::from_str(json).unwrap();

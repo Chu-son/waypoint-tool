@@ -225,7 +225,7 @@ export function ExportTemplatesTab() {
   const handleExportTemplate = async (template: ExportTemplate) => {
     try {
       const { DialogAPI, BackendAPI } = await import("../../../api");
-      const safeName = template.name.replace(/[^a-zA-Z0-9_\-]/g, "_") || "template";
+      const safeName = template.name.replace(/[^a-zA-Z0-9_-]/g, "_") || "template";
       const savePath = await DialogAPI.save({
         defaultPath: `${safeName}.wpt_template`,
         filters: [{ name: "Waypoint Export Template", extensions: ["wpt_template"] }],

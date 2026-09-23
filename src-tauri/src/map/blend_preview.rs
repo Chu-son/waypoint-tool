@@ -54,7 +54,7 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
         let info = layer.info.as_ref();
         let l_res = info.and_then(|i| i.get("resolution")).and_then(|v| v.as_f64()).unwrap_or(0.05);
         let l_orig = info.and_then(|i| i.get("origin")).and_then(|v| v.as_array());
-        let l_ox = l_orig.as_ref().and_then(|a| a.get(0)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let l_ox = l_orig.as_ref().and_then(|a| a.first()).and_then(|v| v.as_f64()).unwrap_or(0.0);
         let l_oy = l_orig.as_ref().and_then(|a| a.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0);
         let l_oyaw = l_orig.as_ref().and_then(|a| a.get(2)).and_then(|v| v.as_f64()).unwrap_or(0.0);
 
@@ -110,7 +110,7 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
         let info = layer.info.as_ref();
         let l_res = info.and_then(|i| i.get("resolution")).and_then(|v| v.as_f64()).unwrap_or(0.05);
         let l_orig = info.and_then(|i| i.get("origin")).and_then(|v| v.as_array());
-        let l_ox = l_orig.as_ref().and_then(|a| a.get(0)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let l_ox = l_orig.as_ref().and_then(|a| a.first()).and_then(|v| v.as_f64()).unwrap_or(0.0);
         let l_oy = l_orig.as_ref().and_then(|a| a.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0);
         let l_oyaw = l_orig.as_ref().and_then(|a| a.get(2)).and_then(|v| v.as_f64()).unwrap_or(0.0);
 

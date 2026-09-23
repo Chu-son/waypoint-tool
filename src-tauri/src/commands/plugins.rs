@@ -269,7 +269,7 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 pub fn collect_python_library_paths_from_plugins(plugins: &[PluginInstance]) -> Vec<std::path::PathBuf> {
     let mut paths = Vec::new();
     for p in plugins {
-        let has_module = p.manifest.module_name.as_ref().map_or(false, |m| !m.trim().is_empty());
+        let has_module = p.manifest.module_name.as_ref().is_some_and(|m| !m.trim().is_empty());
         if p.manifest.plugin_type == "python_library" || has_module {
             let path = std::path::PathBuf::from(&p.folder_path);
             if !path.as_os_str().is_empty() && !paths.contains(&path) {
@@ -517,14 +517,10 @@ pub fn run_plugin_sync(
             enriched_json.into_bytes()
         };
 
-        let stdin_handle = if let Some(mut stdin) = child.stdin.take() {
-            Some(std::thread::spawn(move || {
+        let stdin_handle = child.stdin.take().map(|mut stdin| std::thread::spawn(move || {
                 use std::io::Write;
                 let _ = stdin.write_all(&final_stdin_bytes);
-            }))
-        } else {
-            None
-        };
+            }));
 
         let output = child.wait_with_output()
             .map_err(|e| format!("Failed to wait for python plugin: {}", e))?;

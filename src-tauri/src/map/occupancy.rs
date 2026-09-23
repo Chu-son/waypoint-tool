@@ -23,7 +23,7 @@ pub fn parse_layer_info(info: Option<&serde_json::Value>) -> Result<(f64, [f64; 
     let info = info.ok_or("Map layer has no info")?;
     let resolution = info.get("resolution").and_then(|v| v.as_f64()).unwrap_or(0.05);
     let origin_arr = info.get("origin").and_then(|v| v.as_array()).ok_or("Map info missing origin")?;
-    let ox = origin_arr.get(0).and_then(|v| v.as_f64()).unwrap_or(0.0);
+    let ox = origin_arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0);
     let oy = origin_arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0);
     let oyaw = origin_arr.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0);
     let negate = info.get("negate").and_then(|v| v.as_i64()).unwrap_or(0) != 0;
@@ -57,7 +57,7 @@ pub fn evaluate_pixel(
     let gray_raw = pixel[0] as f64 * 0.299 + pixel[1] as f64 * 0.587 + pixel[2] as f64 * 0.114;
 
     // Canonical ROS Unknown space (gray value 205 / 0xCD, typical range 198 ~ 212)
-    if !negate && (gray_raw >= 198.0 && gray_raw <= 212.0) {
+    if !negate && (198.0..=212.0).contains(&gray_raw) {
         return CellValue::Unknown;
     }
 
@@ -89,7 +89,7 @@ pub fn build_occupancy_grid_from_layers(
             continue;
         }
         let (resolution, origin, negate, occ_thresh, free_thresh) = parse_layer_info(layer.info.as_ref())?;
-        let b64 = layer.image_base64.split(',').last().unwrap_or(&layer.image_base64);
+        let b64 = layer.image_base64.split(',').next_back().unwrap_or(&layer.image_base64);
         if b64.trim().is_empty() {
             continue;
         }

@@ -81,7 +81,7 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('read_text_file', { path });
   }
 
-  async writeTextFile(path: string, content: String): Promise<void> {
+  async writeTextFile(path: string, content: string): Promise<void> {
     return invoke('write_text_file', { path, content });
   }
 

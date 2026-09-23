@@ -280,7 +280,7 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
         }
 
         const isTab = e.key === 'Tab' || e.code === 'Tab';
-        const isRelevantKey = e.key === 'Backspace' || e.key === 'Enter' || isTab || e.key.startsWith('Arrow') || /^[0-9.\-]$/.test(e.key);
+        const isRelevantKey = e.key === 'Backspace' || e.key === 'Enter' || isTab || e.key.startsWith('Arrow') || /^[0-9.-]$/.test(e.key);
 
         if (isTab) {
           if (activeTool === 'add_point' && interactionMode.current === 'none') {
@@ -396,7 +396,7 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
           }
         } else if (e.key === 'Backspace') {
           setSnapInputSynced(prev => prev.slice(0, -1));
-        } else if (/^[0-9.\-]$/.test(e.key)) {
+        } else if (/^[0-9.-]$/.test(e.key)) {
           setSnapInputSynced(prev => prev + e.key);
         }
       };

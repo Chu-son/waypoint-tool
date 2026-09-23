@@ -13,6 +13,21 @@ export default defineConfig(async () => ({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    restoreMocks: true,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/*.d.ts', 'src/main.tsx', 'src/types/**'],
+      reporter: ['text-summary', 'html', 'json-summary'],
+      // Ratchet: raise these as coverage improves; never lower them (docs/TESTING.md).
+      thresholds: {
+        lines: 56,
+        functions: 60,
+        branches: 49,
+        statements: 56,
+      },
+    },
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

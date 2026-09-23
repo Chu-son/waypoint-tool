@@ -91,7 +91,7 @@ let currentCalculationRequestId = 0;
 
 function getPathValue(obj: any, path: string): any {
   if (!obj || !path) return undefined;
-  const tokens = path.match(/[^.\[\]]+/g) || [];
+  const tokens = path.match(/[^.[\]]+/g) || [];
   let current = obj;
   for (const token of tokens) {
     if (current == null) return undefined;
