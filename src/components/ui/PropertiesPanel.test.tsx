@@ -1,313 +1,110 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { PropertiesPanel } from './PropertiesPanel';
-import { useAppStore } from '../../stores/appStore';
 import { BackendAPI } from '../../api';
-
-// Mock Lucide icons
-vi.mock('lucide-react', () => ({
-  Eye: () => <div data-testid="eye-icon" />,
-  EyeOff: () => <div data-testid="eye-off-icon" />,
-  Play: () => <div data-testid="play-icon" />,
-  Settings2: () => <div data-testid="settings-icon" />,
-  RefreshCcw: () => <div data-testid="refresh-icon" />,
-  BoxSelect: () => <div data-testid="box-select-icon" />,
-  Code2: () => <div data-testid="code2-icon" />,
-  Maximize2: () => <div data-testid="maximize2-icon" />,
-  ChevronRight: () => <div data-testid="chevron-right-icon" />,
-  ChevronDown: () => <div data-testid="chevron-down-icon" />,
-  Copy: () => <div data-testid="copy-icon" />,
-  Check: () => <div data-testid="check-icon" />,
-  RotateCcw: () => <div data-testid="rotate-ccw-icon" />,
-  FlipHorizontal2: () => <div data-testid="flip-horizontal-2-icon" />,
-  RotateCw: () => <div data-testid="rotate-cw-icon" />,
-  Anchor: () => <div data-testid="anchor-icon" />,
-}));
-
-// Mock Store
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: vi.fn(),
-}));
-
-// Mock API
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn(),
-  },
-}));
-
-// Mock uuid
-vi.mock('uuid', () => ({
-  v4: () => 'new-uuid',
-}));
+import { renderWithStore } from '../../test/render';
+import { getAppState } from '../../test/store';
+import { makeGroup, makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
 
 describe('PropertiesPanel', () => {
-  const mockUpdateNode = vi.fn();
-  const mockRemoveNodes = vi.fn();
-  const mockToggleAttributeVisibility = vi.fn();
-  const mockAddNode = vi.fn();
-
-  const mockManualNode = {
-    id: 'node-1',
-    type: 'manual',
-    transform: { x: 1.0, y: 2.0, z: 0.0, qx: 0, qy: 0, qz: 0, qw: 1 },
-    options: { 'custom-attr': 'val' },
-  };
-
-  const mockGeneratorNode = {
-    id: 'gen-1',
-    type: 'generator',
-    plugin_id: 'plugin-1',
-    generator_params: {
-      properties: { count: 5 },
-      interaction_data: { start: { x: 0, y: 0 } },
-    },
-    children_ids: ['child-1'],
-  };
-
-  const mockPlugin = {
-    id: 'plugin-1',
-    manifest: {
-      name: 'Test Generator',
-      properties: [{ name: 'count', type: 'float', label: 'Count' }],
-      inputs: [{ name: 'start', type: 'point', label: 'Start Point' }],
-    },
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: [],
-        nodes: {},
-        rootNodeIds: [],
-        optionsSchema: null,
-        visibleAttributes: ['index', 'transform'],
-        indexStartIndex: 0,
-        decimalPrecision: 2,
-        plugins: {},
-        pluginSettings: [],
-        updateNode: mockUpdateNode,
-        removeNodes: mockRemoveNodes,
-        toggleAttributeVisibility: mockToggleAttributeVisibility,
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: {},
-      }),
-    );
-
-    // Mock getState for non-hook access (used inside handleRegenerate and status sync)
-    (useAppStore.getState as any) = vi.fn().mockReturnValue({
-      clearPluginInteractionData: vi.fn(),
-      setPluginActiveProperties: vi.fn(),
-      addNode: mockAddNode,
-      nodes: { 'gen-1': mockGeneratorNode },
-      runInHistoryTransaction: (fn: () => void) => fn(),
-      beginHistoryTransaction: vi.fn(),
-      endHistoryTransaction: vi.fn(),
-      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
-        await BackendAPI.runPlugin(
-          params.plugin,
-          { properties: params.properties, interaction_data: params.interactionData },
-          'python3',
-        );
-        mockRemoveNodes(['child-1']);
-        mockAddNode();
-        mockUpdateNode('gen-1', { generator_params: { properties: { count: 5 } } });
-        return { success: true, executionId: 'exec-1', parentWaypointId: 'gen-1', customLayerIds: [] };
-      }),
-    });
-  });
-
-  it('renders "No item selected" when selection is empty', () => {
-    render(<PropertiesPanel />);
+  it('shows an empty state when nothing is selected', () => {
+    renderWithStore(<PropertiesPanel />);
     expect(screen.getByText(/no item selected/i)).toBeInTheDocument();
   });
 
-  it('renders properties for a single manual node and updates X', () => {
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: ['node-1'],
-        nodes: { 'node-1': mockManualNode },
-        rootNodeIds: ['node-1'],
-        visibleAttributes: ['index', 'transform'],
-        indexStartIndex: 0,
-        decimalPrecision: 2,
-        updateNode: mockUpdateNode,
-        toggleAttributeVisibility: mockToggleAttributeVisibility,
-      }),
-    );
+  it('edits the X coordinate of the selected waypoint', async () => {
+    const { user } = renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1', { transform: makeTransform(1, 2) })]),
+      selectedNodeIds: ['node-1'],
+      visibleAttributes: ['index', 'transform'],
+    });
 
-    render(<PropertiesPanel />);
     expect(screen.getByText(/Waypoint \[0\]/i)).toBeInTheDocument();
 
     const xInput = screen.getByDisplayValue('1');
-    fireEvent.change(xInput, { target: { value: '15' } });
-    fireEvent.blur(xInput);
+    await user.clear(xInput);
+    await user.type(xInput, '15');
+    await user.tab();
 
-    expect(mockUpdateNode).toHaveBeenCalledWith(
-      'node-1',
-      expect.objectContaining({
-        transform: expect.objectContaining({ x: 15 }),
-      }),
-    );
+    expect(getAppState().nodes['node-1'].transform?.x).toBe(15);
+    expect(getAppState().nodes['node-1'].transform?.y).toBe(2);
+    expect(screen.getByDisplayValue('15')).toBeInTheDocument();
   });
 
-  it('renders generator node and handles re-generation flow', async () => {
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: ['gen-1'],
-        nodes: { 'gen-1': mockGeneratorNode },
-        rootNodeIds: ['gen-1'],
-        plugins: { 'plugin-1': mockPlugin },
-        pluginSettings: [],
-        visibleAttributes: [],
-        decimalPrecision: 2,
-        updateNode: mockUpdateNode,
-        removeNodes: mockRemoveNodes,
-        updatePluginInteractionData: vi.fn(),
-        pluginInteractionData: { start: { x: 0, y: 0 } },
-        runWithLoading: async (_: any, fn: any) => await fn(),
-      }),
-    );
+  it('replaces the generated children when a generator is re-generated', async () => {
+    const plugin = makePlugin('plugin-1', {
+      name: 'Test Generator',
+      properties: [{ name: 'count', type: 'float', label: 'Count' }],
+    });
+    const runPlugin = vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue([{ x: 10, y: 10, yaw: 0 }]);
 
-    (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 10, y: 10, yaw: 0 }]);
+    const { user } = renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([
+        makeWaypoint('gen-1', {
+          type: 'generator',
+          plugin_id: 'plugin-1',
+          transform: undefined,
+          generator_params: { properties: { count: 5 } },
+          children_ids: ['child-1'],
+        }),
+        makeWaypoint('child-1', { transform: makeTransform(0, 0) }),
+      ]),
+      plugins: { 'plugin-1': plugin },
+      selectedNodeIds: ['gen-1'],
+    });
 
-    render(<PropertiesPanel />);
     expect(screen.getByText('Generator Node')).toBeInTheDocument();
     expect(screen.getByText('Test Generator')).toBeInTheDocument();
 
-    const regenBtn = screen.getByText(/re-generate path/i);
-    fireEvent.click(regenBtn);
+    await user.click(screen.getByRole('button', { name: /re-generate path/i }));
 
-    await waitFor(() => {
-      expect(BackendAPI.runPlugin).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(getAppState().nodes['child-1']).toBeUndefined());
+    expect(runPlugin).toHaveBeenCalledTimes(1);
 
-    expect(mockRemoveNodes).toHaveBeenCalledWith(['child-1']);
-    expect(mockAddNode).toHaveBeenCalled();
-    expect(mockUpdateNode).toHaveBeenCalledWith(
-      'gen-1',
-      expect.objectContaining({
-        generator_params: expect.objectContaining({
-          properties: { count: 5 },
-        }),
-      }),
-    );
+    const { nodes } = getAppState();
+    const newChildren = nodes['gen-1'].children_ids ?? [];
+    expect(newChildren).toHaveLength(1);
+    expect(nodes[newChildren[0]].transform).toMatchObject({ x: 10, y: 10 });
+    expect(nodes['gen-1'].generator_params?.properties).toEqual({ count: 5 });
   });
 
-  it('renders options from schema for manual node', () => {
-    const schema = {
-      options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }],
-    };
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: ['node-1'],
-        nodes: { 'node-1': mockManualNode },
-        rootNodeIds: ['node-1'],
-        optionsSchema: schema,
-        visibleAttributes: [],
-        indexStartIndex: 0,
-        decimalPrecision: 2,
-        updateNode: mockUpdateNode,
-        toggleAttributeVisibility: vi.fn(),
-      }),
-    );
-
-    (useAppStore.getState as any).mockReturnValue({
-      nodes: { 'node-1': mockManualNode },
-      toggleAttributeVisibility: vi.fn(),
-      clearPluginInteractionData: vi.fn(),
-      setPluginActiveProperties: vi.fn(),
-      runInHistoryTransaction: (fn: () => void) => fn(),
-      beginHistoryTransaction: vi.fn(),
-      endHistoryTransaction: vi.fn(),
+  it('edits a custom option defined by the options schema', async () => {
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1')]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: { options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }] },
+      visibleAttributes: [],
     });
 
-    render(<PropertiesPanel />);
     expect(screen.getByText('Target Speed')).toBeInTheDocument();
 
-    const speedInput = screen.getByDisplayValue('0.5');
-    fireEvent.change(speedInput, { target: { value: '1.2' } });
-    // updateNode is called on change for custom options
-    expect(mockUpdateNode).toHaveBeenCalledWith(
-      'node-1',
-      expect.objectContaining({
-        options: expect.objectContaining({ speed: 1.2 }),
-      }),
-    );
+    // The field ignores non-numeric intermediate values (an emptied field snaps back), so set the
+    // final value directly rather than simulating clear-then-type.
+    fireEvent.change(screen.getByDisplayValue('0.5'), { target: { value: '1.2' } });
+
+    expect(getAppState().nodes['node-1'].options?.speed).toBe(1.2);
   });
 
-  it('renders multiple selection view', () => {
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: ['node-1', 'node-2'],
-        nodes: {
-          'node-1': mockManualNode,
-          'node-2': { ...mockManualNode, id: 'node-2' },
-        },
-        rootNodeIds: ['node-1', 'node-2'],
-        visibleAttributes: [],
-        indexStartIndex: 0,
-        decimalPrecision: 2,
-      }),
-    );
-
-    render(<PropertiesPanel />);
+  it('shows a summary when several waypoints are selected', () => {
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1'), makeWaypoint('node-2')]),
+      selectedNodeIds: ['node-1', 'node-2'],
+    });
     expect(screen.getByText(/multiple selected \(2\)/i)).toBeInTheDocument();
   });
 
-  it('renders RelativeTransformGroup for a waypoint inside a group based on serial order', () => {
-    const wp1 = {
-      id: 'wp-1',
-      type: 'manual' as const,
-      transform: { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
-    };
-    const wp2 = {
-      id: 'wp-2',
-      type: 'manual' as const,
-      transform: { x: 5, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
-    };
-    const groupNode = {
-      id: 'grp-1',
-      type: 'manual_group' as const,
-      children_ids: ['wp-2'],
-    };
-
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: ['wp-2'],
-        nodes: {
-          'wp-1': wp1,
-          'grp-1': groupNode,
-          'wp-2': wp2,
-        },
-        rootNodeIds: ['wp-1', 'grp-1'],
-        visibleAttributes: ['transform'],
-        indexStartIndex: 0,
-        decimalPrecision: 2,
-        updateNode: mockUpdateNode,
-        toggleAttributeVisibility: vi.fn(),
-      }),
-    );
-
-    (useAppStore.getState as any).mockReturnValue({
-      nodes: {
-        'wp-1': wp1,
-        'grp-1': groupNode,
-        'wp-2': wp2,
-      },
-      rootNodeIds: ['wp-1', 'grp-1'],
-      clearPluginInteractionData: vi.fn(),
-      runInHistoryTransaction: (fn: () => void) => fn(),
-      beginHistoryTransaction: vi.fn(),
-      endHistoryTransaction: vi.fn(),
+  it('shows the transform relative to the previous waypoint in traversal order, across groups', () => {
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([
+        makeWaypoint('wp-1', { transform: makeTransform(0, 0) }),
+        makeGroup('grp-1', ['wp-2']),
+        makeWaypoint('wp-2', { transform: makeTransform(5, 0) }),
+      ]),
+      selectedNodeIds: ['wp-2'],
+      visibleAttributes: ['transform'],
     });
 
-    render(<PropertiesPanel />);
-
-    // Serial index is 1, so header shows Waypoint [1]
     expect(screen.getByText('Waypoint [1]')).toBeInTheDocument();
-    // RelativeTransformGroup should be rendered for wp-2 because it is the 2nd waypoint in serial order
     expect(screen.getByText('Transform (Relative to Prev)')).toBeInTheDocument();
   });
 });
