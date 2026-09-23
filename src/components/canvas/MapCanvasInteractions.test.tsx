@@ -44,6 +44,17 @@ function renderCanvas(state: Partial<AppState> = {}) {
   return { ...utils, viewport, pointer };
 }
 
+/**
+ * The pickable shape of the waypoint drawn at world (x, y). Under jsdom the PixiJS scene renders
+ * as inert elements whose attributes mirror the display-object props, so this is "whatever is
+ * under the pointer at that waypoint".
+ */
+const waypointAt = (container: HTMLElement, x: number, y: number) => {
+  const el = container.querySelector(`pixicontainer[x="${x}"][y="${y}"] > pixigraphics[eventmode="dynamic"]`);
+  if (!el) throw new Error(`No waypoint drawn at (${x}, ${y})`);
+  return el;
+};
+
 const selectTool = (tool: AppState['activeTool']) => act(() => getAppState().setActiveTool(tool));
 const escape = () => act(() => void getAppState().handleGlobalEscape());
 
@@ -161,6 +172,75 @@ describe('MapCanvas tools', () => {
       pointer.up(100, 0, { shiftKey: true });
 
       expect(getAppState().selectedNodeIds.sort()).toEqual(['inside-1', 'inside-2']);
+    });
+  });
+
+  describe('dragging waypoints', () => {
+    const twoWaypoints = () =>
+      waypointTree([
+        makeWaypoint('a', { transform: makeTransform(10, 20) }),
+        makeWaypoint('b', { transform: makeTransform(50, 20) }),
+      ]);
+
+    it('selects and moves a waypoint by the dragged distance', () => {
+      const { pointer, container } = renderCanvas(twoWaypoints());
+
+      fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.move(40, 60);
+      pointer.up(40, 60);
+
+      expect(getAppState().selectedNodeIds).toEqual(['a']);
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 40, y: 60 });
+      expect(getAppState().nodes.b.transform).toMatchObject({ x: 50, y: 20 });
+    });
+
+    it('moves every selected waypoint together', () => {
+      const { pointer, container } = renderCanvas(twoWaypoints());
+      act(() => getAppState().selectNodes(['a', 'b']));
+
+      fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.move(20, 30);
+      pointer.up(20, 30);
+
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 20, y: 30 });
+      expect(getAppState().nodes.b.transform).toMatchObject({ x: 60, y: 30 });
+    });
+
+    it('adds a waypoint to the selection with Shift+click', () => {
+      const { pointer, container } = renderCanvas(twoWaypoints());
+      act(() => getAppState().selectNodes(['a']));
+
+      fireEvent.pointerDown(waypointAt(container, 50, 20), {
+        button: 0,
+        pointerId: 1,
+        shiftKey: true,
+        ...toScreen(50, 20),
+      });
+      pointer.up(50, 20);
+
+      expect(getAppState().selectedNodeIds).toEqual(['a', 'b']);
+    });
+
+    it('undoes a drag in one step', () => {
+      const { pointer, container } = renderCanvas(twoWaypoints());
+
+      fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.move(25, 20);
+      pointer.move(40, 60);
+      pointer.up(40, 60);
+      act(() => getAppState().undo());
+
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 10, y: 20 });
+    });
+
+    it('returns the waypoint to where it started when Escape is pressed mid-drag', () => {
+      const { pointer, container } = renderCanvas(twoWaypoints());
+
+      fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.move(40, 60);
+      escape();
+
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 10, y: 20 });
     });
   });
 
