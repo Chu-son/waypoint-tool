@@ -29,6 +29,7 @@ import {
   TreeFileNode,
 } from '../../../utils/exportTemplateEngine';
 import { extractWaypointsForExport } from '../../../utils/exportWaypointUtils';
+import { buildExportPackageItems, formatSessionTimestamp } from '../../../utils/exportPackage';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
 import { confirmAction, notify } from '../../../services/notify';
@@ -295,7 +296,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           // 2. Extract map shot canvas if requested
           let imageDataB64: string | undefined = undefined;
           if (hasMapShot) {
-            useAppStore.setState({ shouldFitToMaps: Date.now() });
+            useAppStore.getState().triggerFitToMaps();
             await new Promise((r) => setTimeout(r, 800));
             const canvas = document.querySelector('canvas');
             if (canvas) {
@@ -303,24 +304,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
             }
           }
 
-          // 3. Extract waypoints
-          const extractedWaypoints = extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex);
-
-          // 4. Resolve package items
-          const waypointItems: any[] = [];
-          const mapItems: any[] = [];
-
-          const timestampStr = `${sessionDate.getFullYear()}${String(sessionDate.getMonth() + 1).padStart(
-            2,
-            '0',
-          )}${String(sessionDate.getDate()).padStart(
-            2,
-            '0',
-          )}_${String(sessionDate.getHours()).padStart(2, '0')}${String(sessionDate.getMinutes()).padStart(
-            2,
-            '0',
-          )}${String(sessionDate.getSeconds()).padStart(2, '0')}`;
-
+          // 3. Resolve the package items (waypoint files and map regions)
           const resolvedTargetFiles = resolveExportFiles(enabledItems, {
             now: sessionDate,
             projectName,
@@ -338,70 +322,21 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
             })),
           });
 
-          // Group by item
-          for (const item of enabledItems) {
-            if (item.type === 'waypoint_template' || item.type === 'waypoint_default') {
-              const file = resolvedTargetFiles.find((f) => f.item.id === item.id && !f.isPairSecondary);
-              if (!file) continue;
+          const { waypointItems, mapItems } = buildExportPackageItems({
+            enabledItems,
+            resolvedFiles: resolvedTargetFiles,
+            templates: exportTemplates,
+            regions: exportRegions,
+            waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
+            mapLayers: preparedLayers,
+            mapImageB64: imageDataB64,
+          });
 
-              let templateContent: string | undefined = undefined;
-              if (item.type === 'waypoint_template') {
-                const t = exportTemplates.find((x) => x.id === item.sourceId);
-                templateContent = t?.content;
-              }
-
-              waypointItems.push({
-                path: file.fullPath,
-                waypoints: extractedWaypoints,
-                template: templateContent,
-                image_data_b64: item.includeMapImage ? imageDataB64 : undefined,
-              });
-            } else if (item.type === 'map_all_regions') {
-              const regions = exportRegions.length > 0 ? exportRegions : [];
-              for (const reg of regions) {
-                const primaryFile = resolvedTargetFiles.find(
-                  (f) => f.item.id === item.id && !f.isPairSecondary && f.fileName.startsWith(reg.name),
-                );
-                if (!primaryFile) continue;
-
-                const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, '');
-                mapItems.push({
-                  save_path: basePath,
-                  format: item.mapFormat || 'ros_standard',
-                  region: {
-                    name: reg.name,
-                    rect: reg.rect,
-                    layerVisibility: {},
-                  },
-                  layers: preparedLayers,
-                });
-              }
-            } else if (item.type === 'map_region') {
-              const reg = exportRegions.find((r) => r.id === item.sourceId);
-              if (!reg) continue;
-
-              const primaryFile = resolvedTargetFiles.find((f) => f.item.id === item.id && !f.isPairSecondary);
-              if (!primaryFile) continue;
-
-              const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, '');
-              mapItems.push({
-                save_path: basePath,
-                format: item.mapFormat || 'ros_standard',
-                region: {
-                  name: reg.name,
-                  rect: reg.rect,
-                  layerVisibility: {},
-                },
-                layers: preparedLayers,
-              });
-            }
-          }
-
-          // 5. Invoke Backend API
+          // 4. Invoke Backend API
           const result = await BackendAPI.executeExportPackage({
             root_dir: rootDir,
             conflict_resolution: activeProfile.conflictResolution,
-            session_timestamp: timestampStr,
+            session_timestamp: formatSessionTimestamp(sessionDate),
             waypoint_items: waypointItems,
             map_items: mapItems,
           });

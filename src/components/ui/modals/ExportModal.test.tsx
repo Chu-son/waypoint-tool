@@ -97,9 +97,24 @@ describe('ExportModal UI', () => {
 
     fireEvent.click(exportBtn);
 
-    await waitFor(() => {
-      expect(BackendAPI.executeExportPackage).toHaveBeenCalled();
-      expect(mockOnClose).toHaveBeenCalled();
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+    expect(BackendAPI.executeExportPackage).toHaveBeenCalledWith({
+      root_dir: '/mock/export/dir',
+      conflict_resolution: 'backup_file',
+      session_timestamp: expect.stringMatching(/^\d{8}_\d{6}$/),
+      waypoint_items: [
+        expect.objectContaining({
+          path: expect.stringMatching(/^\/mock\/export\/dir\/waypoints\/\d{8}_waypoints\.yaml$/),
+          waypoints: [expect.objectContaining({ id: 'wp1', x: 1, y: 2 })],
+        }),
+      ],
+      map_items: [
+        expect.objectContaining({
+          save_path: '/mock/export/dir/Map/area_1',
+          region: expect.objectContaining({ name: 'area_1' }),
+        }),
+      ],
     });
+    expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
   });
 });
