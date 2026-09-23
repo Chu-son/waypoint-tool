@@ -9,7 +9,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
-import { makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
+import { makeGroup, makeMapLayer, makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
+import { useAppStore } from '../../stores/appStore';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import type { AppState } from '../../stores/appStore';
 
@@ -241,6 +242,30 @@ describe('MapCanvas tools', () => {
       escape();
 
       expect(getAppState().nodes.a.transform).toMatchObject({ x: 10, y: 20 });
+    });
+  });
+
+  describe('fit to maps', () => {
+    it('frames both the maps and every waypoint, including ones added after the map', () => {
+      const { viewport } = renderCanvas({
+        mapLayers: [makeMapLayer('m', { width: 100, height: 100, info: { resolution: 0.1, origin: [0, 0, 0] } })],
+      });
+      // A waypoint far outside the map, nested in a group, added after the map was loaded.
+      act(() =>
+        useAppStore.setState(
+          waypointTree([makeGroup('g', ['far']), makeWaypoint('far', { transform: makeTransform(200, 200) })]),
+        ),
+      );
+
+      act(() => getAppState().triggerFitToMaps());
+      selectTool('add_point');
+      // Screen coordinates: after fitting, the viewport is no longer the identity transform.
+      fireEvent.pointerDown(viewport, { button: 0, pointerId: 1, clientX: 400, clientY: 400 });
+
+      // The screen centre now shows the centre of map (0..10) ∪ waypoint (200): about (100, 100).
+      const placed = Object.values(getAppState().nodes).find((n) => n.id !== 'far' && n.type === 'manual')!;
+      expect(placed.transform!.x).toBeCloseTo(100, 0);
+      expect(placed.transform!.y).toBeCloseTo(100, 0);
     });
   });
 

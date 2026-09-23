@@ -24,7 +24,14 @@ import { useAnnotationEdit } from './hooks/useAnnotationEdit';
 import { useBlendedPreview } from './hooks/useBlendedPreview';
 import { useCanvasTheme } from './hooks/useCanvasTheme';
 import { computePointsBoundingBox } from '../../utils/geometry';
-import { getPrecedingManualWaypoint, findNodeParentId } from '../../utils/treeUtils';
+import { getPrecedingManualWaypoint, findNodeParentId, getFlattenedNodeIds } from '../../utils/treeUtils';
+import {
+  contentBounds,
+  fitViewport,
+  screenToWorld as viewportScreenToWorld,
+  zoomAt,
+  type Viewport,
+} from './utils/viewport';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { MapLayerSprite } from './MapLayerSprite';
@@ -103,12 +110,17 @@ export function MapCanvas() {
   const lastContextMenuTime = useRef(0);
 
   const screenToWorld = useCallback(
-    (screenX: number, screenY: number) => {
-      let worldX = (screenX - (position.x + 400)) / scale;
-      let worldY = (position.y + 400 - screenY) / scale;
-      return { x: worldX, y: worldY };
-    },
+    (screenX: number, screenY: number) => viewportScreenToWorld(screenX, screenY, { scale, position }),
     [position, scale],
+  );
+
+  const applyViewport = useCallback(
+    (viewport: Viewport) => {
+      setScale(viewport.scale);
+      setMapScale(viewport.scale);
+      setPosition(viewport.position);
+    },
+    [setMapScale],
   );
 
   const occupancySettings = useAppStore((state) => state.occupancySettings);
@@ -735,98 +747,19 @@ export function MapCanvas() {
 
   const fitToMaps = useCallback(() => {
     if (!containerRef.current) return;
+    // Read the latest waypoints at call time so waypoints added after the maps are framed too.
+    const { nodes: currentNodes, rootNodeIds: currentRoots } = useAppStore.getState();
+    const waypointPositions = getFlattenedNodeIds(currentRoots, currentNodes)
+      .map((id) => currentNodes[id]?.transform)
+      .filter((t): t is NonNullable<typeof t> => !!t);
 
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    let hasContent = false;
-
-    mapLayers.forEach((layer) => {
-      // Fallback to width/height if info is not provided
-      const width = layer.info?.width || layer.width;
-      const height = layer.info?.height || layer.height;
-      const resolution = layer.info?.resolution || 0.05;
-      const originX = layer.info?.origin?.[0] || 0;
-      const originY = layer.info?.origin?.[1] || 0;
-      const originYaw = layer.info?.origin?.[2] || 0;
-
-      const w = (width || 1000) * resolution;
-      const h = (height || 1000) * resolution;
-
-      if (Math.abs(originYaw) < 1e-6) {
-        minX = Math.min(minX, originX);
-        minY = Math.min(minY, originY);
-        maxX = Math.max(maxX, originX + w);
-        maxY = Math.max(maxY, originY + h);
-      } else {
-        const cosY = Math.cos(originYaw);
-        const sinY = Math.sin(originYaw);
-        const corners: [number, number][] = [
-          [0, 0],
-          [w, 0],
-          [w, h],
-          [0, h],
-        ];
-        corners.forEach(([cx, cy]) => {
-          const wx = originX + cx * cosY - cy * sinY;
-          const wy = originY + cx * sinY + cy * cosY;
-          minX = Math.min(minX, wx);
-          minY = Math.min(minY, wy);
-          maxX = Math.max(maxX, wx);
-          maxY = Math.max(maxY, wy);
-        });
-      }
-      hasContent = true;
-    });
-
-    // Also include waypoints to ensure they are never cut off
-    rootNodeIds.forEach((id) => {
-      const node = nodes[id];
-      if (node && node.transform) {
-        minX = Math.min(minX, node.transform.x);
-        minY = Math.min(minY, node.transform.y);
-        maxX = Math.max(maxX, node.transform.x);
-        maxY = Math.max(maxY, node.transform.y);
-        hasContent = true;
-      }
-    });
-
-    if (!hasContent || minX === Infinity || maxX === -Infinity) return;
-
-    // Add 10% padding
-    const paddingX = Math.max((maxX - minX) * 0.1, 1.0);
-    const paddingY = Math.max((maxY - minY) * 0.1, 1.0);
-    minX -= paddingX;
-    maxX += paddingX;
-    minY -= paddingY;
-    maxY += paddingY;
+    const bounds = contentBounds(mapLayers, waypointPositions);
+    if (!bounds) return;
 
     const rect = containerRef.current.getBoundingClientRect();
-    const screenW = rect.width || window.innerWidth;
-    const screenH = rect.height || window.innerHeight;
-
-    const worldW = maxX - minX;
-    const worldH = maxY - minY;
-
-    if (worldW <= 0 || worldH <= 0) return;
-
-    const scaleX = (screenW * 0.9) / worldW;
-    const scaleY = (screenH * 0.9) / worldH;
-    const newScale = Math.min(scaleX, scaleY);
-
-    const clampedScale = Math.max(0.01, Math.min(500, newScale));
-
-    const worldCenterX = (minX + maxX) / 2;
-    const worldCenterY = (minY + maxY) / 2;
-
-    const newPosX = screenW / 2 - worldCenterX * clampedScale - 400;
-    const newPosY = screenH / 2 + worldCenterY * clampedScale - 400;
-
-    setScale(clampedScale);
-    setMapScale(clampedScale);
-    setPosition({ x: newPosX, y: newPosY });
-  }, [mapLayers]);
+    const viewport = fitViewport(bounds, rect.width || window.innerWidth, rect.height || window.innerHeight);
+    if (viewport) applyViewport(viewport);
+  }, [mapLayers, applyViewport]);
 
   const prevMapCount = useRef(0);
   useEffect(() => {
@@ -2021,27 +1954,8 @@ export function MapCanvas() {
 
     // Determine cursor position in screen space
     const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Determine current world coordinates under the cursor
-    const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-
-    const zoomFactor = -e.deltaY * 0.001;
-    // Increase max zoom limit significantly (e.g. from 10 to 500)
-    const newScale = Math.max(0.01, Math.min(500, scale * (1 + zoomFactor)));
-
-    // Calculate new position so that the world coordinates stay at the same screen coordinates
-    // screenX = worldX * newScale + newPosition.x + 400
-    const newPosX = mouseX - worldX * newScale - 400;
-
-    // container Y is inverted: screenY = -worldY * newScale + newPosition.y + 400
-    // newPosition.y = screenY + worldY * newScale - 400
-    const newPosY = mouseY + worldY * newScale - 400;
-
-    setScale(newScale);
-    setMapScale(newScale);
-    setPosition({ x: newPosX, y: newPosY });
+    const zoomFactor = 1 - e.deltaY * 0.001;
+    applyViewport(zoomAt({ scale, position }, e.clientX - rect.left, e.clientY - rect.top, zoomFactor));
   };
 
   const textStyle = useMemo(
