@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { buildProjectData } from './projectSlice';
+import { buildProjectData } from '../serialization/projectSerializer';
 import { StrictProjectData } from '../../types/store';
 import {
   DEFAULT_ROBOT_FOOTPRINT,

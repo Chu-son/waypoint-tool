@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { normalizeProjectData } from './projectSlice';
+import { normalizeProjectData } from '../serialization/projectSerializer';
 import { BackendAPI } from '../../api';
 import { PluginCustomLayer } from '../../types/store';
 

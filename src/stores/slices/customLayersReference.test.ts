@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
-import { normalizeProjectData } from './projectSlice';
+import { normalizeProjectData } from '../serialization/projectSerializer';
 import { prepareLayersForExport } from '../../services/mapRasterize';
 import { ProjectMapLayer } from '../../types/store';
 
