@@ -75,6 +75,14 @@
 - **`ToggleSwitch`** ([`src/components/ui/common/ToggleSwitch.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/ToggleSwitch.tsx))
   - **概要**: ON/OFF 状態を保持するアクセシブルなカスタムトグルスイッチ部品。
   - **主要Props**: `checked`, `onChange`, `disabled`, `title`
+- **`ContextMenu`** / **`ContextMenuItem`** / **`ContextMenuSeparator`** ([`src/components/ui/common/ContextMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/ContextMenu.tsx))
+  - **概要**: 右クリックメニュー。指定座標に固定表示し、外側クリックで閉じる。項目は選択後に自動でメニューを閉じる（`role="menu"` / `menuitem`）。ツリー・レイヤーパネルのメニューはすべてこれを使うこと。
+  - **主要Props**: `ContextMenu`: `x`, `y`, `onClose` / `ContextMenuItem`: `icon`, `onSelect`, `tone` (`default` | `danger`), `emphasis` (`normal` | `strong`)
+
+### 共通 Hooks (`src/hooks/`)
+- **`useClickOutside(ref, onOutside, enabled?)`**: 要素の外側でマウスが押されたときにコールバック（ドロップダウン・メニューのクローズ）。
+- **`useTreeItemSelection`** / **`useTreeReveal`**: ツリーのクリック・Shift 範囲選択、および選択要素までの自動展開・スクロール。
+- **`useResponsiveContainer`**: コンテナ幅に応じたレスポンシブ表示切り替え。
 
 
 ---
@@ -130,6 +138,10 @@
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
   - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
+  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：姿勢・不透明度・閾値）, `CustomLayerCard`, `RegionCard`
+- **ツリー部品** (`ui/trees/`): `WaypointTree` / `AnnotationTree` 本体と、行コンポーネント `WaypointTreeRow` / `AnnotationTreeRow`、挿入位置バー `InsertionBarItem`
+- **プラグイン入力フォーム** (`ui/plugins/`): `PluginInputEditor` が入力種別ごとに `PointInputForm` / `PointsListInputForm` / `RectangleInputForm` / `WaypointSelectInputForm` / `AnnotationSelectInputForm` / `CustomLayerSelectInputForm` を切り替える
+- **条件付き書式** (`ui/settings/`): `ConditionalStylesTab` が `ConditionEditor`（ネスト可能な条件グループ）と `StyleOverrideEditor`（要素別スタイル上書き）を組み合わせる
   - **主要Props**: なし
 - **`WaypointTreePanel`** ([`src/components/ui/trees/WaypointTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/WaypointTreePanel.tsx))
   - **概要**: ウェイポイントツリー (`WaypointTree`) を単独でフルハイト表示する専用パネルコンポーネント。
@@ -231,6 +243,11 @@
 9. **`ExportRegionLayer`**: マップ切り出しエクスポート枠
 10. **`SnappingGuideLayer`**: 直交スナップガイド線および数値入力 HUD（最前面）
 
+### Canvas 補助モジュール (`src/components/canvas/`)
+- **`MapLayerSprite`** (`MapLayerSprite.tsx`): 占有格子画像 1 枚を ROS 原点に合わせて描画し、占有ハイライトフィルタを適用。
+- **Hooks** (`canvas/hooks/`): `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
+- **純粋関数** (`canvas/utils/`): `viewport`（screen⇔world 変換・フィット・ズーム）, `hitTest`（矩形入力ハンドル判定・計測スナップ）, `canvasTheme`（フォールバックグリッド配色）, `labelLayout`（ラベル配置）
+
 ### Canvas レイヤー & フィルター群 (`src/components/canvas/`)
 - **`OccupancyHighlightFilter`** ([`src/components/canvas/filters/OccupancyHighlightFilter.ts`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/filters/OccupancyHighlightFilter.ts))
   - **概要**: マップ画像を 2D Occupancy Grid の 3 領域（Obstacle: 赤, Free: 緑, Unknown: 紫）にリアルタイム色分けする PixiJS GPU GLSL シェーダーフィルター。
@@ -266,7 +283,11 @@
 ## 6. コアストア & ユーティリティ (`src/stores/`, `src/utils/`)
 
 - **`useAppStore`** ([`src/stores/appStore.ts`](file:///home/chuson/develop/waypoint-tool/src/stores/appStore.ts))
-  - **概要**: 全状態とアクション（`nodeSlice`, `mapSlice`, `pluginSlice`, `projectSlice`, `uiSlice`）を提供するメインフック。
+  - **概要**: 全状態とアクション（`nodeSlice`, `mapSlice`, `pluginSlice`, `pathCalculatorSlice`, `projectSlice`, `uiSlice` ほか）を提供するメインフック。
+- **Services** (`src/services/`): ストアと API を組み合わせるユースケース
+  - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `mapRasterize`（レイヤーのラスタライズ）, `workflowActions`（カスタム UI ワークフロー）
+- **API アダプタ** (`src/api/`): `BackendAPI`（Tauri IPC）, `DialogAPI`（ファイル／確認／メッセージダイアログ）, `AppAPI`（バージョン・終了・ウィンドウ操作）。いずれも jsdom / ブラウザでは Mock 実装に自動切替。
+- **プラグイン出力・設定の純粋関数** (`src/utils/`): `pluginResult`（出力の正規化）, `pluginBindings`（パイプラインのバインディング解決）, `pluginRegistry`（カスタムプラグイン登録）, `pythonPath`（インタプリタ解決）, `exportPackage`（エクスポート要求の構築）, `footprint`（フットプリント幅）
 - **`transformUtils`** ([`src/utils/transformUtils.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/transformUtils.ts))
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
   - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`
