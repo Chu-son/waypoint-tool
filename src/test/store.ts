@@ -20,5 +20,15 @@ export function resetAppStore(overrides: Partial<AppState> = {}): void {
   useAppStore.setState({ ...initialState, ...overrides }, true);
 }
 
+/**
+ * A freshly-created store represents the very first launch, so the welcome modal is open and
+ * keyboard shortcuts are blocked. Spread this into the state to start from the idle editor.
+ */
+export const PAST_WELCOME: Partial<AppState> = {
+  isInitialLaunch: false,
+  isWelcomeModalOpen: false,
+  modalStack: [],
+};
+
 /** Shorthand for `useAppStore.getState()`. */
 export const getAppState = (): AppState => useAppStore.getState();

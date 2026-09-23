@@ -1,222 +1,152 @@
-import { render, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { ShortcutManager } from './ShortcutManager';
-import { useAppStore } from '../../stores/appStore';
-import { DialogAPI } from '../../api';
+import { BackendAPI, DialogAPI } from '../../api';
+import { renderWithStore } from '../../test/render';
+import { getAppState, PAST_WELCOME } from '../../test/store';
+import { makeWaypoint, waypointTree } from '../../test/fixtures';
+import type { AppState } from '../../stores/appStore';
 
-// Mock useAppStore and DialogAPI
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: vi.fn(),
-}));
+const press = (key: string, modifiers: Partial<KeyboardEventInit> = {}) =>
+  fireEvent.keyDown(window, { key, ...modifiers });
 
-vi.mock('../../api', () => ({
-  DialogAPI: {
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
+const twoWaypoints = () => waypointTree([makeWaypoint('node-1'), makeWaypoint('node-2')]);
+
+const renderShortcuts = (state: Partial<AppState> = {}) =>
+  renderWithStore(<ShortcutManager />, { ...PAST_WELCOME, ...state });
 
 describe('ShortcutManager', () => {
-  const mockRemoveNodes = vi.fn();
-  const mockSelectAllNodes = vi.fn();
-  const mockSelectNodes = vi.fn();
-  const mockSetExportModalOpen = vi.fn();
-  const mockLoadProject = vi.fn();
-  const mockSaveProject = vi.fn();
-  const mockSaveProjectAs = vi.fn();
-  const mockResetProject = vi.fn();
-  const mockSetRightPanelActiveTab = vi.fn();
-  const mockSetActiveTool = vi.fn();
-  const mockSetActivePlugin = vi.fn();
-  const mockClearPluginInteractionData = vi.fn();
-  const mockSetAnnotationEditMode = vi.fn();
-  const mockSetMapEditMode = vi.fn();
-  const mockSetShowOccupancyHighlight = vi.fn();
+  it('Delete removes the selected waypoints', () => {
+    renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).getState = vi.fn().mockReturnValue({ isDirty: false });
-    (useAppStore as any).mockReturnValue({
-      selectedNodeIds: [],
-      activeTool: 'select',
-      removeNodes: mockRemoveNodes,
-      selectAllNodes: mockSelectAllNodes,
-      selectNodes: mockSelectNodes,
-      setExportModalOpen: mockSetExportModalOpen,
-      loadProject: mockLoadProject,
-      saveProject: mockSaveProject,
-      saveProjectAs: mockSaveProjectAs,
-      resetProject: mockResetProject,
-      setRightPanelActiveTab: mockSetRightPanelActiveTab,
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-      clearPluginInteractionData: mockClearPluginInteractionData,
-      setAnnotationEditMode: mockSetAnnotationEditMode,
-      setMapEditMode: mockSetMapEditMode,
-      setShowOccupancyHighlight: mockSetShowOccupancyHighlight,
-      showOccupancyHighlight: false,
+    press('Delete');
+
+    expect(getAppState().rootNodeIds).toEqual(['node-2']);
+    expect(getAppState().nodes['node-1']).toBeUndefined();
+  });
+
+  it('Ctrl+A selects every waypoint', () => {
+    renderShortcuts(twoWaypoints());
+
+    press('a', { ctrlKey: true });
+
+    expect(getAppState().selectedNodeIds).toEqual(['node-1', 'node-2']);
+  });
+
+  it('Ctrl+S overwrites the current project file after confirmation', async () => {
+    vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+    const save = vi.spyOn(BackendAPI, 'saveProject').mockResolvedValue();
+    renderShortcuts({ currentProjectPath: '/work/site.wptroj' });
+
+    press('s', { ctrlKey: true });
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith('/work/site.wptroj', expect.anything()));
+  });
+
+  it('Ctrl+Shift+S asks for a new location even when the project has a path', async () => {
+    const saveDialog = vi.spyOn(DialogAPI, 'save').mockResolvedValue('/work/copy');
+    const save = vi.spyOn(BackendAPI, 'saveProject').mockResolvedValue();
+    renderShortcuts({ currentProjectPath: '/work/site.wptroj' });
+
+    press('s', { ctrlKey: true, shiftKey: true });
+
+    await waitFor(() => expect(save).toHaveBeenCalledWith('/work/copy.wptroj', expect.anything()));
+    expect(saveDialog).toHaveBeenCalledTimes(1);
+  });
+
+  it('Ctrl+O opens the project file picker', async () => {
+    const open = vi.spyOn(DialogAPI, 'open').mockResolvedValue(null);
+    renderShortcuts();
+
+    press('o', { ctrlKey: true });
+
+    await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+  });
+
+  it('Ctrl+N starts a new project', async () => {
+    renderShortcuts(twoWaypoints());
+
+    press('n', { ctrlKey: true });
+
+    await waitFor(() => expect(getAppState().rootNodeIds).toEqual([]));
+  });
+
+  describe('with unsaved changes', () => {
+    it('Ctrl+N keeps the project when the user declines to discard changes', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      renderShortcuts({ ...twoWaypoints(), isDirty: true });
+
+      press('n', { ctrlKey: true });
+
+      await waitFor(() => expect(ask).toHaveBeenCalled());
+      expect(getAppState().rootNodeIds).toEqual(['node-1', 'node-2']);
+    });
+
+    it('Ctrl+O does not open a project when the user declines to discard changes', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      const open = vi.spyOn(DialogAPI, 'open');
+      renderShortcuts({ isDirty: true });
+
+      press('o', { ctrlKey: true });
+
+      await waitFor(() => expect(ask).toHaveBeenCalled());
+      expect(open).not.toHaveBeenCalled();
     });
   });
 
-  it('triggers removeNodes on Delete key when nodes are selected', () => {
-    (useAppStore as any).mockReturnValue({
-      selectedNodeIds: ['node-1'],
-      removeNodes: mockRemoveNodes,
-    });
-    render(<ShortcutManager />);
+  it('V and P switch between the select and add-waypoint tools', () => {
+    renderShortcuts();
 
-    fireEvent.keyDown(window, { key: 'Delete' });
-    expect(mockRemoveNodes).toHaveBeenCalledWith(['node-1']);
+    press('p');
+    expect(getAppState().activeTool).toBe('add_point');
+    expect(getAppState().appMode.mode).toBe('waypoint_add');
+
+    press('v');
+    expect(getAppState().activeTool).toBe('select');
+    expect(getAppState().appMode.mode).toBe('select');
   });
 
-  it('triggers selectAllNodes on Ctrl+A', () => {
-    render(<ShortcutManager />);
+  it('Ctrl+E opens the export dialog', () => {
+    renderShortcuts();
 
-    fireEvent.keyDown(window, { key: 'a', ctrlKey: true });
-    expect(mockSelectAllNodes).toHaveBeenCalled();
+    press('e', { ctrlKey: true });
+
+    expect(getAppState().isExportModalOpen).toBe(true);
   });
 
-  it('triggers saveProject on Ctrl+S', () => {
-    render(<ShortcutManager />);
+  it('Escape clears the current selection', () => {
+    renderShortcuts(twoWaypoints());
+    act(() => getAppState().selectNodes(['node-1']));
 
-    fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: false });
-    expect(mockSaveProject).toHaveBeenCalled();
-    expect(mockSaveProjectAs).not.toHaveBeenCalled();
+    press('Escape');
+
+    expect(getAppState().selectedNodeIds).toEqual([]);
   });
 
-  it('triggers saveProjectAs on Ctrl+Shift+S', () => {
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: true });
-    expect(mockSaveProjectAs).toHaveBeenCalled();
-    expect(mockSaveProject).not.toHaveBeenCalled();
-  });
-
-  it('triggers loadProject on Ctrl+O', async () => {
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'o', ctrlKey: true });
-    await waitFor(() => {
-      expect(mockLoadProject).toHaveBeenCalled();
-    });
-  });
-
-  it('triggers resetProject on Ctrl+N', async () => {
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
-    await waitFor(() => {
-      expect(mockResetProject).toHaveBeenCalled();
-    });
-  });
-
-  it('blocks resetProject on Ctrl+N when dirty and user cancels', async () => {
-    (useAppStore as any).getState = vi.fn().mockReturnValue({ isDirty: true });
-    (DialogAPI.ask as any).mockResolvedValueOnce(false);
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
-    await waitFor(() => {
-      expect(DialogAPI.ask).toHaveBeenCalled();
-    });
-    expect(mockResetProject).not.toHaveBeenCalled();
-  });
-
-  it('blocks loadProject on Ctrl+O when dirty and user cancels', async () => {
-    (useAppStore as any).getState = vi.fn().mockReturnValue({ isDirty: true });
-    (DialogAPI.ask as any).mockResolvedValueOnce(false);
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'o', ctrlKey: true });
-    await waitFor(() => {
-      expect(DialogAPI.ask).toHaveBeenCalled();
-    });
-    expect(mockLoadProject).not.toHaveBeenCalled();
-  });
-
-  it('switches tool via V and P shortcuts', () => {
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'v' });
-    expect(mockSetActiveTool).toHaveBeenCalledWith('select');
-
-    fireEvent.keyDown(window, { key: 'p' });
-    expect(mockSetActiveTool).toHaveBeenCalledWith('add_point');
-  });
-
-  it('triggers setExportModalOpen on Ctrl+E', () => {
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'e', ctrlKey: true });
-    expect(mockSetExportModalOpen).toHaveBeenCalledWith(true);
-  });
-
-  it('triggers handleGlobalEscape on Escape key', () => {
-    const mockHandleGlobalEscape = vi.fn().mockReturnValue(true);
-    (useAppStore as any).mockReturnValue({
-      handleGlobalEscape: mockHandleGlobalEscape,
-    });
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(mockHandleGlobalEscape).toHaveBeenCalledTimes(1);
-  });
-
-  it('resets selection and tool on Escape when handleGlobalEscape is absent (fallback)', () => {
-    (useAppStore as any).mockReturnValue({
-      selectedNodeIds: ['node-1'],
-      activeTool: 'add',
-      selectNodes: mockSelectNodes,
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-      clearPluginInteractionData: mockClearPluginInteractionData,
-      setAnnotationEditMode: mockSetAnnotationEditMode,
-      setMapEditMode: mockSetMapEditMode,
-      setRightPanelActiveTab: mockSetRightPanelActiveTab,
-    });
-    render(<ShortcutManager />);
-
-    fireEvent.keyDown(window, { key: 'Escape' });
-
-    expect(mockSelectNodes).toHaveBeenCalledWith([]);
-    expect(mockSetActiveTool).toHaveBeenCalledWith('select');
-    expect(mockSetActivePlugin).toHaveBeenCalledWith(null);
-    expect(mockClearPluginInteractionData).toHaveBeenCalled();
-    expect(mockSetAnnotationEditMode).toHaveBeenCalledWith(false);
-    expect(mockSetMapEditMode).toHaveBeenCalledWith(false);
-    expect(mockSetRightPanelActiveTab).toHaveBeenCalledWith('layers');
-  });
-
-  it('ignores shortcuts when focused on INPUT', () => {
-    render(<ShortcutManager />);
-
+  it('ignores shortcuts while typing in a text field', () => {
+    renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
     const input = document.createElement('input');
     document.body.appendChild(input);
     input.focus();
 
-    fireEvent.keyDown(window, { key: 'Delete' });
-    expect(mockRemoveNodes).not.toHaveBeenCalled();
+    press('Delete');
 
-    document.body.removeChild(input);
+    expect(getAppState().rootNodeIds).toEqual(['node-1', 'node-2']);
+    input.remove();
   });
 
-  it('blocks shortcuts other than Escape when any modal is open (modalStack not empty)', () => {
-    (useAppStore as any).getState = vi.fn().mockReturnValue({
+  it('ignores shortcuts other than Escape while a modal is open', () => {
+    renderShortcuts({
+      ...twoWaypoints(),
+      selectedNodeIds: ['node-1'],
       modalStack: ['settings'],
       isSettingsModalOpen: true,
     });
-    (useAppStore as any).mockReturnValue({
-      selectedNodeIds: ['node-1'],
-      removeNodes: mockRemoveNodes,
-      selectAllNodes: mockSelectAllNodes,
-    });
-    render(<ShortcutManager />);
 
-    // Delete should be blocked
-    fireEvent.keyDown(window, { key: 'Delete' });
-    expect(mockRemoveNodes).not.toHaveBeenCalled();
+    press('Delete');
+    press('a', { ctrlKey: true });
 
-    // Ctrl+A should be blocked
-    fireEvent.keyDown(window, { key: 'a', ctrlKey: true });
-    expect(mockSelectAllNodes).not.toHaveBeenCalled();
+    expect(getAppState().rootNodeIds).toEqual(['node-1', 'node-2']);
+    expect(getAppState().selectedNodeIds).toEqual(['node-1']);
   });
 });
