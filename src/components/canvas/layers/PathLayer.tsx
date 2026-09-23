@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import * as PIXI from 'pixi.js';
 import { getFlattenedWaypointIds, getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
+import { getFootprintWidth } from '../../../utils/footprint';
 import { resolvePathConditionalStyle, parseColorSafe, drawDashedLine } from '../../../utils/conditionalStyles';
 
 export function PathLayer({ scale }: { scale: number }) {
@@ -25,21 +26,8 @@ export function PathLayer({ scale }: { scale: number }) {
   }, [rootNodeIds, nodes, insertionTarget]);
 
   const baseEffectiveWidth = useMemo(() => {
-    let w = Math.max(0.01, pathWidth);
-    if (syncPathWidthWithFootprint && robotFootprint) {
-      if (robotFootprint.type === 'circular') {
-        w = (robotFootprint.radius || 0.25) * 2;
-      } else if (robotFootprint.type === 'rectangular') {
-        w = robotFootprint.width || 0.5;
-      } else if (robotFootprint.type === 'polygon' && robotFootprint.points && robotFootprint.points.length > 0) {
-        const maxR = Math.max(
-          ...robotFootprint.points.map((p: any) => (Array.isArray(p) ? Math.hypot(p[0], p[1]) : Math.hypot(p.x, p.y))),
-          0.25,
-        );
-        w = maxR * 2;
-      }
-    }
-    return w;
+    if (syncPathWidthWithFootprint && robotFootprint) return getFootprintWidth(robotFootprint);
+    return Math.max(0.01, pathWidth);
   }, [pathWidth, syncPathWidthWithFootprint, robotFootprint]);
 
   const defaultColorNum = useMemo(() => {

@@ -12,6 +12,7 @@ import { NumericInput } from '../common/NumericInput';
 import { Route, RefreshCcw, ChevronDown } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { PATH_COLOR_PRESETS, DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
+import { getFootprintWidth } from '../../../utils/footprint';
 
 export function PathRouterMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,17 +38,7 @@ export function PathRouterMenu() {
   const setSyncPathWidthWithFootprint = useAppStore((state) => state.setSyncPathWidthWithFootprint);
   const robotFootprint = useAppStore((state) => state.robotFootprint);
 
-  let currentFootprintWidth = 0.5;
-  if (robotFootprint) {
-    if (robotFootprint.type === 'circular') {
-      currentFootprintWidth = (robotFootprint.radius || 0.25) * 2;
-    } else if (robotFootprint.type === 'rectangular') {
-      currentFootprintWidth = robotFootprint.width || 0.5;
-    } else if (robotFootprint.type === 'polygon' && robotFootprint.points && robotFootprint.points.length > 0) {
-      const maxR = Math.max(...robotFootprint.points.map((p: any) => Math.hypot(p.x, p.y)), 0.25);
-      currentFootprintWidth = maxR * 2;
-    }
-  }
+  const currentFootprintWidth = robotFootprint ? getFootprintWidth(robotFootprint) : 0.5;
 
   const pathPlugins = Object.values(plugins).filter(
     (p) => p && p.manifest && p.manifest.category === 'path_calculator',

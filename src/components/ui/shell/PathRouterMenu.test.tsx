@@ -31,6 +31,24 @@ describe('PathRouterMenu', () => {
     expect(screen.getByText('Dijkstra Avoidance')).toBeInTheDocument();
   });
 
+  it('shows the footprint width of a polygon footprint when the path width follows the footprint', () => {
+    renderWithStore(<PathRouterMenu />, {
+      plugins: {},
+      syncPathWidthWithFootprint: true,
+      robotFootprint: {
+        type: 'polygon',
+        points: [
+          [0.3, 0.4],
+          [-0.3, 0.4],
+          [0, -0.2],
+        ],
+      },
+    });
+    fireEvent.click(screen.getByTitle('Path Routing Settings'));
+
+    expect(screen.getByText('(Footprint: 1.00m)')).toBeInTheDocument();
+  });
+
   it('activates the chosen path calculator', () => {
     renderMenu();
     fireEvent.click(screen.getByTitle('Path Routing Settings'));
