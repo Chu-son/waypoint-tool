@@ -1,6 +1,6 @@
 import { AppState, useAppStore } from '../stores/appStore';
 import { DialogAPI, BackendAPI } from '../api';
-import { AnnotationToolType } from '../stores/slices/annotationSlice';
+import type { AnnotationToolType } from '../types/ui';
 import { v4 as uuidv4 } from 'uuid';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;

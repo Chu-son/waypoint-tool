@@ -1,7 +1,7 @@
 import { useAppStore } from '../../../stores/appStore';
 import { WaypointNode } from '../../../types/store';
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from '../../../utils/transformUtils';
-import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import type { ElementCopyField } from '../../../types/ui';
 import { TransformField } from './TransformField';
 import { PropertySectionHeader } from './PropertySectionHeader';
 import { Anchor } from 'lucide-react';

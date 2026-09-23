@@ -2,7 +2,7 @@ import { RotateCcw, FlipHorizontal2, RotateCw } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
 import { WaypointNode, Transform } from '../../../types/store';
 import { quaternionToYaw, yawToQuaternion } from '../../../utils/transformUtils';
-import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import type { ElementCopyField } from '../../../types/ui';
 import { Button } from '../common/Button';
 import { TransformField } from './TransformField';
 import { PropertySectionHeader } from './PropertySectionHeader';

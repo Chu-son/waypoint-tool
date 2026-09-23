@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore';
 import { FloatingActionBanner } from './common/FloatingActionBanner';
 import { Button } from './common/Button';
 import { CircleDot, Navigation, Minus, Square, Circle, MousePointer, Check, Trash2, Palette } from 'lucide-react';
-import { AnnotationToolType } from '../../stores/slices/annotationSlice';
+import type { AnnotationToolType } from '../../types/ui';
 import { useResponsiveContainer } from '../../hooks/useResponsiveContainer';
 
 import { ANNOTATION_COLOR_PRESETS } from '../../utils/colorPresets';

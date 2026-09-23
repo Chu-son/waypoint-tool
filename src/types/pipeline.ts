@@ -1,5 +1,3 @@
-import { PluginInputDef, OptionDef } from './store';
-
 export interface PipelineStepExportsDef {
   custom_layers?: boolean;
   waypoints?: boolean;
@@ -41,35 +39,4 @@ export interface PythonDependencyDef {
   version?: string;
   optional?: boolean;
   description?: string;
-}
-
-export interface ManualInputItem {
-  stepId: string;
-  stepName?: string;
-  pluginId: string;
-  inputId: string;
-  label: string;
-  inputDef: PluginInputDef;
-  defaultValue?: any;
-}
-
-export interface ManualPropertyItem {
-  stepId: string;
-  stepName?: string;
-  pluginId: string;
-  propertyName: string;
-  label: string;
-  propertyDef: OptionDef;
-  defaultValue?: any;
-}
-
-export interface PipelineExecutionSetup {
-  pipelineId: string;
-  pipelineName?: string;
-  manualInputs: ManualInputItem[];
-  manualProperties: ManualPropertyItem[];
-  defaultInputs: Record<string, Record<string, any>>;
-  defaultProperties: Record<string, Record<string, any>>;
-  missingPlugins: string[];
-  errors: string[];
 }

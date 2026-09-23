@@ -1,10 +1,10 @@
-import { ObjectNode, OptionsSchema } from '../types/store';
+import type { WaypointNode, OptionsSchema } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
 
 export interface ExportedWaypointItem {
   index: number;
   id: string;
-  type: ObjectNode['type'];
+  type: WaypointNode['type'];
   x: number;
   y: number;
   z: number;
@@ -18,7 +18,7 @@ export interface ExportedWaypointItem {
 
 export function extractWaypointsForExport(
   rootNodeIds: string[],
-  nodes: Record<string, ObjectNode>,
+  nodes: Record<string, WaypointNode>,
   optionsSchema: OptionsSchema | null,
   indexStartIndex: number = 0,
 ): ExportedWaypointItem[] {

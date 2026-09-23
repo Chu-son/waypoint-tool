@@ -1,13 +1,12 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { AnnotationObject, AnnotationGroup } from '../../types/store';
+import type { AnnotationToolType } from '../../types/ui';
 import { v4 as uuidv4 } from 'uuid';
 import { findHighestLevelParent, collectDescendantIds, getNextSequentialName } from '../../utils/treeUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { AnnotationClipboardPayload } from '../../utils/mapElementClipboard';
-
-export type AnnotationToolType = 'select' | 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
 
 export interface AnnotationSlice {
   annotationObjects: Record<string, AnnotationObject>;

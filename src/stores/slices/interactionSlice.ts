@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { AppModeState, AppModeTransition } from '../../types/mode';
 import { ActiveSelection } from '../../types/selection';
 import { ModalType, ModalStack } from '../../types/modal';

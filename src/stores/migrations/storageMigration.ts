@@ -1,13 +1,11 @@
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 import { DefaultExportFormat, PluginSetting } from '../../types/store';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
+import type { PanelLayout } from '../../types/ui';
+
+export type { PanelLayout };
 
 export const STORAGE_VERSION = 3;
-
-export interface PanelLayout {
-  leftTabs: string[];
-  rightTabs: string[];
-}
 
 export const DEFAULT_PANEL_LAYOUT: PanelLayout = {
   leftTabs: ['waypoints', 'annotations', 'plugins'],

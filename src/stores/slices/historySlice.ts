@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { WaypointNode, CustomLayer, AnnotationObject, InsertionTarget } from '../../types/store';
 import { ActiveSelection } from '../../types/selection';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';

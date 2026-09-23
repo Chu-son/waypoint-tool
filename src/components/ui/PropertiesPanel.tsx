@@ -9,7 +9,7 @@ import { RelativeTransformGroup } from './properties/RelativeTransformGroup';
 import { AnchorTransformGroup } from './properties/AnchorTransformGroup';
 import { CustomOptionsGroup } from './properties/CustomOptionsGroup';
 import { ElementCopyContextMenu } from './properties/ElementCopyContextMenu';
-import { ElementCopyField } from '../../stores/slices/uiSlice';
+import type { ElementCopyField } from '../../types/ui';
 import { EmptyState } from './common/EmptyState';
 import { Anchor } from 'lucide-react';
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from '../../utils/transformUtils';

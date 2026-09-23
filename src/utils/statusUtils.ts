@@ -1,4 +1,4 @@
-import { AppState } from '../stores/appStore';
+import type { AppState } from '../stores/appStore';
 import { getFlattenedWaypointIds } from './treeUtils';
 import { WaypointNode } from '../types/store';
 

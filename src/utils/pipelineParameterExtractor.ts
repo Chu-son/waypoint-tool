@@ -1,5 +1,5 @@
 import { PluginInstance, PluginInputDef, OptionDef } from '../types/store';
-import type { PipelineExecutionSetup } from '../types/pipeline';
+import type { PipelineExecutionSetup } from '../types/pipelineSetup';
 
 /**
  * Checks if a given plugin input definition is bound by the pipeline step bindings.

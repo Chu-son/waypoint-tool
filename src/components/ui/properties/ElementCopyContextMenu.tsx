@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import type { ElementCopyField } from '../../../types/ui';
 import { Button } from '../common/Button';
 import { FieldLabel } from '../common/FieldLabel';
 import { cn } from '../../../utils/cn';

@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { CustomUiConfig } from '../../types/customUi';
 import { BackendAPI } from '../../api';
 

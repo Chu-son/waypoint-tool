@@ -1,18 +1,9 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { v4 as uuidv4 } from 'uuid';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
-import { PanelLayout, DEFAULT_PANEL_LAYOUT } from '../migrations/storageMigration';
-
-export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
-export type ElementCopyCoordSystem = 'world' | 'anchor';
-
-export type ElementCopyState = {
-  field: ElementCopyField;
-  value: number;
-  coordSystem: ElementCopyCoordSystem;
-  previewNodeId: string | null;
-} | null;
+import { DEFAULT_PANEL_LAYOUT } from '../migrations/storageMigration';
+import type { ElementCopyState, PanelLayout } from '../../types/ui';
 
 export interface TreeRevealTarget {
   type: 'node' | 'annotation';

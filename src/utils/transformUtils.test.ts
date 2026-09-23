@@ -6,7 +6,7 @@ import {
   calculateAnchorRelativeTransform,
 } from './transformUtils';
 import { WaypointNode } from '../types/store';
-import { ElementCopyState } from '../stores/slices/uiSlice';
+import type { ElementCopyState } from '../types/ui';
 
 describe('transformUtils', () => {
   it('quaternionToYaw and yawToQuaternion convert correctly', () => {

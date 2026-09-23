@@ -1,5 +1,5 @@
 import { WaypointNode, Transform } from '../types/store';
-import { ElementCopyState } from '../stores/slices/uiSlice';
+import type { ElementCopyState } from '../types/ui';
 
 export interface AnchorRelativeTransform {
   relX: number;

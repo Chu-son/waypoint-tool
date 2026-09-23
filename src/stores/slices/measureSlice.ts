@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { v4 as uuidv4 } from 'uuid';
 import { LineAnnotation, AnnotationObject } from '../../types/store';
 
