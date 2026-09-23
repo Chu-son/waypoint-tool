@@ -34,6 +34,7 @@ import { VenvSetupModal } from './VenvSetupModal';
 import { BackendAPI } from '../../../api';
 import { PluginInstance } from '../../../types/store';
 import { notify } from '../../../services/notify';
+import { resolvePythonPath } from '../../../utils/pythonPath';
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -62,8 +63,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
         p.manifest.python_dependencies.length > 0
       ) {
         const pkgNames = p.manifest.python_dependencies.map((d: any) => (typeof d === 'string' ? d : d.name));
-        const setting = pluginSettings.find((s) => s.id === p.id);
-        const pythonPath = setting?.pythonOverridePath?.trim() || globalPythonPath?.trim() || 'python3';
+        const pythonPath = resolvePythonPath(p, pluginSettings, globalPythonPath);
 
         setIsCheckingPackages((prev) => ({ ...prev, [p.id]: true }));
         try {

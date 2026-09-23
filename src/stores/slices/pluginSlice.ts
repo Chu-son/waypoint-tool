@@ -19,6 +19,7 @@ import { applyGeneratorStash, computeGeneratorStash } from '../../utils/generato
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';
 import { cloneSelection } from './historySlice';
+import { resolvePythonPath } from '../../utils/pythonPath';
 import { v4 as uuidv4 } from 'uuid';
 
 export type PluginPlacement = { type: 'replace_ids'; ids: string[] } | { type: 'use_insertion_target' };
@@ -364,13 +365,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       contextData.robot_footprint = robotFootprint;
     }
 
-    let pythonPathToUse = globalPythonPath?.trim() || 'python3';
-    if (plugin.manifest.type === 'python') {
-      const setting = pluginSettings.find((s) => s.id === plugin.id);
-      if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== '') {
-        pythonPathToUse = setting.pythonOverridePath.trim();
-      }
-    }
+    const pythonPathToUse = resolvePythonPath(plugin, pluginSettings, globalPythonPath);
 
     const needsOccupancyGrid = plugin.manifest.needs?.some(
       (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
@@ -914,13 +909,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
 
         // 5. Python interpreter path
-        let pythonPathToUse = get().globalPythonPath?.trim() || 'python3';
-        if (targetPlugin.manifest?.type === 'python') {
-          const setting = get().pluginSettings.find((s) => s.id === targetPlugin.id);
-          if (setting?.pythonOverridePath?.trim()) {
-            pythonPathToUse = setting.pythonOverridePath.trim();
-          }
-        }
+        const pythonPathToUse = resolvePythonPath(targetPlugin, get().pluginSettings, get().globalPythonPath);
 
         // 6. Pass map layers and custom layers (including intermediate non-exported layers)
         const allAvailableCustomLayers = [...get().customLayers, ...intermediateLayers];
@@ -1539,13 +1528,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
 
     try {
-      let pythonPathToUse = globalPythonPath?.trim() || 'python3';
-      if (plugin.manifest.type === 'python') {
-        const setting = pluginSettings.find((s) => s.id === plugin.id);
-        if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== '') {
-          pythonPathToUse = setting.pythonOverridePath.trim();
-        }
-      }
+      const pythonPathToUse = resolvePythonPath(plugin, pluginSettings, globalPythonPath);
 
       const contextData: any = {
         waypoints,
