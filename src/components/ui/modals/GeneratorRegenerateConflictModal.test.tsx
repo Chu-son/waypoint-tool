@@ -40,7 +40,7 @@ describe('GeneratorRegenerateConflictModal', () => {
         summary={dummySummary}
         onDiscardAndRegenerate={vi.fn()}
         onStashAndRegenerate={vi.fn()}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -54,7 +54,7 @@ describe('GeneratorRegenerateConflictModal', () => {
         generatorName="Path Gen Test"
         onDiscardAndRegenerate={vi.fn()}
         onStashAndRegenerate={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText('手動変更の検知 - 再生成の確認')).toBeInTheDocument();
@@ -76,7 +76,7 @@ describe('GeneratorRegenerateConflictModal', () => {
         summary={dummySummary}
         onDiscardAndRegenerate={onDiscard}
         onStashAndRegenerate={onStash}
-      />
+      />,
     );
 
     // Click Cancel

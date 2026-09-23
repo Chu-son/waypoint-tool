@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { RobotFootprint } from '../../../types/store';
 import { quaternionToYaw } from '../../../utils/transformUtils';
 import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { CANVAS_FOOTPRINT_SELECTED_COLOR, CANVAS_MUTED_COLOR } from '../canvasConstants';
 import {
   parseColorSafe,
   resolveFootprintConditionalStyle,
@@ -23,27 +24,38 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   const conditionalStyles = useAppStore((state) => state.conditionalStyles);
   const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
 
-  if (!robotFootprint) return null;
-
   // Collect all renderable nodes (same logic as WaypointLayer)
-  const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
-  const renderableNodes = flatIds
-    .map(id => nodes[id])
-    .filter(node => node && node.transform)
-    .map(node => ({ node }));
-
-  const safeScale = Math.max(scale, 0.001);
+  const renderableNodes = useMemo(
+    () =>
+      getFlattenedWaypointIds(rootNodeIds, nodes)
+        .map((id) => nodes[id])
+        .filter((node) => node && node.transform)
+        .map((node) => ({ node })),
+    [rootNodeIds, nodes],
+  );
 
   // 条件付き書式のメモ化キャッシュ
   const resolvedFpMap = useMemo(() => {
     const map = new Map<string, ResolvedFootprintStyle>();
-    if (!conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0) return map;
+    if (!robotFootprint || !conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0)
+      return map;
     renderableNodes.forEach(({ node }, idx) => {
-      const style = resolveFootprintConditionalStyle(node, robotFootprint, conditionalStyles, conditionalStylesEnabled, optionsSchema, { index: idx });
+      const style = resolveFootprintConditionalStyle(
+        node,
+        robotFootprint,
+        conditionalStyles,
+        conditionalStylesEnabled,
+        optionsSchema,
+        { index: idx },
+      );
       if (style) map.set(node.id, style);
     });
     return map;
   }, [renderableNodes, robotFootprint, conditionalStyles, conditionalStylesEnabled, optionsSchema]);
+
+  if (!robotFootprint) return null;
+
+  const safeScale = Math.max(scale, 0.001);
 
   return (
     <>
@@ -63,22 +75,20 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
         const px = isFinite(transform.x) ? transform.x : 0;
         const py = isFinite(transform.y) ? transform.y : 0;
 
-        const baseStroke = condStyle?.strokeColor ? parseColorSafe(condStyle.strokeColor, 0x94a3b8) : 0x94a3b8;
-        const baseFill = condStyle?.fillColor ? parseColorSafe(condStyle.fillColor, 0x94a3b8) : 0x94a3b8;
+        const baseStroke = condStyle?.strokeColor
+          ? parseColorSafe(condStyle.strokeColor, CANVAS_MUTED_COLOR)
+          : CANVAS_MUTED_COLOR;
+        const baseFill = condStyle?.fillColor
+          ? parseColorSafe(condStyle.fillColor, CANVAS_MUTED_COLOR)
+          : CANVAS_MUTED_COLOR;
 
-        const strokeColor = isSelected ? 0x38bdf8 : baseStroke;
-        const strokeWidth = isSelected ? 1.5 / safeScale : ((condStyle?.strokeWidth ?? 1.0) / safeScale);
-        const fillColor = isSelected ? 0x38bdf8 : baseFill;
+        const strokeColor = isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseStroke;
+        const strokeWidth = isSelected ? 1.5 / safeScale : (condStyle?.strokeWidth ?? 1.0) / safeScale;
+        const fillColor = isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseFill;
         const fillAlpha = isSelected ? 0.18 : (condStyle?.fillAlpha ?? 0.05);
 
         return (
-          <pixiContainer
-            key={`footprint-${node.id}`}
-            x={px}
-            y={py}
-            rotation={yaw}
-            eventMode="none"
-          >
+          <pixiContainer key={`footprint-${node.id}`} x={px} y={py} rotation={yaw} eventMode="none">
             <pixiGraphics
               eventMode="none"
               draw={(g) => {
@@ -96,12 +106,7 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   );
 }
 
-function drawFootprintShape(
-  g: any,
-  footprint: RobotFootprint,
-  safeScale: number,
-  isSelected: boolean
-) {
+function drawFootprintShape(g: any, footprint: RobotFootprint, safeScale: number, isSelected: boolean) {
   if (footprint.type === 'circular') {
     const r = footprint.radius;
     g.circle(0, 0, r);

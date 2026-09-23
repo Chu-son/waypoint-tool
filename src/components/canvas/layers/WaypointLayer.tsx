@@ -1,9 +1,16 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { TextStyle, FederatedPointerEvent } from 'pixi.js';
-import { computeLabelOffsets, LabelCandidate } from '../../../utils/labelLayout';
+import { computeLabelOffsets, LabelCandidate } from '../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
-import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_HOVER_COLOR } from '../canvasConstants';
+import { quaternionToYaw } from '../../../utils/transformUtils';
+import {
+  CANVAS_ACCENT_COLOR,
+  CANVAS_ACCENT_HOVER_COLOR,
+  CANVAS_CONTRAST_COLOR,
+  CANVAS_HIT_AREA_COLOR,
+  WAYPOINT_COLORS,
+} from '../canvasConstants';
 import {
   parseColorSafe,
   resolveWaypointConditionalStyle,
@@ -11,11 +18,7 @@ import {
 } from '../../../utils/conditionalStyles';
 import { WaypointShape } from '../../../types/store';
 
-function drawWaypointShape(
-  g: any,
-  shape: WaypointShape,
-  s: number
-) {
+function drawWaypointShape(g: any, shape: WaypointShape, s: number) {
   if (shape === 'circle') {
     g.circle(0, 0, 6 * s);
     g.fill();
@@ -94,26 +97,26 @@ export function WaypointLayer({
   onNodeHandlePointerDown,
   onNodeContextMenu,
 }: WaypointLayerProps) {
-  const rootNodeIds = useAppStore(state => state.rootNodeIds);
-  const nodes = useAppStore(state => state.nodes);
-  const insertionTarget = useAppStore(state => state.insertionTarget);
-  const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
-  const activeTool = useAppStore(state => state.activeTool);
-  const plugins = useAppStore(state => state.plugins);
-  const activePluginId = useAppStore(state => state.activePluginId);
-  const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
-  const visibleAttributes = useAppStore(state => state.visibleAttributes);
-  const optionsSchema = useAppStore(state => state.optionsSchema);
-  const indexStartIndex = useAppStore(state => state.indexStartIndex);
-  const showProperties = useAppStore(state => state.showProperties);
-  const conditionalStyles = useAppStore(state => state.conditionalStyles);
-  const conditionalStylesEnabled = useAppStore(state => state.conditionalStylesEnabled);
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
+  const nodes = useAppStore((state) => state.nodes);
+  const insertionTarget = useAppStore((state) => state.insertionTarget);
+  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
+  const activeTool = useAppStore((state) => state.activeTool);
+  const plugins = useAppStore((state) => state.plugins);
+  const activePluginId = useAppStore((state) => state.activePluginId);
+  const pluginInteractionData = useAppStore((state) => state.pluginInteractionData);
+  const visibleAttributes = useAppStore((state) => state.visibleAttributes);
+  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const indexStartIndex = useAppStore((state) => state.indexStartIndex);
+  const showProperties = useAppStore((state) => state.showProperties);
+  const conditionalStyles = useAppStore((state) => state.conditionalStyles);
+  const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
 
   const afterNodeIds = useMemo(() => {
     return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
   }, [rootNodeIds, nodes, insertionTarget]);
 
-  const renderableNodes: { node: typeof nodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
+  const renderableNodes: { node: (typeof nodes)[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
   let globalIdx = 0;
 
   function traverse(id: string, isUnderGenerator: boolean) {
@@ -121,13 +124,13 @@ export function WaypointLayer({
     if (!node) return;
     const isGen = isUnderGenerator || node.type === 'generator';
     if (node.children_ids && node.children_ids.length > 0) {
-      node.children_ids.forEach(cid => traverse(cid, isGen));
+      node.children_ids.forEach((cid) => traverse(cid, isGen));
     } else if (node.type === 'manual' && node.transform) {
       renderableNodes.push({ node, parentIsGenerator: isGen, globalIndex: globalIdx++ });
     }
   }
 
-  rootNodeIds.forEach(id => traverse(id, false));
+  rootNodeIds.forEach((id) => traverse(id, false));
 
   // 条件付き書式のメモ化キャッシュ（ノード・ルール・スキーマ変更時のみ再計算）
   const resolvedStyleMap = useMemo(() => {
@@ -136,7 +139,9 @@ export function WaypointLayer({
       return map;
     }
     renderableNodes.forEach(({ node, globalIndex }) => {
-      const style = resolveWaypointConditionalStyle(node, conditionalStyles, conditionalStylesEnabled, optionsSchema, { index: globalIndex });
+      const style = resolveWaypointConditionalStyle(node, conditionalStyles, conditionalStylesEnabled, optionsSchema, {
+        index: globalIndex,
+      });
       if (style) {
         map.set(node.id, style);
       }
@@ -152,20 +157,16 @@ export function WaypointLayer({
     const rootIdx = rootNodeIds.indexOf(node.id);
     if (rootIdx !== -1) {
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
-      const waypointInputKeys = activePlugin?.manifest?.inputs
-        ?.filter(inp => inp.type === 'waypoint')
-        ?.map(inp => inp.name || inp.id) || [];
+      const waypointInputKeys =
+        activePlugin?.manifest?.inputs?.filter((inp) => inp.type === 'waypoint')?.map((inp) => inp.name || inp.id) ||
+        [];
 
-      isReferenced = waypointInputKeys.some(key => pluginInteractionData[key] === rootIdx);
+      isReferenced = waypointInputKeys.some((key) => pluginInteractionData[key] === rootIdx);
     }
 
     const transform = node.transform!;
-    const qx = transform.qx ?? 0;
-    const qy = transform.qy ?? 0;
-    const qz = transform.qz ?? 0;
-    const qw = transform.qw ?? 1;
-    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-    if (!isFinite(yaw)) yaw = 0;
+    const { qx, qy, qz, qw } = transform;
+    const yaw = quaternionToYaw(transform);
     const px = isFinite(transform.x) ? transform.x : 0;
     const py = isFinite(transform.y) ? transform.y : 0;
 
@@ -175,12 +176,14 @@ export function WaypointLayer({
         lines.push(`Index: [${globalIndex + indexStartIndex}]`);
       }
       if (visibleAttributes.includes('transform')) {
-        lines.push(`Transform:\n  x: ${transform.x.toFixed(3)}, y: ${transform.y.toFixed(3)}, z: ${(transform.z ?? 0).toFixed(3)}\n  yaw: ${yaw.toFixed(3)}\n  qx: ${qx.toFixed(3)}, qy: ${qy.toFixed(3)}, qz: ${qz.toFixed(3)}, qw: ${qw.toFixed(3)}`);
+        lines.push(
+          `Transform:\n  x: ${transform.x.toFixed(3)}, y: ${transform.y.toFixed(3)}, z: ${(transform.z ?? 0).toFixed(3)}\n  yaw: ${yaw.toFixed(3)}\n  qx: ${qx.toFixed(3)}, qy: ${qy.toFixed(3)}, qz: ${qz.toFixed(3)}, qw: ${qw.toFixed(3)}`,
+        );
       }
-      const optionKeys = visibleAttributes.filter(attr => attr.startsWith('options.'));
-      optionKeys.forEach(attr => {
+      const optionKeys = visibleAttributes.filter((attr) => attr.startsWith('options.'));
+      optionKeys.forEach((attr) => {
         const key = attr.split('.')[1];
-        const optDef = optionsSchema?.options?.find(o => o.name === key);
+        const optDef = optionsSchema?.options?.find((o) => o.name === key);
         let val = node.options?.[key];
         if (val === undefined && optDef && optDef.default !== undefined) {
           val = optDef.default;
@@ -197,8 +200,8 @@ export function WaypointLayer({
   });
 
   const labelCandidates: LabelCandidate[] = items
-    .filter(item => item.lines.length > 0)
-    .map(item => ({ id: item.node.id, worldX: item.px, worldY: item.py, lines: item.lines }));
+    .filter((item) => item.lines.length > 0)
+    .map((item) => ({ id: item.node.id, worldX: item.px, worldY: item.py, lines: item.lines }));
   const labelLayoutMap = computeLabelOffsets(labelCandidates, scale, textStyle);
 
   return (
@@ -208,8 +211,9 @@ export function WaypointLayer({
 
         const condStyle = resolvedStyleMap.get(node.id);
 
-        let baseColor = parentIsGenerator ? 0x22c55e : 0xffa500;
-        let baseFill = parentIsGenerator ? 0x4ade80 : 0xffd700;
+        const base = parentIsGenerator ? WAYPOINT_COLORS.generated : WAYPOINT_COLORS.manual;
+        let baseColor: number = base.stroke;
+        let baseFill: number = base.fill;
 
         if (condStyle?.color) {
           baseColor = parseColorSafe(condStyle.color, baseColor);
@@ -219,21 +223,16 @@ export function WaypointLayer({
         }
 
         const isLocked = lockedWaypointId === node.id;
-        const normalColor = isLocked
-          ? 0x10b981
+        const stateColors = isLocked
+          ? WAYPOINT_COLORS.locked
           : isReferenced
-          ? 0xfacc15
-          : isAfter
-          ? 0x94a3b8
-          : baseColor;
+            ? WAYPOINT_COLORS.referenced
+            : isAfter
+              ? WAYPOINT_COLORS.afterInsertion
+              : null;
+        const normalColor = stateColors ? stateColors.stroke : baseColor;
         const selectedColor = CANVAS_ACCENT_COLOR;
-        const normalFill = isLocked
-          ? 0x34d399
-          : isReferenced
-          ? 0xfef08a
-          : isAfter
-          ? 0xcbd5e1
-          : baseFill;
+        const normalFill = stateColors ? stateColors.fill : baseFill;
         const selectedFill = CANVAS_ACCENT_HOVER_COLOR;
 
         const itemScale = condStyle?.scale ?? 1.0;
@@ -249,13 +248,7 @@ export function WaypointLayer({
         const showLabel = condStyle?.labelVisible !== false;
 
         return (
-          <pixiContainer
-            key={node.id}
-            x={px}
-            y={py}
-            rotation={yaw}
-            alpha={finalAlpha}
-          >
+          <pixiContainer key={node.id} x={px} y={py} rotation={yaw} alpha={finalAlpha}>
             <pixiGraphics
               eventMode="dynamic"
               cursor={activeTool === 'select' ? 'pointer' : 'default'}
@@ -292,16 +285,16 @@ export function WaypointLayer({
                 onPointerDown={(e: FederatedPointerEvent) => onNodeHandlePointerDown(e, node.id)}
                 draw={(g) => {
                   g.clear();
-                  g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                  g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                   g.circle(0, 0, 15 / safeScale);
                   g.fill();
 
                   g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ACCENT_COLOR };
-                  g.fillStyle = { color: 0xffffff, alpha: 0.9 };
+                  g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 0.9 };
                   g.circle(0, 0, 4 / safeScale);
                   g.fill();
                   g.stroke();
-                  
+
                   g.moveTo(-15 / safeScale, 0);
                   g.lineTo(-4 / safeScale, 0);
                   g.stroke();
@@ -310,7 +303,12 @@ export function WaypointLayer({
             )}
 
             {showLabel && lines.length > 0 && (
-              <pixiContainer rotation={-yaw} scale={{ x: 1 / safeScale, y: -1 / safeScale }} x={labelOffsetX} y={labelOffsetY}>
+              <pixiContainer
+                rotation={-yaw}
+                scale={{ x: 1 / safeScale, y: -1 / safeScale }}
+                x={labelOffsetX}
+                y={labelOffsetY}
+              >
                 <pixiGraphics
                   eventMode="dynamic"
                   cursor={activeTool === 'select' ? 'pointer' : 'default'}
@@ -336,7 +334,7 @@ export function WaypointLayer({
                       g.fillStyle = { color: selectedFill, alpha: 0.25 };
                       g.strokeStyle = { width: 1.5, color: selectedColor };
                     } else {
-                      g.fillStyle = { color: 0xffffff, alpha: 0.001 };
+                      g.fillStyle = { color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                     }
                     g.rect(0, -labelHeight, labelWidth, labelHeight);
                     g.fill();

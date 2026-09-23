@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 import { NodeSlice, createNodeSlice } from './slices/nodeSlice';
 import { UISlice, createUISlice } from './slices/uiSlice';
 import { PluginSlice, createPluginSlice } from './slices/pluginSlice';
+import { PathCalculatorSlice, createPathCalculatorSlice } from './slices/pathCalculatorSlice';
 import { MapSlice, createMapSlice } from './slices/mapSlice';
 import { ProjectSlice, createProjectSlice } from './slices/projectSlice';
 import { HistorySlice, createHistorySlice } from './slices/historySlice';
@@ -14,7 +15,18 @@ import { InteractionSlice, createInteractionSlice } from './slices/interactionSl
 import { MeasureSlice, createMeasureSlice } from './slices/measureSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 
-export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice & InteractionSlice & MeasureSlice;
+export type AppState = NodeSlice &
+  UISlice &
+  PluginSlice &
+  PathCalculatorSlice &
+  MapSlice &
+  ProjectSlice &
+  HistorySlice &
+  CustomUISlice &
+  WorkflowSlice &
+  AnnotationSlice &
+  InteractionSlice &
+  MeasureSlice;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -22,6 +34,7 @@ export const useAppStore = create<AppState>()(
       ...createNodeSlice(set, get, api),
       ...createUISlice(set, get, api),
       ...createPluginSlice(set, get, api),
+      ...createPathCalculatorSlice(set, get, api),
       ...createMapSlice(set, get, api),
       ...createProjectSlice(set, get, api),
       ...createHistorySlice(set, get, api),
@@ -40,7 +53,7 @@ export const useAppStore = create<AppState>()(
         lastDirectory: state.lastDirectory,
         recentProjects: state.recentProjects,
         enableSnapping: state.enableSnapping,
-        exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'), // Treat undefined as global by default
+        exportTemplates: state.exportTemplates.filter((t) => t.scope !== 'local'), // Treat undefined as global by default
         defaultExportFormats: state.defaultExportFormats,
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,
@@ -63,8 +76,8 @@ export const useAppStore = create<AppState>()(
         leftPanelActiveTab: state.leftPanelActiveTab,
         rightPanelActiveTab: state.rightPanelActiveTab,
       }),
-    }
-  )
+    },
+  ),
 );
 
 if (typeof window !== 'undefined') {

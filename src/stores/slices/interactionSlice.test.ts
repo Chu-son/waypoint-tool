@@ -1,27 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
+import { resetAppStore } from '../../test/store';
 
 describe('interactionSlice', () => {
   beforeEach(() => {
-    useAppStore.getState().resetProject();
-    useAppStore.setState({
-      appMode: { mode: 'select' },
-      selection: { type: 'none' },
-      modalStack: [],
-      isSettingsModalOpen: false,
-      isExportModalOpen: false,
-      isImportModalOpen: false,
-      isExportMapsModalOpen: false,
-      isShortcutsModalOpen: false,
-      isWelcomeModalOpen: false,
-      isInitialLaunch: false,
-      rightPanelActiveTab: 'layers',
-      elementCopyState: null,
-      selectedNodeIds: [],
-      selectedAnnotationIds: [],
-      activeCustomLayerId: null,
-      selectedEditObjectId: null,
-    });
+    // Start past the first-launch welcome modal that a fresh store opens.
+    resetAppStore({ isInitialLaunch: false, isWelcomeModalOpen: false, modalStack: [], rightPanelActiveTab: 'layers' });
   });
 
   describe('Mode Transitions', () => {
@@ -485,7 +469,10 @@ describe('interactionSlice', () => {
 
     it('enforces Selection Authority Invariant across mode transitions', () => {
       // 1. Having selected nodes, transition to custom_layer_edit -> clears selectedNodeIds
-      useAppStore.setState({ selectedNodeIds: ['node-1', 'node-2'], selection: { type: 'nodes', ids: ['node-1', 'node-2'] } });
+      useAppStore.setState({
+        selectedNodeIds: ['node-1', 'node-2'],
+        selection: { type: 'nodes', ids: ['node-1', 'node-2'] },
+      });
       useAppStore.getState().transitionToMode({ mode: 'custom_layer_edit', targetLayerId: 'layer-1' });
       expect(useAppStore.getState().selectedNodeIds).toEqual([]);
       expect(useAppStore.getState().selection.type).toBe('custom_layer');
@@ -538,8 +525,13 @@ describe('interactionSlice', () => {
 
       useAppStore.getState().transitionToMode({ mode: 'waypoint_add' });
 
-      expect(listener.onExit).toHaveBeenCalledWith({ mode: 'select' }, expect.objectContaining({ mode: 'waypoint_add' }));
-      expect(listener.onEnter).toHaveBeenCalledWith(expect.objectContaining({ mode: 'waypoint_add' }), { mode: 'select' });
+      expect(listener.onExit).toHaveBeenCalledWith(
+        { mode: 'select' },
+        expect.objectContaining({ mode: 'waypoint_add' }),
+      );
+      expect(listener.onEnter).toHaveBeenCalledWith(expect.objectContaining({ mode: 'waypoint_add' }), {
+        mode: 'select',
+      });
       expect(callLog).toEqual(['exit:select->waypoint_add', 'enter:waypoint_add<-select']);
 
       unsubscribe();
@@ -618,5 +610,3 @@ describe('interactionSlice', () => {
     });
   });
 });
-
-

@@ -3,21 +3,17 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { CustomLayerInspector } from './CustomLayerInspector';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance, ManualCustomLayer, PluginCustomLayer } from '../../../types/store';
-import { BackendAPI } from '../../../api';
+import { BackendAPI, DialogAPI } from '../../../api';
 
-vi.mock('../../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn().mockResolvedValue({
-      name: 'Generated Overlay',
-      image_base64: 'data:image/png;base64,mock',
-      info: { resolution: 0.05, origin: [0, 0, 0] },
-      blend_mode: 'overwrite',
-    }),
-  },
-  DialogAPI: {
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue({
+    name: 'Generated Overlay',
+    image_base64: 'data:image/png;base64,mock',
+    info: { resolution: 0.05, origin: [0, 0, 0] },
+    blend_mode: 'overwrite',
+  });
+  vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+});
 
 describe('CustomLayerInspector', () => {
   const mockPlugin: PluginInstance = {
@@ -30,12 +26,8 @@ describe('CustomLayerInspector', () => {
       type: 'python',
       executable: 'main.py',
       description: 'Inflates obstacles in the map',
-      properties: [
-        { name: 'radius', type: 'number', default: 0.5, label: 'Inflation Radius' },
-      ],
-      inputs: [
-        { id: 'seed_point', name: 'seed_point', type: 'point', label: 'Seed Point', required: true },
-      ],
+      properties: [{ name: 'radius', type: 'number', default: 0.5, label: 'Inflation Radius' }],
+      inputs: [{ id: 'seed_point', name: 'seed_point', type: 'point', label: 'Seed Point', required: true }],
     },
   };
 
@@ -77,9 +69,7 @@ describe('CustomLayerInspector', () => {
       opacity: 1.0,
       z_index: 0,
       blend_mode: 'overwrite',
-      editObjects: [
-        { id: 'obj-1', type: 'rect', fillValue: 0, cx: 1, cy: 1, width: 2, height: 2, angle: 0 },
-      ],
+      editObjects: [{ id: 'obj-1', type: 'rect', fillValue: 0, cx: 1, cy: 1, width: 2, height: 2, angle: 0 }],
     };
 
     useAppStore.setState({

@@ -1,5 +1,10 @@
-import { open as tauriOpen, save as tauriSave, ask as tauriAsk } from '@tauri-apps/plugin-dialog';
-import { IDialogAPI, OpenDialogOptions, SaveDialogOptions } from '../types';
+import {
+  open as tauriOpen,
+  save as tauriSave,
+  ask as tauriAsk,
+  message as tauriMessage,
+} from '@tauri-apps/plugin-dialog';
+import { IDialogAPI, MessageDialogOptions, OpenDialogOptions, SaveDialogOptions } from '../types';
 
 export class TauriDialogAPI implements IDialogAPI {
   async open(options?: OpenDialogOptions): Promise<string | string[] | null> {
@@ -12,5 +17,9 @@ export class TauriDialogAPI implements IDialogAPI {
 
   async ask(message: string, options?: any): Promise<boolean> {
     return tauriAsk(message, options);
+  }
+
+  async message(message: string, options?: MessageDialogOptions): Promise<void> {
+    await tauriMessage(message, options);
   }
 }

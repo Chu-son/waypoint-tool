@@ -6,16 +6,16 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] loadROSMap called with path:', yamlPath);
     return {
       info: {
-        image: "dummy_image.png",
+        image: 'dummy_image.png',
         resolution: 0.05,
         origin: [0, 0, 0],
         negate: 0,
         occupied_thresh: 0.65,
-        free_thresh: 0.196
+        free_thresh: 0.196,
       },
-      image_data_b64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+      image_data_b64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
       width: 1,
-      height: 1
+      height: 1,
     };
   }
 
@@ -33,7 +33,12 @@ export class MockBackendAPI implements IBackendAPI {
     return { options: [] };
   }
 
-  async exportWaypoints(_path: string, _waypoints: Record<string, any>[], _template?: string, _imageB64?: string): Promise<void> {
+  async exportWaypoints(
+    _path: string,
+    _waypoints: Record<string, any>[],
+    _template?: string,
+    _imageB64?: string,
+  ): Promise<void> {
     console.log('[Mock Backend] exportWaypoints called to path:', _path, _waypoints.length, 'points');
   }
 
@@ -49,12 +54,21 @@ export class MockBackendAPI implements IBackendAPI {
 
   async fetchInstalledPlugins(): Promise<PluginInstance[]> {
     console.log('[Mock Backend] fetchInstalledPlugins called');
-    return [{
-      id: 'mock-plugin',
-      folder_path: '/mock/path',
-      is_builtin: false,
-      manifest: { name: 'Mock Plugin', description: 'A dummy plugin for testing', type: 'python', executable: 'main.py', inputs: [], properties: [] }
-    }];
+    return [
+      {
+        id: 'mock-plugin',
+        folder_path: '/mock/path',
+        is_builtin: false,
+        manifest: {
+          name: 'Mock Plugin',
+          description: 'A dummy plugin for testing',
+          type: 'python',
+          executable: 'main.py',
+          inputs: [],
+          properties: [],
+        },
+      },
+    ];
   }
 
   async scanCustomPlugin(path: string): Promise<PluginInstance> {
@@ -63,7 +77,14 @@ export class MockBackendAPI implements IBackendAPI {
       id: 'scanned-plugin',
       folder_path: path,
       is_builtin: false,
-      manifest: { name: 'Scanned Plugin', description: 'Mock', type: 'python', executable: 'main.py', inputs: [], properties: [] }
+      manifest: {
+        name: 'Scanned Plugin',
+        description: 'Mock',
+        type: 'python',
+        executable: 'main.py',
+        inputs: [],
+        properties: [],
+      },
     };
   }
 
@@ -74,14 +95,28 @@ export class MockBackendAPI implements IBackendAPI {
         id: 'scanned-plugin-1',
         folder_path: `${path}/plugin-1`,
         is_builtin: false,
-        manifest: { name: 'Scanned Plugin 1', description: 'Mock 1', type: 'python', executable: 'main.py', inputs: [], properties: [] }
+        manifest: {
+          name: 'Scanned Plugin 1',
+          description: 'Mock 1',
+          type: 'python',
+          executable: 'main.py',
+          inputs: [],
+          properties: [],
+        },
       },
       {
         id: 'scanned-plugin-2',
         folder_path: `${path}/plugin-2`,
         is_builtin: false,
-        manifest: { name: 'Scanned Plugin 2', description: 'Mock 2', type: 'python', executable: 'main.py', inputs: [], properties: [] }
-      }
+        manifest: {
+          name: 'Scanned Plugin 2',
+          description: 'Mock 2',
+          type: 'python',
+          executable: 'main.py',
+          inputs: [],
+          properties: [],
+        },
+      },
     ];
   }
 
@@ -89,7 +124,7 @@ export class MockBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     _contextData: any,
     _pythonPath?: string,
-    _mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[]
+    _mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
   ): Promise<any> {
     console.log('[Mock Backend] runPlugin called for:', pluginInstance.manifest.name);
     return [];
@@ -106,25 +141,25 @@ export class MockBackendAPI implements IBackendAPI {
       id: pluginName,
       folder_path: targetDir,
       is_builtin: false,
-      manifest: { name: pluginName, type: 'python', executable: 'main.py', inputs: [], properties: [] }
+      manifest: { name: pluginName, type: 'python', executable: 'main.py', inputs: [], properties: [] },
     };
   }
 
   async checkSdkVersion(): Promise<string> {
     console.log('[Mock Backend] checkSdkVersion called');
-    return "0.1.0-mock";
+    return '0.1.0-mock';
   }
 
   async updatePluginSdk(pluginFolderPath: string): Promise<string> {
     console.log('[Mock Backend] updatePluginSdk called for:', pluginFolderPath);
-    return "Mock SDK Updated successfully";
+    return 'Mock SDK Updated successfully';
   }
 
   private mockFiles: Record<string, string> = {};
 
   async readImageBase64(path: string): Promise<string> {
     console.log('[Mock Backend] readImageBase64 called for:', path);
-    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   }
 
   async readTextFile(path: string): Promise<string> {
@@ -147,7 +182,8 @@ export class MockBackendAPI implements IBackendAPI {
   async blendMapPreview(_layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
     console.log('[Mock Backend] blendMapPreview called');
     return {
-      image_data_b64: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+      image_data_b64:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
       width: 1,
       height: 1,
       origin: [0, 0, 0],
@@ -197,7 +233,7 @@ export class MockBackendAPI implements IBackendAPI {
 
   async checkExportConflicts(files: string[]): Promise<string[]> {
     console.log('[Mock Backend] checkExportConflicts called for:', files);
-    return files.filter(f => f in this.mockFiles);
+    return files.filter((f) => f in this.mockFiles);
   }
 
   async executeExportPackage(options: any): Promise<any> {

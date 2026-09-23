@@ -19,7 +19,7 @@
 
 > **【重要】**
 > ショートカットキーを**追加・変更・削除**した場合は、**必ずユーザー向けのHelp（ショートカット一覧モーダル等）も合わせて修正してください。**
-> - 対象ファイル例: `src/components/ui/KeyboardShortcutsModal.tsx`
+> - 対象ファイル例: `src/components/ui/modals/KeyboardShortcutsModal.tsx`
 
 内部の実装（`ShortcutManager`等）だけを変更して、UI上の説明（Help）の更新を忘れることがないよう徹底してください。
 
@@ -37,10 +37,18 @@
   - `MapCanvas` など、マップ描画やWebGL/2Dコンテキストを扱うコアな描画コンポーネント。
 - **`common/`**: UIを持たない、または特定のUIコンポーネント群に依存しないアプリケーション全体の共通機能
   - 例: `ShortcutManager` など。
-- **`ui/`**: 画面を構成するUIコンポーネント全般
-  - **`ui/common/`**: ボタン、入力欄、モーダルなど、汎用・再利用可能な純粋な表示要素。
-  - **`ui/settings/`**: 設定画面（Option Schema, Export Templates, Plugins 等）に関するコンポーネント。
-  - その他、各機能（プロパティパネル、プラグインリスト等）に特化したUIコンポーネント。
+- **`ui/`**: 画面を構成するUIコンポーネント全般。**`ui/` 直下にはファイルを置かず**、必ず以下のいずれかのサブディレクトリに配置する。
+  - **`ui/common/`**: ボタン、入力欄、モーダル枠など、汎用・再利用可能な純粋な表示要素（2ファイル以上で共通利用）。
+  - **`ui/shell/`**: アプリの外枠（TopMenu, ToolPanel, StatusBar, PanelContainer/PanelRegistry, ThemeInjector 等）。
+  - **`ui/modals/`**: モーダルダイアログ（Export, Import, Settings, Welcome, KeyboardShortcuts 等）。
+  - **`ui/trees/`**: 階層ツリー（WaypointTree, AnnotationTree とそのパネル）。
+  - **`ui/layers/`**: マップ・カスタムレイヤー・エクスポート領域の一覧パネル。
+  - **`ui/plugins/`**: プラグイン一覧・パラメータ・入力エディタ。
+  - **`ui/overlays/`**: キャンバス上に重ねるフローティング UI（MapEdit, Measure, AnnotationEdit, ElementCopy）。
+  - **`ui/properties/`**: 右ペインの Inspector（PropertiesPanel とその部品）。
+  - **`ui/settings/`**: 設定画面（Option Schema, Export Templates, Plugins 等）のタブ。
+  - **`ui/pipeline/`**, **`ui/workflow/`**: パイプライン実行 UI、カスタム UI ワークフロー。
+  - 巨大コンポーネントを分割した子コンポーネントは、親と同じサブディレクトリ（または親名のサブディレクトリ）に置く。
 
 ### 2.2 新規機能追加時の例外
 
@@ -69,7 +77,7 @@
 | **プロジェクトファイル** | `.wptroj` | `src/stores/migrations/projectMigration.ts` | ・`migrateAndNormalizeProjectData` で v0 から v1 への昇格と全必須フィールドのデフォルト補完。<br>・Rust側は `serde_json::Value` で完全透過。<br>・保存時は `buildProjectData` により常に最新形式（StrictProjectData / version: 1）で書き出し。 |
 | **ユーザー設定永続化** | LocalStorage / Zustand persist | `src/stores/migrations/storageMigration.ts` | ・`persist` ミドルウェアに `version: STORAGE_VERSION` および `migrateStorage` を設定。<br>・設定項目の追加・変更時は旧ストレージデータの自動補完・型正規化を実装。 |
 | **プラグイン通信** | `manifest.json`, IPC stdio JSON | `src/stores/slices/pluginSlice.ts` / Rust `plugins` | ・**追加のみ（Additive Only）の原則**: プラグインへ送る `context` は既存キーを変更せず、新情報は新キーとして追加。<br>・旧マニフェスト（`category` 等）は読み込み時に新仕様（`primary_output`）へ自動マッピング。<br>・出力結果は旧仕様（単一ウェイポイント配列）と新仕様（`PluginResult`）の両方を境界で判別・正規化。 |
-| **外部入出力** | ROS Map, Waypoint Import, Handlebars Template | `src/utils/importUtils.ts`, `src/components/ui/ExportModal.tsx`, `src/utils/treeUtils.ts` | ・インポート時はカラム名・キー名揺れを推論アダプタで吸収。<br>・エクスポート用 Handlebars コンテキストには旧テンプレート互換用エイリアス（例: `node.name` と `node.label`）を維持・提供。 |
+| **外部入出力** | ROS Map, Waypoint Import, Handlebars Template | `src/utils/importUtils.ts`, `src/components/ui/modals/ExportModal.tsx`, `src/utils/treeUtils.ts` | ・インポート時はカラム名・キー名揺れを推論アダプタで吸収。<br>・エクスポート用 Handlebars コンテキストには旧テンプレート互換用エイリアス（例: `node.name` と `node.label`）を維持・提供。 |
 | **ストアアクション** | `src/stores/slices/*.ts` | アクション定義部 | ・引数の拡張は**オプション引数オブジェクト化（`options?: { ... }`）**を推奨。<br>・シグネチャ変更時は旧関数を即時削除せず、`@deprecated` を付与したラッパーとして一時維持。 |
 | **操作体系・ショートカット** | `ShortcutManager.tsx` | キーイベントディスパッチャ | ・既存ショートカットの破壊的変更時はエイリアスキーを提供。<br>・ショートカット変更時は本ガイド 1.2 項に従い `KeyboardShortcutsModal.tsx` を必ず同期更新。 |
 
@@ -162,3 +170,29 @@
   モード遷移を発生させるすべてのコード（ツールバー、ショートカット、プラグイン対話、プロジェクト読込・リセット）は、例外なく `transitionToMode`（または `abortCanvasGestures`）を経由しなければならない。
 - **OnExit での過渡ジェスチャー自動破棄**:
   モード遷移時は、OnExit フェーズにおいて進行中の過渡ジェスチャーが自動的に強制ロールバック（アボート）される。コンポーネント側で独自のクリーンアップコードを重複実装する必要はなく、ストアのチョークポイントに委譲すること。
+
+---
+
+## 6. 依存関係・肥大化防止規約 (Dependency & Size Rules)
+
+### 6.1 層規約の遵守
+- モジュール間の依存方向は [ARCHITECTURE.md §1.1](./ARCHITECTURE.md) の層規約（`types ← utils ← api ← services ← stores ← hooks ← components`）に従う。
+- `utils/` には純粋関数のみを置く。ストア・React・DOM・PixiJS に依存する処理は `services/`・`hooks/`・`components/canvas/` に置く。
+- コンポーネントは `@tauri-apps/*` を直接 import しない。ウィンドウ操作・バージョン取得等も `src/api` のアダプタを経由する。
+
+### 6.2 ユーザー通知・確認
+- `window.alert` / `window.confirm` を新たに使用しない（ESLint `no-alert`）。ユーザーへの通知・確認は `DialogAPI`（または `services/` の通知ヘルパー）を経由する。
+
+### 6.3 ストア購読
+- 複数フィールドを購読する場合は `useShallow` でまとめ、不要な再レンダリングを避ける。ストア全体の購読（`useAppStore()` の引数なし呼び出し）は禁止。
+- イベントハンドラ内での `useAppStore.getState()` 参照は許容する（描画に使う値は selector で購読する）。
+- ドメインロジック（エクスポート実行、プラグインのインポート、マップ読込等）はコンポーネントに書かず、ストアアクション・`services/`・カスタム Hook に置く。
+
+### 6.4 ファイルサイズの目安
+- コンポーネントファイルが **400 行**、ストアスライスが **600 行** を超えたら分割を検討する。
+- 分割の単位は「責務」。1 ファイル内に複数の独立したサブコンポーネント・フォーム・ハンドラ群がある場合は、サブコンポーネント・カスタム Hook・純粋関数に切り出す。
+- 同じ UI パターン（コンテキストメニュー、click-outside、インラインリネーム、ツリー行など）が 2 箇所以上に現れたら `ui/common/` または `hooks/` に共通化する（[DESIGN_SYSTEM.md §7](./DESIGN_SYSTEM.md)）。
+
+### 6.5 テスト
+- テストは振る舞いを検証する。ストアのモック禁止、境界のみのモック、共通ヘルパーの利用など詳細は 📖 [TESTING.md](./TESTING.md) に従う。
+- リファクタリングの前に対象の振る舞いテストを用意し、テストが通る状態を保ったまま進める。

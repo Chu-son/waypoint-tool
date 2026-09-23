@@ -25,14 +25,7 @@ describe('CanvasContextMenu', () => {
       parentContainerName: 'Group Alpha',
     };
 
-    render(
-      <CanvasContextMenu
-        x={100}
-        y={150}
-        target={target}
-        onClose={mockOnClose}
-      />
-    );
+    render(<CanvasContextMenu x={100} y={150} target={target} onClose={mockOnClose} />);
 
     expect(screen.getByText('WP-01')).toBeInTheDocument();
     expect(screen.getByText('一覧リストで位置を表示')).toBeInTheDocument();
@@ -41,9 +34,7 @@ describe('CanvasContextMenu', () => {
 
     // Click "一覧リストで位置を表示"
     fireEvent.click(screen.getByText('一覧リストで位置を表示'));
-    expect(useAppStore.getState().treeRevealTarget).toEqual(
-      expect.objectContaining({ type: 'node', id: 'wp-1' })
-    );
+    expect(useAppStore.getState().treeRevealTarget).toEqual(expect.objectContaining({ type: 'node', id: 'wp-1' }));
     expect(useAppStore.getState().isLeftPanelOpen).toBe(true);
     expect(useAppStore.getState().leftPanelActiveTab).toBe('waypoints');
     expect(mockOnClose).toHaveBeenCalled();
@@ -61,14 +52,7 @@ describe('CanvasContextMenu', () => {
       parentContainerName: 'Group Alpha',
     };
 
-    render(
-      <CanvasContextMenu
-        x={100}
-        y={150}
-        target={target}
-        onClose={mockOnClose}
-      />
-    );
+    render(<CanvasContextMenu x={100} y={150} target={target} onClose={mockOnClose} />);
 
     fireEvent.click(screen.getByText('所属グループ全体を選択'));
     expect(selectNodesSpy).toHaveBeenCalledWith(['grp-1']);
@@ -83,14 +67,7 @@ describe('CanvasContextMenu', () => {
       parentContainerKind: null,
     };
 
-    render(
-      <CanvasContextMenu
-        x={100}
-        y={150}
-        target={target}
-        onClose={mockOnClose}
-      />
-    );
+    render(<CanvasContextMenu x={100} y={150} target={target} onClose={mockOnClose} />);
 
     const selectBtn = screen.getByText('所属グループ全体を選択').closest('button');
     expect(selectBtn).toBeDisabled();
@@ -106,14 +83,7 @@ describe('CanvasContextMenu', () => {
       parentContainerName: 'Circle Generator',
     };
 
-    render(
-      <CanvasContextMenu
-        x={100}
-        y={150}
-        target={target}
-        onClose={mockOnClose}
-      />
-    );
+    render(<CanvasContextMenu x={100} y={150} target={target} onClose={mockOnClose} />);
 
     expect(screen.getByText('所属ジェネレータ全体を選択')).toBeInTheDocument();
     expect(screen.getByText('(Circle Generator)')).toBeInTheDocument();
@@ -131,14 +101,7 @@ describe('CanvasContextMenu', () => {
       parentContainerName: 'ROI Group',
     };
 
-    render(
-      <CanvasContextMenu
-        x={100}
-        y={150}
-        target={target}
-        onClose={mockOnClose}
-      />
-    );
+    render(<CanvasContextMenu x={100} y={150} target={target} onClose={mockOnClose} />);
 
     fireEvent.click(screen.getByText('所属グループ全体を選択'));
     expect(selectAnnotationSpy).toHaveBeenCalledWith(['grp-roi']);
@@ -155,14 +118,7 @@ describe('CanvasContextMenu', () => {
       parentContainerKind: null,
     };
 
-    render(
-      <CanvasContextMenu
-        x={100}
-        y={150}
-        target={target}
-        onClose={mockOnClose}
-      />
-    );
+    render(<CanvasContextMenu x={100} y={150} target={target} onClose={mockOnClose} />);
 
     // Escape key works immediately
     fireEvent.keyDown(window, { key: 'Escape' });

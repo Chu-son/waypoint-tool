@@ -5,10 +5,7 @@ use std::process::Command;
 /// Check whether specified Python packages/modules are importable in the given Python environment.
 ///
 /// Returns a map of package name -> bool indicating whether each package is installed.
-pub fn check_python_packages_sync(
-    python_path: &str,
-    packages: &[String],
-) -> Result<HashMap<String, bool>, String> {
+pub fn check_python_packages_sync(python_path: &str, packages: &[String]) -> Result<HashMap<String, bool>, String> {
     let py = python_path.trim();
     if py.is_empty() {
         return Err("Python interpreter path must not be empty.".to_string());
@@ -108,12 +105,8 @@ print("__WPT_PKGS__:" + json.dumps(results))
     // Look for deterministic marker line first
     if let Some(marker_line) = trimmed.lines().find(|line| line.starts_with("__WPT_PKGS__:")) {
         let json_part = &marker_line["__WPT_PKGS__:".len()..];
-        return serde_json::from_str::<HashMap<String, bool>>(json_part.trim()).map_err(|e| {
-            format!(
-                "Failed to parse marked package check JSON from '{}': {}",
-                json_part, e
-            )
-        });
+        return serde_json::from_str::<HashMap<String, bool>>(json_part.trim())
+            .map_err(|e| format!("Failed to parse marked package check JSON from '{}': {}", json_part, e));
     }
 
     // Direct JSON parsing fallback
@@ -132,12 +125,8 @@ print("__WPT_PKGS__:" + json.dumps(results))
                         trimmed, stderr
                     )
                 })?;
-            serde_json::from_str::<HashMap<String, bool>>(json_line.trim()).map_err(|e| {
-                format!(
-                    "Failed to parse package check JSON from '{}': {}",
-                    json_line, e
-                )
-            })
+            serde_json::from_str::<HashMap<String, bool>>(json_line.trim())
+                .map_err(|e| format!("Failed to parse package check JSON from '{}': {}", json_line, e))
         }
     }
 }
@@ -145,10 +134,7 @@ print("__WPT_PKGS__:" + json.dumps(results))
 /// Create a new Python virtual environment at the target directory using `python -m venv`.
 ///
 /// Returns the absolute path to the newly created python interpreter executable.
-pub fn create_virtualenv_sync(
-    target_dir: &str,
-    base_python: Option<&str>,
-) -> Result<String, String> {
+pub fn create_virtualenv_sync(target_dir: &str, base_python: Option<&str>) -> Result<String, String> {
     let trimmed_dir = target_dir.trim();
     if trimmed_dir.is_empty() {
         return Err("Target directory must not be empty.".to_string());
@@ -254,10 +240,7 @@ pub fn create_virtualenv_sync(
 /// Install specified packages into the Python environment using `pip install`.
 ///
 /// Returns combined stdout and stderr output on success, or an error string on failure.
-pub fn install_pip_packages_sync(
-    python_path: &str,
-    packages: &[String],
-) -> Result<String, String> {
+pub fn install_pip_packages_sync(python_path: &str, packages: &[String]) -> Result<String, String> {
     let py = python_path.trim();
     if py.is_empty() {
         return Err("Python interpreter path must not be empty.".to_string());
@@ -322,35 +305,23 @@ pub async fn check_python_packages(
     python_path: String,
     packages: Vec<String>,
 ) -> Result<HashMap<String, bool>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        check_python_packages_sync(&python_path, &packages)
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?
+    tauri::async_runtime::spawn_blocking(move || check_python_packages_sync(&python_path, &packages))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }
 
 #[tauri::command]
-pub async fn create_virtualenv(
-    target_dir: String,
-    base_python: Option<String>,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        create_virtualenv_sync(&target_dir, base_python.as_deref())
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?
+pub async fn create_virtualenv(target_dir: String, base_python: Option<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || create_virtualenv_sync(&target_dir, base_python.as_deref()))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }
 
 #[tauri::command]
-pub async fn install_pip_packages(
-    python_path: String,
-    packages: Vec<String>,
-) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        install_pip_packages_sync(&python_path, &packages)
-    })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?
+pub async fn install_pip_packages(python_path: String, packages: Vec<String>) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || install_pip_packages_sync(&python_path, &packages))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }
 
 #[cfg(test)]
@@ -367,10 +338,7 @@ mod tests {
 
     #[test]
     fn test_check_python_packages_invalid_python() {
-        let res = check_python_packages_sync(
-            "nonexistent_python_binary_xyz_123",
-            &["numpy".to_string()],
-        );
+        let res = check_python_packages_sync("nonexistent_python_binary_xyz_123", &["numpy".to_string()]);
         assert!(res.is_err());
     }
 
@@ -387,10 +355,7 @@ mod tests {
 
     #[test]
     fn test_install_pip_packages_invalid_python() {
-        let res = install_pip_packages_sync(
-            "nonexistent_python_binary_xyz_123",
-            &["numpy".to_string()],
-        );
+        let res = install_pip_packages_sync("nonexistent_python_binary_xyz_123", &["numpy".to_string()]);
         assert!(res.is_err());
     }
 
@@ -405,10 +370,7 @@ mod tests {
     fn test_create_virtualenv_invalid_base_python() {
         let tmp = TempDir::new().unwrap();
         let target = tmp.path().join("venv");
-        let res = create_virtualenv_sync(
-            &target.to_string_lossy(),
-            Some("nonexistent_base_python_xyz_123"),
-        );
+        let res = create_virtualenv_sync(&target.to_string_lossy(), Some("nonexistent_base_python_xyz_123"));
         assert!(res.is_err());
     }
 

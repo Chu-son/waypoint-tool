@@ -9,6 +9,7 @@ import {
   WaypointShape,
 } from '../types/store';
 import { quaternionToYaw } from './transformUtils';
+import { hexStringToNumber } from './colorUtils';
 
 // ============================================================================
 // Types
@@ -57,17 +58,7 @@ export interface ResolvedAnnotationStyle {
  * 不正な値の場合は defaultColor を返す。
  */
 export function parseColorSafe(hex?: string, defaultColor: number = 0xffa500): number {
-  if (!hex || typeof hex !== 'string') return defaultColor;
-  const cleanHex = hex.replace('#', '').trim();
-  if (!/^[0-9a-fA-F]{3,8}$/.test(cleanHex)) return defaultColor;
-  if (cleanHex.length === 3) {
-    const r = cleanHex[0] + cleanHex[0];
-    const g = cleanHex[1] + cleanHex[1];
-    const b = cleanHex[2] + cleanHex[2];
-    return parseInt(r + g + b, 16) || defaultColor;
-  }
-  const parsed = parseInt(cleanHex.slice(0, 6), 16);
-  return isNaN(parsed) ? defaultColor : parsed;
+  return hexStringToNumber(hex, defaultColor);
 }
 
 /**
@@ -89,7 +80,7 @@ export function drawDashedLine(
   x2: number,
   y2: number,
   dashLength: number = 0.1,
-  gapLength: number = 0.05
+  gapLength: number = 0.05,
 ): void {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -133,7 +124,7 @@ export function resolvePropertyValue(
   target: any,
   propPath: string,
   optionsSchema?: OptionsSchema | null,
-  context?: { index?: number }
+  context?: { index?: number },
 ): any {
   if (!target || !propPath) return undefined;
 
@@ -191,7 +182,7 @@ export function evaluateRule(
   rule: ConditionRule,
   target: any,
   optionsSchema?: OptionsSchema | null,
-  context?: { index?: number }
+  context?: { index?: number },
 ): boolean {
   if (!rule || !rule.property) return true;
 
@@ -200,10 +191,20 @@ export function evaluateRule(
 
   switch (rule.operator) {
     case 'is_empty':
-      return actualValue === undefined || actualValue === null || actualValue === '' || (Array.isArray(actualValue) && actualValue.length === 0);
+      return (
+        actualValue === undefined ||
+        actualValue === null ||
+        actualValue === '' ||
+        (Array.isArray(actualValue) && actualValue.length === 0)
+      );
 
     case 'is_not_empty':
-      return actualValue !== undefined && actualValue !== null && actualValue !== '' && (!Array.isArray(actualValue) || actualValue.length > 0);
+      return (
+        actualValue !== undefined &&
+        actualValue !== null &&
+        actualValue !== '' &&
+        (!Array.isArray(actualValue) || actualValue.length > 0)
+      );
 
     case 'equals': {
       if (actualValue === undefined || actualValue === null) {
@@ -297,7 +298,7 @@ export function evaluateConditionGroup(
   group: ConditionGroup,
   target: any,
   optionsSchema?: OptionsSchema | null,
-  context?: { index?: number }
+  context?: { index?: number },
 ): boolean {
   if (!group || !Array.isArray(group.children) || group.children.length === 0) {
     return true;
@@ -333,7 +334,7 @@ export function resolveWaypointConditionalStyle(
   rules: ConditionalStyleRule[],
   enabled: boolean,
   optionsSchema?: OptionsSchema | null,
-  context?: { index?: number }
+  context?: { index?: number },
 ): ResolvedWaypointStyle | null {
   if (!enabled || !Array.isArray(rules) || rules.length === 0) return null;
 
@@ -349,10 +350,13 @@ export function resolveWaypointConditionalStyle(
 
       if (override.color !== undefined && merged.color === undefined) merged.color = override.color;
       if (override.fillColor !== undefined && merged.fillColor === undefined) merged.fillColor = override.fillColor;
-      if (override.scale !== undefined && merged.scale === undefined) merged.scale = clampNumber(override.scale, 0.1, 10.0, 1.0);
-      if (override.opacity !== undefined && merged.opacity === undefined) merged.opacity = clampNumber(override.opacity, 0.0, 1.0, 1.0);
+      if (override.scale !== undefined && merged.scale === undefined)
+        merged.scale = clampNumber(override.scale, 0.1, 10.0, 1.0);
+      if (override.opacity !== undefined && merged.opacity === undefined)
+        merged.opacity = clampNumber(override.opacity, 0.0, 1.0, 1.0);
       if (override.shape !== undefined && merged.shape === undefined) merged.shape = override.shape;
-      if (override.labelVisible !== undefined && merged.labelVisible === undefined) merged.labelVisible = override.labelVisible;
+      if (override.labelVisible !== undefined && merged.labelVisible === undefined)
+        merged.labelVisible = override.labelVisible;
 
       if (rule.stopIfMatched) {
         break;
@@ -373,7 +377,7 @@ export function resolvePathConditionalStyle(
   rules: ConditionalStyleRule[],
   enabled: boolean,
   optionsSchema?: OptionsSchema | null,
-  context?: { sourceIndex?: number; targetIndex?: number }
+  context?: { sourceIndex?: number; targetIndex?: number },
 ): ResolvedPathStyle | null {
   if (!enabled || !Array.isArray(rules) || rules.length === 0) return null;
 
@@ -389,7 +393,10 @@ export function resolvePathConditionalStyle(
     const evaluatedNode = direction === 'incoming' ? targetNode : sourceNode;
     const evaluatedIndex = direction === 'incoming' ? context?.targetIndex : context?.sourceIndex;
 
-    if (evaluatedNode && evaluateConditionGroup(rule.condition, evaluatedNode, optionsSchema, { index: evaluatedIndex })) {
+    if (
+      evaluatedNode &&
+      evaluateConditionGroup(rule.condition, evaluatedNode, optionsSchema, { index: evaluatedIndex })
+    ) {
       if (!merged) merged = {};
 
       if (override.color !== undefined && merged.color === undefined) merged.color = override.color;
@@ -408,8 +415,10 @@ export function resolvePathConditionalStyle(
         }
       }
 
-      if (override.opacity !== undefined && merged.opacity === undefined) merged.opacity = clampNumber(override.opacity, 0.0, 1.0, 0.7);
-      if (override.dashPattern !== undefined && merged.dashPattern === undefined) merged.dashPattern = override.dashPattern;
+      if (override.opacity !== undefined && merged.opacity === undefined)
+        merged.opacity = clampNumber(override.opacity, 0.0, 1.0, 0.7);
+      if (override.dashPattern !== undefined && merged.dashPattern === undefined)
+        merged.dashPattern = override.dashPattern;
 
       if (rule.stopIfMatched) {
         break;
@@ -429,7 +438,7 @@ export function resolveFootprintConditionalStyle(
   rules: ConditionalStyleRule[],
   enabled: boolean,
   optionsSchema?: OptionsSchema | null,
-  context?: { index?: number }
+  context?: { index?: number },
 ): ResolvedFootprintStyle | null {
   if (!enabled || !Array.isArray(rules) || rules.length === 0) return null;
 
@@ -468,8 +477,10 @@ export function resolveFootprintConditionalStyle(
       }
       if (strokeColor === undefined && override.strokeColor !== undefined) strokeColor = override.strokeColor;
       if (fillColor === undefined && override.fillColor !== undefined) fillColor = override.fillColor;
-      if (fillAlpha === undefined && override.fillAlpha !== undefined) fillAlpha = clampNumber(override.fillAlpha, 0.0, 1.0, 0.18);
-      if (strokeWidth === undefined && override.strokeWidth !== undefined) strokeWidth = clampNumber(override.strokeWidth, 0.1, 20.0, 1.0);
+      if (fillAlpha === undefined && override.fillAlpha !== undefined)
+        fillAlpha = clampNumber(override.fillAlpha, 0.0, 1.0, 0.18);
+      if (strokeWidth === undefined && override.strokeWidth !== undefined)
+        strokeWidth = clampNumber(override.strokeWidth, 0.1, 20.0, 1.0);
 
       if (rule.stopIfMatched) {
         break;
@@ -539,7 +550,7 @@ export function resolveAnnotationConditionalStyle(
   annotation: AnnotationObject,
   rules: ConditionalStyleRule[],
   enabled: boolean,
-  optionsSchema?: OptionsSchema | null
+  optionsSchema?: OptionsSchema | null,
 ): ResolvedAnnotationStyle | null {
   if (!enabled || !Array.isArray(rules) || rules.length === 0) return null;
 
@@ -553,10 +564,13 @@ export function resolveAnnotationConditionalStyle(
       const override = rule.style.annotation!;
       if (!merged) merged = {};
 
-      if (override.strokeColor !== undefined && merged.strokeColor === undefined) merged.strokeColor = override.strokeColor;
+      if (override.strokeColor !== undefined && merged.strokeColor === undefined)
+        merged.strokeColor = override.strokeColor;
       if (override.fillColor !== undefined && merged.fillColor === undefined) merged.fillColor = override.fillColor;
-      if (override.strokeWidth !== undefined && merged.strokeWidth === undefined) merged.strokeWidth = clampNumber(override.strokeWidth, 0.5, 20.0, 2.0);
-      if (override.opacity !== undefined && merged.opacity === undefined) merged.opacity = clampNumber(override.opacity, 0.0, 1.0, 1.0);
+      if (override.strokeWidth !== undefined && merged.strokeWidth === undefined)
+        merged.strokeWidth = clampNumber(override.strokeWidth, 0.5, 20.0, 2.0);
+      if (override.opacity !== undefined && merged.opacity === undefined)
+        merged.opacity = clampNumber(override.opacity, 0.0, 1.0, 1.0);
       if (override.visible !== undefined && merged.visible === undefined) merged.visible = override.visible;
 
       if (rule.stopIfMatched) {

@@ -1,11 +1,16 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { MapCanvas, getFallbackGridColors } from './MapCanvas';
+import { MapCanvas } from './MapCanvas';
+import { getFallbackGridColors } from './utils/canvasTheme';
 import { useAppStore } from '../../stores/appStore';
 
 // Mock PixiJS and @pixi/react
 vi.mock('@pixi/react', () => ({
-  Application: ({ children, background }: any) => <div data-testid="pixi-app" data-background={background}>{children}</div>,
+  Application: ({ children, background }: any) => (
+    <div data-testid="pixi-app" data-background={background}>
+      {children}
+    </div>
+  ),
   extend: vi.fn(),
 }));
 
@@ -47,7 +52,7 @@ vi.mock('uuid', () => ({
 describe('MapCanvas', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Polyfill for pointer capture which is missing in jsdom
     if (!HTMLDivElement.prototype.setPointerCapture) {
       HTMLDivElement.prototype.setPointerCapture = vi.fn();
@@ -121,7 +126,7 @@ describe('MapCanvas', () => {
     });
 
     render(<MapCanvas />);
-    
+
     // triggerFitToMaps increments a counter in the store
     act(() => {
       useAppStore.setState({ shouldFitToMaps: 1 });

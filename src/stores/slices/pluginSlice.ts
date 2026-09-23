@@ -1,17 +1,34 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
-import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject, WaypointBaselineItem, GeneratorStash, Transform, WaypointNode, PipelineMetadata, InsertionTarget } from '../../types/store';
+import type { AppState } from '../appStore';
+import {
+  PluginInstance,
+  PluginSetting,
+  PluginCustomLayer,
+  AnnotationGroup,
+  AnnotationObject,
+  GeneratorStash,
+  WaypointNode,
+  PipelineMetadata,
+  InsertionTarget,
+} from '../../types/store';
 import { BackendAPI } from '../../api';
-import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
+import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../services/mapRasterize';
 import { applyGeneratorStash, computeGeneratorStash } from '../../utils/generatorStashUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';
 import { cloneSelection } from './historySlice';
+import { resolvePythonPath } from '../../utils/pythonPath';
+import { resolveBindingExpression } from '../../utils/pluginBindings';
+import {
+  extractAnnotationsFromRawResult,
+  extractCustomLayerItems,
+  extractWaypointsFromRawResult,
+  pluginWaypointTransform,
+  toBaselineWaypoints,
+} from '../../utils/pluginResult';
 import { v4 as uuidv4 } from 'uuid';
 
-export type PluginPlacement =
-  | { type: 'replace_ids'; ids: string[] }
-  | { type: 'use_insertion_target' };
+export type PluginPlacement = { type: 'replace_ids'; ids: string[] } | { type: 'use_insertion_target' };
 
 export interface ExecutePluginParams {
   plugin: PluginInstance;
@@ -34,12 +51,6 @@ export type PluginSlice = {
   pluginActiveProperties: Record<string, any>;
   activeInputIndex: number;
   activePipelineInputRef: { stepId: string; inputId: string } | null;
-
-  activePathCalculatorPluginId: string | null;
-  pathCalculatorParams: Record<string, any>;
-  autoRecalculatePath: boolean;
-  calculatedPathSegments: Array<Array<{ x: number; y: number }>> | null;
-  isCalculatingPath: boolean;
 
   setPlugins: (plugins: Record<string, PluginInstance>) => void;
   setPluginSettings: (settings: PluginSetting[]) => void;
@@ -72,139 +83,8 @@ export type PluginSlice = {
     error?: string;
   }>;
 
-  detachFromPipeline: (params: {
-    nodeId?: string;
-    customLayerId?: string;
-    annotationGroupId?: string;
-  }) => void;
-
-  setActivePathCalculatorPluginId: (pluginId: string | null) => void;
-  setPathCalculatorParams: (params: Record<string, any>) => void;
-  setAutoRecalculatePath: (enabled: boolean) => void;
-  setCalculatedPathSegments: (segments: Array<Array<{ x: number; y: number }>> | null) => void;
-  debouncedRecalculatePath: (delayMs?: number) => void;
-  recalculatePath: (options?: { immediate?: boolean }) => Promise<void>;
+  detachFromPipeline: (params: { nodeId?: string; customLayerId?: string; annotationGroupId?: string }) => void;
 };
-
-let recalculateTimer: any = null;
-let currentCalculationRequestId = 0;
-
-function getPathValue(obj: any, path: string): any {
-  if (!obj || !path) return undefined;
-  const tokens = path.match(/[^.\[\]]+/g) || [];
-  let current = obj;
-  for (const token of tokens) {
-    if (current == null) return undefined;
-    if (current[token] !== undefined) {
-      current = current[token];
-    } else if (current.raw && current.raw[token] !== undefined) {
-      current = current.raw[token];
-    } else {
-      return undefined;
-    }
-  }
-  return current;
-}
-
-function resolveBindingExpression(
-  expr: string,
-  stepOutputs: Record<string, any>,
-  manualInputs: Record<string, Record<string, any>>
-): any {
-  if (expr.startsWith('$steps.')) {
-    const rest = expr.slice(7);
-    const dotIndex = rest.indexOf('.');
-    if (dotIndex === -1) {
-      const stepId = rest;
-      return stepOutputs[stepId]?.raw;
-    }
-    const stepId = rest.slice(0, dotIndex);
-    const path = rest.slice(dotIndex + 1);
-
-    const stepOut = stepOutputs[stepId];
-    if (!stepOut) {
-      throw new Error(`Referenced step "${stepId}" output was not found for binding "${expr}".`);
-    }
-
-    const val = getPathValue(stepOut, path);
-    if (val === undefined) {
-      if (path.startsWith('inputs.') || path.startsWith('inputs[')) {
-        return undefined;
-      }
-      throw new Error(`Binding "${expr}" could not be resolved: path "${path}" in step "${stepId}" evaluated to undefined.`);
-    }
-
-    return val;
-  }
-
-  if (expr.startsWith('$inputs.')) {
-    const key = expr.slice(8);
-    for (const sInputs of Object.values(manualInputs)) {
-      if (sInputs[key] !== undefined) {
-        return sInputs[key];
-      }
-    }
-    return undefined;
-  }
-
-  if (manualInputs[expr] !== undefined) {
-    return manualInputs[expr];
-  }
-  for (const sInputs of Object.values(manualInputs)) {
-    if (sInputs[expr] !== undefined) {
-      return sInputs[expr];
-    }
-  }
-
-  // If it looks like an identifier rather than a literal value, do not return it as a raw string if missing
-  if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(expr)) {
-    return undefined;
-  }
-
-  return expr;
-}
-
-export interface ParsedWaypointsResult {
-  items: any[];
-  pluginData?: Record<string, any>;
-  groupName?: string;
-}
-
-export function extractWaypointsFromRawResult(rawResult: any): ParsedWaypointsResult {
-  let items: any[] = [];
-  let pluginData: Record<string, any> | undefined = undefined;
-  let groupName: string | undefined = undefined;
-
-  if (rawResult && rawResult.waypoints) {
-    const wp = rawResult.waypoints;
-    if (wp.columnar) {
-      const count = wp.count ?? (Array.isArray(wp.x) ? wp.x.length : 0);
-      items = new Array(count);
-      for (let i = 0; i < count; i++) {
-        items[i] = {
-          x: wp.x?.[i] ?? 0,
-          y: wp.y?.[i] ?? 0,
-          z: wp.z?.[i] ?? 0,
-          yaw: wp.yaw?.[i] ?? 0,
-          name: wp.names?.[i],
-          options: wp.options?.[i],
-        };
-      }
-      pluginData = wp.plugin_data;
-      groupName = wp.name;
-    } else if (Array.isArray(wp)) {
-      items = wp;
-    } else if (wp.items && Array.isArray(wp.items)) {
-      items = wp.items;
-      pluginData = wp.plugin_data;
-      groupName = wp.name;
-    }
-  } else if (Array.isArray(rawResult) && rawResult.length > 0 && (rawResult[0].transform || rawResult[0].x !== undefined)) {
-    items = rawResult;
-  }
-
-  return { items, pluginData, groupName };
-}
 
 export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (set, get) => ({
   plugins: {},
@@ -214,12 +94,6 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   pluginActiveProperties: {},
   activeInputIndex: 0,
   activePipelineInputRef: null,
-
-  activePathCalculatorPluginId: null,
-  pathCalculatorParams: {},
-  autoRecalculatePath: true,
-  calculatedPathSegments: null,
-  isCalculatingPath: false,
 
   setPlugins: (plugins) => {
     const merged: Record<string, PluginInstance> = { ...plugins };
@@ -234,64 +108,68 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
     set({ plugins: merged });
   },
-  
+
   setPluginSettings: (settings) => set({ pluginSettings: Array.isArray(settings) ? settings : [], isDirty: true }),
-  
-  updatePluginSetting: (id, updates) => set((state) => {
-    const list = Array.isArray(state.pluginSettings) ? state.pluginSettings : [];
-    const index = list.findIndex((p) => p.id === id);
-    if (index >= 0) {
+
+  updatePluginSetting: (id, updates) =>
+    set((state) => {
+      const list = Array.isArray(state.pluginSettings) ? state.pluginSettings : [];
+      const index = list.findIndex((p) => p.id === id);
+      if (index >= 0) {
+        return {
+          pluginSettings: list.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+          isDirty: true,
+        };
+      }
+      const newSetting: PluginSetting = {
+        id,
+        enabled: true,
+        order: list.length,
+        isBuiltin: false,
+        ...updates,
+      };
       return {
-        pluginSettings: list.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        pluginSettings: [...list, newSetting],
         isDirty: true,
       };
-    }
-    const newSetting: PluginSetting = {
-      id,
-      enabled: true,
-      order: list.length,
-      isBuiltin: false,
-      ...updates,
-    };
-    return {
-      pluginSettings: [...list, newSetting],
-      isDirty: true,
-    };
-  }),
-  
-  setActivePlugin: (pluginId) => set((state) => {
-    if (state.activePluginId === pluginId) {
-      return { isAnnotationEditMode: false, activePipelineInputRef: null };
-    }
-    const plugin = pluginId && state.plugins ? state.plugins[pluginId] : null;
-    const isMapLayerGen = plugin?.manifest?.category === 'map_layer_generator';
-    return {
-      activePluginId: pluginId,
+    }),
+
+  setActivePlugin: (pluginId) =>
+    set((state) => {
+      if (state.activePluginId === pluginId) {
+        return { isAnnotationEditMode: false, activePipelineInputRef: null };
+      }
+      const plugin = pluginId && state.plugins ? state.plugins[pluginId] : null;
+      const isMapLayerGen = plugin?.manifest?.category === 'map_layer_generator';
+      return {
+        activePluginId: pluginId,
+        pluginInteractionData: {},
+        pluginActiveProperties: {},
+        activeInputIndex: 0,
+        activePipelineInputRef: null,
+        isAnnotationEditMode: false,
+        ...(!isMapLayerGen ? { activeCustomLayerId: null, isMapEditMode: false } : {}),
+      };
+    }),
+
+  updatePluginInteractionData: (inputId, data) =>
+    set((state) => ({
+      pluginInteractionData: {
+        ...state.pluginInteractionData,
+        [inputId]: data,
+      },
+    })),
+
+  clearPluginInteractionData: () =>
+    set({
       pluginInteractionData: {},
       pluginActiveProperties: {},
       activeInputIndex: 0,
       activePipelineInputRef: null,
-      isAnnotationEditMode: false,
-      ...(!isMapLayerGen ? { activeCustomLayerId: null, isMapEditMode: false } : {}),
-    };
-  }),
-  
-  updatePluginInteractionData: (inputId, data) => set((state) => ({
-    pluginInteractionData: {
-      ...state.pluginInteractionData,
-      [inputId]: data
-    }
-  })),
-    
-  clearPluginInteractionData: () => set({ 
-    pluginInteractionData: {}, 
-    pluginActiveProperties: {},
-    activeInputIndex: 0,
-    activePipelineInputRef: null,
-  }),
-  
+    }),
+
   setPluginActiveProperties: (props) => set({ pluginActiveProperties: props }),
-  
+
   setActiveInputIndex: (index) => set({ activeInputIndex: index }),
 
   setActivePipelineInputRef: (ref) => set({ activePipelineInputRef: ref }),
@@ -341,30 +219,20 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
 
     if (needsSelection) {
-      contextData.selected_points = selectedNodeIds
-        .map((id) => nodes[id]?.transform)
-        .filter(Boolean);
+      contextData.selected_points = selectedNodeIds.map((id) => nodes[id]?.transform).filter(Boolean);
     }
 
     if (plugin.manifest.needs?.includes('robot_footprint')) {
       contextData.robot_footprint = robotFootprint;
     }
 
-    let pythonPathToUse = globalPythonPath?.trim() || 'python3';
-    if (plugin.manifest.type === 'python') {
-      const setting = pluginSettings.find((s) => s.id === plugin.id);
-      if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== '') {
-        pythonPathToUse = setting.pythonOverridePath.trim();
-      }
-    }
+    const pythonPathToUse = resolvePythonPath(plugin, pluginSettings, globalPythonPath);
 
     const needsOccupancyGrid = plugin.manifest.needs?.some(
-      (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+      (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
     );
 
-    const layersToPass = needsOccupancyGrid
-      ? await prepareLayersForExport(mapLayers, customLayers)
-      : undefined;
+    const layersToPass = needsOccupancyGrid ? await prepareLayersForExport(mapLayers, customLayers) : undefined;
 
     const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
     const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
@@ -372,7 +240,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       contextData.interaction_data || {},
       customLayers,
       baseRes,
-      annotationObjects
+      annotationObjects,
     );
 
     const finalContextData = {
@@ -380,12 +248,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       interaction_data: enrichedInteractionData,
     };
 
-    const rawResult: any = await BackendAPI.runPlugin(
-      plugin,
-      finalContextData,
-      pythonPathToUse,
-      layersToPass
-    );
+    const rawResult: any = await BackendAPI.runPlugin(plugin, finalContextData, pythonPathToUse, layersToPass);
 
     let resultingParentWaypointId: string | undefined = undefined;
     const resultingCustomLayerIds: string[] = [];
@@ -397,42 +260,21 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 1. Waypoint Output Handling
       // ----------------------------------------------------
-      const { items: waypointItems, pluginData: waypointPluginData, groupName: waypointGroupName } =
-        extractWaypointsFromRawResult(rawResult);
+      const {
+        items: waypointItems,
+        pluginData: waypointPluginData,
+        groupName: waypointGroupName,
+      } = extractWaypointsFromRawResult(rawResult);
 
       if (waypointItems && waypointItems.length > 0) {
-        const baselineWaypoints: WaypointBaselineItem[] = waypointItems.map((wp) => {
-          let qx = wp.qx ?? 0,
-            qy = wp.qy ?? 0,
-            qz = wp.qz ?? 0,
-            qw = wp.qw ?? 1;
-          if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-            const halfYaw = wp.yaw / 2.0;
-            qz = Math.sin(halfYaw);
-            qw = Math.cos(halfYaw);
-          }
-          const transform: Transform = wp.transform
-            ? { ...wp.transform }
-            : {
-                x: wp.x ?? 0,
-                y: wp.y ?? 0,
-                z: wp.z ?? 0,
-                qx,
-                qy,
-                qz,
-                qw,
-              };
-          return {
-            transform,
-            options: wp.options ? { ...wp.options } : undefined,
-            name: wp.name,
-          };
-        });
+        const baselineWaypoints = toBaselineWaypoints(waypointItems);
 
         let parentId = targetParentWaypointId;
         if (!parentId && existingExecutionId) {
           // Find parent node with matching execution_id
-          const found = Object.values(store.nodes).find(n => n.type === 'generator' && n.source_execution_id === existingExecutionId);
+          const found = Object.values(store.nodes).find(
+            (n) => n.type === 'generator' && n.source_execution_id === existingExecutionId,
+          );
           if (found) parentId = found.id;
         }
 
@@ -454,11 +296,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         } else {
           // New parent generator node
           parentId = uuidv4();
-          const placement: PluginPlacement = params.placement || (
-            (idsToConsume && idsToConsume.length > 0)
+          const placement: PluginPlacement =
+            params.placement ||
+            (idsToConsume && idsToConsume.length > 0
               ? { type: 'replace_ids', ids: idsToConsume }
-              : { type: 'use_insertion_target' }
-          );
+              : { type: 'use_insertion_target' });
 
           let targetParentId: string | null | undefined = undefined;
           let targetIndex: number | undefined = undefined;
@@ -469,7 +311,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             const currentRootIds = get().rootNodeIds;
             const parentOfFirst = findNodeParentId(firstId, currentRootIds, currentNodes);
             targetParentId = parentOfFirst;
-            const siblings = parentOfFirst ? (currentNodes[parentOfFirst]?.children_ids || []) : currentRootIds;
+            const siblings = parentOfFirst ? currentNodes[parentOfFirst]?.children_ids || [] : currentRootIds;
             const idx = siblings.indexOf(firstId);
             if (idx !== -1) {
               targetIndex = idx;
@@ -494,38 +336,16 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
 
         // Apply stash if provided
-        const waypointsToInstantiate = stashToApply
-          ? applyGeneratorStash(waypointItems, stashToApply)
-          : waypointItems;
+        const waypointsToInstantiate = stashToApply ? applyGeneratorStash(waypointItems, stashToApply) : waypointItems;
 
         // Add child waypoint nodes in a single atomic batch
-        const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => {
-          let qx = wp.qx ?? 0,
-            qy = wp.qy ?? 0,
-            qz = wp.qz ?? 0,
-            qw = wp.qw ?? 1;
-          if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-            const halfYaw = wp.yaw / 2.0;
-            qz = Math.sin(halfYaw);
-            qw = Math.cos(halfYaw);
-          }
-
-          return {
-            id: uuidv4(),
-            type: 'manual' as const,
-            name: wp.name,
-            transform: wp.transform || {
-              x: wp.x ?? 0,
-              y: wp.y ?? 0,
-              z: wp.z ?? 0,
-              qx,
-              qy,
-              qz,
-              qw,
-            },
-            options: wp.options || {},
-          };
-        });
+        const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => ({
+          id: uuidv4(),
+          type: 'manual' as const,
+          name: wp.name,
+          transform: pluginWaypointTransform(wp),
+          options: wp.options || {},
+        }));
 
         if (childNodes.length > 0) {
           store.addNodes(childNodes, parentId);
@@ -535,19 +355,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 2. Custom Layer Output Handling
       // ----------------------------------------------------
-      let layerList: any[] = [];
-      if (rawResult && rawResult.custom_layers && Array.isArray(rawResult.custom_layers)) {
-        layerList = rawResult.custom_layers;
-      } else if (rawResult && rawResult.image_base64 && rawResult.info) {
-        // Direct single layer output
-        layerList = [rawResult];
-      }
-
-      layerList.forEach((layerItem) => {
+      extractCustomLayerItems(rawResult).forEach((layerItem) => {
         let existingLayerId = targetCustomLayerId;
         if (!existingLayerId && existingExecutionId) {
           const found = store.customLayers.find(
-            (l) => l.type === 'plugin' && (l as any).source_execution_id === existingExecutionId
+            (l) => l.type === 'plugin' && (l as any).source_execution_id === existingExecutionId,
           );
           if (found) existingLayerId = found.id;
         }
@@ -595,25 +407,17 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 3. Annotation Output Handling
       // ----------------------------------------------------
-      let annotationItems: any[] | null = null;
-      let annotationPluginData: Record<string, any> | undefined = undefined;
-      let annotationGroupName: string | undefined = undefined;
+      const {
+        items: annotationItems,
+        pluginData: annotationPluginData,
+        groupName: annotationGroupName,
+      } = extractAnnotationsFromRawResult(rawResult);
 
-      if (rawResult && rawResult.annotations) {
-        if (Array.isArray(rawResult.annotations)) {
-          annotationItems = rawResult.annotations;
-        } else if (rawResult.annotations.items && Array.isArray(rawResult.annotations.items)) {
-          annotationItems = rawResult.annotations.items;
-          annotationPluginData = rawResult.annotations.plugin_data;
-          annotationGroupName = rawResult.annotations.name;
-        }
-      }
-
-      if (annotationItems && annotationItems.length > 0) {
+      if (annotationItems.length > 0) {
         let groupId = targetAnnotationGroupId;
         if (!groupId && existingExecutionId) {
           const found = Object.values(store.annotationGroups).find(
-            (g) => g.source_execution_id === existingExecutionId
+            (g) => g.source_execution_id === existingExecutionId,
           );
           if (found) groupId = found.id;
         }
@@ -703,12 +507,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   },
 
   executePipeline: async (params) => {
-    const {
-      pipelinePlugin,
-      manualInputs,
-      manualProperties,
-      existingExecutionId,
-    } = params;
+    const { pipelinePlugin, manualInputs, manualProperties, existingExecutionId } = params;
 
     const recipe = pipelinePlugin.manifest?.pipeline;
     const steps = recipe?.steps || [];
@@ -775,18 +574,19 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
     if (existingExecutionId) {
       const existingLayer = get().customLayers.find(
-        (l) => l.pipeline_metadata?.pipeline_execution_id === existingExecutionId && l.pipeline_metadata?.pipeline_inputs
+        (l) =>
+          l.pipeline_metadata?.pipeline_execution_id === existingExecutionId && l.pipeline_metadata?.pipeline_inputs,
       );
       const existingNode = Object.values(get().nodes).find(
-        (n) => n.pipeline_metadata?.pipeline_execution_id === existingExecutionId && n.pipeline_metadata?.pipeline_inputs
+        (n) =>
+          n.pipeline_metadata?.pipeline_execution_id === existingExecutionId && n.pipeline_metadata?.pipeline_inputs,
       );
       const existingGroup = Object.values(get().annotationGroups).find(
-        (g) => g.pipeline_metadata?.pipeline_execution_id === existingExecutionId && g.pipeline_metadata?.pipeline_inputs
+        (g) =>
+          g.pipeline_metadata?.pipeline_execution_id === existingExecutionId && g.pipeline_metadata?.pipeline_inputs,
       );
       const metaWithSnapshots =
-        existingLayer?.pipeline_metadata ||
-        existingNode?.pipeline_metadata ||
-        existingGroup?.pipeline_metadata;
+        existingLayer?.pipeline_metadata || existingNode?.pipeline_metadata || existingGroup?.pipeline_metadata;
 
       if (metaWithSnapshots) {
         previousInputsSnapshot = metaWithSnapshots.pipeline_inputs;
@@ -853,19 +653,15 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           const resolvedValue = resolveBindingExpression(expr, stepOutputs, manualInputs);
           if (targetKey.startsWith('inputs.')) {
             const rawKey = targetKey.slice(7);
-            const matchingInp = targetPlugin.manifest?.inputs?.find(
-              (i) => i.id === rawKey || i.name === rawKey
-            );
-            const canonicalKey = matchingInp ? (matchingInp.name || matchingInp.id) : rawKey;
+            const matchingInp = targetPlugin.manifest?.inputs?.find((i) => i.id === rawKey || i.name === rawKey);
+            const canonicalKey = matchingInp ? matchingInp.name || matchingInp.id : rawKey;
             stepInteractionData[canonicalKey] = resolvedValue;
             stepInteractionData[rawKey] = resolvedValue;
           } else if (targetKey.startsWith('properties.')) {
             const key = targetKey.slice(11);
             stepProperties[key] = resolvedValue;
           } else {
-            const matchingInp = targetPlugin.manifest?.inputs?.find(
-              (i) => i.id === targetKey || i.name === targetKey
-            );
+            const matchingInp = targetPlugin.manifest?.inputs?.find((i) => i.id === targetKey || i.name === targetKey);
             if (matchingInp) {
               const canonicalKey = matchingInp.name || matchingInp.id;
               stepInteractionData[canonicalKey] = resolvedValue;
@@ -894,10 +690,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             stepInteractionData[canonicalKey] !== undefined
               ? stepInteractionData[canonicalKey]
               : inp.id && stepInteractionData[inp.id] !== undefined
-              ? stepInteractionData[inp.id]
-              : inp.name && stepInteractionData[inp.name] !== undefined
-              ? stepInteractionData[inp.name]
-              : undefined;
+                ? stepInteractionData[inp.id]
+                : inp.name && stepInteractionData[inp.name] !== undefined
+                  ? stepInteractionData[inp.name]
+                  : undefined;
           if (canonicalKey && val !== undefined && val !== null && val !== '') {
             contextData.interaction_data[canonicalKey] = val;
           }
@@ -912,18 +708,12 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
 
         // 5. Python interpreter path
-        let pythonPathToUse = get().globalPythonPath?.trim() || 'python3';
-        if (targetPlugin.manifest?.type === 'python') {
-          const setting = get().pluginSettings.find((s) => s.id === targetPlugin.id);
-          if (setting?.pythonOverridePath?.trim()) {
-            pythonPathToUse = setting.pythonOverridePath.trim();
-          }
-        }
+        const pythonPathToUse = resolvePythonPath(targetPlugin, get().pluginSettings, get().globalPythonPath);
 
         // 6. Pass map layers and custom layers (including intermediate non-exported layers)
         const allAvailableCustomLayers = [...get().customLayers, ...intermediateLayers];
         const needsOccupancyGrid = targetPlugin.manifest?.needs?.some(
-          (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+          (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
         );
         const layersToPass = needsOccupancyGrid
           ? await prepareLayersForExport(get().mapLayers, allAvailableCustomLayers)
@@ -935,7 +725,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           contextData.interaction_data || {},
           allAvailableCustomLayers,
           baseRes,
-          get().annotationObjects
+          get().annotationObjects,
         );
 
         const finalContextData = {
@@ -958,16 +748,17 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         const inputsChanged = JSON.stringify(currentStepInputs) !== JSON.stringify(prevStepInputs);
 
         const currentStepProps = manualProperties[stepId] || manualProperties[targetPlugin.id] || {};
-        const prevStepProps = previousPropertiesSnapshot?.[stepId] || previousPropertiesSnapshot?.[targetPlugin.id] || {};
+        const prevStepProps =
+          previousPropertiesSnapshot?.[stepId] || previousPropertiesSnapshot?.[targetPlugin.id] || {};
         const propertiesChanged = JSON.stringify(currentStepProps) !== JSON.stringify(prevStepProps);
 
         const existingStepLayers = existingExecutionId
-          ? (get().customLayers.filter(
+          ? get().customLayers.filter(
               (l): l is PluginCustomLayer =>
                 l.type === 'plugin' &&
                 l.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                l.pipeline_metadata?.step_id === stepId
-            ))
+                l.pipeline_metadata?.step_id === stepId,
+            )
           : [];
 
         const existingParent = existingExecutionId
@@ -975,7 +766,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               (n) =>
                 n.type === 'generator' &&
                 n.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                n.pipeline_metadata?.step_id === stepId
+                n.pipeline_metadata?.step_id === stepId,
             )
           : undefined;
 
@@ -983,13 +774,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           ? Object.values(get().annotationGroups).find(
               (g) =>
                 g.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                g.pipeline_metadata?.step_id === stepId
+                g.pipeline_metadata?.step_id === stepId,
             )
           : undefined;
 
-        const hasExistingArtifacts = Boolean(
-          existingStepLayers.length > 0 || existingParent || existingGroup
-        );
+        const hasExistingArtifacts = Boolean(existingStepLayers.length > 0 || existingParent || existingGroup);
 
         const isStepDirty =
           !existingExecutionId ||
@@ -1014,9 +803,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         let annotationGroupName: string | undefined = undefined;
 
         if (!isStepDirty) {
-          console.info(
-            `[PIPELINE] Step "${stepId}" is clean. Skipping backend execution and reusing cached outputs.`
-          );
+          console.info(`[PIPELINE] Step "${stepId}" is clean. Skipping backend execution and reusing cached outputs.`);
 
           if (existingStepLayers.length > 0) {
             constructedLayers = existingStepLayers.map((l) => ({
@@ -1052,32 +839,18 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             annotationPluginData = existingGroup.plugin_data;
             annotationGroupName = existingGroup.name;
             if (existingGroup.children_ids) {
-              rawAnnotations = existingGroup.children_ids
-                .map((cid) => get().annotationObjects[cid])
-                .filter(Boolean);
+              rawAnnotations = existingGroup.children_ids.map((cid) => get().annotationObjects[cid]).filter(Boolean);
             }
           }
         } else {
           dirtySteps.add(stepId);
 
           // 7. Run plugin backend API
-          rawResult = await BackendAPI.runPlugin(
-            targetPlugin,
-            finalContextData,
-            pythonPathToUse,
-            layersToPass
-          );
+          rawResult = await BackendAPI.runPlugin(targetPlugin, finalContextData, pythonPathToUse, layersToPass);
 
           // 8. Process outputs
           // Custom Layers output
-          let rawLayers: any[] = [];
-          if (rawResult?.custom_layers && Array.isArray(rawResult.custom_layers)) {
-            rawLayers = rawResult.custom_layers;
-          } else if (rawResult?.image_base64 && rawResult?.info) {
-            rawLayers = [rawResult];
-          }
-
-          constructedLayers = rawLayers.map((layerItem, idx) => {
+          constructedLayers = extractCustomLayerItems(rawResult).map((layerItem, idx) => {
             return {
               id: layerItem.id || uuidv4(),
               name: layerItem.name || `${stepName || targetPlugin.manifest.name} Layer`,
@@ -1105,14 +878,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           waypointGroupName = extractedWp.groupName;
 
           // Annotations output
-          if (rawResult?.annotations) {
-            if (Array.isArray(rawResult.annotations)) {
-              rawAnnotations = rawResult.annotations;
-            } else if (rawResult.annotations.items && Array.isArray(rawResult.annotations.items)) {
-              rawAnnotations = rawResult.annotations.items;
-              annotationPluginData = rawResult.annotations.plugin_data;
-              annotationGroupName = rawResult.annotations.name;
-            }
+          const extractedAnnotations = extractAnnotationsFromRawResult(rawResult);
+          if (extractedAnnotations.items.length > 0) {
+            rawAnnotations = extractedAnnotations.items;
+            annotationPluginData = extractedAnnotations.pluginData;
+            annotationGroupName = extractedAnnotations.groupName;
           }
         }
 
@@ -1161,7 +931,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
                   (l) =>
                     l.type === 'plugin' &&
                     l.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                    l.pipeline_metadata?.step_id === stepId
+                    l.pipeline_metadata?.step_id === stepId,
                 )
               : [];
 
@@ -1187,7 +957,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
                 (n) =>
                   n.type === 'generator' &&
                   n.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                  n.pipeline_metadata?.step_id === stepId
+                  n.pipeline_metadata?.step_id === stepId,
               );
               if (found) targetParentId = found.id;
             }
@@ -1201,33 +971,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               }
             }
 
-            const baselineWaypoints: WaypointBaselineItem[] = rawWaypoints.map((wp) => {
-              let qx = wp.qx ?? 0,
-                qy = wp.qy ?? 0,
-                qz = wp.qz ?? 0,
-                qw = wp.qw ?? 1;
-              if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-                const halfYaw = wp.yaw / 2.0;
-                qz = Math.sin(halfYaw);
-                qw = Math.cos(halfYaw);
-              }
-              const transform: Transform = wp.transform
-                ? { ...wp.transform }
-                : {
-                    x: wp.x ?? 0,
-                    y: wp.y ?? 0,
-                    z: wp.z ?? 0,
-                    qx,
-                    qy,
-                    qz,
-                    qw,
-                  };
-              return {
-                transform,
-                options: wp.options ? { ...wp.options } : undefined,
-                name: wp.name,
-              };
-            });
+            const baselineWaypoints = toBaselineWaypoints(rawWaypoints);
 
             const waypointsToInstantiate = stashToApply
               ? applyGeneratorStash(rawWaypoints, stashToApply)
@@ -1265,33 +1009,14 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               store.addNodes([generatorNode]);
             }
 
-            const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => {
-              let qx = wp.qx ?? 0,
-                qy = wp.qy ?? 0,
-                qz = wp.qz ?? 0,
-                qw = wp.qw ?? 1;
-              if (typeof wp.yaw === 'number' && typeof wp.qw !== 'number') {
-                const halfYaw = wp.yaw / 2.0;
-                qz = Math.sin(halfYaw);
-                qw = Math.cos(halfYaw);
-              }
-              return {
-                id: uuidv4(),
-                type: 'manual' as const,
-                name: wp.name,
-                transform: wp.transform || {
-                  x: wp.x ?? 0,
-                  y: wp.y ?? 0,
-                  z: wp.z ?? 0,
-                  qx,
-                  qy,
-                  qz,
-                  qw,
-                },
-                options: wp.options || {},
-                pipeline_metadata: pipelineMetadata,
-              };
-            });
+            const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => ({
+              id: uuidv4(),
+              type: 'manual' as const,
+              name: wp.name,
+              transform: pluginWaypointTransform(wp),
+              options: wp.options || {},
+              pipeline_metadata: pipelineMetadata,
+            }));
             if (childNodes.length > 0) {
               store.addNodes(childNodes, parentId);
             }
@@ -1304,7 +1029,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               const found = Object.values(store.annotationGroups).find(
                 (g) =>
                   g.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                  g.pipeline_metadata?.step_id === stepId
+                  g.pipeline_metadata?.step_id === stepId,
               );
               if (found) targetGroupId = found.id;
             }
@@ -1450,166 +1175,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
   },
 
-  setActivePathCalculatorPluginId: (pluginId) => {
-    set({ activePathCalculatorPluginId: pluginId, isDirty: true });
-    if (!pluginId) {
-      set({ calculatedPathSegments: null, isCalculatingPath: false });
-    } else if (get().autoRecalculatePath) {
-      get().recalculatePath({ immediate: true });
-    }
-  },
-
-  setPathCalculatorParams: (params) => {
-    set({ pathCalculatorParams: params, isDirty: true });
-    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
-      get().debouncedRecalculatePath(200);
-    }
-  },
-
-  setAutoRecalculatePath: (enabled) => set({ autoRecalculatePath: enabled, isDirty: true }),
-
-  setCalculatedPathSegments: (segments) => set({ calculatedPathSegments: segments }),
-
-  debouncedRecalculatePath: (delayMs = 200) => {
-    if (recalculateTimer) {
-      clearTimeout(recalculateTimer);
-      recalculateTimer = null;
-    }
-    recalculateTimer = setTimeout(() => {
-      recalculateTimer = null;
-      get().recalculatePath({ immediate: true });
-    }, delayMs);
-  },
-
-  recalculatePath: async (options) => {
-    if (!options?.immediate) {
-      get().debouncedRecalculatePath(200);
-      return;
-    }
-
-    if (recalculateTimer) {
-      clearTimeout(recalculateTimer);
-      recalculateTimer = null;
-    }
-
-    const requestId = ++currentCalculationRequestId;
-
-    const {
-      activePathCalculatorPluginId,
-      pathCalculatorParams,
-      plugins,
-      pluginSettings,
-      globalPythonPath,
-      rootNodeIds,
-      nodes,
-      mapLayers,
-      customLayers,
-      robotFootprint,
-    } = get();
-
-    if (!activePathCalculatorPluginId || !plugins[activePathCalculatorPluginId]) {
-      set({ calculatedPathSegments: null, isCalculatingPath: false });
-      get().stopLoading('path-calc');
-      return;
-    }
-
-    const plugin = plugins[activePathCalculatorPluginId];
-
-    // Collect ordered waypoints
-    const waypoints: Array<{ x: number; y: number; qx: number; qy: number; qz: number; qw: number }> = [];
-    rootNodeIds.forEach((id) => {
-      const node = nodes[id];
-      if (!node) return;
-      if (node.type === 'manual' && node.transform) {
-        waypoints.push(node.transform);
-      } else if (node.type === 'generator' && node.children_ids) {
-        node.children_ids.forEach((cid) => {
-          const child = nodes[cid];
-          if (child && child.transform) {
-            waypoints.push(child.transform);
-          }
-        });
-      }
-    });
-
-    if (waypoints.length < 2) {
-      set({ calculatedPathSegments: null, isCalculatingPath: false });
-      get().stopLoading('path-calc');
-      return;
-    }
-
-    set({ isCalculatingPath: true });
-    get().startLoading({
-      id: 'path-calc',
-      message: '経路を計算中...',
-      detail: plugin.manifest.name || plugin.id,
-      blocking: false,
-    });
-
-    try {
-      let pythonPathToUse = globalPythonPath?.trim() || "python3";
-      if (plugin.manifest.type === "python") {
-        const setting = pluginSettings.find((s) => s.id === plugin.id);
-        if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== "") {
-          pythonPathToUse = setting.pythonOverridePath.trim();
-        }
-      }
-
-      const contextData: any = {
-        waypoints,
-        properties: pathCalculatorParams,
-      };
-
-      if (plugin.manifest.needs?.includes('robot_footprint')) {
-        contextData.robot_footprint = robotFootprint;
-      }
-
-      const needsOccupancyGrid = plugin.manifest.needs?.some(
-        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
-      );
-
-      const layersToPass = needsOccupancyGrid
-        ? await prepareLayersForExport(mapLayers || [], customLayers || [])
-        : undefined;
-
-      const result = await BackendAPI.runPlugin(
-        plugin,
-        contextData,
-        pythonPathToUse,
-        layersToPass
-      );
-
-      // Check if this request is still the latest one
-      if (requestId !== currentCalculationRequestId) {
-        return;
-      }
-
-      if (result && Array.isArray(result.segments)) {
-        set({ calculatedPathSegments: result.segments, isCalculatingPath: false });
-      } else if (Array.isArray(result)) {
-        // Flat list of segments or points
-        set({ calculatedPathSegments: [result], isCalculatingPath: false });
-      } else {
-        console.warn("[recalculatePath] Unexpected result format from path calculator:", result);
-        set({ calculatedPathSegments: null, isCalculatingPath: false });
-      }
-    } catch (err) {
-      if (requestId === currentCalculationRequestId) {
-        console.error("[recalculatePath] Failed to calculate path:", err);
-        set({ calculatedPathSegments: null, isCalculatingPath: false });
-      }
-    } finally {
-      if (requestId === currentCalculationRequestId) {
-        get().stopLoading('path-calc');
-      }
-    }
-  },
-
   reloadPlugins: async () => {
     try {
       const installedPlugins = await BackendAPI.fetchInstalledPlugins();
       const newMap: Record<string, PluginInstance> = {};
-      
+
       installedPlugins.forEach((p: PluginInstance) => {
         newMap[p.id] = p;
       });
@@ -1625,7 +1195,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           }
         }
       }
-      
+
       // Alias resolution for legacy_ids
       Object.values(newMap).forEach((p) => {
         if (p.manifest?.legacy_ids) {
@@ -1638,9 +1208,9 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       });
 
       set({ plugins: newMap });
-      console.log("[AppStore] Plugins reloaded successfully (with custom merging).");
+      console.log('[AppStore] Plugins reloaded successfully (with custom merging).');
     } catch (err) {
-      console.error("Failed to reload plugins:", err);
+      console.error('Failed to reload plugins:', err);
       throw err;
     }
   },

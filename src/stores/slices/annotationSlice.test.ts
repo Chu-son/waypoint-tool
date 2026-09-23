@@ -15,8 +15,24 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
   });
 
   it('groups multiple annotations into a new AnnotationGroup', () => {
-    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'Point 1', x: 0, y: 0, visible: true, labelVisible: true };
-    const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'Point 2', x: 1, y: 1, visible: true, labelVisible: true };
+    const p1: PointAnnotation = {
+      id: 'p1',
+      type: 'point',
+      name: 'Point 1',
+      x: 0,
+      y: 0,
+      visible: true,
+      labelVisible: true,
+    };
+    const p2: PointAnnotation = {
+      id: 'p2',
+      type: 'point',
+      name: 'Point 2',
+      x: 1,
+      y: 1,
+      visible: true,
+      labelVisible: true,
+    };
 
     useAppStore.setState({
       annotationObjects: { p1, p2 },
@@ -40,9 +56,33 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
   });
 
   it('supports nesting groups within groups and ungroups properly', () => {
-    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'Point 1', x: 0, y: 0, visible: true, labelVisible: true };
-    const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'Point 2', x: 1, y: 1, visible: true, labelVisible: true };
-    const p3: PointAnnotation = { id: 'p3', type: 'point', name: 'Point 3', x: 2, y: 2, visible: true, labelVisible: true };
+    const p1: PointAnnotation = {
+      id: 'p1',
+      type: 'point',
+      name: 'Point 1',
+      x: 0,
+      y: 0,
+      visible: true,
+      labelVisible: true,
+    };
+    const p2: PointAnnotation = {
+      id: 'p2',
+      type: 'point',
+      name: 'Point 2',
+      x: 1,
+      y: 1,
+      visible: true,
+      labelVisible: true,
+    };
+    const p3: PointAnnotation = {
+      id: 'p3',
+      type: 'point',
+      name: 'Point 3',
+      x: 2,
+      y: 2,
+      visible: true,
+      labelVisible: true,
+    };
 
     const subGroup: AnnotationGroup = {
       id: 'sub-g',
@@ -118,9 +158,31 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
 
   describe('moveAnnotationsInTree', () => {
     it('moves an annotation into a group', () => {
-      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true };
-      const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'P2', x: 1, y: 1, visible: true, labelVisible: true };
-      const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p2'], visible: true };
+      const p1: PointAnnotation = {
+        id: 'p1',
+        type: 'point',
+        name: 'P1',
+        x: 0,
+        y: 0,
+        visible: true,
+        labelVisible: true,
+      };
+      const p2: PointAnnotation = {
+        id: 'p2',
+        type: 'point',
+        name: 'P2',
+        x: 1,
+        y: 1,
+        visible: true,
+        labelVisible: true,
+      };
+      const grp: AnnotationGroup = {
+        id: 'g1',
+        type: 'manual_group',
+        name: 'Group 1',
+        children_ids: ['p2'],
+        visible: true,
+      };
 
       useAppStore.setState({
         annotationObjects: { p1, p2 },
@@ -137,9 +199,33 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
     });
 
     it('moves an annotation from a group to root', () => {
-      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true, group_id: 'g1' };
-      const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'P2', x: 1, y: 1, visible: true, labelVisible: true, group_id: 'g1' };
-      const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p1', 'p2'], visible: true };
+      const p1: PointAnnotation = {
+        id: 'p1',
+        type: 'point',
+        name: 'P1',
+        x: 0,
+        y: 0,
+        visible: true,
+        labelVisible: true,
+        group_id: 'g1',
+      };
+      const p2: PointAnnotation = {
+        id: 'p2',
+        type: 'point',
+        name: 'P2',
+        x: 1,
+        y: 1,
+        visible: true,
+        labelVisible: true,
+        group_id: 'g1',
+      };
+      const grp: AnnotationGroup = {
+        id: 'g1',
+        type: 'manual_group',
+        name: 'Group 1',
+        children_ids: ['p1', 'p2'],
+        visible: true,
+      };
 
       useAppStore.setState({
         annotationObjects: { p1, p2 },
@@ -158,7 +244,15 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
 
   describe('duplicateAnnotations', () => {
     it('duplicates single and multiple annotation objects without offset (same coordinates) and Copy suffix', () => {
-      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 10, y: 20, visible: true, labelVisible: true };
+      const p1: PointAnnotation = {
+        id: 'p1',
+        type: 'point',
+        name: 'P1',
+        x: 10,
+        y: 20,
+        visible: true,
+        labelVisible: true,
+      };
 
       useAppStore.setState({
         annotationObjects: { p1 },
@@ -220,8 +314,23 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
     });
 
     it('duplicates a group recursively along with its children and syncs annotationOrder', () => {
-      const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true, group_id: 'g1' };
-      const grp: AnnotationGroup = { id: 'g1', type: 'manual_group', name: 'Group 1', children_ids: ['p1'], visible: true };
+      const p1: PointAnnotation = {
+        id: 'p1',
+        type: 'point',
+        name: 'P1',
+        x: 0,
+        y: 0,
+        visible: true,
+        labelVisible: true,
+        group_id: 'g1',
+      };
+      const grp: AnnotationGroup = {
+        id: 'g1',
+        type: 'manual_group',
+        name: 'Group 1',
+        children_ids: ['p1'],
+        visible: true,
+      };
 
       useAppStore.setState({
         annotationObjects: { p1 },

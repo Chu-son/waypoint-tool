@@ -8,12 +8,7 @@ interface DynamicIconProps {
   fallback?: React.ReactNode;
 }
 
-export const DynamicIcon: React.FC<DynamicIconProps> = ({
-  name,
-  size = 16,
-  className,
-  fallback = null,
-}) => {
+export const DynamicIcon: React.FC<DynamicIconProps> = ({ name, size = 16, className, fallback = null }) => {
   if (!name) return <>{fallback}</>;
 
   // Try exact match

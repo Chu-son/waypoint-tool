@@ -1,5 +1,4 @@
-import { AnnotationToolType } from '../stores/slices/annotationSlice';
-import { ElementCopyField, ElementCopyCoordSystem } from '../stores/slices/uiSlice';
+import type { AnnotationToolType, ElementCopyField, ElementCopyCoordSystem } from './ui';
 
 export type AppModeState =
   | { mode: 'select' }

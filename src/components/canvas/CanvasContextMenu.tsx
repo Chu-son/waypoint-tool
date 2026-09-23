@@ -58,12 +58,8 @@ export function CanvasContextMenu({ x, y, target, onClose }: CanvasContextMenuPr
   // ウィンドウ外へのはみ出し防止位置調整
   const menuWidth = 230;
   const menuHeight = 110;
-  const adjustedX = typeof window !== 'undefined'
-    ? Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8))
-    : x;
-  const adjustedY = typeof window !== 'undefined'
-    ? Math.max(8, Math.min(y, window.innerHeight - menuHeight - 8))
-    : y;
+  const adjustedX = typeof window !== 'undefined' ? Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8)) : x;
+  const adjustedY = typeof window !== 'undefined' ? Math.max(8, Math.min(y, window.innerHeight - menuHeight - 8)) : y;
 
   const handleReveal = () => {
     revealInTree(target.type, target.id);
@@ -92,7 +88,9 @@ export function CanvasContextMenu({ x, y, target, onClose }: CanvasContextMenuPr
     >
       {/* Header Info */}
       <div className="px-3 py-1 text-[11px] font-semibold text-text-muted border-b border-border-base/30 flex items-center justify-between">
-        <span className="truncate max-w-[170px]">{target.name || (target.type === 'node' ? 'Waypoint' : 'Annotation')}</span>
+        <span className="truncate max-w-[170px]">
+          {target.name || (target.type === 'node' ? 'Waypoint' : 'Annotation')}
+        </span>
         <span className="text-[10px] uppercase tracking-wider px-1 py-0.2 bg-surface-hover rounded text-text-muted">
           {target.type === 'node' ? 'WP' : 'ROI'}
         </span>
@@ -115,9 +113,7 @@ export function CanvasContextMenu({ x, y, target, onClose }: CanvasContextMenuPr
         onClick={handleSelectParent}
         className={cn(
           'flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-left w-full transition-colors font-medium',
-          hasParent
-            ? 'hover:bg-surface-hover text-text-base cursor-pointer'
-            : 'text-text-muted/40 cursor-not-allowed'
+          hasParent ? 'hover:bg-surface-hover text-text-base cursor-pointer' : 'text-text-muted/40 cursor-not-allowed',
         )}
       >
         {isGenerator ? (
@@ -128,15 +124,9 @@ export function CanvasContextMenu({ x, y, target, onClose }: CanvasContextMenuPr
         <div className="flex flex-col min-w-0">
           <span>所属{parentLabel}全体を選択</span>
           {hasParent && target.parentContainerName && (
-            <span className="text-[10px] text-text-muted truncate max-w-[150px]">
-              ({target.parentContainerName})
-            </span>
+            <span className="text-[10px] text-text-muted truncate max-w-[150px]">({target.parentContainerName})</span>
           )}
-          {!hasParent && (
-            <span className="text-[10px] text-text-muted/50">
-              (グループ未所属)
-            </span>
-          )}
+          {!hasParent && <span className="text-[10px] text-text-muted/50">(グループ未所属)</span>}
         </div>
       </button>
     </div>

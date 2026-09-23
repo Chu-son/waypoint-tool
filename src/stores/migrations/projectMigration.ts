@@ -1,4 +1,14 @@
-import { StrictProjectData, CustomLayer, RobotFootprint, OccupancySettings, DefaultExportFormat, RectangularFootprint, CircularFootprint, ConditionalStyleRule, ExportProfile } from '../../types/store';
+import {
+  StrictProjectData,
+  CustomLayer,
+  RobotFootprint,
+  OccupancySettings,
+  DefaultExportFormat,
+  RectangularFootprint,
+  CircularFootprint,
+  ConditionalStyleRule,
+  ExportProfile,
+} from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -149,14 +159,12 @@ export function normalizePluginId(id: string): string {
  * 全27フィールドを厳格に検証・補完し、型安全な StrictProjectData を生成する。
  */
 export function normalizeV1(raw: any): StrictProjectData {
-  const data = (raw && typeof raw === 'object') ? raw : {};
+  const data = raw && typeof raw === 'object' ? raw : {};
 
   // 1. ノード・ID
   const rawRootNodeIds = data.root_node_ids ?? data.rootNodeIds;
   const rootNodeIds: string[] = Array.isArray(rawRootNodeIds) ? rawRootNodeIds : [];
-  const rawNodes = (data.nodes && typeof data.nodes === 'object' && !Array.isArray(data.nodes))
-    ? data.nodes
-    : {};
+  const rawNodes = data.nodes && typeof data.nodes === 'object' && !Array.isArray(data.nodes) ? data.nodes : {};
   const nodes: Record<string, any> = { ...rawNodes };
 
   Object.keys(nodes).forEach((id) => {
@@ -182,22 +190,31 @@ export function normalizeV1(raw: any): StrictProjectData {
   });
 
   // 2. デフォルトマップ透過度
-  const defaultMapOpacity = typeof data.default_map_opacity === 'number'
-    ? data.default_map_opacity
-    : (typeof data.defaultMapOpacity === 'number' ? data.defaultMapOpacity : DEFAULT_MAP_OPACITY);
+  const defaultMapOpacity =
+    typeof data.default_map_opacity === 'number'
+      ? data.default_map_opacity
+      : typeof data.defaultMapOpacity === 'number'
+        ? data.defaultMapOpacity
+        : DEFAULT_MAP_OPACITY;
 
   // 3. マップレイヤー
   const rawMapLayers = data.map_layers ?? data.mapLayers;
   const mapLayersList = Array.isArray(rawMapLayers) ? rawMapLayers : [];
   const mapLayers = mapLayersList.map((layer: any, index: number) => {
-    const rawInfo = (layer?.info && typeof layer.info === 'object') ? layer.info : {};
+    const rawInfo = layer?.info && typeof layer.info === 'object' ? layer.info : {};
     const rawOrigin = rawInfo.origin;
-    const origin: [number, number, number] = Array.isArray(rawOrigin) && rawOrigin.length >= 2
-      ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
-      : [0, 0, 0];
-    const initial_origin: [number, number, number] = Array.isArray(rawInfo.initial_origin) && rawInfo.initial_origin.length >= 2
-      ? [Number(rawInfo.initial_origin[0]) || 0, Number(rawInfo.initial_origin[1]) || 0, Number(rawInfo.initial_origin[2]) || 0]
-      : [...origin];
+    const origin: [number, number, number] =
+      Array.isArray(rawOrigin) && rawOrigin.length >= 2
+        ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
+        : [0, 0, 0];
+    const initial_origin: [number, number, number] =
+      Array.isArray(rawInfo.initial_origin) && rawInfo.initial_origin.length >= 2
+        ? [
+            Number(rawInfo.initial_origin[0]) || 0,
+            Number(rawInfo.initial_origin[1]) || 0,
+            Number(rawInfo.initial_origin[2]) || 0,
+          ]
+        : [...origin];
     const info = {
       ...rawInfo,
       origin,
@@ -226,11 +243,12 @@ export function normalizeV1(raw: any): StrictProjectData {
       id: l?.id || uuidv4(),
       is_reference: l?.is_reference ?? false,
       z_index: typeof l?.z_index === 'number' ? l.z_index : i,
-      editObjects: l?.type === 'manual'
-        ? (Array.isArray(l.editObjects ?? l.edit_objects)
+      editObjects:
+        l?.type === 'manual'
+          ? Array.isArray(l.editObjects ?? l.edit_objects)
             ? (l.editObjects ?? l.edit_objects).map((o: any) => ({ ...o, id: o?.id || uuidv4() }))
-            : [])
-        : undefined,
+            : []
+          : undefined,
     }));
   } else {
     const rawEdit = data.edit_layers ?? data.editLayers;
@@ -286,29 +304,28 @@ export function normalizeV1(raw: any): StrictProjectData {
   const annotationObjects = rawAnnotationList.map((a: any) => ({
     ...a,
     id: a?.id || uuidv4(),
-    options: (a?.options && typeof a.options === 'object' && !Array.isArray(a.options)) ? { ...a.options } : {},
+    options: a?.options && typeof a.options === 'object' && !Array.isArray(a.options) ? { ...a.options } : {},
   }));
 
   const rawAnnotationGroups = data.annotation_groups ?? data.annotationGroups;
-  const annotationGroups = (rawAnnotationGroups && typeof rawAnnotationGroups === 'object' && !Array.isArray(rawAnnotationGroups))
-    ? rawAnnotationGroups
-    : {};
+  const annotationGroups =
+    rawAnnotationGroups && typeof rawAnnotationGroups === 'object' && !Array.isArray(rawAnnotationGroups)
+      ? rawAnnotationGroups
+      : {};
 
   const rawRootAnnotationIds = data.root_annotation_ids ?? data.rootAnnotationIds;
   const rootAnnotationIds: string[] = Array.isArray(rawRootAnnotationIds)
     ? rawRootAnnotationIds
-    : (
-      Object.keys(annotationGroups).length > 0
-        ? [...Object.keys(annotationGroups), ...annotationObjects.filter((a: any) => !a.group_id).map((a: any) => a.id)]
-        : annotationObjects.map((a: any) => a.id)
-    );
+    : Object.keys(annotationGroups).length > 0
+      ? [...Object.keys(annotationGroups), ...annotationObjects.filter((a: any) => !a.group_id).map((a: any) => a.id)]
+      : annotationObjects.map((a: any) => a.id);
 
   // 6. エクスポート領域・テンプレート
   const rawExportRegions = data.export_regions ?? data.exportRegions;
   const exportRegions = Array.isArray(rawExportRegions) ? rawExportRegions : [];
 
   const rawOptionsSchema = data.options_schema ?? data.optionsSchema;
-  const optionsSchema = (rawOptionsSchema && typeof rawOptionsSchema === 'object') ? rawOptionsSchema : null;
+  const optionsSchema = rawOptionsSchema && typeof rawOptionsSchema === 'object' ? rawOptionsSchema : null;
 
   const rawExportTemplates = data.export_templates ?? data.exportTemplates;
   const exportTemplates = Array.isArray(rawExportTemplates) ? rawExportTemplates : [];
@@ -337,42 +354,51 @@ export function normalizeV1(raw: any): StrictProjectData {
 
   const rawOcc = data.occupancy_settings ?? data.occupancySettings ?? {};
   const occupancySettings: OccupancySettings = {
-    defaultOccupiedThresh: typeof rawOcc.defaultOccupiedThresh === 'number'
-      ? rawOcc.defaultOccupiedThresh
-      : DEFAULT_OCCUPANCY_SETTINGS.defaultOccupiedThresh,
-    defaultFreeThresh: typeof rawOcc.defaultFreeThresh === 'number'
-      ? rawOcc.defaultFreeThresh
-      : DEFAULT_OCCUPANCY_SETTINGS.defaultFreeThresh,
-    defaultNegate: (rawOcc.defaultNegate === 1 || rawOcc.defaultNegate === 0)
-      ? rawOcc.defaultNegate
-      : DEFAULT_OCCUPANCY_SETTINGS.defaultNegate,
+    defaultOccupiedThresh:
+      typeof rawOcc.defaultOccupiedThresh === 'number'
+        ? rawOcc.defaultOccupiedThresh
+        : DEFAULT_OCCUPANCY_SETTINGS.defaultOccupiedThresh,
+    defaultFreeThresh:
+      typeof rawOcc.defaultFreeThresh === 'number'
+        ? rawOcc.defaultFreeThresh
+        : DEFAULT_OCCUPANCY_SETTINGS.defaultFreeThresh,
+    defaultNegate:
+      rawOcc.defaultNegate === 1 || rawOcc.defaultNegate === 0
+        ? rawOcc.defaultNegate
+        : DEFAULT_OCCUPANCY_SETTINGS.defaultNegate,
   };
 
   // 9. パネルビューモード & 経路計算
-  const leftPanelViewMode = (data.left_panel_view_mode === 'split' || data.leftPanelViewMode === 'split') ? 'split' : 'tabs';
-  const rightPanelViewMode = (data.right_panel_view_mode === 'split' || data.rightPanelViewMode === 'split') ? 'split' : 'tabs';
+  const leftPanelViewMode =
+    data.left_panel_view_mode === 'split' || data.leftPanelViewMode === 'split' ? 'split' : 'tabs';
+  const rightPanelViewMode =
+    data.right_panel_view_mode === 'split' || data.rightPanelViewMode === 'split' ? 'split' : 'tabs';
 
-  const activePathCalculatorPluginId = typeof (data.active_path_calculator_plugin_id ?? data.activePathCalculatorPluginId) === 'string'
-    ? (data.active_path_calculator_plugin_id ?? data.activePathCalculatorPluginId)
-    : null;
+  const activePathCalculatorPluginId =
+    typeof (data.active_path_calculator_plugin_id ?? data.activePathCalculatorPluginId) === 'string'
+      ? (data.active_path_calculator_plugin_id ?? data.activePathCalculatorPluginId)
+      : null;
 
   const rawPathCalcParams = data.path_calculator_params ?? data.pathCalculatorParams;
-  const pathCalculatorParams = (rawPathCalcParams && typeof rawPathCalcParams === 'object' && !Array.isArray(rawPathCalcParams))
-    ? rawPathCalcParams
-    : {};
+  const pathCalculatorParams =
+    rawPathCalcParams && typeof rawPathCalcParams === 'object' && !Array.isArray(rawPathCalcParams)
+      ? rawPathCalcParams
+      : {};
 
   const autoRecalculatePath = data.auto_recalculate_path ?? data.autoRecalculatePath ?? true;
   const pathColor = data.path_color || data.pathColor || DEFAULT_PATH_COLOR;
   const pathWidth = typeof (data.path_width ?? data.pathWidth) === 'number' ? (data.path_width ?? data.pathWidth) : 0.1;
-  const pathOpacity = typeof (data.path_opacity ?? data.pathOpacity) === 'number' ? (data.path_opacity ?? data.pathOpacity) : 0.7;
+  const pathOpacity =
+    typeof (data.path_opacity ?? data.pathOpacity) === 'number' ? (data.path_opacity ?? data.pathOpacity) : 0.7;
   const syncPathWidthWithFootprint = data.sync_path_width_with_footprint ?? data.syncPathWidthWithFootprint ?? false;
 
   const rawIndex = data.index_start_index ?? data.indexStartIndex;
-  const indexStartIndex: 0 | 1 = (Number(rawIndex) === 1) ? 1 : 0;
+  const indexStartIndex: 0 | 1 = Number(rawIndex) === 1 ? 1 : 0;
 
-  const decimalPrecision = typeof (data.decimal_precision ?? data.decimalPrecision) === 'number'
-    ? (data.decimal_precision ?? data.decimalPrecision)
-    : 6;
+  const decimalPrecision =
+    typeof (data.decimal_precision ?? data.decimalPrecision) === 'number'
+      ? (data.decimal_precision ?? data.decimalPrecision)
+      : 6;
 
   // 10. 条件付き書式 (Conditional Styles)
   const rawConditionalStyles = data.conditional_styles ?? data.conditionalStyles;
@@ -380,15 +406,15 @@ export function normalizeV1(raw: any): StrictProjectData {
     ? rawConditionalStyles
     : DEFAULT_CONDITIONAL_STYLES;
 
-  const conditionalStylesEnabled = typeof (data.conditional_styles_enabled ?? data.conditionalStylesEnabled) === 'boolean'
-    ? (data.conditional_styles_enabled ?? data.conditionalStylesEnabled)
-    : DEFAULT_CONDITIONAL_STYLES_ENABLED;
+  const conditionalStylesEnabled =
+    typeof (data.conditional_styles_enabled ?? data.conditionalStylesEnabled) === 'boolean'
+      ? (data.conditional_styles_enabled ?? data.conditionalStylesEnabled)
+      : DEFAULT_CONDITIONAL_STYLES_ENABLED;
 
   // 11. カスタムUI & ワークフロー状態 (camelCase 解決とクリーンアップ)
   const rawCustomUi = data.custom_ui_data ?? data.customUiData ?? {};
-  const customUiData: Record<string, any> = (rawCustomUi && typeof rawCustomUi === 'object' && !Array.isArray(rawCustomUi))
-    ? { ...rawCustomUi }
-    : {};
+  const customUiData: Record<string, any> =
+    rawCustomUi && typeof rawCustomUi === 'object' && !Array.isArray(rawCustomUi) ? { ...rawCustomUi } : {};
 
   const legacyWorkflow = data.workflow_state ?? data.workflowState;
   const wsSource = customUiData.workflow_state ?? customUiData.workflowState ?? legacyWorkflow;
@@ -398,52 +424,67 @@ export function normalizeV1(raw: any): StrictProjectData {
 
   if (wsSource && typeof wsSource === 'object') {
     customUiData.workflow_state = {
-      current_step_index: typeof (wsSource.current_step_index ?? wsSource.currentStepIndex) === 'number'
-        ? (wsSource.current_step_index ?? wsSource.currentStepIndex)
-        : 0,
-      max_reached_step_index: typeof (wsSource.max_reached_step_index ?? wsSource.maxReachedStepIndex) === 'number'
-        ? (wsSource.max_reached_step_index ?? wsSource.maxReachedStepIndex)
-        : 0,
-      workflow_variables: (wsSource.workflow_variables ?? wsSource.workflowVariables) && typeof (wsSource.workflow_variables ?? wsSource.workflowVariables) === 'object'
-        ? { ...(wsSource.workflow_variables ?? wsSource.workflowVariables) }
-        : {},
-      step_execution_ids: (wsSource.step_execution_ids ?? wsSource.stepExecutionIds) && typeof (wsSource.step_execution_ids ?? wsSource.stepExecutionIds) === 'object'
-        ? { ...(wsSource.step_execution_ids ?? wsSource.stepExecutionIds) }
-        : {},
+      current_step_index:
+        typeof (wsSource.current_step_index ?? wsSource.currentStepIndex) === 'number'
+          ? (wsSource.current_step_index ?? wsSource.currentStepIndex)
+          : 0,
+      max_reached_step_index:
+        typeof (wsSource.max_reached_step_index ?? wsSource.maxReachedStepIndex) === 'number'
+          ? (wsSource.max_reached_step_index ?? wsSource.maxReachedStepIndex)
+          : 0,
+      workflow_variables:
+        (wsSource.workflow_variables ?? wsSource.workflowVariables) &&
+        typeof (wsSource.workflow_variables ?? wsSource.workflowVariables) === 'object'
+          ? { ...(wsSource.workflow_variables ?? wsSource.workflowVariables) }
+          : {},
+      step_execution_ids:
+        (wsSource.step_execution_ids ?? wsSource.stepExecutionIds) &&
+        typeof (wsSource.step_execution_ids ?? wsSource.stepExecutionIds) === 'object'
+          ? { ...(wsSource.step_execution_ids ?? wsSource.stepExecutionIds) }
+          : {},
     };
   }
 
   // エクスポートプロファイル
   const rawExportProfiles = data.export_profiles ?? data.exportProfiles;
-  const exportProfiles: ExportProfile[] = Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0
-    ? rawExportProfiles.map((p: any) => ({
-        id: typeof p.id === 'string' ? p.id : uuidv4(),
-        name: typeof p.name === 'string' ? p.name : 'Untitled Profile',
-        description: typeof p.description === 'string' ? p.description : '',
-        outputRootDir: typeof (p.outputRootDir ?? p.output_root_dir) === 'string' ? (p.outputRootDir ?? p.output_root_dir) : undefined,
-        conflictResolution: p.conflictResolution === 'overwrite' || p.conflict_resolution === 'overwrite' ? 'overwrite' : 'backup_file',
-        items: Array.isArray(p.items)
-          ? p.items.map((item: any) => ({
-              id: typeof item.id === 'string' ? item.id : uuidv4(),
-              type: ['waypoint_template', 'waypoint_default', 'map_region', 'map_all_regions'].includes(item.type)
-                ? item.type
-                : 'waypoint_default',
-              sourceId: typeof (item.sourceId ?? item.source_id) === 'string' ? (item.sourceId ?? item.source_id) : '__default_yaml__',
-              relativePathPattern: typeof (item.relativePathPattern ?? item.relative_path_pattern) === 'string'
-                ? (item.relativePathPattern ?? item.relative_path_pattern)
-                : 'waypoints/{{yyyymmdd}}_waypoints.yaml',
-              mapFormat: item.mapFormat === 'png_only' || item.map_format === 'png_only' ? 'png_only' : 'ros_standard',
-              includeMapImage: Boolean(item.includeMapImage ?? item.include_map_image),
-              enabled: item.enabled !== false,
-            }))
-          : [],
-      }))
-    : [...DEFAULT_EXPORT_PROFILES];
+  const exportProfiles: ExportProfile[] =
+    Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0
+      ? rawExportProfiles.map((p: any) => ({
+          id: typeof p.id === 'string' ? p.id : uuidv4(),
+          name: typeof p.name === 'string' ? p.name : 'Untitled Profile',
+          description: typeof p.description === 'string' ? p.description : '',
+          outputRootDir:
+            typeof (p.outputRootDir ?? p.output_root_dir) === 'string'
+              ? (p.outputRootDir ?? p.output_root_dir)
+              : undefined,
+          conflictResolution:
+            p.conflictResolution === 'overwrite' || p.conflict_resolution === 'overwrite' ? 'overwrite' : 'backup_file',
+          items: Array.isArray(p.items)
+            ? p.items.map((item: any) => ({
+                id: typeof item.id === 'string' ? item.id : uuidv4(),
+                type: ['waypoint_template', 'waypoint_default', 'map_region', 'map_all_regions'].includes(item.type)
+                  ? item.type
+                  : 'waypoint_default',
+                sourceId:
+                  typeof (item.sourceId ?? item.source_id) === 'string'
+                    ? (item.sourceId ?? item.source_id)
+                    : '__default_yaml__',
+                relativePathPattern:
+                  typeof (item.relativePathPattern ?? item.relative_path_pattern) === 'string'
+                    ? (item.relativePathPattern ?? item.relative_path_pattern)
+                    : 'waypoints/{{yyyymmdd}}_waypoints.yaml',
+                mapFormat:
+                  item.mapFormat === 'png_only' || item.map_format === 'png_only' ? 'png_only' : 'ros_standard',
+                includeMapImage: Boolean(item.includeMapImage ?? item.include_map_image),
+                enabled: item.enabled !== false,
+              }))
+            : [],
+        }))
+      : [...DEFAULT_EXPORT_PROFILES];
 
   const rawActiveProfileId = data.active_export_profile_id ?? data.activeExportProfileId;
-  const activeExportProfileId: string | null = typeof rawActiveProfileId === 'string'
-    ? rawActiveProfileId
-    : (exportProfiles[0]?.id ?? null);
+  const activeExportProfileId: string | null =
+    typeof rawActiveProfileId === 'string' ? rawActiveProfileId : (exportProfiles[0]?.id ?? null);
 
   return {
     version: 1,

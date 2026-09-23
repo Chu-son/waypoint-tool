@@ -3,10 +3,7 @@ import { WaypointNode, AnnotationGroup, AnnotationObject, InsertionTarget } from
 /**
  * ウェイポイントツリーを深さ優先探索 (DFS) で走査し、すべてのマニュアルウェイポイントIDを順序通りに抽出する。
  */
-export function getFlattenedWaypointIds(
-  rootIds: string[],
-  nodes: Record<string, WaypointNode>
-): string[] {
+export function getFlattenedWaypointIds(rootIds: string[], nodes: Record<string, WaypointNode>): string[] {
   const result: string[] = [];
 
   function traverse(id: string) {
@@ -27,10 +24,7 @@ export function getFlattenedWaypointIds(
 /**
  * ウェイポイントツリーを走査し、グループ・ジェネレーターを含むすべてのノードIDを深さ優先順で抽出する。
  */
-export function getFlattenedNodeIds(
-  rootIds: string[],
-  nodes: Record<string, WaypointNode>
-): string[] {
+export function getFlattenedNodeIds(rootIds: string[], nodes: Record<string, WaypointNode>): string[] {
   const result: string[] = [];
 
   function traverse(id: string) {
@@ -52,7 +46,7 @@ export function getFlattenedNodeIds(
 export function getFlattenedAnnotationIds(
   rootIds: string[],
   annotationGroups: Record<string, AnnotationGroup>,
-  annotationObjects: Record<string, AnnotationObject>
+  annotationObjects: Record<string, AnnotationObject>,
 ): string[] {
   const result: string[] = [];
 
@@ -77,7 +71,7 @@ export function getFlattenedAnnotationIds(
 export function findNodeParentId(
   id: string,
   rootIds: string[],
-  nodesOrGroups: Record<string, { children_ids?: string[] }>
+  nodesOrGroups: Record<string, { children_ids?: string[] }>,
 ): string | null {
   if (rootIds.includes(id)) {
     return null;
@@ -95,10 +89,7 @@ export function findNodeParentId(
 /**
  * 汎用的なツリー先祖ID探索関数（親からルートに向かって全先祖IDを収集、循環参照保護付き）
  */
-export function getAncestorIds(
-  id: string,
-  getParentId: (currId: string) => string | null
-): string[] {
+export function getAncestorIds(id: string, getParentId: (currId: string) => string | null): string[] {
   const ancestors: string[] = [];
   const visited = new Set<string>([id]);
   let curr = getParentId(id);
@@ -115,7 +106,7 @@ export function getAncestorIds(
  */
 export function getHighlightedContainerIds(
   selectedIds: string[],
-  getParentId: (currId: string) => string | null
+  getParentId: (currId: string) => string | null,
 ): Set<string> {
   const highlighted = new Set<string>();
   for (const id of selectedIds) {
@@ -134,7 +125,7 @@ export function getAnnotationParentId(
   id: string,
   rootAnnotationIds: string[],
   annotationGroups: Record<string, AnnotationGroup>,
-  annotationObjects: Record<string, AnnotationObject>
+  annotationObjects: Record<string, AnnotationObject>,
 ): string | null {
   const obj = annotationObjects[id];
   if (obj) return obj.group_id ?? null;
@@ -149,7 +140,7 @@ export function getAnnotationParentId(
 export function getNodeDepth(
   id: string,
   rootIds: string[],
-  nodesOrGroups: Record<string, { children_ids?: string[] }>
+  nodesOrGroups: Record<string, { children_ids?: string[] }>,
 ): number {
   let depth = 0;
   let currentId: string | null = id;
@@ -178,10 +169,7 @@ export function getNodeDepth(
 /**
  * 指定されたノード/グループのすべての子孫IDを再帰的に収集する。
  */
-export function collectDescendantIds(
-  id: string,
-  nodesOrGroups: Record<string, { children_ids?: string[] }>
-): string[] {
+export function collectDescendantIds(id: string, nodesOrGroups: Record<string, { children_ids?: string[] }>): string[] {
   const descendants: string[] = [];
   const visited = new Set<string>();
 
@@ -209,7 +197,7 @@ export function collectDescendantIds(
 export function findHighestLevelParent(
   targetIds: string[],
   rootIds: string[],
-  nodesOrGroups: Record<string, { children_ids?: string[] }>
+  nodesOrGroups: Record<string, { children_ids?: string[] }>,
 ): { parentId: string | null; insertIndex: number } {
   if (targetIds.length === 0) {
     return { parentId: null, insertIndex: rootIds.length };
@@ -231,9 +219,7 @@ export function findHighestLevelParent(
   const targetParentId = primaryItem.parentId;
 
   // 3. 親のリスト内での挿入インデックスを決定（最初の対象アイテムがあった位置）
-  const siblingList = targetParentId
-    ? nodesOrGroups[targetParentId]?.children_ids || []
-    : rootIds;
+  const siblingList = targetParentId ? nodesOrGroups[targetParentId]?.children_ids || [] : rootIds;
 
   const firstIndex = siblingList.indexOf(primaryItem.id);
   const insertIndex = firstIndex !== -1 ? firstIndex : siblingList.length;
@@ -252,7 +238,7 @@ export interface VisibleTreeNode {
 export function getVisibleTreeNodes(
   rootIds: string[],
   nodesOrGroups: Record<string, { children_ids?: string[] }>,
-  expandedIds: Set<string>
+  expandedIds: Set<string>,
 ): VisibleTreeNode[] {
   const result: VisibleTreeNode[] = [];
 
@@ -277,7 +263,7 @@ export function getVisibleAnnotationNodes(
   rootIds: string[],
   groups: Record<string, AnnotationGroup>,
   objects: Record<string, AnnotationObject>,
-  expandedIds: Set<string>
+  expandedIds: Set<string>,
 ): VisibleTreeNode[] {
   const result: VisibleTreeNode[] = [];
 
@@ -305,7 +291,7 @@ export function getVisibleAnnotationNodes(
 export function getFlattenedAnnotationNodeIds(
   rootIds: string[],
   groups: Record<string, AnnotationGroup>,
-  objects: Record<string, AnnotationObject>
+  objects: Record<string, AnnotationObject>,
 ): string[] {
   const result: string[] = [];
 
@@ -335,7 +321,7 @@ export function computeRangeSelection(
   lastSelectedId: string | null,
   orderedIds: string[],
   currentSelectedIds: string[],
-  isCtrlOrMeta: boolean
+  isCtrlOrMeta: boolean,
 ): string[] {
   if (!lastSelectedId || !orderedIds.includes(lastSelectedId) || !orderedIds.includes(targetId)) {
     return [targetId];
@@ -356,11 +342,7 @@ export function computeRangeSelection(
 /**
  * ドラッグ中のアイテムとドロップ先アイテムのインデックス関係から、挿入方向（'before' | 'after'）を計算する。
  */
-export function computeDragDropPosition(
-  activeId: string,
-  overId: string,
-  visibleIds: string[]
-): 'before' | 'after' {
+export function computeDragDropPosition(activeId: string, overId: string, visibleIds: string[]): 'before' | 'after' {
   const activeIdx = visibleIds.indexOf(activeId);
   const overIdx = visibleIds.indexOf(overId);
   return activeIdx < overIdx ? 'after' : 'before';
@@ -370,10 +352,7 @@ export function computeDragDropPosition(
  * 既存の名前リストから、指定プレフィックスに続く最小の未使用正の整数（連番）を割り当てた名前を生成する。
  * 例: prefix = "Point", existingNames = ["Point 1", "Point 2", "Point 4"] -> "Point 3"
  */
-export function getNextSequentialName(
-  prefix: string,
-  existingNames: (string | undefined | null)[]
-): string {
+export function getNextSequentialName(prefix: string, existingNames: (string | undefined | null)[]): string {
   const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const regex = new RegExp(`^${escapedPrefix}\\s+(\\d+)$`);
   const usedNumbers = new Set<number>();
@@ -404,7 +383,7 @@ export function getNextSequentialName(
 export function getNodesAfterInsertionTarget(
   rootNodeIds: string[],
   nodes: Record<string, WaypointNode>,
-  insertionTarget: InsertionTarget | null
+  insertionTarget: InsertionTarget | null,
 ): Set<string> {
   const result = new Set<string>();
   if (!insertionTarget) return result;
@@ -442,7 +421,7 @@ export function getNodesAfterInsertionTarget(
 export function getPrecedingManualWaypoint(
   rootNodeIds: string[],
   nodes: Record<string, WaypointNode>,
-  insertionTarget: InsertionTarget | null
+  insertionTarget: InsertionTarget | null,
 ): WaypointNode | null {
   let lastManual: WaypointNode | null = null;
   let targetFound = false;
@@ -469,7 +448,12 @@ export function getPrecedingManualWaypoint(
       }
     }
 
-    if (insertionTarget && !targetFound && insertionTarget.parentId === parentId && insertionTarget.index >= list.length) {
+    if (
+      insertionTarget &&
+      !targetFound &&
+      insertionTarget.parentId === parentId &&
+      insertionTarget.index >= list.length
+    ) {
       targetFound = true;
       result = lastManual;
       return;
@@ -491,10 +475,7 @@ export function isInsertableContainer(node: WaypointNode | null | undefined): bo
 /**
  * 与えられたノードIDリストを展開し、グループノードが含まれる場合はその全子孫ノードID（generatorは除外）を含めたID配列を返す。
  */
-export function expandSelectionWithDescendants(
-  ids: string[],
-  nodes: Record<string, WaypointNode>
-): string[] {
+export function expandSelectionWithDescendants(ids: string[], nodes: Record<string, WaypointNode>): string[] {
   const expanded = new Set<string>();
   ids.forEach((id) => {
     expanded.add(id);
@@ -513,7 +494,7 @@ export function expandSelectionWithDescendants(
 export function validateAndCorrectInsertionTarget(
   target: InsertionTarget | null,
   rootNodeIds: string[],
-  nodes: Record<string, WaypointNode>
+  nodes: Record<string, WaypointNode>,
 ): InsertionTarget | null {
   if (!target) return null;
 
@@ -526,18 +507,19 @@ export function validateAndCorrectInsertionTarget(
   }
 
   // 親が generator 等の挿入不能コンテナである場合は、外側（Generator直後）へ自動エスケープ
-  while (effectiveParentId !== null && (!nodes[effectiveParentId] || !isInsertableContainer(nodes[effectiveParentId]))) {
+  while (
+    effectiveParentId !== null &&
+    (!nodes[effectiveParentId] || !isInsertableContainer(nodes[effectiveParentId]))
+  ) {
     const invalidParentId = effectiveParentId;
     const grandParentId = findNodeParentId(invalidParentId, rootNodeIds, nodes);
-    const siblings = grandParentId ? (nodes[grandParentId]?.children_ids || []) : rootNodeIds;
+    const siblings = grandParentId ? nodes[grandParentId]?.children_ids || [] : rootNodeIds;
     const parentIdx = siblings.indexOf(invalidParentId);
     effectiveParentId = grandParentId;
     effectiveIndex = parentIdx !== -1 ? parentIdx + 1 : siblings.length;
   }
 
-  const siblings = effectiveParentId !== null
-    ? (nodes[effectiveParentId]?.children_ids || [])
-    : rootNodeIds;
+  const siblings = effectiveParentId !== null ? nodes[effectiveParentId]?.children_ids || [] : rootNodeIds;
 
   const safeIndex = Math.max(0, Math.min(effectiveIndex, siblings.length));
   return {
@@ -555,7 +537,7 @@ export function escapeCollapsedInsertionTarget(
   target: InsertionTarget | null,
   expandedNodes: Set<string>,
   rootNodeIds: string[],
-  nodes: Record<string, WaypointNode>
+  nodes: Record<string, WaypointNode>,
 ): InsertionTarget | null {
   if (!target || target.parentId === null) return target;
 
@@ -577,7 +559,7 @@ export function escapeCollapsedInsertionTarget(
 
   if (needsEscape && escapeAncestorId) {
     const parentOfEscape = findNodeParentId(escapeAncestorId, rootNodeIds, nodes);
-    const siblings = parentOfEscape ? (nodes[parentOfEscape]?.children_ids || []) : rootNodeIds;
+    const siblings = parentOfEscape ? nodes[parentOfEscape]?.children_ids || [] : rootNodeIds;
     const idx = siblings.indexOf(escapeAncestorId);
     return {
       parentId: parentOfEscape,
@@ -598,7 +580,7 @@ function resolveHeadAnchor(
   oldNodes: Record<string, WaypointNode>,
   newRootIds: string[],
   newNodes: Record<string, WaypointNode>,
-  visited: Set<string> = new Set()
+  visited: Set<string> = new Set(),
 ): { parentId: string | null; index: number } {
   if (parentId === null) {
     return { parentId: null, index: 0 };
@@ -619,7 +601,7 @@ function resolveHeadAnchor(
   for (const cid of oldChildren) {
     if (newNodes[cid]) {
       const newParent = findNodeParentId(cid, newRootIds, newNodes);
-      const newSibs = newParent ? (newNodes[newParent]?.children_ids || []) : newRootIds;
+      const newSibs = newParent ? newNodes[newParent]?.children_ids || [] : newRootIds;
       const idx = newSibs.indexOf(cid);
       if (idx !== -1) {
         return { parentId: newParent, index: idx };
@@ -629,9 +611,7 @@ function resolveHeadAnchor(
 
   // 親コンテナが削除された場合: 旧ツリーにおける親の位置(oldGrandParentId, oldParentIdx)を特定
   const oldGrandParentId = findNodeParentId(parentId, oldRootIds, oldNodes);
-  const oldParentSiblings = oldGrandParentId
-    ? (oldNodes[oldGrandParentId]?.children_ids || [])
-    : oldRootIds;
+  const oldParentSiblings = oldGrandParentId ? oldNodes[oldGrandParentId]?.children_ids || [] : oldRootIds;
   const oldParentIdx = oldParentSiblings.indexOf(parentId);
 
   if (oldParentIdx !== -1) {
@@ -640,7 +620,7 @@ function resolveHeadAnchor(
       const prevId = oldParentSiblings[k];
       if (newNodes[prevId]) {
         const newParent = findNodeParentId(prevId, newRootIds, newNodes);
-        const newSibs = newParent ? (newNodes[newParent]?.children_ids || []) : newRootIds;
+        const newSibs = newParent ? newNodes[newParent]?.children_ids || [] : newRootIds;
         const idx = newSibs.indexOf(prevId);
         if (idx !== -1) {
           return { parentId: newParent, index: idx + 1 };
@@ -653,7 +633,7 @@ function resolveHeadAnchor(
       const nextId = oldParentSiblings[k];
       if (newNodes[nextId]) {
         const newParent = findNodeParentId(nextId, newRootIds, newNodes);
-        const newSibs = newParent ? (newNodes[newParent]?.children_ids || []) : newRootIds;
+        const newSibs = newParent ? newNodes[newParent]?.children_ids || [] : newRootIds;
         const idx = newSibs.indexOf(nextId);
         if (idx !== -1) {
           return { parentId: newParent, index: idx };
@@ -675,24 +655,16 @@ export function mapInsertionTarget(
   oldRootIds: string[],
   oldNodes: Record<string, WaypointNode>,
   newRootIds: string[],
-  newNodes: Record<string, WaypointNode>
+  newNodes: Record<string, WaypointNode>,
 ): InsertionTarget | null {
   if (!currentTarget) return null;
 
-  const oldSiblings = currentTarget.parentId
-    ? (oldNodes[currentTarget.parentId]?.children_ids || [])
-    : oldRootIds;
+  const oldSiblings = currentTarget.parentId ? oldNodes[currentTarget.parentId]?.children_ids || [] : oldRootIds;
 
   let mapped: { parentId: string | null; index: number };
 
   if (currentTarget.index === 0) {
-    mapped = resolveHeadAnchor(
-      currentTarget.parentId,
-      oldRootIds,
-      oldNodes,
-      newRootIds,
-      newNodes
-    );
+    mapped = resolveHeadAnchor(currentTarget.parentId, oldRootIds, oldNodes, newRootIds, newNodes);
   } else {
     // index > 0: After Anchor (S = siblings[index - 1], AFTER)
     const anchorIdx = Math.min(currentTarget.index - 1, oldSiblings.length - 1);
@@ -701,7 +673,7 @@ export function mapInsertionTarget(
     if (anchorId && newNodes[anchorId]) {
       // アンカーノードが存続している場合、その新しい位置の直後へ写像
       const newParent = findNodeParentId(anchorId, newRootIds, newNodes);
-      const newSiblings = newParent ? (newNodes[newParent]?.children_ids || []) : newRootIds;
+      const newSiblings = newParent ? newNodes[newParent]?.children_ids || [] : newRootIds;
       const idx = newSiblings.indexOf(anchorId);
       mapped = {
         parentId: newParent,
@@ -717,7 +689,7 @@ export function mapInsertionTarget(
         const prevId = oldSiblings[k];
         if (newNodes[prevId]) {
           foundParent = findNodeParentId(prevId, newRootIds, newNodes);
-          const newSiblings = foundParent ? (newNodes[foundParent]?.children_ids || []) : newRootIds;
+          const newSiblings = foundParent ? newNodes[foundParent]?.children_ids || [] : newRootIds;
           const idx = newSiblings.indexOf(prevId);
           if (idx !== -1) {
             foundIndex = idx + 1;
@@ -731,23 +703,13 @@ export function mapInsertionTarget(
         mapped = { parentId: foundParent, index: foundIndex };
       } else {
         // 手前に生存兄弟が存在しない場合: コンテナ先頭境界 (P, HEAD) として解決
-        mapped = resolveHeadAnchor(
-          currentTarget.parentId,
-          oldRootIds,
-          oldNodes,
-          newRootIds,
-          newNodes
-        );
+        mapped = resolveHeadAnchor(currentTarget.parentId, oldRootIds, oldNodes, newRootIds, newNodes);
       }
     }
   }
 
   // Generator 内部エスケープおよび有効コンテナ検証
-  return validateAndCorrectInsertionTarget(
-    mapped,
-    newRootIds,
-    newNodes
-  );
+  return validateAndCorrectInsertionTarget(mapped, newRootIds, newNodes);
 }
 
 export interface MultiDepthDropOptions {
@@ -766,9 +728,7 @@ export interface MultiDepthDropOptions {
  * 水平X座標（インデント量）に基づいて深さ（Group内 vs Group外/親レベル）を判定して
  * 適切な InsertionTarget を導出する。
  */
-export function determineMultiDepthDropTarget(
-  options: MultiDepthDropOptions
-): InsertionTarget | null {
+export function determineMultiDepthDropTarget(options: MultiDepthDropOptions): InsertionTarget | null {
   const {
     activeId: _activeId,
     overId,
@@ -783,7 +743,8 @@ export function determineMultiDepthDropTarget(
   if (rootNodeIds.length === 0) return null;
 
   const overNode = nodes[overId];
-  const isOverContainer = overNode && (overNode.type === 'manual_group' || overNode.type === 'group' || overNode.type === 'generator');
+  const isOverContainer =
+    overNode && (overNode.type === 'manual_group' || overNode.type === 'group' || overNode.type === 'generator');
   const isOverInsertable = isInsertableContainer(overNode);
   const isOverExpanded = isOverContainer && expandedNodes.has(overId);
 
@@ -795,7 +756,7 @@ export function determineMultiDepthDropTarget(
       refId = parentId;
       parentId = findNodeParentId(parentId, rootNodeIds, nodes);
     }
-    const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+    const siblings = parentId ? nodes[parentId]?.children_ids || [] : rootNodeIds;
     const idx = siblings.indexOf(refId);
     return {
       parentId,
@@ -816,7 +777,7 @@ export function determineMultiDepthDropTarget(
         while (parentId && !isInsertableContainer(nodes[parentId])) {
           parentId = findNodeParentId(parentId, rootNodeIds, nodes);
         }
-        const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+        const siblings = parentId ? nodes[parentId]?.children_ids || [] : rootNodeIds;
         const idx = siblings.indexOf(overId);
         return idx !== -1 && parentId === null && idx === rootNodeIds.length - 1
           ? null
@@ -829,7 +790,7 @@ export function determineMultiDepthDropTarget(
     while (parentId && !isInsertableContainer(nodes[parentId])) {
       parentId = findNodeParentId(parentId, rootNodeIds, nodes);
     }
-    const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+    const siblings = parentId ? nodes[parentId]?.children_ids || [] : rootNodeIds;
     const idx = siblings.indexOf(overId);
     return idx !== -1 && parentId === null && idx === rootNodeIds.length - 1
       ? null
@@ -844,7 +805,7 @@ export function determineMultiDepthDropTarget(
     immediateParentId = findNodeParentId(immediateParentId, rootNodeIds, nodes);
   }
 
-  const siblings = immediateParentId ? (nodes[immediateParentId]?.children_ids || []) : rootNodeIds;
+  const siblings = immediateParentId ? nodes[immediateParentId]?.children_ids || [] : rootNodeIds;
   const idx = siblings.indexOf(refId);
 
   // immediateParentId 内で最後の兄弟かどうかを判定
@@ -888,7 +849,7 @@ export function determineMultiDepthDropTarget(
       currParentId = findNodeParentId(currParentId, rootNodeIds, nodes);
     }
 
-    const currSiblings = currParentId ? (nodes[currParentId]?.children_ids || []) : rootNodeIds;
+    const currSiblings = currParentId ? nodes[currParentId]?.children_ids || [] : rootNodeIds;
     const currIdx = currSiblings.indexOf(currChildId);
 
     const targetIndex = currIdx !== -1 ? currIdx + 1 : currSiblings.length;
@@ -924,4 +885,3 @@ export function determineMultiDepthDropTarget(
     return c.parentId === null && c.index >= rootNodeIds.length ? null : { parentId: c.parentId, index: c.index };
   }
 }
-

@@ -23,20 +23,20 @@ describe('Occupancy Settings & Highlight Store Integration', () => {
   it('updates occupancy settings and marks project dirty', () => {
     useAppStore.getState().updateOccupancySettings({
       defaultOccupiedThresh: 0.75,
-      defaultFreeThresh: 0.20,
+      defaultFreeThresh: 0.2,
     });
 
     const settings = useAppStore.getState().occupancySettings;
     expect(settings.defaultOccupiedThresh).toBe(0.75);
-    expect(settings.defaultFreeThresh).toBe(0.20);
+    expect(settings.defaultFreeThresh).toBe(0.2);
     expect(settings.defaultNegate).toBe(0);
     expect(useAppStore.getState().isDirty).toBe(true);
   });
 
   it('injects default occupancy settings into new map layers when info is missing threshold values', () => {
     useAppStore.getState().updateOccupancySettings({
-      defaultOccupiedThresh: 0.80,
-      defaultFreeThresh: 0.30,
+      defaultOccupiedThresh: 0.8,
+      defaultFreeThresh: 0.3,
       defaultNegate: 1,
     });
 
@@ -44,19 +44,21 @@ describe('Occupancy Settings & Highlight Store Integration', () => {
 
     const layers = useAppStore.getState().mapLayers;
     expect(layers.length).toBe(1);
-    expect(layers[0].info.occupied_thresh).toBe(0.80);
-    expect(layers[0].info.free_thresh).toBe(0.30);
+    expect(layers[0].info.occupied_thresh).toBe(0.8);
+    expect(layers[0].info.free_thresh).toBe(0.3);
     expect(layers[0].info.negate).toBe(1);
   });
 
   it('preserves existing map layer thresholds if provided in YAML info', () => {
-    useAppStore.getState().addMapLayer(
-      'Custom Map',
-      { resolution: 0.05, occupied_thresh: 0.55, free_thresh: 0.15, negate: 0 },
-      'fake-base64',
-      100,
-      100
-    );
+    useAppStore
+      .getState()
+      .addMapLayer(
+        'Custom Map',
+        { resolution: 0.05, occupied_thresh: 0.55, free_thresh: 0.15, negate: 0 },
+        'fake-base64',
+        100,
+        100,
+      );
 
     const layers = useAppStore.getState().mapLayers;
     expect(layers.length).toBe(1);

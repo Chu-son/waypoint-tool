@@ -1,24 +1,24 @@
+use crate::models::MapInfo;
+use base64::{engine::general_purpose, Engine as _};
+use image::GenericImageView;
 use serde_yaml;
 use std::fs;
 use std::path::Path;
-use image::GenericImageView;
-use base64::{Engine as _, engine::general_purpose};
-use crate::models::MapInfo;
 
-pub mod export_maps;
-pub mod occupancy;
 pub mod blend_preview;
 pub mod blending;
-pub use export_maps::*;
-pub use occupancy::*;
+pub mod export_maps;
+pub mod occupancy;
 pub use blend_preview::*;
 pub use blending::*;
+pub use export_maps::*;
+pub use occupancy::*;
 
 #[derive(Debug, serde::Serialize)]
 pub struct MapLoadResult {
     pub info: MapInfo,
     // Base64 encoded PNG or WebP data string to use in <img> or Canvas
-    pub image_data_b64: String, 
+    pub image_data_b64: String,
     pub width: u32,
     pub height: u32,
 }
@@ -28,16 +28,13 @@ pub fn load_map(yaml_path: &str) -> std::result::Result<MapLoadResult, String> {
     let parent_dir = path.parent().unwrap_or(Path::new(""));
 
     // 1. Parse YAML
-    let yaml_content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read YAML: {}", e))?;
-    
-    let map_info: MapInfo = serde_yaml::from_str(&yaml_content)
-        .map_err(|e| format!("Failed to parse YAML: {}", e))?;
+    let yaml_content = fs::read_to_string(path).map_err(|e| format!("Failed to read YAML: {}", e))?;
+
+    let map_info: MapInfo = serde_yaml::from_str(&yaml_content).map_err(|e| format!("Failed to parse YAML: {}", e))?;
 
     // 2. Load image (PGM or PNG)
     let image_path = parent_dir.join(&map_info.image);
-    let img = image::open(&image_path)
-        .map_err(|e| format!("Failed to open image {}: {}", image_path.display(), e))?;
+    let img = image::open(&image_path).map_err(|e| format!("Failed to open image {}: {}", image_path.display(), e))?;
 
     let (width, height) = img.dimensions();
 
@@ -54,22 +51,22 @@ pub fn load_map(yaml_path: &str) -> std::result::Result<MapLoadResult, String> {
         info: map_info,
         image_data_b64,
         width,
-        height
+        height,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
+    use image::{ImageBuffer, Rgb};
     use std::fs::File;
     use std::io::Write;
-    use image::{ImageBuffer, Rgb};
+    use tempfile::tempdir;
 
     #[test]
     fn test_load_valid_ros_map() {
         let dir = tempdir().unwrap();
-        
+
         // 1. Create a dummy image (PNG is fine, image crate handles it)
         let img_path = dir.path().join("dummy_map.png");
         let img = ImageBuffer::from_pixel(10, 10, Rgb([255u8, 255u8, 255u8]));
@@ -77,9 +74,7 @@ mod tests {
 
         // 2. Create the YAML file
         let yaml_path = dir.path().join("map.yaml");
-        let yaml_content = format!(
-            "image: dummy_map.png\nresolution: 0.05\norigin: [-10.0, -10.0, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196"
-        );
+        let yaml_content = "image: dummy_map.png\nresolution: 0.05\norigin: [-10.0, -10.0, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196".to_string();
         let mut file = File::create(&yaml_path).unwrap();
         file.write_all(yaml_content.as_bytes()).unwrap();
 
@@ -99,9 +94,7 @@ mod tests {
     fn test_load_map_missing_image() {
         let dir = tempdir().unwrap();
         let yaml_path = dir.path().join("map.yaml");
-        let yaml_content = format!(
-            "image: does_not_exist.png\nresolution: 0.05\norigin: [0, 0, 0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196"
-        );
+        let yaml_content = "image: does_not_exist.png\nresolution: 0.05\norigin: [0, 0, 0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196".to_string();
         let mut file = File::create(&yaml_path).unwrap();
         file.write_all(yaml_content.as_bytes()).unwrap();
 

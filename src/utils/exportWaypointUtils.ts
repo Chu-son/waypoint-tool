@@ -1,10 +1,11 @@
-import { ObjectNode, OptionsSchema } from '../types/store';
+import type { WaypointNode, OptionsSchema } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
+import { quaternionToYaw } from './transformUtils';
 
 export interface ExportedWaypointItem {
   index: number;
   id: string;
-  type: ObjectNode['type'];
+  type: WaypointNode['type'];
   x: number;
   y: number;
   z: number;
@@ -18,9 +19,9 @@ export interface ExportedWaypointItem {
 
 export function extractWaypointsForExport(
   rootNodeIds: string[],
-  nodes: Record<string, ObjectNode>,
+  nodes: Record<string, WaypointNode>,
   optionsSchema: OptionsSchema | null,
-  indexStartIndex: number = 0
+  indexStartIndex: number = 0,
 ): ExportedWaypointItem[] {
   const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
 
@@ -33,9 +34,7 @@ export function extractWaypointsForExport(
       if (optionsSchema && optionsSchema.options) {
         optionsSchema.options.forEach((opt: any) => {
           fullOptions[opt.name] =
-            node.options && node.options[opt.name] !== undefined
-              ? node.options[opt.name]
-              : opt.default;
+            node.options && node.options[opt.name] !== undefined ? node.options[opt.name] : opt.default;
         });
       }
       if (node.options) {
@@ -50,10 +49,7 @@ export function extractWaypointsForExport(
       const qy = node.transform?.qy || 0;
       const qz = node.transform?.qz || 0;
       const qw = node.transform?.qw ?? 1;
-      const yawVal = Math.atan2(
-        2.0 * (qw * qz + qx * qy),
-        1.0 - 2.0 * (qy * qy + qz * qz)
-      );
+      const yawVal = quaternionToYaw(node.transform);
 
       return {
         index: index + indexStartIndex,

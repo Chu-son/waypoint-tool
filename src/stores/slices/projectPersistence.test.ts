@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { buildProjectData } from './projectSlice';
+import { buildProjectData } from '../serialization/projectSerializer';
 import { StrictProjectData } from '../../types/store';
 import {
   DEFAULT_ROBOT_FOOTPRINT,
@@ -52,9 +52,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
           z_index: 0,
           blend_mode: 'overwrite',
           is_reference: false,
-          editObjects: [
-            { id: 'obj-1', type: 'rect', cx: 10, cy: 10, width: 20, height: 20, angle: 0, fillValue: 0 },
-          ],
+          editObjects: [{ id: 'obj-1', type: 'rect', cx: 10, cy: 10, width: 20, height: 20, angle: 0, fillValue: 0 }],
         },
       ],
       annotation_objects: [

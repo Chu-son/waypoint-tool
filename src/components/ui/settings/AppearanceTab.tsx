@@ -1,17 +1,17 @@
-import { useAppStore } from "../../../stores/appStore";
-import { Select } from "../common/Select";
-import { Input } from "../common/Input";
-import { Checkbox } from "../common/Checkbox";
-import { FormField } from "../common/FormField";
-import { Slider } from "../common/Slider";
-import { Button } from "../common/Button";
-import { DEFAULT_PATH_COLOR } from "../../../utils/colorPresets";
-import { ACCENT_THEME_PRESETS } from "../../../utils/themePresets";
-import { NumericInput } from "../NumericInput";
-import { Moon, Sun, Palette, SlidersHorizontal, Map as MapIcon } from "lucide-react";
-import { cn } from "../../../utils/cn";
-import { TabSectionHeader } from "./TabSectionHeader";
-import { SettingsSection } from "./SettingsSection";
+import { useAppStore } from '../../../stores/appStore';
+import { Select } from '../common/Select';
+import { Input } from '../common/Input';
+import { Checkbox } from '../common/Checkbox';
+import { FormField } from '../common/FormField';
+import { Slider } from '../common/Slider';
+import { Button } from '../common/Button';
+import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
+import { ACCENT_THEME_PRESETS } from '../../../utils/themePresets';
+import { NumericInput } from '../common/NumericInput';
+import { Moon, Sun, Palette, SlidersHorizontal, Map as MapIcon } from 'lucide-react';
+import { cn } from '../../../utils/cn';
+import { TabSectionHeader } from './TabSectionHeader';
+import { SettingsSection } from './SettingsSection';
 
 export function AppearanceTab() {
   const themeMode = useAppStore((state) => state.themeMode);
@@ -57,14 +57,14 @@ export function AppearanceTab() {
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Color Theme">
             <Button
               type="button"
-              variant={themeMode === "light" ? "secondary" : "ghost"}
-              onClick={() => setThemeMode("light")}
-              aria-pressed={themeMode === "light"}
+              variant={themeMode === 'light' ? 'secondary' : 'ghost'}
+              onClick={() => setThemeMode('light')}
+              aria-pressed={themeMode === 'light'}
               className={cn(
-                "h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all",
-                themeMode === "light"
-                  ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base"
-                  : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+                'h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all',
+                themeMode === 'light'
+                  ? 'bg-primary-base/15 border-primary-base text-primary-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base'
+                  : 'border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover',
               )}
             >
               <Sun className="w-4 h-4 shrink-0" />
@@ -72,14 +72,14 @@ export function AppearanceTab() {
             </Button>
             <Button
               type="button"
-              variant={themeMode === "dark" ? "secondary" : "ghost"}
-              onClick={() => setThemeMode("dark")}
-              aria-pressed={themeMode === "dark"}
+              variant={themeMode === 'dark' ? 'secondary' : 'ghost'}
+              onClick={() => setThemeMode('dark')}
+              aria-pressed={themeMode === 'dark'}
               className={cn(
-                "h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all",
-                themeMode === "dark"
-                  ? "bg-primary-base/15 border-primary-base text-primary-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base"
-                  : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+                'h-8 text-[13px] font-medium justify-center rounded-md border flex items-center gap-2 transition-all',
+                themeMode === 'dark'
+                  ? 'bg-primary-base/15 border-primary-base text-primary-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base'
+                  : 'border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover',
               )}
             >
               <Moon className="w-4 h-4 shrink-0" />
@@ -88,30 +88,28 @@ export function AppearanceTab() {
           </div>
 
           <div className="mt-4 pt-3 border-t border-border-base/40 space-y-2">
-            <div className="text-[11px] font-medium text-text-muted">
-              Accent Theme
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2" role="group" aria-label="Accent Theme Presets">
+            <div className="text-[11px] font-medium text-text-muted">Accent Theme</div>
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2"
+              role="group"
+              aria-label="Accent Theme Presets"
+            >
               {ACCENT_THEME_PRESETS.map((preset) => {
                 const currentPreset =
-                  themePreset === "roomba"
-                    ? "emerald"
-                    : themePreset === "dark"
-                    ? "default"
-                    : themePreset || "default";
+                  themePreset === 'roomba' ? 'emerald' : themePreset === 'dark' ? 'default' : themePreset || 'default';
                 const isSelected = currentPreset === preset.id;
                 return (
                   <Button
                     key={preset.id}
                     type="button"
-                    variant={isSelected ? "secondary" : "ghost"}
+                    variant={isSelected ? 'secondary' : 'ghost'}
                     onClick={() => setThemePreset(preset.id)}
                     aria-pressed={isSelected}
                     className={cn(
-                      "h-8 text-xs font-medium justify-start px-2.5 rounded-md border flex items-center gap-2 transition-all",
+                      'h-8 text-xs font-medium justify-start px-2.5 rounded-md border flex items-center gap-2 transition-all',
                       isSelected
-                        ? "bg-primary-base/15 border-primary-base text-text-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base"
-                        : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+                        ? 'bg-primary-base/15 border-primary-base text-text-base shadow-xs hover:bg-primary-base/20 hover:border-primary-base'
+                        : 'border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover',
                     )}
                   >
                     <span
@@ -170,10 +168,7 @@ export function AppearanceTab() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-border-base/30">
-          <FormField
-            label="Path Color"
-            description="Color used to render paths across the canvas."
-          >
+          <FormField label="Path Color" description="Color used to render paths across the canvas.">
             <div className="flex items-center gap-3">
               <input
                 type="color"
@@ -254,9 +249,7 @@ export function AppearanceTab() {
               style={{
                 width: `${Math.max(
                   0,
-                  (occupancySettings.defaultOccupiedThresh -
-                    occupancySettings.defaultFreeThresh) *
-                    100
+                  (occupancySettings.defaultOccupiedThresh - occupancySettings.defaultFreeThresh) * 100,
                 )}%`,
               }}
               className="bg-occupancy-unknown/80 transition-all"
@@ -266,10 +259,7 @@ export function AppearanceTab() {
             </div>
             <div
               style={{
-                width: `${Math.max(
-                  0,
-                  (1.0 - occupancySettings.defaultOccupiedThresh) * 100
-                )}%`,
+                width: `${Math.max(0, (1.0 - occupancySettings.defaultOccupiedThresh) * 100)}%`,
               }}
               className="bg-occupancy-obstacle/80 transition-all"
               title={`Obstacle: ${occupancySettings.defaultOccupiedThresh.toFixed(2)} ~ 1.00`}

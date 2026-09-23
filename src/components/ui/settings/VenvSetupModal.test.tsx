@@ -1,150 +1,85 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VenvSetupModal } from './VenvSetupModal';
-import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
-import { PluginInstance } from '../../../types/store';
+import { renderWithStore } from '../../../test/render';
+import { getAppState } from '../../../test/store';
+import { makePlugin } from '../../../test/fixtures';
+import type { PluginSetting } from '../../../types/store';
 
-// Mock the store
-vi.mock('../../../stores/appStore', () => ({
-  useAppStore: Object.assign(vi.fn(), {
-    getState: vi.fn(),
-    setState: vi.fn(),
-    subscribe: vi.fn(),
+const VENV_PYTHON = '/home/user/plugins/geo-plugin/.venv/bin/python';
+
+const plugin = {
+  ...makePlugin('geo-plugin', {
+    name: 'Geo Analyzer',
+    python_dependencies: [
+      { name: 'numpy', version: '>=1.20', description: 'Matrix operations' },
+      { name: 'shapely', version: '2.0.0', optional: true },
+    ],
   }),
-}));
+  folder_path: '/home/user/plugins/geo-plugin',
+};
 
-// Mock BackendAPI
-vi.mock('../../../api', () => ({
-  BackendAPI: {
-    getPythonEnvironments: vi.fn(),
-    createVirtualenv: vi.fn(),
-    installPipPackages: vi.fn(),
-  },
-}));
-
-describe('VenvSetupModal', () => {
-  const mockPlugin: PluginInstance = {
-    id: 'geo-plugin',
-    is_builtin: false,
-    manifest: {
-      name: 'Geo Analyzer',
-      type: 'python',
-      executable: 'main.py',
-      inputs: [],
-      properties: [],
-      python_dependencies: [
-        { name: 'numpy', version: '>=1.20', description: 'Matrix operations' },
-        { name: 'shapely', version: '2.0.0', optional: true },
+const renderModal = (props: { globalPythonPath?: string; onComplete?: (path: string) => void } = {}) =>
+  renderWithStore(
+    <VenvSetupModal
+      isOpen={true}
+      onClose={vi.fn()}
+      plugin={plugin}
+      globalPythonPath={props.globalPythonPath ?? '/usr/bin/python3'}
+      onComplete={props.onComplete}
+    />,
+    {
+      plugins: { [plugin.id]: plugin },
+      pluginSettings: [
+        { id: plugin.id, enabled: true, order: 0, isBuiltin: false, path: plugin.folder_path } as PluginSetting,
       ],
     },
-    folder_path: '/home/user/plugins/geo-plugin',
-  };
+  );
 
-  const mockUpdatePluginSetting = vi.fn();
-  const mockOnClose = vi.fn();
-  const mockOnComplete = vi.fn();
+const overrideFor = (id: string) => getAppState().pluginSettings.find((s) => s.id === id)?.pythonOverridePath;
 
+describe('VenvSetupModal', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    (BackendAPI.getPythonEnvironments as any).mockResolvedValue([
-      '/usr/bin/python3',
-      '/opt/conda/bin/python',
-    ]);
-    (BackendAPI.createVirtualenv as any).mockResolvedValue(
-      '/home/user/plugins/geo-plugin/.venv/bin/python'
-    );
-    (BackendAPI.installPipPackages as any).mockResolvedValue(
-      'Successfully installed numpy-1.24.0 shapely-2.0.0'
-    );
-
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        updatePluginSetting: mockUpdatePluginSetting,
-      })
-    );
+    vi.spyOn(BackendAPI, 'getPythonEnvironments').mockResolvedValue(['/usr/bin/python3', '/opt/conda/bin/python']);
+    vi.spyOn(BackendAPI, 'createVirtualenv').mockResolvedValue(VENV_PYTHON);
+    vi.spyOn(BackendAPI, 'installPipPackages').mockResolvedValue('Successfully installed numpy-1.24.0 shapely-2.0.0');
   });
 
-  it('renders base interpreter, target directory, and package list', async () => {
-    render(
-      <VenvSetupModal
-        isOpen={true}
-        onClose={mockOnClose}
-        plugin={mockPlugin}
-        globalPythonPath="/usr/local/bin/python3"
-      />
-    );
+  it('shows the base interpreter, target directory and packages to install', async () => {
+    renderModal({ globalPythonPath: '/usr/local/bin/python3' });
 
     expect(screen.getByText(/Virtual Environment Setup - Geo Analyzer/i)).toBeInTheDocument();
     expect(screen.getByDisplayValue('/usr/local/bin/python3')).toBeInTheDocument();
     expect(screen.getByDisplayValue('/home/user/plugins/geo-plugin/.venv')).toBeInTheDocument();
-
     expect(screen.getByText('numpy>=1.20')).toBeInTheDocument();
     expect(screen.getByText('- Matrix operations')).toBeInTheDocument();
     expect(screen.getByText('shapely==2.0.0')).toBeInTheDocument();
     expect(screen.getByText('optional')).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(BackendAPI.getPythonEnvironments).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(BackendAPI.getPythonEnvironments).toHaveBeenCalled());
   });
 
-  it('creates venv, installs dependencies, and updates plugin setting on Create & Install', async () => {
-    render(
-      <VenvSetupModal
-        isOpen={true}
-        onClose={mockOnClose}
-        plugin={mockPlugin}
-        globalPythonPath="/usr/bin/python3"
-        onComplete={mockOnComplete}
-      />
-    );
+  it('creates the venv, installs the packages and points the plugin at the new interpreter', async () => {
+    const onComplete = vi.fn();
+    renderModal({ onComplete });
 
-    const createBtn = screen.getByRole('button', { name: /Create & Install/i });
-    fireEvent.click(createBtn);
+    fireEvent.click(screen.getByRole('button', { name: /Create & Install/i }));
 
-    await waitFor(() => {
-      expect(BackendAPI.createVirtualenv).toHaveBeenCalledWith(
-        '/home/user/plugins/geo-plugin/.venv',
-        '/usr/bin/python3'
-      );
-      expect(BackendAPI.installPipPackages).toHaveBeenCalledWith(
-        '/home/user/plugins/geo-plugin/.venv/bin/python',
-        ['numpy>=1.20', 'shapely==2.0.0']
-      );
-      expect(mockUpdatePluginSetting).toHaveBeenCalledWith('geo-plugin', {
-        pythonOverridePath: '/home/user/plugins/geo-plugin/.venv/bin/python',
-      });
-      expect(mockOnComplete).toHaveBeenCalledWith(
-        '/home/user/plugins/geo-plugin/.venv/bin/python'
-      );
-    });
-
-    expect(screen.getByText('Setup Completed')).toBeInTheDocument();
+    expect(await screen.findByText('Setup Completed')).toBeInTheDocument();
+    expect(BackendAPI.createVirtualenv).toHaveBeenCalledWith('/home/user/plugins/geo-plugin/.venv', '/usr/bin/python3');
+    expect(BackendAPI.installPipPackages).toHaveBeenCalledWith(VENV_PYTHON, ['numpy>=1.20', 'shapely==2.0.0']);
+    expect(overrideFor('geo-plugin')).toBe(VENV_PYTHON);
+    expect(onComplete).toHaveBeenCalledWith(VENV_PYTHON);
   });
 
-  it('handles error during venv creation or installation gracefully', async () => {
-    (BackendAPI.createVirtualenv as any).mockRejectedValueOnce(
-      new Error('Failed to execute python -m venv')
-    );
+  it('reports a failure and leaves the plugin interpreter unchanged', async () => {
+    vi.spyOn(BackendAPI, 'createVirtualenv').mockRejectedValueOnce(new Error('Failed to execute python -m venv'));
+    renderModal();
 
-    render(
-      <VenvSetupModal
-        isOpen={true}
-        onClose={mockOnClose}
-        plugin={mockPlugin}
-        globalPythonPath="/usr/bin/python3"
-      />
-    );
+    fireEvent.click(screen.getByRole('button', { name: /Create & Install/i }));
 
-    const createBtn = screen.getByRole('button', { name: /Create & Install/i });
-    fireEvent.click(createBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText('Setup Failed')).toBeInTheDocument();
-      expect(screen.getByText('Failed to execute python -m venv')).toBeInTheDocument();
-    });
-
-    expect(mockUpdatePluginSetting).not.toHaveBeenCalled();
+    expect(await screen.findByText('Setup Failed')).toBeInTheDocument();
+    expect(screen.getByText('Failed to execute python -m venv')).toBeInTheDocument();
+    expect(overrideFor('geo-plugin')).toBeUndefined();
   });
 });

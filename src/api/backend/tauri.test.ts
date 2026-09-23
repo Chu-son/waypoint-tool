@@ -34,7 +34,7 @@ describe('TauriBackendAPI', () => {
     expect(invoke).toHaveBeenCalledWith('run_plugin', {
       pluginInstance: plugin,
       contextJson: JSON.stringify(context),
-      pythonPath: 'python3'
+      pythonPath: 'python3',
     });
   });
 
@@ -44,7 +44,7 @@ describe('TauriBackendAPI', () => {
       path: '/path/to/export',
       waypoints: [],
       template: null,
-      imageDataB64: null
+      imageDataB64: null,
     });
   });
 

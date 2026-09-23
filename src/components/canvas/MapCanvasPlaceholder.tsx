@@ -2,9 +2,9 @@ import { useAppStore } from '../../stores/appStore';
 import { v4 as uuidv4 } from 'uuid';
 
 export function MapCanvasPlaceholder() {
-  const activeTool = useAppStore(state => state.activeTool);
-  const addNode = useAppStore(state => state.addNode);
-  const selectNodes = useAppStore(state => state.selectNodes);
+  const activeTool = useAppStore((state) => state.activeTool);
+  const addNode = useAppStore((state) => state.addNode);
+  const selectNodes = useAppStore((state) => state.selectNodes);
 
   // Simulated click handler on the "canvas"
   const handleCanvasClick = () => {
@@ -20,9 +20,9 @@ export function MapCanvasPlaceholder() {
           qx: 0,
           qy: 0,
           qz: 0,
-          qw: 1
+          qw: 1,
         },
-        options: {}
+        options: {},
       });
       // Optionally auto-select the new point
       selectNodes([id]);
@@ -33,7 +33,7 @@ export function MapCanvasPlaceholder() {
   };
 
   return (
-    <div 
+    <div
       className={`absolute inset-0 flex items-center justify-center 
         ${activeTool === 'add_point' ? 'cursor-crosshair' : 'cursor-default'}`}
       onClick={handleCanvasClick}

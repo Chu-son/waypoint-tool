@@ -32,7 +32,10 @@ AIエージェントは、これから実行するタスクの内容に応じて
   - **目的**: 5つの直交軸、8つのプライマリモード、ActiveSelection単一権限、Tier 1〜Tier 7 Escape順序律、不変条件の確認。
 - 📖 **[docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md)**
   - **いつ読むか**: 開発環境のセットアップやテスト実行を行う時、命名規則を確認する時。
-  - **目的**: 命名規則（CamelCase vs PascalCase, Rustのsnake_case等）やテスト方針の確認。
+  - **目的**: 命名規則（CamelCase vs PascalCase, Rustのsnake_case等）、lint / format / CI コマンドの確認。
+- 📖 **[docs/TESTING.md](./docs/TESTING.md)**
+  - **いつ読むか**: テストを追加・修正する時。リファクタリングを始める前。
+  - **目的**: 振る舞い検証の原則、ストアのモック禁止、境界のみのモック、`src/test/` 共通ヘルパーの使い方、リファクタリング手順の確認。
 - 📖 **[docs/PLUGIN_GUIDE.md](./docs/PLUGIN_GUIDE.md)**
   - **いつ読むか**: ジェネレーター機能（Pythonプラグイン）の修正や追加を行う時。インタラクションヒントを触る時。
   - **目的**: プラグインと本体の通信仕様（JSON）、`manifest.json` の構造、Python SDKの使い方の確認。
@@ -50,4 +53,5 @@ AIエージェントは、これから実行するタスクの内容に応じて
   - 新規ファイルの作成には必ず専用のファイル作成ツール（`write_to_file`）を使用し、既存ファイルの編集には必ずファイル編集ツール（`replace_file_content`）を使用すること。
   - `run_command` 経由で `cat << 'EOF' > ...` や `echo ... > ...` を実行することは、ユーザーに長大なコマンド承認の手間と認知的負荷を強いるため**厳禁**とする。
   - `run_command` はテスト実行（`npm test`）、ビルド確認、依存解決など、コマンドライン実行が不可欠なタスクのみに使用を限定すること。
+- **変更完了前の検証**: コードを変更したら `npm run check`（型チェック・lint・フォーマット・カバレッジ付きテスト）が通ることを確認すること。Rust を変更した場合は `cargo fmt --check` / `cargo clippy --all-targets -- -D warnings` / `cargo test` も実行する。
 

@@ -43,7 +43,7 @@ export function useTreeItemSelection({
 
       onInspect?.();
     },
-    [lastSelectedId, visibleIds, selectedIds, selectFn, onInspect, elementCopyState, onElementCopySelect]
+    [lastSelectedId, visibleIds, selectedIds, selectFn, onInspect, elementCopyState, onElementCopySelect],
   );
 
   const handleItemContextMenu = useCallback(
@@ -56,7 +56,7 @@ export function useTreeItemSelection({
         setLastSelectedId(id);
       }
     },
-    [selectedIds, selectFn]
+    [selectedIds, selectFn],
   );
 
   return {

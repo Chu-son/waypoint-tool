@@ -1,15 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { normalizeProjectData } from './projectSlice';
+import { normalizeProjectData } from '../serialization/projectSerializer';
 import { BackendAPI } from '../../api';
 import { PluginCustomLayer } from '../../types/store';
 
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn(),
-    fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
-  },
-}));
+// Stub the IPC boundary; individual tests set runPlugin's result.
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(undefined);
+  vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([]);
+});
 
 describe('customLayers and pathCalculator in appStore', () => {
   beforeEach(() => {
@@ -74,9 +73,7 @@ describe('customLayers and pathCalculator in appStore', () => {
           visible: true,
           opacity: 1.0,
           z_index: 0,
-          editObjects: [
-            { id: 'obj-1', type: 'rect', fillValue: 0, cx: 0, cy: 0, width: 2, height: 2, angle: 0 },
-          ],
+          editObjects: [{ id: 'obj-1', type: 'rect', fillValue: 0, cx: 0, cy: 0, width: 2, height: 2, angle: 0 }],
         },
       ],
       generated_layers: [
@@ -129,14 +126,22 @@ describe('customLayers and pathCalculator in appStore', () => {
 
     (BackendAPI.runPlugin as any).mockResolvedValue({
       segments: [
-        [{ x: 0, y: 0 }, { x: 2.5, y: 2.5 }, { x: 5, y: 5 }]
-      ]
+        [
+          { x: 0, y: 0 },
+          { x: 2.5, y: 2.5 },
+          { x: 5, y: 5 },
+        ],
+      ],
     });
 
     await useAppStore.getState().recalculatePath({ immediate: true });
 
     expect(useAppStore.getState().calculatedPathSegments).toEqual([
-      [{ x: 0, y: 0 }, { x: 2.5, y: 2.5 }, { x: 5, y: 5 }]
+      [
+        { x: 0, y: 0 },
+        { x: 2.5, y: 2.5 },
+        { x: 5, y: 5 },
+      ],
     ]);
   });
 
@@ -144,7 +149,12 @@ describe('customLayers and pathCalculator in appStore', () => {
     vi.useFakeTimers();
     (BackendAPI.runPlugin as any).mockClear();
     (BackendAPI.runPlugin as any).mockResolvedValue({
-      segments: [[{ x: 0, y: 0 }, { x: 5, y: 5 }]]
+      segments: [
+        [
+          { x: 0, y: 0 },
+          { x: 5, y: 5 },
+        ],
+      ],
     });
 
     const mockPlugin = {

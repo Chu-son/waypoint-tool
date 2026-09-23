@@ -15,9 +15,7 @@ export interface AnnotationClipboardPayload {
   annotationGroups: Record<string, AnnotationGroup>;
 }
 
-export type MapElementClipboardPayload =
-  | WaypointClipboardPayload
-  | AnnotationClipboardPayload;
+export type MapElementClipboardPayload = WaypointClipboardPayload | AnnotationClipboardPayload;
 
 export interface MapElementClipboardEnvelope {
   schema: 'waypoint-tool/map-element-clipboard';
@@ -45,9 +43,7 @@ export function getMemoryClipboardCache(): MapElementClipboardPayload | null {
 /**
  * 外部入力文字列を検証し、正規の MapElementClipboardEnvelope かどうかを判定する (ACL)
  */
-export function validateAndParseClipboardEnvelope(
-  rawText: string
-): MapElementClipboardPayload | null {
+export function validateAndParseClipboardEnvelope(rawText: string): MapElementClipboardPayload | null {
   if (!rawText || typeof rawText !== 'string') return null;
 
   try {
@@ -66,11 +62,7 @@ export function validateAndParseClipboardEnvelope(
     const payload = parsed.payload as MapElementClipboardPayload;
 
     if (payload.elementType === 'waypoint') {
-      if (
-        Array.isArray(payload.topLevelIds) &&
-        payload.nodes &&
-        typeof payload.nodes === 'object'
-      ) {
+      if (Array.isArray(payload.topLevelIds) && payload.nodes && typeof payload.nodes === 'object') {
         return payload;
       }
     } else if (payload.elementType === 'annotation') {
@@ -94,9 +86,7 @@ export function validateAndParseClipboardEnvelope(
 /**
  * マップ要素ペイロードをシステムクリップボードおよびメモリキャッシュに書き込む
  */
-export async function writeMapElementsToClipboard(
-  payload: MapElementClipboardPayload
-): Promise<boolean> {
+export async function writeMapElementsToClipboard(payload: MapElementClipboardPayload): Promise<boolean> {
   const envelope: MapElementClipboardEnvelope = {
     schema: MAP_ELEMENT_CLIPBOARD_SCHEMA,
     version: MAP_ELEMENT_CLIPBOARD_VERSION,
@@ -143,4 +133,3 @@ export async function readMapElementsFromClipboard(): Promise<MapElementClipboar
 
   return getMemoryClipboardCache();
 }
-

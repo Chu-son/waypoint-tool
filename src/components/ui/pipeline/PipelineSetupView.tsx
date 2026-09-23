@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance } from '../../../types/store';
 import { extractPipelineParameters } from '../../../utils/pipelineParameterExtractor';
-import { PluginInputEditor } from '../PluginInputEditor';
-import { PluginPropertyEditor } from '../PluginPropertyEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
+import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
 import { Button } from '../common/Button';
 import { AlertBox } from '../common/AlertBox';
 import {
@@ -54,7 +54,7 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
   });
 
   const [manualProperties, setManualProperties] = useState<Record<string, Record<string, any>>>(
-    () => setup.defaultProperties || {}
+    () => setup.defaultProperties || {},
   );
 
   // Track collapsed state per stepId
@@ -228,13 +228,13 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
           const pExecId = result.pipelineExecutionId;
 
           const matchingNodes = Object.values(state.nodes).filter(
-            (n) => n.pipeline_metadata?.pipeline_execution_id === pExecId
+            (n) => n.pipeline_metadata?.pipeline_execution_id === pExecId,
           );
           const matchingLayers = state.customLayers.filter(
-            (l) => l.pipeline_metadata?.pipeline_execution_id === pExecId
+            (l) => l.pipeline_metadata?.pipeline_execution_id === pExecId,
           );
           const matchingAnnotations = Object.values(state.annotationGroups).filter(
-            (g) => g.pipeline_metadata?.pipeline_execution_id === pExecId
+            (g) => g.pipeline_metadata?.pipeline_execution_id === pExecId,
           );
 
           if (matchingNodes.length > 0) {
@@ -249,7 +249,7 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
           state.setActivePlugin(null);
           state.setActivePipelineInputRef(null);
           state.setActiveTool('select');
-        }
+        },
       );
     } catch (err: any) {
       setErrorMessage(err?.message || String(err));
@@ -270,16 +270,12 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
               <Workflow size={16} />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-text-base leading-none">
-                {plugin.manifest.name}
-              </h2>
+              <h2 className="text-sm font-bold text-text-base leading-none">{plugin.manifest.name}</h2>
               <span className="text-[10px] text-primary-base font-medium">Pipeline Workflow</span>
             </div>
           </div>
           {plugin.manifest.description && (
-            <p className="text-[11px] text-text-muted mt-1.5 leading-tight">
-              {plugin.manifest.description}
-            </p>
+            <p className="text-[11px] text-text-muted mt-1.5 leading-tight">{plugin.manifest.description}</p>
           )}
         </div>
         <Button
@@ -314,9 +310,7 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
         {missingRequiredInputs.length > 0 && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-status-warning/10 border border-status-warning/20 text-status-warning text-xs">
             <AlertCircle size={14} className="shrink-0" />
-            <span>
-              Required inputs need setup: {missingRequiredInputs.map((i) => i.label).join(', ')}
-            </span>
+            <span>Required inputs need setup: {missingRequiredInputs.map((i) => i.label).join(', ')}</span>
           </div>
         )}
       </div>
@@ -330,12 +324,8 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
 
           const stepManualInputs = setup.manualInputs.filter((i) => i.stepId === stepId);
           const stepManualProperties = setup.manualProperties.filter((p) => p.stepId === stepId);
-          const boundInputEntries = Object.entries(step.bindings || {}).filter(
-            ([k]) => !k.startsWith('properties.')
-          );
-          const boundPropEntries = Object.entries(step.bindings || {}).filter(
-            ([k]) => k.startsWith('properties.')
-          );
+          const boundInputEntries = Object.entries(step.bindings || {}).filter(([k]) => !k.startsWith('properties.'));
+          const boundPropEntries = Object.entries(step.bindings || {}).filter(([k]) => k.startsWith('properties.'));
           const propOverrides = Object.entries(step.property_overrides || {});
 
           const hasItems =
@@ -360,9 +350,7 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
                     {stepIndex + 1}
                   </span>
                   <div className="truncate">
-                    <span className="text-xs font-bold text-text-base">
-                      {step.name || stepId}
-                    </span>
+                    <span className="text-xs font-bold text-text-base">{step.name || stepId}</span>
                     <span className="text-[10px] text-text-muted ml-2 font-mono">
                       ({targetPlugin?.manifest.name || step.plugin_id})
                     </span>
@@ -373,11 +361,8 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
                   {stepManualInputs.every(
                     (i) =>
                       !i.inputDef.required ||
-                      (manualInputs[stepId]?.[i.inputId] !== undefined &&
-                        manualInputs[stepId]?.[i.inputId] !== '')
-                  ) && (
-                    <CheckCircle2 size={13} className="text-status-success shrink-0" />
-                  )}
+                      (manualInputs[stepId]?.[i.inputId] !== undefined && manualInputs[stepId]?.[i.inputId] !== ''),
+                  ) && <CheckCircle2 size={13} className="text-status-success shrink-0" />}
                   {isCollapsed ? (
                     <ChevronRight size={14} className="text-text-muted" />
                   ) : (
@@ -403,9 +388,7 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
                           >
                             <ArrowRightLeft size={11} className="text-primary-base shrink-0" />
                             <span className="font-mono text-text-base">{k.replace('inputs.', '')}</span>
-                            <span className="italic text-text-muted/80">
-                              (Auto-wired from {expr})
-                            </span>
+                            <span className="italic text-text-muted/80">(Auto-wired from {expr})</span>
                           </div>
                         ))}
                       </div>
@@ -461,12 +444,8 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
                           <PluginPropertyEditor
                             key={item.propertyName}
                             property={item.propertyDef}
-                            value={
-                              manualProperties[stepId]?.[item.propertyName] ?? item.defaultValue
-                            }
-                            onChange={(val) =>
-                              handleUpdateProperty(stepId, item.propertyName, val)
-                            }
+                            value={manualProperties[stepId]?.[item.propertyName] ?? item.defaultValue}
+                            onChange={(val) => handleUpdateProperty(stepId, item.propertyName, val)}
                           />
                         ))}
                       </div>
@@ -476,9 +455,7 @@ export const PipelineSetupView: React.FC<PipelineSetupViewProps> = ({ plugin }) 
                   {/* Overridden / Fixed Properties */}
                   {(boundPropEntries.length > 0 || propOverrides.length > 0) && (
                     <div className="text-[10px] text-text-muted space-y-1">
-                      <span className="font-semibold uppercase tracking-wider">
-                        Preset Overrides
-                      </span>
+                      <span className="font-semibold uppercase tracking-wider">Preset Overrides</span>
                       <div className="flex flex-wrap gap-1">
                         {propOverrides.map(([k, v]) => (
                           <span

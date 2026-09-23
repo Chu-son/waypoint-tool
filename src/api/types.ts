@@ -147,4 +147,29 @@ export interface IDialogAPI {
   open(options?: OpenDialogOptions): Promise<string | string[] | null>;
   save(options?: SaveDialogOptions): Promise<string | null>;
   ask(message: string, options?: any): Promise<boolean>;
+  /** Show an informational message box and wait until the user dismisses it. */
+  message(message: string, options?: MessageDialogOptions): Promise<void>;
+}
+
+export type MessageDialogOptions = {
+  title?: string;
+  kind?: 'info' | 'warning' | 'error';
+};
+
+/** Application process and main-window control. */
+export interface IAppAPI {
+  getVersion(): Promise<string>;
+  /** Quit immediately, bypassing the close-requested handler. */
+  forceExit(): Promise<void>;
+  openDevtools(): Promise<void>;
+  setWindowTitle(title: string): Promise<void>;
+  minimizeWindow(): Promise<void>;
+  toggleMaximizeWindow(): Promise<void>;
+  /** Persist window size/position so it is restored on next launch. */
+  saveWindowState(): Promise<void>;
+  /**
+   * Intercept the window close button. The default close is always prevented; the handler
+   * decides whether to quit (e.g. by calling `forceExit`). Resolves to an unsubscribe function.
+   */
+  onCloseRequested(handler: () => void | Promise<void>): Promise<() => void>;
 }

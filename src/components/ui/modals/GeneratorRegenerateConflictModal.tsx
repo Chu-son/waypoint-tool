@@ -1,8 +1,8 @@
-import { Modal, ModalHeader, ModalContent, ModalFooter } from "../common/Modal";
-import { Button } from "../common/Button";
-import { AlertBox } from "../common/AlertBox";
-import { AlertTriangle, Undo2, Trash2, ArrowRight, ShieldCheck } from "lucide-react";
-import { GeneratorModificationSummary } from "../../../types/store";
+import { Modal, ModalHeader, ModalContent, ModalFooter } from '../common/Modal';
+import { Button } from '../common/Button';
+import { AlertBox } from '../common/AlertBox';
+import { AlertTriangle, Undo2, Trash2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { GeneratorModificationSummary } from '../../../types/store';
 
 export interface GeneratorRegenerateConflictModalProps {
   isOpen: boolean;
@@ -33,12 +33,13 @@ export function GeneratorRegenerateConflictModal({
 
       <ModalContent className="space-y-4">
         <AlertBox variant="warning" title="手動で編集されたウェイポイントが存在します">
-          ジェネレーター「{generatorName || "Waypoint Generator"}」で生成されたウェイポイントのうち、
+          ジェネレーター「{generatorName || 'Waypoint Generator'}」で生成されたウェイポイントのうち、
           <strong className="text-text-base mx-1">{summary.modifiedCount} 箇所</strong>
           で手動変更（位置、向き、オプション等）が検知されました。
           {summary.hasCountChanged && (
             <span className="block mt-1 text-xs text-status-warning/90">
-              ※ 生成直後から子ウェイポイントの総数（現在 {summary.totalCurrent} 点 / 生成時 {summary.totalBaseline} 点）も変更されています。
+              ※ 生成直後から子ウェイポイントの総数（現在 {summary.totalCurrent} 点 / 生成時 {summary.totalBaseline}{' '}
+              点）も変更されています。
             </span>
           )}
         </AlertBox>
@@ -61,20 +62,17 @@ export function GeneratorRegenerateConflictModal({
             <tbody className="divide-y divide-border-base/50 font-mono text-[11px]">
               {summary.diffs.map((diff) => {
                 const deltaYawDeg = (diff.deltaYaw * 180) / Math.PI;
-                const hasPosDiff =
-                  Math.abs(diff.deltaX) > 1e-4 || Math.abs(diff.deltaY) > 1e-4;
+                const hasPosDiff = Math.abs(diff.deltaX) > 1e-4 || Math.abs(diff.deltaY) > 1e-4;
                 const hasYawDiff = Math.abs(diff.deltaYaw) > 1e-3;
 
                 return (
                   <tr key={diff.index} className="hover:bg-surface-hover/40">
-                    <td className="py-1.5 px-3 font-bold text-accent-generator">
-                      #{diff.index + 1}
-                    </td>
+                    <td className="py-1.5 px-3 font-bold text-accent-generator">#{diff.index + 1}</td>
                     <td className="py-1.5 px-3">
                       {hasPosDiff ? (
                         <span className="text-text-base">
-                          {diff.deltaX >= 0 ? "+" : ""}
-                          {diff.deltaX.toFixed(3)}m, {diff.deltaY >= 0 ? "+" : ""}
+                          {diff.deltaX >= 0 ? '+' : ''}
+                          {diff.deltaX.toFixed(3)}m, {diff.deltaY >= 0 ? '+' : ''}
                           {diff.deltaY.toFixed(3)}m
                         </span>
                       ) : (
@@ -84,7 +82,7 @@ export function GeneratorRegenerateConflictModal({
                     <td className="py-1.5 px-3">
                       {hasYawDiff ? (
                         <span className="text-text-base">
-                          {deltaYawDeg >= 0 ? "+" : ""}
+                          {deltaYawDeg >= 0 ? '+' : ''}
                           {deltaYawDeg.toFixed(1)}°
                         </span>
                       ) : (
@@ -93,19 +91,15 @@ export function GeneratorRegenerateConflictModal({
                     </td>
                     <td className="py-1.5 px-3">
                       {diff.customName ? (
-                        <span className="text-accent-anchor mr-2">
-                          名前: {diff.customName}
-                        </span>
+                        <span className="text-accent-anchor mr-2">名前: {diff.customName}</span>
                       ) : null}
-                      {diff.modifiedOptions &&
-                      Object.keys(diff.modifiedOptions).length > 0 ? (
+                      {diff.modifiedOptions && Object.keys(diff.modifiedOptions).length > 0 ? (
                         <span className="text-accent-automation">
                           Options ({Object.keys(diff.modifiedOptions).length}件)
                         </span>
                       ) : null}
                       {!diff.customName &&
-                        (!diff.modifiedOptions ||
-                          Object.keys(diff.modifiedOptions).length === 0) && (
+                        (!diff.modifiedOptions || Object.keys(diff.modifiedOptions).length === 0) && (
                           <span className="text-text-muted/60">-</span>
                         )}
                     </td>
@@ -139,12 +133,7 @@ export function GeneratorRegenerateConflictModal({
             編集を破棄して再生成
           </Button>
 
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onStashAndRegenerate}
-            className="gap-1.5"
-          >
+          <Button variant="primary" size="sm" onClick={onStashAndRegenerate} className="gap-1.5">
             <ShieldCheck size={14} />
             スタッシュして適用
             <ArrowRight size={14} />

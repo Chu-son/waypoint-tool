@@ -19,7 +19,12 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('load_options_schema', { yamlPath });
   }
 
-  async exportWaypoints(path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void> {
+  async exportWaypoints(
+    path: string,
+    waypoints: Record<string, any>[],
+    template?: string,
+    imageB64?: string,
+  ): Promise<void> {
     return invoke('export_waypoints', { path, waypoints, template: template || null, imageDataB64: imageB64 || null });
   }
 
@@ -81,7 +86,7 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('read_text_file', { path });
   }
 
-  async writeTextFile(path: string, content: String): Promise<void> {
+  async writeTextFile(path: string, content: string): Promise<void> {
     return invoke('write_text_file', { path, content });
   }
 

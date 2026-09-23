@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  filterTopLevelIds,
-  remapHierarchicalIds,
-  resolveMapElementName,
-} from './mapElementTreeUtils';
+import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from './mapElementTreeUtils';
 
 describe('mapElementTreeUtils', () => {
   describe('filterTopLevelIds', () => {

@@ -61,8 +61,14 @@ describe('mapElementClipboard', () => {
       expect(validateAndParseClipboardEnvelope('')).toBeNull();
       expect(validateAndParseClipboardEnvelope('not json')).toBeNull();
       expect(validateAndParseClipboardEnvelope(JSON.stringify({ schema: 'other-app' }))).toBeNull();
-      expect(validateAndParseClipboardEnvelope(JSON.stringify({ schema: MAP_ELEMENT_CLIPBOARD_SCHEMA, version: 99 }))).toBeNull();
-      expect(validateAndParseClipboardEnvelope(JSON.stringify({ schema: MAP_ELEMENT_CLIPBOARD_SCHEMA, version: 1, payload: {} }))).toBeNull();
+      expect(
+        validateAndParseClipboardEnvelope(JSON.stringify({ schema: MAP_ELEMENT_CLIPBOARD_SCHEMA, version: 99 })),
+      ).toBeNull();
+      expect(
+        validateAndParseClipboardEnvelope(
+          JSON.stringify({ schema: MAP_ELEMENT_CLIPBOARD_SCHEMA, version: 1, payload: {} }),
+        ),
+      ).toBeNull();
     });
   });
 
@@ -164,4 +170,3 @@ describe('mapElementClipboard', () => {
     });
   });
 });
-

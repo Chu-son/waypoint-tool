@@ -34,9 +34,7 @@ describe('pipelineParameterExtractor', () => {
         { id: 'cost_layer', name: 'cost_layer', label: 'Cost Layer', type: 'custom_layer' },
         { id: 'goal_pos', name: 'goal_pos', label: 'Goal Position', type: 'point' },
       ],
-      properties: [
-        { name: 'tolerance', label: 'Goal Tolerance', type: 'float', default: 0.2 },
-      ],
+      properties: [{ name: 'tolerance', label: 'Goal Tolerance', type: 'float', default: 0.2 }],
     },
   };
 
@@ -207,9 +205,7 @@ describe('pipelineParameterExtractor', () => {
         name: 'Custom Differ Plugin',
         type: 'python',
         executable: 'main.py',
-        inputs: [
-          { id: 'input_uuid_1', name: 'target_goal', label: 'Target Goal', type: 'point' },
-        ],
+        inputs: [{ id: 'input_uuid_1', name: 'target_goal', label: 'Target Goal', type: 'point' }],
         properties: [],
       },
     };
@@ -252,9 +248,7 @@ describe('pipelineParameterExtractor', () => {
         inputs: [],
         properties: [],
         pipeline: {
-          steps: [
-            { step_id: '', plugin_id: 'layer_gen' } as any,
-          ],
+          steps: [{ step_id: '', plugin_id: 'layer_gen' } as any],
         },
       },
     };

@@ -3,28 +3,32 @@
  */
 
 /**
- * Converts a hex string (e.g. '#3b82f6', '3b82f6', '#fff') to a PixiJS numeric color (e.g. 0x3b82f6).
+ * Converts a hex color ('#3b82f6', '3b82f6', '#fff', '#3b82f6ff') to a PixiJS numeric color
+ * (0x3b82f6). Any alpha channel is ignored. Returns `fallback` for anything that is not a
+ * well-formed #RGB / #RRGGBB / #RRGGBBAA string.
  */
 export function hexStringToNumber(hex?: string | null, fallback = 0x000000): number {
   if (!hex || typeof hex !== 'string') return fallback;
   const cleaned = hex.trim().replace(/^#/, '');
-  if (cleaned.length === 3) {
-    const expanded = cleaned
-      .split('')
-      .map((c) => c + c)
-      .join('');
-    const parsed = parseInt(expanded, 16);
-    return isNaN(parsed) ? fallback : parsed;
-  }
-  const parsed = parseInt(cleaned, 16);
-  return isNaN(parsed) ? fallback : parsed;
+  if (!/^(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(cleaned)) return fallback;
+  const rgb =
+    cleaned.length === 3
+      ? cleaned
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : cleaned.slice(0, 6);
+  return parseInt(rgb, 16);
 }
 
 /**
  * Converts a hex string or RGB color to an RGB normalized tuple ([r, g, b] with values 0.0 to 1.0)
  * useful for WebGL / GLSL shader uniforms.
  */
-export function hexStringToVec3(hex?: string | null, fallback: [number, number, number] = [0, 0, 0]): [number, number, number] {
+export function hexStringToVec3(
+  hex?: string | null,
+  fallback: [number, number, number] = [0, 0, 0],
+): [number, number, number] {
   if (!hex || typeof hex !== 'string') return fallback;
   const num = hexStringToNumber(hex, -1);
   if (num === -1) return fallback;

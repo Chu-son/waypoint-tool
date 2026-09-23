@@ -16,9 +16,9 @@ export function useMapEditCircle() {
   const handleCircleDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      let targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual');
+      let targetLayer = state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual');
       if (!targetLayer) {
-        targetLayer = state.customLayers.find(l => l.type === 'manual') || state.addManualCustomLayer();
+        targetLayer = state.customLayers.find((l) => l.type === 'manual') || state.addManualCustomLayer();
       }
       if (state.activeCustomLayerId !== targetLayer.id) {
         state.setActiveCustomLayerId(targetLayer.id);
@@ -33,7 +33,7 @@ export function useMapEditCircle() {
         radius: 0.01,
       });
     },
-    [activeCustomLayerId, mapEditFillValue]
+    [activeCustomLayerId, mapEditFillValue],
   );
 
   const handleCircleDrawMove = useCallback(
@@ -52,12 +52,14 @@ export function useMapEditCircle() {
         radius: Math.max(0.01, radius),
       });
     },
-    [circleCenter, mapEditFillValue]
+    [circleCenter, mapEditFillValue],
   );
 
   const handleCircleDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
-    const targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual') || state.customLayers.find(l => l.type === 'manual');
+    const targetLayer =
+      state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') ||
+      state.customLayers.find((l) => l.type === 'manual');
     const targetLayerId = targetLayer?.id;
     if (!circleCenter || !circlePreview || !targetLayerId) {
       setCircleCenter(null);
@@ -77,14 +79,7 @@ export function useMapEditCircle() {
 
     setCircleCenter(null);
     setCirclePreview(null);
-  }, [
-    circleCenter,
-    circlePreview,
-    activeCustomLayerId,
-    addEditObject,
-    setSelectedEditObjectId,
-    pushHistorySnapshot,
-  ]);
+  }, [circleCenter, circlePreview, activeCustomLayerId, addEditObject, setSelectedEditObjectId, pushHistorySnapshot]);
 
   return {
     circlePreview,

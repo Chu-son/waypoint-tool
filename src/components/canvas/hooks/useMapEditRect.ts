@@ -26,9 +26,9 @@ export function useMapEditRect() {
   const handleRectDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      let targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual');
+      let targetLayer = state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual');
       if (!targetLayer) {
-        targetLayer = state.customLayers.find(l => l.type === 'manual') || state.addManualCustomLayer();
+        targetLayer = state.customLayers.find((l) => l.type === 'manual') || state.addManualCustomLayer();
       }
       if (state.activeCustomLayerId !== targetLayer.id) {
         state.setActiveCustomLayerId(targetLayer.id);
@@ -45,7 +45,7 @@ export function useMapEditRect() {
         angle: 0,
       });
     },
-    [activeCustomLayerId, mapEditFillValue]
+    [activeCustomLayerId, mapEditFillValue],
   );
 
   const handleRectDrawMove = useCallback(
@@ -67,12 +67,14 @@ export function useMapEditRect() {
         angle: 0,
       });
     },
-    [rectDrawStart, mapEditFillValue]
+    [rectDrawStart, mapEditFillValue],
   );
 
   const handleRectDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
-    const targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual') || state.customLayers.find(l => l.type === 'manual');
+    const targetLayer =
+      state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') ||
+      state.customLayers.find((l) => l.type === 'manual');
     const targetLayerId = targetLayer?.id;
     if (!rectDrawStart || !rectPreview || !targetLayerId) {
       setRectDrawStart(null);
@@ -110,7 +112,7 @@ export function useMapEditRect() {
       beginHistoryTransaction();
       setRotatingObj({ layerId, objId, center });
     },
-    [beginHistoryTransaction]
+    [beginHistoryTransaction],
   );
 
   const handleRotateMove = useCallback(
@@ -122,7 +124,7 @@ export function useMapEditRect() {
 
       updateEditObject(rotatingObj.layerId, rotatingObj.objId, { angle });
     },
-    [rotatingObj, updateEditObject]
+    [rotatingObj, updateEditObject],
   );
 
   const handleRotateEnd = useCallback(() => {

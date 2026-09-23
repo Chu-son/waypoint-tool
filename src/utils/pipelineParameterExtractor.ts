@@ -1,5 +1,5 @@
 import { PluginInstance, PluginInputDef, OptionDef } from '../types/store';
-import type { PipelineExecutionSetup } from '../types/pipeline';
+import type { PipelineExecutionSetup } from '../types/pipelineSetup';
 
 /**
  * Checks if a given plugin input definition is bound by the pipeline step bindings.
@@ -9,7 +9,7 @@ function isInputBound(inp: PluginInputDef, bindings: Record<string, string>): bo
   const name = inp.name;
   return Boolean(
     (id && (bindings[id] !== undefined || bindings[`inputs.${id}`] !== undefined)) ||
-    (name && (bindings[name] !== undefined || bindings[`inputs.${name}`] !== undefined))
+    (name && (bindings[name] !== undefined || bindings[`inputs.${name}`] !== undefined)),
   );
 }
 
@@ -19,15 +19,12 @@ function isInputBound(inp: PluginInputDef, bindings: Record<string, string>): bo
 function isPropertyBoundOrOverridden(
   prop: OptionDef,
   bindings: Record<string, string>,
-  overrides: Record<string, any>
+  overrides: Record<string, any>,
 ): boolean {
   const name = prop.name;
   if (!name) return false;
   if (overrides[name] !== undefined) return true;
-  return Boolean(
-    bindings[name] !== undefined ||
-    bindings[`properties.${name}`] !== undefined
-  );
+  return Boolean(bindings[name] !== undefined || bindings[`properties.${name}`] !== undefined);
 }
 
 /**
@@ -37,7 +34,7 @@ function isPropertyBoundOrOverridden(
  */
 export function extractPipelineParameters(
   pipeline: PluginInstance,
-  plugins: Record<string, PluginInstance>
+  plugins: Record<string, PluginInstance>,
 ): PipelineExecutionSetup {
   const setup: PipelineExecutionSetup = {
     pipelineId: pipeline.id,

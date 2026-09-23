@@ -1,11 +1,11 @@
-import { useAppStore } from "../../../stores/appStore";
-import { Select } from "../common/Select";
-import { FormField } from "../common/FormField";
-import { Slider } from "../common/Slider";
-import { BrowseInput } from "../common/BrowseInput";
-import { Sliders, Terminal, Settings2 } from "lucide-react";
-import { TabSectionHeader } from "./TabSectionHeader";
-import { SettingsSection } from "./SettingsSection";
+import { useAppStore } from '../../../stores/appStore';
+import { Select } from '../common/Select';
+import { FormField } from '../common/FormField';
+import { Slider } from '../common/Slider';
+import { BrowseInput } from '../common/BrowseInput';
+import { Sliders, Terminal, Settings2 } from 'lucide-react';
+import { TabSectionHeader } from './TabSectionHeader';
+import { SettingsSection } from './SettingsSection';
 
 export function GeneralTab() {
   const lastDirectory = useAppStore((state) => state.lastDirectory);
@@ -70,7 +70,7 @@ export function GeneralTab() {
           description="Remembered file system location for Open/Save dialogs across sessions."
         >
           <div className="p-3 bg-surface-base/50 border border-border-base/50 rounded-lg text-xs text-text-muted font-mono break-all line-clamp-2 shadow-inner">
-            {lastDirectory || "None"}
+            {lastDirectory || 'None'}
           </div>
         </FormField>
       </SettingsSection>

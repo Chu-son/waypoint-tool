@@ -1,13 +1,11 @@
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 import { DefaultExportFormat, PluginSetting } from '../../types/store';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
+import type { PanelLayout } from '../../types/ui';
+
+export type { PanelLayout };
 
 export const STORAGE_VERSION = 3;
-
-export interface PanelLayout {
-  leftTabs: string[];
-  rightTabs: string[];
-}
 
 export const DEFAULT_PANEL_LAYOUT: PanelLayout = {
   leftTabs: ['waypoints', 'annotations', 'plugins'],
@@ -155,8 +153,12 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     rightPanelActiveTab: rightTab,
     // 参照型や特定型の確実なガード
     recentProjects: Array.isArray(state.recentProjects) ? state.recentProjects : DEFAULT_STORAGE_STATE.recentProjects,
-    exportTemplates: Array.isArray(state.exportTemplates) ? state.exportTemplates : DEFAULT_STORAGE_STATE.exportTemplates,
-    defaultExportFormats: Array.isArray(state.defaultExportFormats) ? state.defaultExportFormats : DEFAULT_STORAGE_STATE.defaultExportFormats,
+    exportTemplates: Array.isArray(state.exportTemplates)
+      ? state.exportTemplates
+      : DEFAULT_STORAGE_STATE.exportTemplates,
+    defaultExportFormats: Array.isArray(state.defaultExportFormats)
+      ? state.defaultExportFormats
+      : DEFAULT_STORAGE_STATE.defaultExportFormats,
     pluginSettings: Array.isArray(state.pluginSettings) ? state.pluginSettings : DEFAULT_STORAGE_STATE.pluginSettings,
     indexStartIndex: state.indexStartIndex === 1 ? 1 : 0,
     decimalPrecision: typeof state.decimalPrecision === 'number' ? Math.max(0, Math.floor(state.decimalPrecision)) : 6,
@@ -230,4 +232,3 @@ export function normalizePanelLayout(rawLayout: any): PanelLayout {
 
   return { leftTabs, rightTabs };
 }
-

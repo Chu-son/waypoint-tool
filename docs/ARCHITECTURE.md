@@ -12,6 +12,7 @@ waypoint-tool/
 │   ├── ARCHITECTURE.md        # [本ファイル] アーキテクチャガイド
 │   ├── COMPONENT_CATALOG.md   # UI・Canvasコンポーネントカタログ
 │   ├── DEVELOPMENT_GUIDE.md   # 開発者ガイド・セットアップ手順
+│   ├── TESTING.md             # テスト方針（振る舞い検証・実ストア・境界モック）
 │   ├── RULES.md               # 開発ルール・ショートカット管理
 │   ├── STATE_MACHINE.md       # 状態機械・モード遷移・選択権限仕様書
 │   ├── REQUIREMENTS.md        # システム要件定義
@@ -23,9 +24,12 @@ waypoint-tool/
 │   │   ├── canvas/            # PixiJS 描画キャンバスとレイヤー群
 │   │   ├── common/            # アプリ共通機能 (ShortcutManager 等)
 │   │   └── ui/                # UI コンポーネント (共通要素・各機能パネル)
+│   ├── hooks/                 # 再利用可能な React Hooks
+│   ├── services/              # ストア・API を組み合わせるユースケース
 │   ├── stores/                # Zustand 状態管理 (Slices 構成)
+│   ├── test/                  # テスト共通基盤 (ストアリセット・fixtures・PixiJS モック)
 │   ├── types/                 # TypeScript 型定義
-│   └── utils/                 # 座標変換・幾何計算などのユーティリティ
+│   └── utils/                 # 座標変換・幾何計算などの純粋関数
 ├── src-tauri/                 # バックエンド (Rust / Tauri Core)
 │   └── src/
 │       ├── commands/          # Tauri IPC コマンド群
@@ -36,6 +40,27 @@ waypoint-tool/
 └── python_sdk/                # プラグイン用 Python SDK & 標準ジェネレータープラグイン
     └── wpt_plugin/            # 幾何計算・通信用 SDK パッケージ
 ```
+
+### 1.1 フロントエンドの依存方向（層規約）
+
+`src/` 配下のモジュールは、以下の **一方向** にのみ依存できます（左が下位層）。上位層から下位層への import のみ許可し、逆方向・循環参照は禁止です。
+
+```
+types  ←  utils  ←  api  ←  services  ←  stores  ←  hooks  ←  components
+```
+
+| 層 | 役割 | 依存してはならないもの |
+|---|---|---|
+| `types/` | ドメイン型・永続化型 | 他のすべての層（型の再エクスポートも含む） |
+| `utils/` | **純粋関数**（幾何計算・ツリー操作・変換） | `stores/`, `components/`, React。DOM / PixiJS に依存する処理は `components/canvas/` 側へ置く |
+| `api/` | Tauri IPC・ダイアログのアダプタ（本番実装 / Mock 実装） | `stores/`, `components/` |
+| `services/` | ストアや API を組み合わせるユースケース（例：破棄確認ガード、ワークフローアクション） | `components/` |
+| `stores/` | Zustand スライス・マイグレーション | `components/` |
+| `hooks/` | 再利用可能な React Hooks | — |
+| `components/` | UI・Canvas | `@tauri-apps/*` の直接 import（必ず `src/api` を経由） |
+
+- slice から `AppState` を参照する際は `import type` を使い、実行時の循環を作らない。
+- これらの規約は ESLint（`no-restricted-imports`, `import-x/no-cycle`）で検出します。既存違反は warning として残っており、リファクタリングで順次解消します。
 
 ---
 
@@ -99,6 +124,8 @@ graph TD
    - プロジェクトファイル（`.wptroj`）読み込み時の `projectMigration.ts`、およびブラウザローカルストレージ設定（`waypoint-tool-storage`）復元時の `storageMigration.ts` を統括します。
    - 外部入力（旧バージョン形式、未定義プロパティ、キー名揺れ等）をエントリポイント境界で即座に検知し、最新の厳格なスキーマへと完全正規化・デフォルト値補完を実施します。
    - これにより、内部スライスやコンポーネント内に互換フォールバック（`||` や `??`）を散乱させないクリーンアーキテクチャを実現します。
+   - 保存時のデータ構築（ストア → `StrictProjectData`）は `src/stores/serialization/projectSerializer.ts`（`buildProjectData`）が担います。
+   - ノード／アノテーション共通の子リスト操作（削除・挿入）は純粋関数 `src/utils/treeOps.ts`（`detachFromTree` / `insertIntoTree`）に集約されています。
 
 5. **バックエンド (Tauri / Rust Core)**:
    - ファイルシステムの直接アクセス、Handlebars テンプレートによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
@@ -114,7 +141,8 @@ graph TD
 - **`mapSlice.ts`**: ロード済みマップレイヤー情報、解像度、原点座標、不透明度、アクティブマップ設定、フットプリント全体表示トグル (`showFootprints`)。
 - **`nodeSlice.ts`**: Waypoint ノードおよびジェネレーターノードの追加・削除・編集・一括操作・Undo/Redo。
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
-- **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。
+- **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
+- **`pathCalculatorSlice.ts`**: 経路計算プラグイン（障害物回避ルーティング等）の選択・パラメータ・計算結果、デバウンス付き再計算 (`recalculatePath`)。
 - **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
 - **`interactionSlice.ts`**: 状態機械および対話管理（8種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、サイドバーパネルの自由ドッキング配置構造（`panelLayout`：左/右パネル所属タブ一覧・並び替え・相互移動・永続化）、アクティブタブ（`activateTab`）、モーダル表示状態、ズーム/パン位置。

@@ -38,7 +38,8 @@ export interface CustomUiThemeColors {
 }
 
 export interface CustomUiTheme {
-  preset?: 'default' | 'dark' | 'emerald' | 'roomba' | 'ocean' | 'amber' | 'purple' | 'midnight' | 'light' | (string & {});
+  preset?:
+    'default' | 'dark' | 'emerald' | 'roomba' | 'ocean' | 'amber' | 'purple' | 'midnight' | 'light' | (string & {});
   colors?: CustomUiThemeColors;
   colorScheme?: 'dark' | 'light';
   cssVariables?: Record<string, string>;

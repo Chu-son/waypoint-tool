@@ -15,10 +15,7 @@ export function normalizeAngle(angle: number): number {
   return a;
 }
 
-export function areOptionsEqual(
-  optA?: WaypointOptions,
-  optB?: WaypointOptions
-): boolean {
+export function areOptionsEqual(optA?: WaypointOptions, optB?: WaypointOptions): boolean {
   if (!optA && !optB) return true;
   if (!optA || !optB) {
     const nonNull = optA || optB;
@@ -49,7 +46,7 @@ export function areOptionsEqual(
  */
 export function detectGeneratorModifications(
   generatorNode: WaypointNode,
-  allNodes: Record<string, WaypointNode>
+  allNodes: Record<string, WaypointNode>,
 ): GeneratorModificationSummary {
   const baseline = generatorNode.baseline_waypoints;
   const childrenIds = generatorNode.children_ids || [];
@@ -102,16 +99,10 @@ export function detectGeneratorModifications(
       const deltaYaw = normalizeAngle(curYaw - baseYaw);
 
       const hasTransformDiff =
-        Math.abs(deltaX) > 1e-4 ||
-        Math.abs(deltaY) > 1e-4 ||
-        Math.abs(deltaZ) > 1e-4 ||
-        Math.abs(deltaYaw) > 1e-3;
+        Math.abs(deltaX) > 1e-4 || Math.abs(deltaY) > 1e-4 || Math.abs(deltaZ) > 1e-4 || Math.abs(deltaYaw) > 1e-3;
 
       const optionsEqual = areOptionsEqual(childNode.options, baseItem.options);
-      const nameDiff =
-        childNode.name !== undefined &&
-        baseItem.name !== undefined &&
-        childNode.name !== baseItem.name;
+      const nameDiff = childNode.name !== undefined && baseItem.name !== undefined && childNode.name !== baseItem.name;
 
       if (hasTransformDiff || !optionsEqual || nameDiff) {
         diffs.push({
@@ -164,7 +155,7 @@ export function detectGeneratorModifications(
  */
 export function computeGeneratorStash(
   generatorNode: WaypointNode,
-  allNodes: Record<string, WaypointNode>
+  allNodes: Record<string, WaypointNode>,
 ): GeneratorStash {
   const summary = detectGeneratorModifications(generatorNode, allNodes);
   const stash: GeneratorStash = {};
@@ -179,10 +170,7 @@ export function computeGeneratorStash(
 /**
  * プラグインが新しく生成したウェイポイント一覧に、スタッシュされた手動変更差分を適用する
  */
-export function applyGeneratorStash(
-  generatedWaypoints: any[],
-  stash: GeneratorStash
-): any[] {
+export function applyGeneratorStash(generatedWaypoints: any[], stash: GeneratorStash): any[] {
   if (!stash || Object.keys(stash).length === 0) {
     return generatedWaypoints;
   }

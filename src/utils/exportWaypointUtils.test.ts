@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { extractWaypointsForExport } from './exportWaypointUtils';
-import { ObjectNode, OptionsSchema } from '../types/store';
+import type { WaypointNode, OptionsSchema } from '../types/store';
 
 describe('exportWaypointUtils', () => {
   it('extracts waypoints in DFS order with schema defaults and yaw computation', () => {
-    const nodes: Record<string, ObjectNode> = {
+    const nodes: Record<string, WaypointNode> = {
       'node-1': {
         id: 'node-1',
         type: 'manual',
@@ -40,9 +40,7 @@ describe('exportWaypointUtils', () => {
     };
 
     const schema: OptionsSchema = {
-      options: [
-        { name: 'speed', label: 'Speed', type: 'number', default: 1.5 },
-      ],
+      options: [{ name: 'speed', label: 'Speed', type: 'number', default: 1.5 }],
     };
 
     const result = extractWaypointsForExport(['node-1', 'node-2'], nodes, schema, 1);

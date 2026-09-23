@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SimplifiedControls } from './SimplifiedControls';
 import { useAppStore } from '../../../stores/appStore';
-import * as workflowActions from '../../../utils/workflowActions';
+import * as workflowActions from '../../../services/workflowActions';
 
 describe('SimplifiedControls', () => {
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe('SimplifiedControls', () => {
           label: 'Run Single Action',
           action: 'reset_project',
         }}
-      />
+      />,
     );
 
     const btn = screen.getByRole('button', { name: /Run Single Action/i });
@@ -50,7 +50,7 @@ describe('SimplifiedControls', () => {
           },
         ]}
         buttonsLayout="column"
-      />
+      />,
     );
 
     expect(screen.getByText('Action One')).toBeInTheDocument();
@@ -67,9 +67,7 @@ describe('SimplifiedControls', () => {
       id: 'drivable_area_layer_generator',
       manifest: {
         name: 'Drivable Area Layer Generator',
-        inputs: [
-          { id: 'sweep_rect', label: 'Cleaning Area (Rectangle)', type: 'rectangle' },
-        ],
+        inputs: [{ id: 'sweep_rect', label: 'Cleaning Area (Rectangle)', type: 'rectangle' }],
       },
     };
 
@@ -78,12 +76,7 @@ describe('SimplifiedControls', () => {
       activePluginId: 'drivable_area_layer_generator',
     });
 
-    render(
-      <SimplifiedControls
-        pluginTarget="drivable_area_layer_generator"
-        showPluginInputs={true}
-      />
-    );
+    render(<SimplifiedControls pluginTarget="drivable_area_layer_generator" showPluginInputs={true} />);
 
     expect(screen.getByText(/Cleaning Area \(Rectangle\)/i)).toBeInTheDocument();
   });
@@ -108,12 +101,7 @@ describe('SimplifiedControls', () => {
       isAnnotationEditMode: true,
     });
 
-    render(
-      <SimplifiedControls
-        pluginTarget="drivable_area_layer_generator"
-        showPluginInputs={true}
-      />
-    );
+    render(<SimplifiedControls pluginTarget="drivable_area_layer_generator" showPluginInputs={true} />);
 
     // Initial mount with showPluginInputs should auto-activate add_generator and exit annotation edit mode
     expect(useAppStore.getState().activeTool).toBe('add_generator');

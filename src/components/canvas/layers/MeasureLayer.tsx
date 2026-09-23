@@ -2,6 +2,12 @@ import { useMemo } from 'react';
 import { TextStyle } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { computeDistance } from '../../../stores/slices/measureSlice';
+import {
+  CANVAS_CONTRAST_COLOR,
+  CANVAS_LABEL_BG,
+  CANVAS_MEASURE_COLOR,
+  CANVAS_MEASURE_LIGHT_COLOR,
+} from '../canvasConstants';
 
 interface MeasureLayerProps {
   scale: number;
@@ -29,7 +35,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
         fontWeight: 'bold',
         stroke: { color: '#000000', width: 2 },
       }),
-    []
+    [],
   );
 
   const snapLabelStyle = useMemo(
@@ -41,7 +47,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
         fontWeight: 'bold',
         stroke: { color: '#0f172a', width: 3 },
       }),
-    []
+    [],
   );
 
   // メジャーモードでない場合は何も描画しない
@@ -50,11 +56,11 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
   if (!measureStartPoint && !(isAltPressed && snappedTarget)) return null;
 
   const p1 = measureStartPoint;
-  const p2 = p1 ? (measureEndPoint || measureHoverPoint) : null;
+  const p2 = p1 ? measureEndPoint || measureHoverPoint : null;
   const isCommitted = measureEndPoint !== null;
 
-  const primaryColor = 0x10b981; // Emerald 500
-  const secondaryColor = 0x34d399; // Emerald 400
+  const primaryColor = CANVAS_MEASURE_COLOR; // Emerald 500
+  const secondaryColor = CANVAS_MEASURE_LIGHT_COLOR; // Emerald 400
   const markerRadius = 6 / safeScale;
   const reticleSize = 10 / safeScale;
   const strokeWidth = (isCommitted ? 2.5 : 2.0) / safeScale;
@@ -104,7 +110,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
             }
 
             // 2. Point 1 Marker (Circle + Reticle)
-            g.fillStyle = { color: 0x0f172a, alpha: 0.8 };
+            g.fillStyle = { color: CANVAS_LABEL_BG, alpha: 0.8 };
             g.strokeStyle = { width: 2 / safeScale, color: primaryColor, alpha: 1.0 };
             g.circle(p1.x, p1.y, markerRadius);
             g.fill();
@@ -129,7 +135,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
 
             // 3. Point 2 Marker (if p2 exists)
             if (p2) {
-              g.fillStyle = { color: 0x0f172a, alpha: 0.8 };
+              g.fillStyle = { color: CANVAS_LABEL_BG, alpha: 0.8 };
               g.strokeStyle = { width: 2 / safeScale, color: isCommitted ? primaryColor : secondaryColor, alpha: 1.0 };
               g.circle(p2.x, p2.y, markerRadius);
               g.fill();
@@ -140,7 +146,11 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
               g.fill();
 
               // Reticle crosshair on p2
-              g.strokeStyle = { width: 1.5 / safeScale, color: isCommitted ? primaryColor : secondaryColor, alpha: 0.9 };
+              g.strokeStyle = {
+                width: 1.5 / safeScale,
+                color: isCommitted ? primaryColor : secondaryColor,
+                alpha: 0.9,
+              };
               g.moveTo(p2.x - reticleSize, p2.y);
               g.lineTo(p2.x - markerRadius - 1 / safeScale, p2.y);
               g.moveTo(p2.x + markerRadius + 1 / safeScale, p2.y);
@@ -162,7 +172,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
             draw={(g) => {
               g.clear();
               // Pill background
-              g.fillStyle = { color: 0x0f172a, alpha: 0.9 };
+              g.fillStyle = { color: CANVAS_LABEL_BG, alpha: 0.9 };
               g.strokeStyle = { width: 1.5 / safeScale, color: primaryColor, alpha: 1.0 };
               g.roundRect(-badgeWidth / 2, -badgeHeight / 2, badgeWidth, badgeHeight, 6 / safeScale);
               g.fill();
@@ -189,17 +199,17 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
               const snapCross = 18 / safeScale;
 
               // Outer pulsing-like ring
-              g.strokeStyle = { width: 2 / safeScale, color: 0x34d399, alpha: 0.85 };
+              g.strokeStyle = { width: 2 / safeScale, color: CANVAS_MEASURE_LIGHT_COLOR, alpha: 0.85 };
               g.circle(0, 0, snapRadius);
               g.stroke();
 
               // Inner accent ring
-              g.strokeStyle = { width: 1 / safeScale, color: 0xffffff, alpha: 0.7 };
+              g.strokeStyle = { width: 1 / safeScale, color: CANVAS_CONTRAST_COLOR, alpha: 0.7 };
               g.circle(0, 0, snapRadius * 0.65);
               g.stroke();
 
               // Crosshair
-              g.strokeStyle = { width: 1.5 / safeScale, color: 0x34d399, alpha: 0.9 };
+              g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_MEASURE_LIGHT_COLOR, alpha: 0.9 };
               g.moveTo(-snapCross, 0);
               g.lineTo(-snapRadius - 2 / safeScale, 0);
               g.moveTo(snapRadius + 2 / safeScale, 0);
@@ -218,8 +228,8 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
                 g.clear();
                 const textWidth = Math.max(48, snappedTarget.objectName.length * 7 + 14) / safeScale;
                 const textHeight = 18 / safeScale;
-                g.fillStyle = { color: 0x0f172a, alpha: 0.85 };
-                g.strokeStyle = { width: 1 / safeScale, color: 0x34d399, alpha: 0.9 };
+                g.fillStyle = { color: CANVAS_LABEL_BG, alpha: 0.85 };
+                g.strokeStyle = { width: 1 / safeScale, color: CANVAS_MEASURE_LIGHT_COLOR, alpha: 0.9 };
                 g.roundRect(-textWidth / 2, -textHeight / 2, textWidth, textHeight, 4 / safeScale);
                 g.fill();
                 g.stroke();

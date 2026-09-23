@@ -18,13 +18,9 @@ export function useMapEditLine() {
   const handleLineDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      let targetLayer = state.customLayers.find(
-        (l) => l.id === activeCustomLayerId && l.type === 'manual'
-      );
+      let targetLayer = state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual');
       if (!targetLayer) {
-        targetLayer =
-          state.customLayers.find((l) => l.type === 'manual') ||
-          state.addManualCustomLayer();
+        targetLayer = state.customLayers.find((l) => l.type === 'manual') || state.addManualCustomLayer();
       }
       if (state.activeCustomLayerId !== targetLayer.id) {
         state.setActiveCustomLayerId(targetLayer.id);
@@ -40,7 +36,7 @@ export function useMapEditLine() {
         y2: worldPos.y,
       });
     },
-    [activeCustomLayerId, mapEditFillValue]
+    [activeCustomLayerId, mapEditFillValue],
   );
 
   const handleLineDrawMove = useCallback(
@@ -57,15 +53,14 @@ export function useMapEditLine() {
         y2: worldPos.y,
       });
     },
-    [lineDrawStart, mapEditFillValue]
+    [lineDrawStart, mapEditFillValue],
   );
 
   const handleLineDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
     const targetLayer =
-      state.customLayers.find(
-        (l) => l.id === activeCustomLayerId && l.type === 'manual'
-      ) || state.customLayers.find((l) => l.type === 'manual');
+      state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') ||
+      state.customLayers.find((l) => l.type === 'manual');
     const targetLayerId = targetLayer?.id;
 
     if (!lineDrawStart || !linePreview || !targetLayerId) {
@@ -74,10 +69,7 @@ export function useMapEditLine() {
       return;
     }
 
-    const length = Math.hypot(
-      linePreview.x2 - linePreview.x1,
-      linePreview.y2 - linePreview.y1
-    );
+    const length = Math.hypot(linePreview.x2 - linePreview.x1, linePreview.y2 - linePreview.y1);
 
     if (length >= 0.05) {
       const newObj: LineEditObject = {

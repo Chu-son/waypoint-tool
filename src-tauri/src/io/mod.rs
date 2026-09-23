@@ -1,48 +1,49 @@
-use std::fs;
 use handlebars::Handlebars;
+use std::fs;
 
 pub fn save_project(path: &str, data: &serde_json::Value) -> Result<(), String> {
-    let json = serde_json::to_string_pretty(data)
-        .map_err(|e| format!("Serialization error: {}", e))?;
-    fs::write(path, json)
-        .map_err(|e| format!("File write error: {}", e))?;
+    let json = serde_json::to_string_pretty(data).map_err(|e| format!("Serialization error: {}", e))?;
+    fs::write(path, json).map_err(|e| format!("File write error: {}", e))?;
     Ok(())
 }
 
 pub fn load_project(path: &str) -> Result<serde_json::Value, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("File read error: {}", e))?;
-    let data: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Deserialization error: {}", e))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("File read error: {}", e))?;
+    let data: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Deserialization error: {}", e))?;
     Ok(data)
 }
 
 use base64::{engine::general_purpose, Engine as _};
 use std::path::Path;
 
-pub fn export_waypoints(path: &str, waypoints: Vec<serde_json::Value>, template: Option<String>, image_data_b64: Option<String>) -> Result<(), String> {
+pub fn export_waypoints(
+    path: &str,
+    waypoints: Vec<serde_json::Value>,
+    template: Option<String>,
+    image_data_b64: Option<String>,
+) -> Result<(), String> {
     let content = if let Some(tmpl) = template {
         let reg = Handlebars::new();
         // Register the template string and render it with wrapped data
-        let rendered = reg.render_template(&tmpl, &serde_json::json!({ "waypoints": waypoints }))
+        let rendered = reg
+            .render_template(&tmpl, &serde_json::json!({ "waypoints": waypoints }))
             .map_err(|e| format!("Template render error: {}", e))?;
         rendered
     } else if path.to_lowercase().ends_with(".yaml") || path.to_lowercase().ends_with(".yml") {
-        serde_yaml::to_string(&waypoints)
-            .map_err(|e| format!("YAML serialization error: {}", e))?
+        serde_yaml::to_string(&waypoints).map_err(|e| format!("YAML serialization error: {}", e))?
     } else {
-        serde_json::to_string_pretty(&waypoints)
-            .map_err(|e| format!("JSON serialization error: {}", e))?
+        serde_json::to_string_pretty(&waypoints).map_err(|e| format!("JSON serialization error: {}", e))?
     };
 
-    fs::write(path, content)
-        .map_err(|e| format!("File write error: {}", e))?;
+    fs::write(path, content).map_err(|e| format!("File write error: {}", e))?;
 
     // Export image if provided
     if let Some(b64) = image_data_b64 {
-        let decoded = general_purpose::STANDARD.decode(b64)
+        let decoded = general_purpose::STANDARD
+            .decode(b64)
             .map_err(|e| format!("Base64 decode error: {}", e))?;
-            
+
         let path_obj = Path::new(path);
         let png_path = path_obj.with_extension("png");
         fs::write(&png_path, decoded).map_err(|e| format!("Image write error: {}", e))?;
@@ -52,15 +53,12 @@ pub fn export_waypoints(path: &str, waypoints: Vec<serde_json::Value>, template:
 }
 
 pub fn import_waypoints(path: &str) -> Result<serde_json::Value, String> {
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("File read error: {}", e))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("File read error: {}", e))?;
 
     if path.to_lowercase().ends_with(".json") {
-        serde_json::from_str::<serde_json::Value>(&content)
-            .map_err(|e| format!("JSON parse error: {}", e))
+        serde_json::from_str::<serde_json::Value>(&content).map_err(|e| format!("JSON parse error: {}", e))
     } else {
-        serde_yaml::from_str::<serde_json::Value>(&content)
-            .map_err(|e| format!("YAML parse error: {}", e))
+        serde_yaml::from_str::<serde_json::Value>(&content).map_err(|e| format!("YAML parse error: {}", e))
     }
 }
 
@@ -194,7 +192,10 @@ pub fn infer_import_mapping(template: &str) -> Result<serde_json::Value, String>
     }
 
     if !(x_path.is_some() && y_path.is_some()) {
-        return Err("テンプレートからx/y座標のパスを自動検出できませんでした。Field Mappingを手動で設定してください。".to_string());
+        return Err(
+            "テンプレートからx/y座標のパスを自動検出できませんでした。Field Mappingを手動で設定してください。"
+                .to_string(),
+        );
     }
 
     Ok(serde_json::Value::Object(mapping))
@@ -218,7 +219,7 @@ mod tests {
         ];
 
         let template = Some("{{#each waypoints}}Node {{id}} is at {{x}}, {{y}}\n{{/each}}".to_string());
-        
+
         // Use temp file for export
         let res = export_waypoints(path_str, waypoints, template, None);
         assert!(res.is_ok(), "Export failed: {:?}", res.err());
@@ -236,7 +237,7 @@ mod tests {
         let path_str = file_path.to_str().unwrap();
 
         let waypoints = vec![json!({ "id": "wp1" })];
-        
+
         let res = export_waypoints(path_str, waypoints, None, None);
         assert!(res.is_ok(), "Export failed");
 

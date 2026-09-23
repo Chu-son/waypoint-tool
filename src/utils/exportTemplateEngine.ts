@@ -79,12 +79,12 @@ export function resolveExportPattern(pattern: string, context: ExportVariableCon
   result = result.replace(/\{\{sec\}\}/gi, seconds);
 
   // 3. 単一変数の置換 (月 MM と 分 mm は大文字小文字を厳格に区別)
-  result = result.replace(/\{\{MM\}\}/g, month);      // 大文字MM = 月 (Month: 01-12)
-  result = result.replace(/\{\{mm\}\}/g, minutes);    // 小文字mm = 分 (Minute: 00-59)
-  result = result.replace(/\{\{yyyy\}\}/gi, year);    // 年 (4桁)
-  result = result.replace(/\{\{dd\}\}/gi, day);       // 日 (01-31)
-  result = result.replace(/\{\{hh\}\}/gi, hours);     // 時 (00-23)
-  result = result.replace(/\{\{ss\}\}/gi, seconds);   // 秒 (00-59)
+  result = result.replace(/\{\{MM\}\}/g, month); // 大文字MM = 月 (Month: 01-12)
+  result = result.replace(/\{\{mm\}\}/g, minutes); // 小文字mm = 分 (Minute: 00-59)
+  result = result.replace(/\{\{yyyy\}\}/gi, year); // 年 (4桁)
+  result = result.replace(/\{\{dd\}\}/gi, day); // 日 (01-31)
+  result = result.replace(/\{\{hh\}\}/gi, hours); // 時 (00-23)
+  result = result.replace(/\{\{ss\}\}/gi, seconds); // 秒 (00-59)
 
   // 4. プロジェクト名・名称コンテキストの置換
   result = result.replace(/\{\{project_name\}\}/gi, projectName);
@@ -132,7 +132,7 @@ export function resolveExportFiles(
     availableRegions: { id: string; name: string }[];
     templates: { id: string; name: string; extension: string }[];
     defaultFormats: { id: string; name: string; extension: string }[];
-  }
+  },
 ): ResolvedExportFile[] {
   const result: ResolvedExportFile[] = [];
   const normalizedRoot = context.rootDir.replace(/\\/g, '/').replace(/\/+$/, '');
@@ -316,9 +316,7 @@ export function buildExportTreePreview(files: ResolvedExportFile[]): (TreeDirect
       const part = parts[i];
       currentRelPath = currentRelPath ? `${currentRelPath}/${part}` : part;
 
-      let dirNode = currentChildren.find(
-        (n): n is TreeDirectoryNode => n.type === 'directory' && n.name === part
-      );
+      let dirNode = currentChildren.find((n): n is TreeDirectoryNode => n.type === 'directory' && n.name === part);
 
       if (!dirNode) {
         dirNode = {

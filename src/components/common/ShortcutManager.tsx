@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { useAppStore } from "../../stores/appStore";
-import { confirmDiscardChanges } from "../../utils/projectGuard";
+import { useEffect } from 'react';
+import { useAppStore } from '../../stores/appStore';
+import { confirmDiscardChanges } from '../../services/projectGuard';
 
 export function ShortcutManager() {
   const {
@@ -44,10 +44,10 @@ export function ShortcutManager() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore shortcuts when user is typing in input fields (except Escape)
       if (
-        (document.activeElement?.tagName === "INPUT" ||
-          document.activeElement?.tagName === "TEXTAREA" ||
+        (document.activeElement?.tagName === 'INPUT' ||
+          document.activeElement?.tagName === 'TEXTAREA' ||
           (document.activeElement as HTMLElement)?.isContentEditable) &&
-        e.key !== "Escape"
+        e.key !== 'Escape'
       ) {
         return;
       }
@@ -56,14 +56,22 @@ export function ShortcutManager() {
       const currentState = (useAppStore as any).getState?.() || {};
       const isModalActuallyOpen = (modal: string): boolean => {
         switch (modal) {
-          case 'settings': return !!currentState.isSettingsModalOpen;
-          case 'export': return !!currentState.isExportModalOpen;
-          case 'import': return !!currentState.isImportModalOpen;
-          case 'export_maps': return !!currentState.isExportMapsModalOpen;
-          case 'shortcuts': return !!currentState.isShortcutsModalOpen;
-          case 'welcome': return !!currentState.isWelcomeModalOpen;
-          case 'plugin_data': return !!currentState.pluginDataModalState?.isOpen;
-          default: return false;
+          case 'settings':
+            return !!currentState.isSettingsModalOpen;
+          case 'export':
+            return !!currentState.isExportModalOpen;
+          case 'import':
+            return !!currentState.isImportModalOpen;
+          case 'export_maps':
+            return !!currentState.isExportMapsModalOpen;
+          case 'shortcuts':
+            return !!currentState.isShortcutsModalOpen;
+          case 'welcome':
+            return !!currentState.isWelcomeModalOpen;
+          case 'plugin_data':
+            return !!currentState.pluginDataModalState?.isOpen;
+          default:
+            return false;
         }
       };
 
@@ -77,12 +85,12 @@ export function ShortcutManager() {
         !!currentState.isWelcomeModalOpen ||
         !!currentState.pluginDataModalState?.isOpen;
 
-      if (isAnyModalOpen && e.key !== "Escape") {
+      if (isAnyModalOpen && e.key !== 'Escape') {
         return;
       }
 
       // Basic Actions
-      if (e.key === "Delete" || e.key === "Backspace") {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedEditObjectId && activeCustomLayerId) {
           removeEditObject?.(activeCustomLayerId, selectedEditObjectId);
           if (setSelectedEditObjectId) setSelectedEditObjectId(null);
@@ -94,58 +102,34 @@ export function ShortcutManager() {
         }
       }
 
-      if (e.key === "Escape") {
-        if (typeof handleGlobalEscape === 'function') {
-          handleGlobalEscape();
-        } else if (typeof (useAppStore as any).getState?.()?.handleGlobalEscape === 'function') {
-          (useAppStore as any).getState().handleGlobalEscape();
-        } else {
-          // Fallback if handleGlobalEscape is not in store (e.g. mocked store in legacy unit tests)
-          if (selectedEditObjectId && setSelectedEditObjectId) {
-            setSelectedEditObjectId(null);
-          }
-          if (selectedNodeIds.length > 0) {
-            selectNodes?.([]);
-          }
-          if (activeCustomLayerId) {
-            setActiveCustomLayerId?.(null);
-          }
-          if (selectedAnnotationIds.length > 0) {
-            clearAnnotationSelection?.();
-          }
-          setAnnotationEditMode?.(false);
-          setMapEditMode?.(false);
-          setActiveTool?.("select");
-          setActivePlugin?.(null);
-          clearPluginInteractionData?.();
-          setRightPanelActiveTab?.("layers");
-        }
+      if (e.key === 'Escape') {
+        handleGlobalEscape();
         return;
       }
 
       // Tool Selection
-      if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey) {
-        setActiveTool("select");
+      if (e.key.toLowerCase() === 'v' && !e.ctrlKey && !e.metaKey) {
+        setActiveTool('select');
       }
-      if (e.key.toLowerCase() === "p" && !e.ctrlKey && !e.metaKey) {
-        setActiveTool("add_point");
+      if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey) {
+        setActiveTool('add_point');
       }
-      if (e.key.toLowerCase() === "m" && !e.ctrlKey && !e.metaKey) {
-        setActiveTool(activeTool === "measure" ? "select" : "measure");
+      if (e.key.toLowerCase() === 'm' && !e.ctrlKey && !e.metaKey) {
+        setActiveTool(activeTool === 'measure' ? 'select' : 'measure');
       }
 
       // Modifier-based Shortcuts
       if (e.ctrlKey || e.metaKey) {
         switch (e.key.toLowerCase()) {
-          case "a":
+          case 'a':
             e.preventDefault();
             selectAllNodes();
             break;
-          case "e":
+          case 'e':
             e.preventDefault();
             setExportModalOpen(true);
             break;
-          case "s":
+          case 's':
             e.preventDefault();
             if (e.shiftKey) {
               saveProjectAs();
@@ -153,7 +137,7 @@ export function ShortcutManager() {
               saveProject();
             }
             break;
-          case "o":
+          case 'o':
             e.preventDefault();
             void (async () => {
               const ok = await confirmDiscardChanges();
@@ -162,7 +146,7 @@ export function ShortcutManager() {
               }
             })();
             break;
-          case "n":
+          case 'n':
             e.preventDefault();
             void (async () => {
               const ok = await confirmDiscardChanges();
@@ -171,31 +155,31 @@ export function ShortcutManager() {
               }
             })();
             break;
-          case "z":
+          case 'z':
             e.preventDefault();
             undo();
             break;
-          case "y":
+          case 'y':
             e.preventDefault();
             redo();
             break;
-          case "c":
+          case 'c':
             e.preventDefault();
             void copySelectedMapElements?.();
             break;
-          case "x":
+          case 'x':
             e.preventDefault();
             void cutSelectedMapElements?.();
             break;
-          case "v":
+          case 'v':
             e.preventDefault();
             void pasteMapElements?.({ asGroup: e.shiftKey });
             break;
-          case "d":
+          case 'd':
             e.preventDefault();
             duplicateSelectedMapElements?.();
             break;
-          case "h":
+          case 'h':
             e.preventDefault();
             setShowOccupancyHighlight(!showOccupancyHighlight);
             break;
@@ -203,8 +187,8 @@ export function ShortcutManager() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
     selectedNodeIds,
     activeTool,

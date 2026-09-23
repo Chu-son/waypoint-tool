@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { PipelineMetadata } from '../../../types/pipeline';
 import { extractPipelineParameters } from '../../../utils/pipelineParameterExtractor';
-import { PluginInputEditor } from '../PluginInputEditor';
-import { PluginPropertyEditor } from '../PluginPropertyEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
+import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
 import { Button } from '../common/Button';
 import { AlertBox } from '../common/AlertBox';
 import { Label } from '../common/Label';
@@ -26,6 +26,7 @@ import {
   Bookmark,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { confirmAction } from '../../../services/notify';
 
 export interface PipelineInspectorProps {
   pipelineMetadata: PipelineMetadata;
@@ -257,7 +258,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
           if (!result.success) {
             throw new Error(result.error || 'Pipeline execution failed');
           }
-        }
+        },
       );
     } catch (err: any) {
       console.error('[PipelineInspector] Re-generation error:', err);
@@ -267,10 +268,10 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
     }
   };
 
-  const handleDetach = () => {
+  const handleDetach = async () => {
     if (
-      window.confirm(
-        'この成果物をパイプラインの連動管理から切り離しますか？\n切り離すと、単独のノードやレイヤーとして独立して編集できるようになります。'
+      await confirmAction(
+        'この成果物をパイプラインの連動管理から切り離しますか？\n切り離すと、単独のノードやレイヤーとして独立して編集できるようになります。',
       )
     ) {
       detachFromPipeline({
@@ -283,14 +284,12 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
 
   // List existing artifacts associated with this pipeline execution
   const executionId = pipelineMetadata.pipeline_execution_id;
-  const linkedLayers = customLayers.filter(
-    (l) => l.pipeline_metadata?.pipeline_execution_id === executionId
-  );
+  const linkedLayers = customLayers.filter((l) => l.pipeline_metadata?.pipeline_execution_id === executionId);
   const linkedNodes = Object.values(nodes).filter(
-    (n) => n.pipeline_metadata?.pipeline_execution_id === executionId && n.type === 'generator'
+    (n) => n.pipeline_metadata?.pipeline_execution_id === executionId && n.type === 'generator',
   );
   const linkedGroups = Object.values(annotationGroups).filter(
-    (g) => g.pipeline_metadata?.pipeline_execution_id === executionId
+    (g) => g.pipeline_metadata?.pipeline_execution_id === executionId,
   );
 
   const recipe = pipelinePlugin.manifest.pipeline;
@@ -313,9 +312,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                 <span className="text-[10px] font-mono bg-accent-primary/10 text-accent-primary px-1.5 py-0.2 rounded font-medium border border-accent-primary/20">
                   Pipeline Instance
                 </span>
-                <span className="text-[10px] text-text-muted truncate">
-                  v{pipelinePlugin.manifest.version}
-                </span>
+                <span className="text-[10px] text-text-muted truncate">v{pipelinePlugin.manifest.version}</span>
               </div>
             </div>
           </div>
@@ -332,9 +329,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
         </div>
 
         {pipelinePlugin.manifest.description && (
-          <p className="text-xs text-text-muted line-clamp-2 mt-1">
-            {pipelinePlugin.manifest.description}
-          </p>
+          <p className="text-xs text-text-muted line-clamp-2 mt-1">{pipelinePlugin.manifest.description}</p>
         )}
 
         {/* Linked artifacts summary */}
@@ -360,8 +355,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
         {/* Target Custom Layer Settings (if selected artifact is a custom layer) */}
         {(() => {
           const effectiveLayerId =
-            targetCustomLayerId ||
-            linkedLayers.find((l) => l.id === useAppStore.getState().activeCustomLayerId)?.id;
+            targetCustomLayerId || linkedLayers.find((l) => l.id === useAppStore.getState().activeCustomLayerId)?.id;
           const targetLayer = effectiveLayerId ? customLayers.find((l) => l.id === effectiveLayerId) : null;
           if (!targetLayer) return null;
 
@@ -370,9 +364,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <Layers size={13} className="text-accent-primary shrink-0" />
-                  <span className="text-xs font-bold text-text-base truncate">
-                    Layer: {targetLayer.name}
-                  </span>
+                  <span className="text-xs font-bold text-text-base truncate">Layer: {targetLayer.name}</span>
                 </div>
                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-accent-primary/10 text-accent-primary border border-accent-primary/20 font-medium">
                   Active Layer
@@ -395,7 +387,9 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                 <div className="flex items-center gap-1.5">
                   <Bookmark
                     size={13}
-                    className={targetLayer.is_reference ? 'text-accent-reference fill-accent-reference' : 'text-text-muted'}
+                    className={
+                      targetLayer.is_reference ? 'text-accent-reference fill-accent-reference' : 'text-text-muted'
+                    }
                   />
                   <span className="text-[11px] font-medium text-text-base">Reference Layer</span>
                 </div>
@@ -429,7 +423,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                   onChange={(e) => updateCustomLayer(targetLayer.id, { blend_mode: e.target.value as any })}
                   className={cn(
                     'h-6 text-[11px] bg-surface-base border-border-base/50 w-32',
-                    targetLayer.is_reference && 'opacity-50 cursor-not-allowed bg-surface-base/30'
+                    targetLayer.is_reference && 'opacity-50 cursor-not-allowed bg-surface-base/30',
                   )}
                 >
                   <option value="overwrite">Overwrite</option>
@@ -467,7 +461,8 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
           const boundInputs = Object.entries(bindings).filter(([k]) => k.startsWith('inputs.'));
 
           const isCurrentTarget =
-            (targetCustomLayerId && linkedLayers.some((l) => l.id === targetCustomLayerId && l.pipeline_metadata?.step_id === stepId)) ||
+            (targetCustomLayerId &&
+              linkedLayers.some((l) => l.id === targetCustomLayerId && l.pipeline_metadata?.step_id === stepId)) ||
             (targetNodeId && linkedNodes.some((n) => n.id === targetNodeId && n.pipeline_metadata?.step_id === stepId));
 
           return (
@@ -477,7 +472,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                 'rounded-lg border transition-colors',
                 isCurrentTarget
                   ? 'border-accent-primary/60 bg-surface-raised/40 shadow-sm'
-                  : 'border-border-base bg-surface-raised/20'
+                  : 'border-border-base bg-surface-raised/20',
               )}
             >
               {/* Step Header */}
@@ -491,9 +486,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                   </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-text-base truncate">
-                        {step.name || stepId}
-                      </span>
+                      <span className="text-xs font-semibold text-text-base truncate">{step.name || stepId}</span>
                       {isCurrentTarget && (
                         <span className="text-[9px] bg-accent-primary/20 text-accent-primary px-1 rounded">
                           Selected
@@ -523,13 +516,9 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                           className="flex items-center gap-1.5 text-[11px] text-text-muted bg-surface-base px-2 py-1 rounded border border-border-base/40"
                         >
                           <ArrowRightLeft size={12} className="text-accent-primary shrink-0" />
-                          <span className="font-mono text-text-base truncate">
-                            {targetKey.replace('inputs.', '')}
-                          </span>
+                          <span className="font-mono text-text-base truncate">{targetKey.replace('inputs.', '')}</span>
                           <span className="text-text-muted">←</span>
-                          <span className="font-mono text-accent-primary truncate text-[10px]">
-                            {expr}
-                          </span>
+                          <span className="font-mono text-accent-primary truncate text-[10px]">{expr}</span>
                         </div>
                       ))}
                     </div>
@@ -559,7 +548,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                               'p-2.5 rounded border transition-colors cursor-pointer',
                               isCanvasActive
                                 ? 'border-accent-primary bg-accent-primary/5 ring-1 ring-accent-primary/30'
-                                : 'border-border-base bg-surface-base hover:border-border-base/80'
+                                : 'border-border-base bg-surface-base hover:border-border-base/80',
                             )}
                             onClick={() => handleSelectInput(item.stepId, item.inputId)}
                           >
@@ -592,13 +581,8 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                           <PluginPropertyEditor
                             key={item.propertyName}
                             property={item.propertyDef}
-                            value={
-                              manualProperties[item.stepId]?.[item.propertyName] ??
-                              item.defaultValue
-                            }
-                            onChange={(val: any) =>
-                              handleUpdateProperty(item.stepId, item.propertyName, val)
-                            }
+                            value={manualProperties[item.stepId]?.[item.propertyName] ?? item.defaultValue}
+                            onChange={(val: any) => handleUpdateProperty(item.stepId, item.propertyName, val)}
                           />
                         ))}
                       </div>
@@ -638,9 +622,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
             </>
           )}
         </Button>
-        <p className="text-[11px] text-center text-text-muted">
-          変更のないステップの計算は自動的にスキップされます
-        </p>
+        <p className="text-[11px] text-center text-text-muted">変更のないステップの計算は自動的にスキップされます</p>
       </div>
     </div>
   );

@@ -1,0 +1,5 @@
+# Bulk formatting commits. Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: Prettier と cargo fmt による一括整形
+756c35e9ee22d83f50cb80a3ea9371ccdf24b78f

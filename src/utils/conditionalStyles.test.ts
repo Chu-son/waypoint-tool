@@ -11,13 +11,7 @@ import {
   resolveFootprintConditionalStyle,
   resolveAnnotationConditionalStyle,
 } from './conditionalStyles';
-import {
-  ConditionalStyleRule,
-  OptionsSchema,
-  WaypointNode,
-  AnnotationObject,
-  RobotFootprint,
-} from '../types/store';
+import { ConditionalStyleRule, OptionsSchema, WaypointNode, AnnotationObject, RobotFootprint } from '../types/store';
 
 describe('conditionalStyles utility', () => {
   describe('safe helpers', () => {
@@ -27,6 +21,10 @@ describe('conditionalStyles utility', () => {
       expect(parseColorSafe('#f00')).toBe(0xff0000);
       expect(parseColorSafe('invalid', 0x123456)).toBe(0x123456);
       expect(parseColorSafe(undefined, 0x123456)).toBe(0x123456);
+    });
+
+    it('parseColorSafe keeps black shorthand instead of falling back to the default', () => {
+      expect(parseColorSafe('#000', 0x123456)).toBe(0x000000);
     });
 
     it('clampNumber clamps value to range', () => {
@@ -97,21 +95,57 @@ describe('conditionalStyles utility', () => {
     };
 
     it('evaluates comparison operators', () => {
-      expect(evaluateRule({ id: 'r1', type: 'rule', property: 'options.speed', operator: 'greater_than', value: 2.0 }, node)).toBe(true);
-      expect(evaluateRule({ id: 'r2', type: 'rule', property: 'options.speed', operator: 'less_than', value: 2.0 }, node)).toBe(false);
-      expect(evaluateRule({ id: 'r3', type: 'rule', property: 'options.speed', operator: 'between', value: 2.0, secondValue: 3.0 }, node)).toBe(true);
-      expect(evaluateRule({ id: 'r4', type: 'rule', property: 'options.speed', operator: 'between', value: 3.0, secondValue: 4.0 }, node)).toBe(false);
+      expect(
+        evaluateRule({ id: 'r1', type: 'rule', property: 'options.speed', operator: 'greater_than', value: 2.0 }, node),
+      ).toBe(true);
+      expect(
+        evaluateRule({ id: 'r2', type: 'rule', property: 'options.speed', operator: 'less_than', value: 2.0 }, node),
+      ).toBe(false);
+      expect(
+        evaluateRule(
+          { id: 'r3', type: 'rule', property: 'options.speed', operator: 'between', value: 2.0, secondValue: 3.0 },
+          node,
+        ),
+      ).toBe(true);
+      expect(
+        evaluateRule(
+          { id: 'r4', type: 'rule', property: 'options.speed', operator: 'between', value: 3.0, secondValue: 4.0 },
+          node,
+        ),
+      ).toBe(false);
     });
 
     it('evaluates equality and string operators', () => {
-      expect(evaluateRule({ id: 'r5', type: 'rule', property: 'options.tag', operator: 'equals', value: 'CHARGING_DOCK' }, node)).toBe(true);
-      expect(evaluateRule({ id: 'r6', type: 'rule', property: 'options.tag', operator: 'contains', value: 'charging' }, node)).toBe(true);
-      expect(evaluateRule({ id: 'r7', type: 'rule', property: 'options.tag', operator: 'in', value: 'dock, depot, charging_dock' }, node)).toBe(true);
+      expect(
+        evaluateRule(
+          { id: 'r5', type: 'rule', property: 'options.tag', operator: 'equals', value: 'CHARGING_DOCK' },
+          node,
+        ),
+      ).toBe(true);
+      expect(
+        evaluateRule(
+          { id: 'r6', type: 'rule', property: 'options.tag', operator: 'contains', value: 'charging' },
+          node,
+        ),
+      ).toBe(true);
+      expect(
+        evaluateRule(
+          { id: 'r7', type: 'rule', property: 'options.tag', operator: 'in', value: 'dock, depot, charging_dock' },
+          node,
+        ),
+      ).toBe(true);
     });
 
     it('evaluates emptiness', () => {
-      expect(evaluateRule({ id: 'r8', type: 'rule', property: 'options.speed', operator: 'is_not_empty', value: null }, node)).toBe(true);
-      expect(evaluateRule({ id: 'r9', type: 'rule', property: 'options.missing', operator: 'is_empty', value: null }, node)).toBe(true);
+      expect(
+        evaluateRule(
+          { id: 'r8', type: 'rule', property: 'options.speed', operator: 'is_not_empty', value: null },
+          node,
+        ),
+      ).toBe(true);
+      expect(
+        evaluateRule({ id: 'r9', type: 'rule', property: 'options.missing', operator: 'is_empty', value: null }, node),
+      ).toBe(true);
     });
   });
 
@@ -133,7 +167,13 @@ describe('conditionalStyles utility', () => {
         logicalOperator: 'and' as const,
         children: [
           { id: 'r1', type: 'rule' as const, property: 'options.speed', operator: 'greater_than' as const, value: 2.0 },
-          { id: 'r2', type: 'rule' as const, property: 'options.area', operator: 'equals' as const, value: 'warehouse' },
+          {
+            id: 'r2',
+            type: 'rule' as const,
+            property: 'options.area',
+            operator: 'equals' as const,
+            value: 'warehouse',
+          },
         ],
       };
       expect(evaluateConditionGroup(andGroup, node)).toBe(true);
@@ -150,8 +190,20 @@ describe('conditionalStyles utility', () => {
             type: 'group' as const,
             logicalOperator: 'and' as const,
             children: [
-              { id: 'r1', type: 'rule' as const, property: 'options.speed', operator: 'greater_than' as const, value: 5.0 }, // False
-              { id: 'r2', type: 'rule' as const, property: 'options.area', operator: 'equals' as const, value: 'warehouse' }, // True
+              {
+                id: 'r1',
+                type: 'rule' as const,
+                property: 'options.speed',
+                operator: 'greater_than' as const,
+                value: 5.0,
+              }, // False
+              {
+                id: 'r2',
+                type: 'rule' as const,
+                property: 'options.area',
+                operator: 'equals' as const,
+                value: 'warehouse',
+              }, // True
             ],
           },
           { id: 'r3', type: 'rule' as const, property: 'options.emergency', operator: 'equals' as const, value: false }, // True
@@ -182,9 +234,7 @@ describe('conditionalStyles utility', () => {
           id: 'g1',
           type: 'group',
           logicalOperator: 'and',
-          children: [
-            { id: 'r1', type: 'rule', property: 'options.speed', operator: 'greater_than', value: 2.0 },
-          ],
+          children: [{ id: 'r1', type: 'rule', property: 'options.speed', operator: 'greater_than', value: 2.0 }],
         },
         style: {
           waypoint: {
@@ -203,9 +253,7 @@ describe('conditionalStyles utility', () => {
           id: 'g2',
           type: 'group',
           logicalOperator: 'and',
-          children: [
-            { id: 'r2', type: 'rule', property: 'options.highlight', operator: 'equals', value: true },
-          ],
+          children: [{ id: 'r2', type: 'rule', property: 'options.highlight', operator: 'equals', value: true }],
         },
         style: {
           waypoint: {
@@ -220,15 +268,12 @@ describe('conditionalStyles utility', () => {
       const resolved = resolveWaypointConditionalStyle(node, rules, true);
       expect(resolved).not.toBeNull();
       expect(resolved?.color).toBe('#FF0000'); // From rule-1
-      expect(resolved?.shape).toBe('star');   // From rule-1
-      expect(resolved?.scale).toBe(1.5);      // From rule-2
+      expect(resolved?.shape).toBe('star'); // From rule-1
+      expect(resolved?.scale).toBe(1.5); // From rule-2
     });
 
     it('respects stopIfMatched flag', () => {
-      const stopRules = [
-        { ...rules[0], stopIfMatched: true },
-        rules[1],
-      ];
+      const stopRules = [{ ...rules[0], stopIfMatched: true }, rules[1]];
       const resolved = resolveWaypointConditionalStyle(node, stopRules, true);
       expect(resolved?.color).toBe('#FF0000');
       expect(resolved?.scale).toBeUndefined(); // rule-2 was never evaluated

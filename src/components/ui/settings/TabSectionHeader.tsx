@@ -1,6 +1,6 @@
-import React from "react";
-import { LucideIcon } from "lucide-react";
-import { cn } from "../../../utils/cn";
+import React from 'react';
+import { LucideIcon } from 'lucide-react';
+import { cn } from '../../../utils/cn';
 
 interface TabSectionHeaderProps {
   title: string;
@@ -11,19 +11,12 @@ interface TabSectionHeaderProps {
   className?: string;
 }
 
-export function TabSectionHeader({
-  title,
-  subtitle,
-  icon: Icon,
-  badge,
-  actions,
-  className,
-}: TabSectionHeaderProps) {
+export function TabSectionHeader({ title, subtitle, icon: Icon, badge, actions, className }: TabSectionHeaderProps) {
   return (
     <div
       className={cn(
-        "flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-panel/80 p-4 rounded-xl border border-border-base/50 shadow-xs",
-        className
+        'flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-panel/80 p-4 rounded-xl border border-border-base/50 shadow-xs',
+        className,
       )}
     >
       <div className="flex items-center gap-3 min-w-0">
@@ -34,21 +27,13 @@ export function TabSectionHeader({
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-bold text-text-base tracking-tight truncate">
-              {title}
-            </h3>
+            <h3 className="text-base sm:text-lg font-bold text-text-base tracking-tight truncate">{title}</h3>
             {badge}
           </div>
-          <p className="text-xs text-text-muted mt-0.5 font-medium leading-relaxed">
-            {subtitle}
-          </p>
+          <p className="text-xs text-text-muted mt-0.5 font-medium leading-relaxed">{subtitle}</p>
         </div>
       </div>
-      {actions && (
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-          {actions}
-        </div>
-      )}
+      {actions && <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">{actions}</div>}
     </div>
   );
 }

@@ -143,9 +143,7 @@ describe('projectMigration', () => {
           height: 500,
         },
       ],
-      annotationObjects: [
-        { id: 'ann-1', name: 'Point Ann' },
-      ],
+      annotationObjects: [{ id: 'ann-1', name: 'Point Ann' }],
       leftPanelViewMode: 'split',
       rightPanelViewMode: 'tabs',
       activePathCalculatorPluginId: 'plug-1',
@@ -320,7 +318,11 @@ describe('projectMigration', () => {
     const polygonData = {
       robot_footprint: {
         type: 'polygon',
-        points: [[0, 0], [1, 0], [0, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
         radius: 0.5, // spurious radius
       },
     };

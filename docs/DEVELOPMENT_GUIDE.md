@@ -45,15 +45,28 @@ npm run tauri dev
 ## 4. テスト指針 (Testing)
 
 ### フロントエンド (Vitest)
-ロジックやコンポーネントの振る舞いをテストします。
+ロジックやコンポーネントの **振る舞い** をテストします。書き方・モック方針・共通ヘルパーは 📖 [TESTING.md](./TESTING.md) を必ず参照してください。
 ```bash
-npm run test
+npm run test           # 型チェック + 全テスト
+npm run test:coverage  # カバレッジ付き（閾値あり）
 ```
 - `*.test.ts` / `*.test.tsx` を同じディレクトリに作成。
+- ストアはモックせず実物を使う（`src/test/` のヘルパーを利用）。
+
+### 静的解析・フォーマット
+```bash
+npm run lint           # ESLint（層ルール・循環参照・Hooks 規約）
+npm run format         # Prettier で整形
+npm run check          # typecheck + lint + format:check + test:coverage（CI と同じ内容）
+```
+- CI（`.github/workflows/ci.yml`）で PR ごとに上記と Rust の `cargo fmt --check` / `cargo clippy -D warnings` / `cargo test` を実行します。
+- 一括整形コミットは `.git-blame-ignore-revs` に登録済みです（`git config blame.ignoreRevsFile .git-blame-ignore-revs`）。
 
 ### バックエンド (Rust)
 ```bash
 cd src-tauri
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 - 各モジュールの末尾にある `#[cfg(test)]` ブロックに記述。

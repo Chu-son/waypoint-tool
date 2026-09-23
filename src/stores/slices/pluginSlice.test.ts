@@ -1,17 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { BackendAPI } from '../../api';
+import { BackendAPI, DialogAPI } from '../../api';
 import { PluginInstance, WaypointNode } from '../../types/store';
 
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    runPlugin: vi.fn(),
-    fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
-  },
-  DialogAPI: {
-    ask: vi.fn().mockResolvedValue(true),
-  },
-}));
+// Stub the IPC boundary; individual tests set runPlugin's result.
+beforeEach(() => {
+  vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(undefined);
+  vi.spyOn(BackendAPI, 'fetchInstalledPlugins').mockResolvedValue([]);
+  vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+});
 
 describe('pluginSlice - executeGeneratorPlugin placement & history atomicity', () => {
   const dummyPlugin: PluginInstance = {
@@ -306,7 +303,7 @@ describe('pluginSlice - executePipeline', () => {
         pipeline_inputs: {
           step_layer: { input_img: 'initial_image' },
         },
-      })
+      }),
     );
 
     // Generator node and child nodes exported
@@ -321,7 +318,7 @@ describe('pluginSlice - executePipeline', () => {
         pipeline_inputs: {
           step_layer: { input_img: 'initial_image' },
         },
-      })
+      }),
     );
     expect(genNode?.children_ids).toHaveLength(2);
   });
@@ -440,9 +437,7 @@ describe('pluginSlice - executePipeline', () => {
         step_id: 'step_path',
         step_execution_id: 'step-exec-old',
       },
-      baseline_waypoints: [
-        { transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 }, name: 'WP1' },
-      ],
+      baseline_waypoints: [{ transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 }, name: 'WP1' }],
     };
 
     // User manually modified child-1: moved x from 0 to 10 (deltaX = 10)
@@ -541,8 +536,16 @@ describe('pluginSlice - executePipeline', () => {
     (BackendAPI.runPlugin as any)
       .mockResolvedValueOnce({
         custom_layers: [
-          { name: 'New Layer 0', image_base64: 'data:new0', info: { resolution: 0.05, origin: [0, 0, 0], width: 5, height: 5 } },
-          { name: 'New Layer 1', image_base64: 'data:new1', info: { resolution: 0.05, origin: [0, 0, 0], width: 5, height: 5 } },
+          {
+            name: 'New Layer 0',
+            image_base64: 'data:new0',
+            info: { resolution: 0.05, origin: [0, 0, 0], width: 5, height: 5 },
+          },
+          {
+            name: 'New Layer 1',
+            image_base64: 'data:new1',
+            info: { resolution: 0.05, origin: [0, 0, 0], width: 5, height: 5 },
+          },
         ],
       })
       .mockResolvedValueOnce({
@@ -613,7 +616,12 @@ describe('pluginSlice - executePipeline', () => {
 
     useAppStore.setState({
       nodes: {
-        'user-wp-1': { id: 'user-wp-1', type: 'manual', name: 'Start', transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        'user-wp-1': {
+          id: 'user-wp-1',
+          type: 'manual',
+          name: 'Start',
+          transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 },
+        },
       },
       rootNodeIds: ['user-wp-1'],
       selectedNodeIds: ['user-wp-1'],
@@ -645,9 +653,7 @@ describe('pluginSlice - executePipeline', () => {
     // Verify Step 2 received the user's initial selected points (x: 10, y: 20)!
     const step2Call = (BackendAPI.runPlugin as any).mock.calls[1];
     expect(step2Call[0].id).toBe('planner_with_sel');
-    expect(step2Call[1].selected_points).toEqual([
-      { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 },
-    ]);
+    expect(step2Call[1].selected_points).toEqual([{ x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 }]);
   });
 
   it('fails and rolls back cleanly when a binding path evaluates to undefined', async () => {
@@ -673,9 +679,7 @@ describe('pluginSlice - executePipeline', () => {
         name: 'Differ Plugin',
         type: 'python',
         executable: 'main.py',
-        inputs: [
-          { id: 'internal_input_id', name: 'public_input_name', label: 'Differ Input', type: 'string' },
-        ],
+        inputs: [{ id: 'internal_input_id', name: 'public_input_name', label: 'Differ Input', type: 'string' }],
         properties: [],
       },
       folder_path: '/plugins/differ',

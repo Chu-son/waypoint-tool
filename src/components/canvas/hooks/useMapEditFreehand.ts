@@ -64,9 +64,9 @@ export function useMapEditFreehand() {
   const handleFreehandDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
       const state = useAppStore.getState();
-      let targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual');
+      let targetLayer = state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual');
       if (!targetLayer) {
-        targetLayer = state.customLayers.find(l => l.type === 'manual') || state.addManualCustomLayer();
+        targetLayer = state.customLayers.find((l) => l.type === 'manual') || state.addManualCustomLayer();
       }
       if (state.activeCustomLayerId !== targetLayer.id) {
         state.setActiveCustomLayerId(targetLayer.id);
@@ -75,7 +75,7 @@ export function useMapEditFreehand() {
       setFreehandPoints([worldPos]);
       setBrushPreviewPos(worldPos);
     },
-    [activeCustomLayerId]
+    [activeCustomLayerId],
   );
 
   const handleFreehandDrawMove = useCallback(
@@ -94,12 +94,14 @@ export function useMapEditFreehand() {
         return prev;
       });
     },
-    [isFreehandDrawing, brushRadiusWorld]
+    [isFreehandDrawing, brushRadiusWorld],
   );
 
   const handleFreehandDrawEnd = useCallback(() => {
     const state = useAppStore.getState();
-    const targetLayer = state.customLayers.find(l => l.id === activeCustomLayerId && l.type === 'manual') || state.customLayers.find(l => l.type === 'manual');
+    const targetLayer =
+      state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') ||
+      state.customLayers.find((l) => l.type === 'manual');
     const targetLayerId = targetLayer?.id;
     if (!isFreehandDrawing || !targetLayerId || freehandPoints.length === 0) {
       setIsFreehandDrawing(false);

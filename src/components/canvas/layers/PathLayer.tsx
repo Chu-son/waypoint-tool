@@ -3,40 +3,32 @@ import { useAppStore } from '../../../stores/appStore';
 import * as PIXI from 'pixi.js';
 import { getFlattenedWaypointIds, getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
+import { getFootprintWidth } from '../../../utils/footprint';
 import { resolvePathConditionalStyle, parseColorSafe, drawDashedLine } from '../../../utils/conditionalStyles';
+import { CANVAS_MUTED_COLOR } from '../canvasConstants';
 
 export function PathLayer({ scale }: { scale: number }) {
-  const rootNodeIds = useAppStore(state => state.rootNodeIds);
-  const nodes = useAppStore(state => state.nodes);
-  const insertionTarget = useAppStore(state => state.insertionTarget);
-  const calculatedPathSegments = useAppStore(state => state.calculatedPathSegments);
-  const activePathCalculatorPluginId = useAppStore(state => state.activePathCalculatorPluginId);
-  const pathColor = useAppStore(state => state.pathColor) || DEFAULT_PATH_COLOR;
-  const pathWidth = useAppStore(state => state.pathWidth) ?? 0.1;
-  const pathOpacity = useAppStore(state => state.pathOpacity) ?? 0.7;
-  const syncPathWidthWithFootprint = useAppStore(state => state.syncPathWidthWithFootprint);
-  const robotFootprint = useAppStore(state => state.robotFootprint);
-  const conditionalStyles = useAppStore(state => state.conditionalStyles);
-  const conditionalStylesEnabled = useAppStore(state => state.conditionalStylesEnabled);
-  const optionsSchema = useAppStore(state => state.optionsSchema);
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
+  const nodes = useAppStore((state) => state.nodes);
+  const insertionTarget = useAppStore((state) => state.insertionTarget);
+  const calculatedPathSegments = useAppStore((state) => state.calculatedPathSegments);
+  const activePathCalculatorPluginId = useAppStore((state) => state.activePathCalculatorPluginId);
+  const pathColor = useAppStore((state) => state.pathColor) || DEFAULT_PATH_COLOR;
+  const pathWidth = useAppStore((state) => state.pathWidth) ?? 0.1;
+  const pathOpacity = useAppStore((state) => state.pathOpacity) ?? 0.7;
+  const syncPathWidthWithFootprint = useAppStore((state) => state.syncPathWidthWithFootprint);
+  const robotFootprint = useAppStore((state) => state.robotFootprint);
+  const conditionalStyles = useAppStore((state) => state.conditionalStyles);
+  const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
+  const optionsSchema = useAppStore((state) => state.optionsSchema);
 
   const afterNodeIds = useMemo(() => {
     return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
   }, [rootNodeIds, nodes, insertionTarget]);
 
   const baseEffectiveWidth = useMemo(() => {
-    let w = Math.max(0.01, pathWidth);
-    if (syncPathWidthWithFootprint && robotFootprint) {
-      if (robotFootprint.type === 'circular') {
-        w = (robotFootprint.radius || 0.25) * 2;
-      } else if (robotFootprint.type === 'rectangular') {
-        w = robotFootprint.width || 0.5;
-      } else if (robotFootprint.type === 'polygon' && robotFootprint.points && robotFootprint.points.length > 0) {
-        const maxR = Math.max(...robotFootprint.points.map((p: any) => Array.isArray(p) ? Math.hypot(p[0], p[1]) : Math.hypot(p.x, p.y)), 0.25);
-        w = maxR * 2;
-      }
-    }
-    return w;
+    if (syncPathWidthWithFootprint && robotFootprint) return getFootprintWidth(robotFootprint);
+    return Math.max(0.01, pathWidth);
   }, [pathWidth, syncPathWidthWithFootprint, robotFootprint]);
 
   const defaultColorNum = useMemo(() => {
@@ -60,7 +52,7 @@ export function PathLayer({ scale }: { scale: number }) {
   const segments = useMemo<SegmentData[]>(() => {
     if (activePathCalculatorPluginId && calculatedPathSegments && calculatedPathSegments.length > 0) {
       const segs: SegmentData[] = [];
-      calculatedPathSegments.forEach(seg => {
+      calculatedPathSegments.forEach((seg) => {
         if (seg && seg.length >= 2) {
           for (let j = 0; j < seg.length - 1; j++) {
             segs.push({
@@ -80,7 +72,7 @@ export function PathLayer({ scale }: { scale: number }) {
 
     const flatWaypointIds = getFlattenedWaypointIds(rootNodeIds, nodes);
     const validWaypoints: { id: string; p: { x: number; y: number } }[] = [];
-    flatWaypointIds.forEach(id => {
+    flatWaypointIds.forEach((id) => {
       const transform = nodes[id]?.transform;
       if (transform && isFinite(transform.x) && isFinite(transform.y)) {
         validWaypoints.push({ id, p: { x: transform.x, y: transform.y } });
@@ -101,7 +93,7 @@ export function PathLayer({ scale }: { scale: number }) {
         conditionalStyles,
         conditionalStylesEnabled,
         optionsSchema,
-        { sourceIndex: i, targetIndex: i + 1 }
+        { sourceIndex: i, targetIndex: i + 1 },
       );
 
       let segColor = defaultColorNum;
@@ -160,7 +152,7 @@ export function PathLayer({ scale }: { scale: number }) {
 
           g.strokeStyle = {
             width,
-            color: isAfter ? 0x94a3b8 : color,
+            color: isAfter ? CANVAS_MUTED_COLOR : color,
             alpha: isAfter ? opacity * 0.1 : opacity * 0.35,
             cap: 'round',
             join: 'round',
@@ -183,7 +175,7 @@ export function PathLayer({ scale }: { scale: number }) {
 
           g.strokeStyle = {
             width: centerWidth,
-            color: isAfter ? 0x94a3b8 : color,
+            color: isAfter ? CANVAS_MUTED_COLOR : color,
             alpha: isAfter ? opacity * 0.25 : opacity,
             cap: 'round',
             join: 'round',
