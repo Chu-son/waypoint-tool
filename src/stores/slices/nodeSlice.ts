@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { WaypointNode, InsertionTarget } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
+import { detachFromTree, insertIntoTree } from '../../utils/treeOps';
 import {
   findHighestLevelParent,
   findNodeParentId,
@@ -408,60 +409,17 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
       if (directMovingIds.length === 0) return state;
 
-      const directMovingSet = new Set(directMovingIds);
-      const newNodes = { ...state.nodes };
-      let newRootIds = [...state.rootNodeIds];
-
-      // 3. 元の親 / Root から削除
-      newRootIds = newRootIds.filter((id) => !directMovingSet.has(id));
-      Object.keys(newNodes).forEach((nid) => {
-        const node = newNodes[nid];
-        if (node.children_ids) {
-          newNodes[nid] = {
-            ...node,
-            children_ids: node.children_ids.filter((cid) => !directMovingSet.has(cid)),
-          };
-        }
-      });
-
-      // 4. ドロップ位置に挿入
-      if (position === 'inside') {
-        const targetNode = newNodes[targetId];
-        if (targetNode) {
-          newNodes[targetId] = {
-            ...targetNode,
-            children_ids: [...(targetNode.children_ids || []), ...directMovingIds],
-          };
-        }
-      } else {
-        // targetId の親を特定
-        const targetParentId = findNodeParentId(targetId, newRootIds, newNodes);
-
-        if (targetParentId && newNodes[targetParentId]) {
-          const parent = newNodes[targetParentId];
-          const siblings = [...(parent.children_ids || [])];
-          let targetIndex = siblings.indexOf(targetId);
-          if (targetIndex === -1) {
-            targetIndex = siblings.length;
-          } else if (position === 'after') {
-            targetIndex += 1;
-          }
-          siblings.splice(targetIndex, 0, ...directMovingIds);
-          newNodes[targetParentId] = {
-            ...parent,
-            children_ids: siblings,
-          };
-        } else {
-          // Root 階層に挿入
-          let targetIndex = newRootIds.indexOf(targetId);
-          if (targetIndex === -1) {
-            targetIndex = newRootIds.length;
-          } else if (position === 'after') {
-            targetIndex += 1;
-          }
-          newRootIds.splice(targetIndex, 0, ...directMovingIds);
-        }
-      }
+      // 3. 元の親 / Root から削除し、4. ドロップ位置に挿入
+      const detached = detachFromTree({ rootIds: state.rootNodeIds, containers: state.nodes }, directMovingIds);
+      const { rootIds: newRootIds, containers: newNodes } = insertIntoTree(
+        detached,
+        directMovingIds,
+        targetId,
+        position,
+        position === 'inside'
+          ? undefined
+          : (findNodeParentId(targetId, detached.rootIds, detached.containers) ?? undefined),
+      );
 
       const nextTarget = mapInsertionTarget(
         state.insertionTarget,

@@ -1,3 +1,4 @@
+import { detachFromTree, insertIntoTree } from '../../utils/treeOps';
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { AnnotationObject, AnnotationGroup } from '../../types/store';
@@ -420,84 +421,36 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
 
       if (directMovingIds.length === 0) return state;
 
-      const directMovingSet = new Set(directMovingIds);
-      const newObjects = { ...state.annotationObjects };
-      const newGroups = { ...state.annotationGroups };
-      let newRootIds = [...state.rootAnnotationIds];
+      // 2. 元の親から削除し、3. ドロップ位置に挿入＆親参照を更新
+      const detached = detachFromTree(
+        { rootIds: state.rootAnnotationIds, containers: state.annotationGroups },
+        directMovingIds,
+      );
 
-      // 2. 元の親から削除
-      newRootIds = newRootIds.filter((id) => !directMovingSet.has(id));
-      Object.keys(newGroups).forEach((gid) => {
-        const grp = newGroups[gid];
-        if (grp.children_ids) {
-          newGroups[gid] = {
-            ...grp,
-            children_ids: grp.children_ids.filter((cid) => !directMovingSet.has(cid)),
-          };
-        }
-      });
-
-      // 3. ドロップ位置に挿入＆親参照を更新
-      if (position === 'inside') {
-        const targetGroup = newGroups[targetId];
-        if (targetGroup) {
-          newGroups[targetId] = {
-            ...targetGroup,
-            children_ids: [...(targetGroup.children_ids || []), ...directMovingIds],
-          };
-          directMovingIds.forEach((id) => {
-            if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: targetId };
-            if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: targetId };
-          });
-        }
-      } else {
-        // targetId の親グループを特定
-        let targetParentId: string | undefined = undefined;
-        if (newObjects[targetId]?.group_id) {
-          targetParentId = newObjects[targetId].group_id;
-        } else if (newGroups[targetId]?.parent_id) {
-          targetParentId = newGroups[targetId].parent_id;
+      let targetParentId: string | undefined = undefined;
+      if (position !== 'inside') {
+        if (state.annotationObjects[targetId]?.group_id) {
+          targetParentId = state.annotationObjects[targetId].group_id;
+        } else if (state.annotationGroups[targetId]?.parent_id) {
+          targetParentId = state.annotationGroups[targetId].parent_id;
         } else {
           // children_ids から逆引き
-          Object.keys(newGroups).forEach((gid) => {
-            if (newGroups[gid].children_ids?.includes(targetId)) {
+          Object.keys(detached.containers).forEach((gid) => {
+            if (detached.containers[gid].children_ids?.includes(targetId)) {
               targetParentId = gid;
             }
           });
         }
+      }
 
-        if (targetParentId && newGroups[targetParentId]) {
-          const parent = newGroups[targetParentId];
-          const siblings = [...(parent.children_ids || [])];
-          let targetIndex = siblings.indexOf(targetId);
-          if (targetIndex === -1) {
-            targetIndex = siblings.length;
-          } else if (position === 'after') {
-            targetIndex += 1;
-          }
-          siblings.splice(targetIndex, 0, ...directMovingIds);
-          newGroups[targetParentId] = {
-            ...parent,
-            children_ids: siblings,
-          };
-          directMovingIds.forEach((id) => {
-            if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: targetParentId };
-            if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: targetParentId };
-          });
-        } else {
-          // Root 階層に挿入
-          let targetIndex = newRootIds.indexOf(targetId);
-          if (targetIndex === -1) {
-            targetIndex = newRootIds.length;
-          } else if (position === 'after') {
-            targetIndex += 1;
-          }
-          newRootIds.splice(targetIndex, 0, ...directMovingIds);
-          directMovingIds.forEach((id) => {
-            if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: undefined };
-            if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: undefined };
-          });
-        }
+      const inserted = insertIntoTree(detached, directMovingIds, targetId, position, targetParentId);
+      const { rootIds: newRootIds, containers: newGroups, parentId } = inserted;
+      const newObjects = { ...state.annotationObjects };
+      if (position !== 'inside' || parentId) {
+        directMovingIds.forEach((id) => {
+          if (newObjects[id]) newObjects[id] = { ...newObjects[id], group_id: parentId };
+          if (newGroups[id]) newGroups[id] = { ...newGroups[id], parent_id: parentId };
+        });
       }
 
       return {
