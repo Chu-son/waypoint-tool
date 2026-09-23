@@ -1,321 +1,161 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { invoke } from '@tauri-apps/api/core';
 import { TopMenu } from './TopMenu';
-import { useAppStore } from '../../stores/appStore';
-import { DialogAPI } from '../../api';
+import { BackendAPI, DialogAPI } from '../../api';
+import { renderWithStore } from '../../test/render';
+import { getAppState, PAST_WELCOME } from '../../test/store';
+import { makePointAnnotation, makeWaypoint, waypointTree } from '../../test/fixtures';
+import type { AppState } from '../../stores/appStore';
 
-// Mock Lucide icons
-vi.mock('lucide-react', () => ({
-  MousePointer2: () => <div data-testid="mouse-icon" />,
-  Minus: () => <div data-testid="minus-icon" />,
-  Square: () => <div data-testid="square-icon" />,
-  X: () => <div data-testid="x-icon" />,
-  Route: () => <div data-testid="route-icon" />,
-  RefreshCcw: () => <div data-testid="refresh-icon" />,
-  ChevronDown: () => <div data-testid="chevrondown-icon" />,
-  Check: () => <div data-testid="check-icon" />,
-  FolderOpen: () => <div data-testid="folder-icon" />,
-}));
+// Window/process control still talks to Tauri directly (to be moved behind src/api).
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
+vi.mock('@tauri-apps/api/app', () => ({ getVersion: vi.fn().mockResolvedValue('0.0.1') }));
+vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ setDecorations: vi.fn() }) }));
 
-// Mock Store
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: vi.fn(),
-}));
+const renderMenu = (state: Partial<AppState> = {}) => renderWithStore(<TopMenu />, { ...PAST_WELCOME, ...state });
 
-// Mock API
-vi.mock('../../api', () => ({
-  DialogAPI: {
-    ask: vi.fn(),
-  },
-}));
-
-// Mock @tauri-apps/api/core
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(),
-}));
-
-// Mock @tauri-apps/api/window
-vi.mock('@tauri-apps/api/window', () => ({
-  getCurrentWindow: () => ({
-    setDecorations: vi.fn(),
-  }),
-}));
+const openMenu = (name: 'File' | 'Edit' | 'View' | 'Help') => fireEvent.click(screen.getByRole('button', { name }));
 
 describe('TopMenu', () => {
-  const mockLoadProject = vi.fn();
-  const mockSaveProject = vi.fn();
-  const mockSetExportModalOpen = vi.fn();
-  const mockSetSettingsModalOpen = vi.fn();
-  const mockSetShowPaths = vi.fn();
-  const mockSetShowGrid = vi.fn();
-  const mockSelectAllNodes = vi.fn();
-  const mockRemoveNodes = vi.fn();
-  const mockRemoveAnnotationObjects = vi.fn();
-  const mockUndo = vi.fn();
-  const mockRedo = vi.fn();
-  const mockSaveProjectAs = vi.fn();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: [],
-        selectedAnnotationIds: [],
-        showPaths: true,
-        showGrid: true,
-        isDirty: false,
-        currentProjectPath: null,
-        isLeftPanelOpen: true,
-        isRightPanelOpen: true,
-        showProperties: true,
-        historyPast: [],
-        historyFuture: [],
-        undo: mockUndo,
-        redo: mockRedo,
-        loadProject: mockLoadProject,
-        saveProject: mockSaveProject,
-        saveProjectAs: mockSaveProjectAs,
-        setExportModalOpen: mockSetExportModalOpen,
-        setSettingsModalOpen: mockSetSettingsModalOpen,
-        setShortcutsModalOpen: vi.fn(),
-        setWelcomeModalOpen: vi.fn(),
-        setIsInitialLaunch: vi.fn(),
-        setShowPaths: mockSetShowPaths,
-        setShowGrid: mockSetShowGrid,
-        selectAllNodes: mockSelectAllNodes,
-        removeNodes: mockRemoveNodes,
-        removeAnnotationObjects: mockRemoveAnnotationObjects,
-        setLeftPanelOpen: vi.fn(),
-        setRightPanelOpen: vi.fn(),
-        setShowProperties: vi.fn(),
-        resetWindowLayout: vi.fn(),
-        triggerFitToMaps: vi.fn(),
-      }),
-    );
-
-    // Mock getState for non-hook access (handleExit)
-    (useAppStore.getState as any) = vi.fn().mockReturnValue({
-      isDirty: false,
-      setIsDirty: vi.fn(),
-      resetProject: vi.fn(),
-    });
-
-    (useAppStore.setState as any) = vi.fn().mockImplementation((updates) => {
-      if (updates.showPaths !== undefined) mockSetShowPaths();
-      if (updates.showGrid !== undefined) mockSetShowGrid();
-    });
-  });
-
-  it('renders application name and main menu categories', () => {
-    render(<TopMenu />);
+  it('shows the application name and the main menus', () => {
+    renderMenu();
     expect(screen.getByText('Waypoint Tool')).toBeInTheDocument();
-    expect(screen.getByText('File')).toBeInTheDocument();
-    expect(screen.getByText('Edit')).toBeInTheDocument();
-    expect(screen.getByText('View')).toBeInTheDocument();
-    expect(screen.getByText('Help')).toBeInTheDocument();
+    for (const menu of ['File', 'Edit', 'View', 'Help']) {
+      expect(screen.getByText(menu)).toBeInTheDocument();
+    }
   });
 
-  it('opens "File" menu and handles "Open Project"', async () => {
-    render(<TopMenu />);
-    const fileBtn = screen.getByText('File');
-    fireEvent.click(fileBtn);
+  describe('File menu', () => {
+    it('Open Project shows the project file picker', async () => {
+      const open = vi.spyOn(DialogAPI, 'open').mockResolvedValue(null);
+      renderMenu();
 
-    const openBtn = screen.getByText(/open project/i);
-    expect(openBtn).toBeInTheDocument();
-    fireEvent.click(openBtn);
+      openMenu('File');
+      fireEvent.click(screen.getByText(/open project/i));
 
-    await waitFor(() => {
-      expect(mockLoadProject).toHaveBeenCalled();
+      await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+    });
+
+    it('Save Project overwrites the current file after confirmation', async () => {
+      vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+      const save = vi.spyOn(BackendAPI, 'saveProject').mockResolvedValue();
+      renderMenu({ currentProjectPath: '/work/site.wptroj' });
+
+      openMenu('File');
+      fireEvent.click(screen.getByText(/^Save Project$/i));
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('/work/site.wptroj', expect.anything()));
+    });
+
+    it('Save Project As asks for a new location', async () => {
+      vi.spyOn(DialogAPI, 'save').mockResolvedValue('/work/copy');
+      const save = vi.spyOn(BackendAPI, 'saveProject').mockResolvedValue();
+      renderMenu({ currentProjectPath: '/work/site.wptroj' });
+
+      openMenu('File');
+      fireEvent.click(screen.getByText(/Save Project As\.\.\./i));
+
+      await waitFor(() => expect(save).toHaveBeenCalledWith('/work/copy.wptroj', expect.anything()));
+    });
+
+    it('Exit does not quit when the user keeps unsaved changes', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      renderMenu({ isDirty: true });
+
+      openMenu('File');
+      fireEvent.click(screen.getByText('Exit'));
+
+      await waitFor(() => expect(ask).toHaveBeenCalled());
+      expect(invoke).not.toHaveBeenCalledWith('force_exit');
+      expect(getAppState().isDirty).toBe(true);
     });
   });
 
-  it('opens "File" menu and handles "Save Project"', async () => {
-    render(<TopMenu />);
-    const fileBtn = screen.getByText('File');
-    fireEvent.click(fileBtn);
+  it('View menu toggles path display', () => {
+    renderMenu({ showPaths: true });
 
-    const saveBtn = screen.getByText(/^Save Project$/i);
-    expect(saveBtn).toBeInTheDocument();
-    fireEvent.click(saveBtn);
+    openMenu('View');
+    fireEvent.click(screen.getByText(/Show Paths/i));
 
-    await waitFor(() => {
-      expect(mockSaveProject).toHaveBeenCalled();
+    expect(getAppState().showPaths).toBe(false);
+  });
+
+  describe('Edit menu', () => {
+    const threeWaypoints = () => waypointTree([makeWaypoint('n1'), makeWaypoint('n2'), makeWaypoint('n3')]);
+
+    it('Select All selects every waypoint', async () => {
+      renderMenu(threeWaypoints());
+
+      openMenu('Edit');
+      fireEvent.click(await screen.findByText('Select All'));
+
+      expect(getAppState().selectedNodeIds).toEqual(['n1', 'n2', 'n3']);
+    });
+
+    it('Deselect All clears the selection', async () => {
+      renderMenu(threeWaypoints());
+      act(() => getAppState().selectNodes(['n1']));
+
+      openMenu('Edit');
+      fireEvent.click(await screen.findByText('Deselect All'));
+
+      expect(getAppState().selectedNodeIds).toEqual([]);
+      expect(getAppState().selection).toEqual({ type: 'none' });
+    });
+
+    it('Delete Selected removes the selected waypoints', async () => {
+      renderMenu(threeWaypoints());
+      act(() => getAppState().selectNodes(['n1']));
+
+      openMenu('Edit');
+      fireEvent.click(await screen.findByText('Delete Selected'));
+
+      expect(getAppState().rootNodeIds).toEqual(['n2', 'n3']);
+    });
+
+    it('Delete Selected removes the selected annotations', async () => {
+      renderMenu({
+        annotationObjects: { 'annot-1': makePointAnnotation('annot-1'), 'annot-2': makePointAnnotation('annot-2') },
+        rootAnnotationIds: ['annot-1', 'annot-2'],
+        annotationOrder: ['annot-1', 'annot-2'],
+      });
+      act(() => getAppState().setSelection({ type: 'annotations', ids: ['annot-1'] }));
+
+      openMenu('Edit');
+      fireEvent.click(await screen.findByText('Delete Selected'));
+
+      expect(getAppState().annotationObjects['annot-1']).toBeUndefined();
+      expect(getAppState().annotationObjects['annot-2']).toBeDefined();
     });
   });
 
-  it('opens "File" menu and handles "Save Project As..."', async () => {
-    render(<TopMenu />);
-    const fileBtn = screen.getByText('File');
-    fireEvent.click(fileBtn);
+  it('switches to another menu on hover while one is open', () => {
+    renderMenu();
 
-    const saveAsBtn = screen.getByText(/Save Project As\.\.\./i);
-    expect(saveAsBtn).toBeInTheDocument();
-    fireEvent.click(saveAsBtn);
-
-    await waitFor(() => {
-      expect(mockSaveProjectAs).toHaveBeenCalled();
-    });
-  });
-
-  it('handles dirty state exit confirmation', async () => {
-    (useAppStore.getState as any).mockReturnValue({
-      isDirty: true,
-      setIsDirty: vi.fn(),
-    });
-    (DialogAPI.ask as any).mockResolvedValue(false); // User cancels exit
-
-    render(<TopMenu />);
     fireEvent.click(screen.getByText('File'));
-    fireEvent.click(screen.getByText('Exit'));
-
-    await waitFor(() => {
-      expect(DialogAPI.ask).toHaveBeenCalled();
-    });
-    // invoke("force_exit") should NOT be called if canceled
-  });
-
-  it('toggles View options', () => {
-    render(<TopMenu />);
-    fireEvent.click(screen.getByText('View'));
-
-    const pathsBtn = screen.getByText(/Show Paths/i);
-    fireEvent.click(pathsBtn);
-    expect(mockSetShowPaths).toHaveBeenCalled();
-  });
-
-  it('handles "Edit" menu actions', async () => {
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: ['n1'],
-        removeNodes: mockRemoveNodes,
-        selectAllNodes: mockSelectAllNodes,
-        historyPast: [],
-        historyFuture: [],
-        undo: mockUndo,
-        redo: mockRedo,
-      }),
-    );
-
-    render(<TopMenu />);
-
-    // Select All
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await waitFor(
-      () => {
-        expect(screen.getByText('Select All')).toBeInTheDocument();
-      },
-      { timeout: 2000 },
-    );
-    fireEvent.click(screen.getByText('Select All'));
-    expect(mockSelectAllNodes).toHaveBeenCalled();
-
-    // Delete Selected - Menu might close after click, so open it again
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await waitFor(
-      () => {
-        expect(screen.getByText('Delete Selected')).toBeInTheDocument();
-      },
-      { timeout: 2000 },
-    );
-    fireEvent.click(screen.getByText('Delete Selected'));
-    expect(mockRemoveNodes).toHaveBeenCalledWith(['n1']);
-  });
-
-  it('triggers removeAnnotationObjects on Delete Selected when annotations are selected', async () => {
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        selectedNodeIds: [],
-        selectedAnnotationIds: ['annot-1'],
-        showPaths: true,
-        showGrid: true,
-        isDirty: false,
-        currentProjectPath: null,
-        isLeftPanelOpen: true,
-        isRightPanelOpen: true,
-        showProperties: true,
-        historyPast: [],
-        historyFuture: [],
-        undo: mockUndo,
-        redo: mockRedo,
-        removeNodes: mockRemoveNodes,
-        removeAnnotationObjects: mockRemoveAnnotationObjects,
-      }),
-    );
-
-    render(<TopMenu />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await waitFor(() => {
-      expect(screen.getByText('Delete Selected')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByText('Delete Selected'));
-    expect(mockRemoveAnnotationObjects).toHaveBeenCalledWith(['annot-1']);
-  });
-
-  it('switches menu on hover when one is open', () => {
-    render(<TopMenu />);
-
-    const fileBtn = screen.getByText('File');
-    const editBtn = screen.getByText('Edit');
-
-    fireEvent.click(fileBtn);
     expect(screen.getByText(/^Open Project...$/i)).toBeInTheDocument();
 
-    fireEvent.mouseEnter(editBtn);
+    fireEvent.mouseEnter(screen.getByText('Edit'));
     expect(screen.queryByText(/^Open Project...$/i)).not.toBeInTheDocument();
     expect(screen.getByText(/^Select All$/i)).toBeInTheDocument();
   });
 
-  describe('ProjectTitleBadge in TopMenu', () => {
-    it('displays "Untitled" when currentProjectPath is null and no dirty indicator if not dirty', () => {
-      render(<TopMenu />);
+  describe('project title', () => {
+    it('shows "Untitled" for a new project without an unsaved marker', () => {
+      renderMenu();
       expect(screen.getByText('Untitled')).toBeInTheDocument();
       expect(screen.queryByTestId('dirty-indicator')).not.toBeInTheDocument();
     });
 
-    it('displays extracted project name when currentProjectPath is set', () => {
-      (useAppStore as any).mockImplementation((selector: any) =>
-        selector({
-          selectedNodeIds: [],
-          showPaths: true,
-          showGrid: true,
-          isDirty: false,
-          currentProjectPath: '/path/to/my_route_project.wptroj',
-          isLeftPanelOpen: true,
-          isRightPanelOpen: true,
-          showProperties: true,
-          historyPast: [],
-          historyFuture: [],
-          undo: mockUndo,
-          redo: mockRedo,
-        }),
-      );
-
-      render(<TopMenu />);
+    it('shows the project file name', () => {
+      renderMenu({ currentProjectPath: '/path/to/my_route_project.wptroj' });
       expect(screen.getByText('my_route_project')).toBeInTheDocument();
       expect(screen.queryByTestId('dirty-indicator')).not.toBeInTheDocument();
     });
 
-    it('displays dirty indicator when isDirty is true', () => {
-      (useAppStore as any).mockImplementation((selector: any) =>
-        selector({
-          selectedNodeIds: [],
-          showPaths: true,
-          showGrid: true,
-          isDirty: true,
-          currentProjectPath: '/path/to/my_route_project.wptroj',
-          isLeftPanelOpen: true,
-          isRightPanelOpen: true,
-          showProperties: true,
-          historyPast: [],
-          historyFuture: [],
-          undo: mockUndo,
-          redo: mockRedo,
-        }),
-      );
-
-      render(<TopMenu />);
-      expect(screen.getByText('my_route_project')).toBeInTheDocument();
+    it('marks unsaved changes', () => {
+      renderMenu({ currentProjectPath: '/path/to/my_route_project.wptroj', isDirty: true });
       expect(screen.getByTestId('dirty-indicator')).toBeInTheDocument();
     });
   });

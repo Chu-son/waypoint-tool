@@ -393,7 +393,7 @@ export function TopMenu() {
           {
             id: 'edit_deselect_all',
             label: 'Deselect All',
-            action: () => useAppStore.setState({ selectedNodeIds: [], selectedAnnotationIds: [] }),
+            action: () => useAppStore.getState().setSelection({ type: 'none' }),
           },
           { divider: true, label: '' },
           {
