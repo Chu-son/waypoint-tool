@@ -1,27 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
+import { resetAppStore } from '../../test/store';
 
 describe('interactionSlice', () => {
   beforeEach(() => {
-    useAppStore.getState().resetProject();
-    useAppStore.setState({
-      appMode: { mode: 'select' },
-      selection: { type: 'none' },
-      modalStack: [],
-      isSettingsModalOpen: false,
-      isExportModalOpen: false,
-      isImportModalOpen: false,
-      isExportMapsModalOpen: false,
-      isShortcutsModalOpen: false,
-      isWelcomeModalOpen: false,
-      isInitialLaunch: false,
-      rightPanelActiveTab: 'layers',
-      elementCopyState: null,
-      selectedNodeIds: [],
-      selectedAnnotationIds: [],
-      activeCustomLayerId: null,
-      selectedEditObjectId: null,
-    });
+    // Start past the first-launch welcome modal that a fresh store opens.
+    resetAppStore({ isInitialLaunch: false, isWelcomeModalOpen: false, modalStack: [], rightPanelActiveTab: 'layers' });
   });
 
   describe('Mode Transitions', () => {

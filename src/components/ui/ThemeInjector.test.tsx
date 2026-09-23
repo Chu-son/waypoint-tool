@@ -1,18 +1,13 @@
 import { render, act } from '@testing-library/react';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { ThemeInjector } from './ThemeInjector';
 import { useAppStore } from '../../stores/appStore';
+import { resetAppStore } from '../../test/store';
 
 describe('ThemeInjector', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     document.documentElement.style.cssText = '';
-    useAppStore.setState({
-      customUiConfig: null,
-      isCustomUiMode: false,
-      themeMode: 'dark',
-      themePreset: 'default',
-    });
+    resetAppStore({ themeMode: 'dark', themePreset: 'default' });
   });
 
   it('injects preset theme CSS variables into document.documentElement when Custom UI mode is active', () => {

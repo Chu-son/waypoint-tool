@@ -1,19 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
 import { WaypointNode } from '../../types/store';
+import { resetAppStore } from '../../test/store';
+
+beforeEach(() => resetAppStore());
 
 describe('NodeSlice - duplicateNodes', () => {
-  beforeEach(() => {
-    useAppStore.setState({
-      nodes: {},
-      rootNodeIds: [],
-      selectedNodeIds: [],
-      insertionTarget: null,
-      historyPast: [],
-      historyFuture: [],
-    });
-  });
-
   it('duplicates a single manual waypoint without offset (same coordinates) and new id', () => {
     const original: WaypointNode = {
       id: 'node-1',
@@ -347,16 +339,6 @@ describe('NodeSlice - duplicateNodes', () => {
 });
 
 describe('NodeSlice - groupNodes and ungroupNode', () => {
-  beforeEach(() => {
-    useAppStore.setState({
-      nodes: {},
-      rootNodeIds: [],
-      selectedNodeIds: [],
-      historyPast: [],
-      historyFuture: [],
-    });
-  });
-
   it('groups multiple manual waypoints into a new manual_group', () => {
     const node1: WaypointNode = { id: 'wp-1', type: 'manual', name: 'WP 1' };
     const node2: WaypointNode = { id: 'wp-2', type: 'manual', name: 'WP 2' };
@@ -465,16 +447,6 @@ describe('NodeSlice - groupNodes and ungroupNode', () => {
 });
 
 describe('NodeSlice - moveNodesInTree', () => {
-  beforeEach(() => {
-    useAppStore.setState({
-      nodes: {},
-      rootNodeIds: [],
-      selectedNodeIds: [],
-      historyPast: [],
-      historyFuture: [],
-    });
-  });
-
   it('moves nodes within the same group', () => {
     const wp1: WaypointNode = { id: 'wp-1', type: 'manual' };
     const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
@@ -548,17 +520,6 @@ describe('NodeSlice - moveNodesInTree', () => {
 });
 
 describe('NodeSlice - insertionTarget & group selection', () => {
-  beforeEach(() => {
-    useAppStore.setState({
-      nodes: {},
-      rootNodeIds: [],
-      selectedNodeIds: [],
-      insertionTarget: null,
-      historyPast: [],
-      historyFuture: [],
-    });
-  });
-
   it('inserts node at root index specified by insertionTarget and advances index', () => {
     const nodeA: WaypointNode = { id: 'wp-a', type: 'manual' };
     const nodeB: WaypointNode = { id: 'wp-b', type: 'manual' };
