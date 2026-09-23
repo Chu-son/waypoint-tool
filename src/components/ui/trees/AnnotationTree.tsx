@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import { useTreeInteractionState } from '../../../hooks/useTreeInteractionState';
+import React, { useMemo } from 'react';
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '../common/ContextMenu';
 import { useAppStore } from '../../../stores/appStore';
 import {
@@ -19,18 +20,8 @@ import {
 } from 'lucide-react';
 import { Button } from '../common/Button';
 import { cn } from '../../../utils/cn';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
-  DragOverlay,
-} from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import {
   getVisibleAnnotationNodes,
   computeDragDropPosition,
@@ -70,15 +61,17 @@ export function AnnotationTree() {
   const cutSelectedMapElements = useAppStore((state) => state.cutSelectedMapElements);
   const pasteMapElements = useAppStore((state) => state.pasteMapElements);
 
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ id: string | null; x: number; y: number } | null>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const {
+    expanded: expandedGroups,
+    setExpanded: setExpandedGroups,
+    editingId,
+    setEditingId,
+    activeDragId,
+    setActiveDragId,
+    contextMenu,
+    setContextMenu,
+    sensors,
+  } = useTreeInteractionState();
 
   const toggleGroupExpand = (groupId: string) => {
     setExpandedGroups((prev) => {

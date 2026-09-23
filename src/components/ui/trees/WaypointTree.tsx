@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '../common/ContextMenu';
 import { useAppStore } from '../../../stores/appStore';
 import {
@@ -15,18 +15,8 @@ import {
   Scissors,
   ClipboardPaste,
 } from 'lucide-react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
-  DragOverlay,
-} from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { DndContext, closestCenter, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { WaypointNode } from '../../../types/store';
 import {
   getFlattenedWaypointIds,
@@ -42,6 +32,7 @@ import {
   getHighlightedContainerIds,
 } from '../../../utils/treeUtils';
 import { useTreeItemSelection } from '../../../hooks/useTreeItemSelection';
+import { useTreeInteractionState } from '../../../hooks/useTreeInteractionState';
 import { useTreeReveal } from '../../../hooks/useTreeReveal';
 import { INSERTION_BAR_ID, InsertionBarItem } from './InsertionBarItem';
 import { SortableTreeNodeItem } from './WaypointTreeRow';
@@ -71,10 +62,20 @@ export function WaypointTree() {
   const cutSelectedMapElements = useAppStore((state) => state.cutSelectedMapElements);
   const pasteMapElements = useAppStore((state) => state.pasteMapElements);
 
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
-  const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ nodeId: string | null; x: number; y: number } | null>(null);
+  const {
+    expanded: expandedNodes,
+    setExpanded: setExpandedNodes,
+    editingId: editingNodeId,
+    setEditingId: setEditingNodeId,
+    activeDragId,
+    setActiveDragId,
+    contextMenu: menuState,
+    setContextMenu: setMenuState,
+    sensors,
+  } = useTreeInteractionState();
+  const contextMenu = menuState && { nodeId: menuState.id, x: menuState.x, y: menuState.y };
+  const setContextMenu = (m: { nodeId: string | null; x: number; y: number } | null) =>
+    setMenuState(m && { id: m.nodeId, x: m.x, y: m.y });
 
   const toggleExpand = (id: string) => {
     const isCurrentlyExpanded = expandedNodes.has(id);
@@ -288,11 +289,6 @@ export function WaypointTree() {
     }
     setContextMenu(null);
   };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
