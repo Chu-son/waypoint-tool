@@ -2,15 +2,9 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
 import { AnnotationObject, AnnotationGroup } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  findHighestLevelParent,
-  collectDescendantIds,
-  getNextSequentialName,
-} from '../../utils/treeUtils';
+import { findHighestLevelParent, collectDescendantIds, getNextSequentialName } from '../../utils/treeUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
-import {
-  resolveMapElementName,
-} from '../../utils/mapElementTreeUtils';
+import { resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { AnnotationClipboardPayload } from '../../utils/mapElementClipboard';
 
 export type AnnotationToolType = 'select' | 'point' | 'oriented_point' | 'line' | 'rect' | 'circle';
@@ -77,7 +71,11 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
 
   setAnnotationEditMode: (enabled: boolean) => {
     const state = get();
-    const subTool = enabled ? (state.activeAnnotationSubTool === 'select' ? 'point' : state.activeAnnotationSubTool) : 'select';
+    const subTool = enabled
+      ? state.activeAnnotationSubTool === 'select'
+        ? 'point'
+        : state.activeAnnotationSubTool
+      : 'select';
     set({
       isAnnotationEditMode: enabled,
       activeAnnotationSubTool: subTool,
@@ -126,7 +124,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   addAnnotationObject: (obj: AnnotationObject, groupId?: string) => {
     get().pushHistorySnapshot();
     set((state) => {
-      const targetGroupId = groupId !== undefined ? groupId : (state.activeAnnotationGroupId || undefined);
+      const targetGroupId = groupId !== undefined ? groupId : state.activeAnnotationGroupId || undefined;
       const newObjects = { ...state.annotationObjects, [obj.id]: { ...obj, group_id: targetGroupId } };
       let newGroups = { ...state.annotationGroups };
       let newRootIds = [...state.rootAnnotationIds];
@@ -222,7 +220,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       const { parentId: targetParentId, insertIndex } = findHighestLevelParent(
         selectedIds,
         state.rootAnnotationIds,
-        groupMap
+        groupMap,
       );
 
       // 2. 連番でグループ名を生成 ("Group 1", "Group 2", ...)
@@ -558,19 +556,15 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         if (grp.children_ids) {
           newGroups[gid] = {
             ...grp,
-            children_ids: grp.children_ids.filter(
-              (cid) => !objectsToRemove.has(cid) && !groupsToRemove.has(cid)
-            ),
+            children_ids: grp.children_ids.filter((cid) => !objectsToRemove.has(cid) && !groupsToRemove.has(cid)),
           };
         }
       });
 
-      const newRootIds = state.rootAnnotationIds.filter(
-        (id) => !groupsToRemove.has(id) && !objectsToRemove.has(id)
-      );
+      const newRootIds = state.rootAnnotationIds.filter((id) => !groupsToRemove.has(id) && !objectsToRemove.has(id));
       const newOrder = state.annotationOrder.filter((id) => !objectsToRemove.has(id));
       const newSelected = state.selectedAnnotationIds.filter(
-        (id) => !objectsToRemove.has(id) && !groupsToRemove.has(id)
+        (id) => !objectsToRemove.has(id) && !groupsToRemove.has(id),
       );
 
       return {
@@ -639,17 +633,19 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
 
   selectAnnotationObjects: (ids: string[], multi = false) => {
     const state = get();
-    const nextIds = multi ? (() => {
-      const setIds = new Set(state.selectedAnnotationIds);
-      ids.forEach((id) => {
-        if (setIds.has(id)) {
-          setIds.delete(id);
-        } else {
-          setIds.add(id);
-        }
-      });
-      return Array.from(setIds);
-    })() : ids;
+    const nextIds = multi
+      ? (() => {
+          const setIds = new Set(state.selectedAnnotationIds);
+          ids.forEach((id) => {
+            if (setIds.has(id)) {
+              setIds.delete(id);
+            } else {
+              setIds.add(id);
+            }
+          });
+          return Array.from(setIds);
+        })()
+      : ids;
 
     state.setSelection(nextIds.length > 0 ? { type: 'annotations', ids: nextIds } : { type: 'none' });
   },
@@ -732,10 +728,12 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       const nextGroups = { ...state.annotationGroups };
       const nextRootIds = [...state.rootAnnotationIds];
 
-      const existingNames = new Set([
-        ...Object.values(state.annotationObjects).map((o) => o.name),
-        ...Object.values(state.annotationGroups).map((g) => g.name),
-      ].filter(Boolean) as string[]);
+      const existingNames = new Set(
+        [
+          ...Object.values(state.annotationObjects).map((o) => o.name),
+          ...Object.values(state.annotationGroups).map((g) => g.name),
+        ].filter(Boolean) as string[],
+      );
 
       const createdObjectIds: string[] = [];
 
@@ -873,10 +871,12 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       const nextGroups = { ...state.annotationGroups };
       let nextRootIds = [...state.rootAnnotationIds];
 
-      const existingNames = new Set([
-        ...Object.values(state.annotationObjects).map((o) => o.name),
-        ...Object.values(state.annotationGroups).map((g) => g.name),
-      ].filter(Boolean) as string[]);
+      const existingNames = new Set(
+        [
+          ...Object.values(state.annotationObjects).map((o) => o.name),
+          ...Object.values(state.annotationGroups).map((g) => g.name),
+        ].filter(Boolean) as string[],
+      );
 
       // 1. 全要素に新規UUIDを発行
       const idMap = new Map<string, string>();
@@ -902,9 +902,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       Object.entries(payload.annotationGroups).forEach(([oldId, orig]) => {
         const newId = idMap.get(oldId)!;
         const newParentId = orig.parent_id ? idMap.get(orig.parent_id) : undefined;
-        const newChildIds = (orig.children_ids || [])
-          .map((cid) => idMap.get(cid) || cid)
-          .filter(Boolean);
+        const newChildIds = (orig.children_ids || []).map((cid) => idMap.get(cid) || cid).filter(Boolean);
 
         const cloned: AnnotationGroup = {
           ...structuredClone(orig),
@@ -921,7 +919,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       // 4. asGroup オプション対応: 新規グループでまとめる
       if (options?.asGroup) {
         const newGroupId = uuidv4();
-        const existingGroupNames = Object.values(state.annotationGroups).map((g) => g.name).filter(Boolean);
+        const existingGroupNames = Object.values(state.annotationGroups)
+          .map((g) => g.name)
+          .filter(Boolean);
         const groupName = getNextSequentialName('Group', existingGroupNames);
 
         const group: AnnotationGroup = {
@@ -1007,10 +1007,14 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       });
     }
 
-    const finalRootIds = rootIds || (groups && groups.length > 0 ? [
-      ...groups.filter(g => !g.parent_id).map(g => g.id),
-      ...objects.filter(o => !o.group_id).map(o => o.id)
-    ] : order);
+    const finalRootIds =
+      rootIds ||
+      (groups && groups.length > 0
+        ? [
+            ...groups.filter((g) => !g.parent_id).map((g) => g.id),
+            ...objects.filter((o) => !o.group_id).map((o) => o.id),
+          ]
+        : order);
 
     set({
       annotationObjects: objectMap,

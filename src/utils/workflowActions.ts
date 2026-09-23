@@ -5,11 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;
 
-export function resolveWorkflowVariables(
-  value: any,
-  variables: Record<string, any>,
-  store?: AppState
-): any {
+export function resolveWorkflowVariables(value: any, variables: Record<string, any>, store?: AppState): any {
   if (value === null || value === undefined) return value;
 
   if (typeof value === 'object') {
@@ -22,9 +18,12 @@ export function resolveWorkflowVariables(
     // $fromAnnotationGroup: { $fromAnnotationGroup: "group_name" | { $var: "..." } }
     if (value.$fromAnnotationGroup) {
       const rawGroupName = resolveWorkflowVariables(value.$fromAnnotationGroup, variables, store);
-      const groupName = typeof rawGroupName === 'object' && rawGroupName.groupName
-        ? rawGroupName.groupName
-        : (typeof rawGroupName === 'object' && rawGroupName.name ? rawGroupName.name : String(rawGroupName));
+      const groupName =
+        typeof rawGroupName === 'object' && rawGroupName.groupName
+          ? rawGroupName.groupName
+          : typeof rawGroupName === 'object' && rawGroupName.name
+            ? rawGroupName.name
+            : String(rawGroupName);
 
       if (store) {
         const groups = store.annotationGroups || {};
@@ -72,7 +71,7 @@ export function resolveExplicitAnnotationBindings(
   annotationObjects: Record<string, any>,
   annotationOrder: string[],
   variables?: Record<string, any>,
-  store?: AppState
+  store?: AppState,
 ): Record<string, any> {
   const vars = variables || {};
   const resolvedWithVars = resolveWorkflowVariables(rawInteractionData, vars, store);
@@ -137,7 +136,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
         const fileName = selected.split(/[/\\]/).pop() || 'Map';
         await store.runWithLoading(
           {
-            message: "マップを読み込み中...",
+            message: 'マップを読み込み中...',
             detail: fileName,
             blocking: true,
           },
@@ -145,7 +144,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
             const mapData = await BackendAPI.loadROSMap(selected);
             store.addMapLayer(fileName, mapData.info, mapData.image_data_b64, mapData.width, mapData.height);
             store.triggerFitToMaps();
-          }
+          },
         );
       }
     } catch (err) {
@@ -184,7 +183,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
   },
 
   setRobotFootprintRadius: (store, args) => {
-    const radius = typeof args?.value === 'number' ? args.value : (typeof args?.radius === 'number' ? args.radius : 0.3);
+    const radius = typeof args?.value === 'number' ? args.value : typeof args?.radius === 'number' ? args.radius : 0.3;
     store.setRobotFootprint({
       type: 'circular',
       radius,
@@ -215,7 +214,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     let targetGroupId: string | null = null;
     if (args?.groupName) {
       const existing = Object.values(store.annotationGroups || {}).find(
-        (g) => g.name === args.groupName || g.id === args.groupName
+        (g) => g.name === args.groupName || g.id === args.groupName,
       );
       if (existing) {
         targetGroupId = existing.id;
@@ -294,9 +293,10 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     const plugin = pluginId ? plugins[pluginId] : null;
     if (!plugin) {
       const availableIds = Object.keys(plugins);
-      const availableMsg = availableIds.length > 0
-        ? `\n\n利用可能なプラグイン一覧:\n- ${availableIds.join('\n- ')}`
-        : '\n\n(利用可能なプラグインがロードされていません)';
+      const availableMsg =
+        availableIds.length > 0
+          ? `\n\n利用可能なプラグイン一覧:\n- ${availableIds.join('\n- ')}`
+          : '\n\n(利用可能なプラグインがロードされていません)';
       console.warn(`[WorkflowAction] Plugin not found: ${pluginId}`, availableIds);
       alert(`プラグインが見つかりません: ${pluginId || '(未指定)'}${availableMsg}`);
       return;
@@ -305,7 +305,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     try {
       await store.runWithLoading(
         {
-          message: "プラグインを実行中...",
+          message: 'プラグインを実行中...',
           detail: plugin.manifest.name || plugin.id,
           blocking: true,
         },
@@ -329,7 +329,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
             store.annotationObjects || {},
             store.annotationOrder || [],
             variables,
-            store
+            store,
           );
 
           const result = await store.executeGeneratorPlugin({
@@ -339,7 +339,8 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
             existingExecutionId,
           });
 
-          const resultExecId = (result as any)?.source_execution_id || (result as any)?.executionId || (result as any)?.execution_id;
+          const resultExecId =
+            (result as any)?.source_execution_id || (result as any)?.executionId || (result as any)?.execution_id;
           if (resultExecId) {
             store.setStepExecutionId(stepId, resultExecId);
           }
@@ -351,7 +352,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
           if (!result.success && result.error) {
             throw new Error(result.error);
           }
-        }
+        },
       );
     } catch (err) {
       console.error('Failed to run plugin in workflow action:', err);
@@ -372,4 +373,3 @@ export async function executeWorkflowAction(actionName: string, args?: any) {
     console.warn(`[WorkflowAction] Unknown action: ${actionName}`);
   }
 }
-

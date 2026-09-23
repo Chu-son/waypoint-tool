@@ -1,19 +1,38 @@
-import { useState, useEffect } from "react";
-import { Plus, Trash2, RefreshCw, Sparkles, Map, PenTool, Wand2, Puzzle, Image as ImageIcon, Check, AlertCircle, ChevronUp, ChevronDown, Workflow, Terminal, Package, AlertTriangle, Loader2 } from "lucide-react";
-import { useAppStore } from "../../../stores/appStore";
-import { Button } from "../common/Button";
-import { Select } from "../common/Select";
-import { cn } from "../../../utils/cn";
-import { TabSectionHeader } from "./TabSectionHeader";
-import { EmptyState } from "../common/EmptyState";
-import { BrowseInput } from "../common/BrowseInput";
-import { ToggleSwitch } from "../common/ToggleSwitch";
-import { FieldLabel } from "../common/FieldLabel";
-import { AlertBox } from "../common/AlertBox";
-import { resolvePluginDependencies } from "../../../utils/dependencyResolver";
-import { VenvSetupModal } from "./VenvSetupModal";
-import { BackendAPI } from "../../../api";
-import { PluginInstance } from "../../../types/store";
+import { useState, useEffect } from 'react';
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  Sparkles,
+  Map,
+  PenTool,
+  Wand2,
+  Puzzle,
+  Image as ImageIcon,
+  Check,
+  AlertCircle,
+  ChevronUp,
+  ChevronDown,
+  Workflow,
+  Terminal,
+  Package,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
+import { useAppStore } from '../../../stores/appStore';
+import { Button } from '../common/Button';
+import { Select } from '../common/Select';
+import { cn } from '../../../utils/cn';
+import { TabSectionHeader } from './TabSectionHeader';
+import { EmptyState } from '../common/EmptyState';
+import { BrowseInput } from '../common/BrowseInput';
+import { ToggleSwitch } from '../common/ToggleSwitch';
+import { FieldLabel } from '../common/FieldLabel';
+import { AlertBox } from '../common/AlertBox';
+import { resolvePluginDependencies } from '../../../utils/dependencyResolver';
+import { VenvSetupModal } from './VenvSetupModal';
+import { BackendAPI } from '../../../api';
+import { PluginInstance } from '../../../types/store';
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -37,16 +56,13 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
   useEffect(() => {
     Object.values(plugins).forEach(async (p) => {
       if (
-        (p?.manifest?.type === "python" || p?.manifest?.type === "python_library") &&
+        (p?.manifest?.type === 'python' || p?.manifest?.type === 'python_library') &&
         p.manifest.python_dependencies &&
         p.manifest.python_dependencies.length > 0
       ) {
-        const pkgNames = p.manifest.python_dependencies.map((d: any) =>
-          typeof d === "string" ? d : d.name
-        );
+        const pkgNames = p.manifest.python_dependencies.map((d: any) => (typeof d === 'string' ? d : d.name));
         const setting = pluginSettings.find((s) => s.id === p.id);
-        const pythonPath =
-          setting?.pythonOverridePath?.trim() || globalPythonPath?.trim() || "python3";
+        const pythonPath = setting?.pythonOverridePath?.trim() || globalPythonPath?.trim() || 'python3';
 
         setIsCheckingPackages((prev) => ({ ...prev, [p.id]: true }));
         try {
@@ -88,10 +104,10 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
               variant="secondary"
               size="sm"
               onClick={async () => {
-                const { DialogAPI, BackendAPI } = await import("../../../api");
+                const { DialogAPI, BackendAPI } = await import('../../../api');
                 const confirmed = await DialogAPI.ask(
-                  "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
-                  { title: "セキュリティ警告", kind: "warning" }
+                  'プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？',
+                  { title: 'セキュリティ警告', kind: 'warning' },
                 );
                 if (!confirmed) {
                   return;
@@ -107,11 +123,11 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   const targetPaths: string[] = [];
                   if (Array.isArray(selectedPath)) {
                     for (const item of selectedPath) {
-                      const p = typeof item === "string" ? item : (item as any)?.path;
+                      const p = typeof item === 'string' ? item : (item as any)?.path;
                       if (p) targetPaths.push(p);
                     }
                   } else {
-                    const p = typeof selectedPath === "string" ? selectedPath : (selectedPath as any)?.path;
+                    const p = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any)?.path;
                     if (p) targetPaths.push(p);
                   }
 
@@ -141,7 +157,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   }
 
                   if (uniquePlugins.length === 0) {
-                    alert("指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。");
+                    alert('指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。');
                     return;
                   }
 
@@ -174,14 +190,12 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                     const p = uniquePlugins[0];
                     alert(`Plugin '${p.manifest?.name || p.id}' をインポートしました。`);
                   } else {
-                    const names = uniquePlugins.map((p) => p.manifest?.name || p.id).join(", ");
+                    const names = uniquePlugins.map((p) => p.manifest?.name || p.id).join(', ');
                     alert(`${uniquePlugins.length} 個のプラグインを一括インポートしました:\n${names}`);
                   }
                 } catch (err) {
-                  console.error("Failed to load custom plugin:", err);
-                  alert(
-                    `Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`,
-                  );
+                  console.error('Failed to load custom plugin:', err);
+                  alert(`Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
                 }
               }}
             >
@@ -191,10 +205,10 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
               variant="primary"
               size="sm"
               onClick={async () => {
-                const { DialogAPI, BackendAPI } = await import("../../../api");
+                const { DialogAPI, BackendAPI } = await import('../../../api');
                 const confirmed = await DialogAPI.ask(
-                  "プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？",
-                  { title: "セキュリティ警告", kind: "warning" }
+                  'プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？',
+                  { title: 'セキュリティ警告', kind: 'warning' },
                 );
                 if (!confirmed) {
                   return;
@@ -206,21 +220,13 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                     defaultPath: lastDirectory || undefined,
                   });
                   if (!selectedPath) return;
-                  const targetDir =
-                    typeof selectedPath === "string"
-                      ? selectedPath
-                      : (selectedPath as any).path;
+                  const targetDir = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
                   if (!targetDir) return;
 
-                  const pluginName = prompt(
-                    `プラグイン名を入力してください:\n(作成先: ${targetDir})`,
-                  );
+                  const pluginName = prompt(`プラグイン名を入力してください:\n(作成先: ${targetDir})`);
                   if (!pluginName || !pluginName.trim()) return;
 
-                  const newPlugin = await BackendAPI.scaffoldPlugin(
-                    pluginName.trim(),
-                    targetDir,
-                  );
+                  const newPlugin = await BackendAPI.scaffoldPlugin(pluginName.trim(), targetDir);
                   const newMap = { ...plugins, [newPlugin.id]: newPlugin };
                   setPlugins(newMap);
 
@@ -236,14 +242,10 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                       },
                     ]);
                   }
-                  alert(
-                    `Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`,
-                  );
+                  alert(`Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`);
                 } catch (err) {
-                  console.error("Failed to scaffold plugin:", err);
-                  alert(
-                    `プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`,
-                  );
+                  console.error('Failed to scaffold plugin:', err);
+                  alert(`プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`);
                 }
               }}
             >
@@ -255,7 +257,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
 
       {/* Missing Plugins Cleanup Banner */}
       {(() => {
-        const missingCount = pluginSettings.filter(s => !plugins[s.id]).length;
+        const missingCount = pluginSettings.filter((s) => !plugins[s.id]).length;
         if (missingCount > 0) {
           return (
             <AlertBox
@@ -266,13 +268,13 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   variant="secondary"
                   size="sm"
                   onClick={async () => {
-                    const { DialogAPI } = await import("../../../api");
+                    const { DialogAPI } = await import('../../../api');
                     const confirmed = await DialogAPI.ask(
                       `${missingCount}個の欠落したプラグイン設定を削除します。よろしいですか？`,
-                      { title: "一括削除の確認", kind: "warning" }
+                      { title: '一括削除の確認', kind: 'warning' },
                     );
                     if (confirmed) {
-                      const nextSettings = pluginSettings.filter(s => !!plugins[s.id]);
+                      const nextSettings = pluginSettings.filter((s) => !!plugins[s.id]);
                       setPluginSettings(nextSettings);
                     }
                   }}
@@ -282,7 +284,8 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                 </Button>
               }
             >
-              {missingCount} {missingCount === 1 ? 'plugin setting doesn\'t' : 'plugin settings don\'t'} match any installed folder.
+              {missingCount} {missingCount === 1 ? "plugin setting doesn't" : "plugin settings don't"} match any
+              installed folder.
             </AlertBox>
           );
         }
@@ -303,8 +306,8 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                 <div
                   key={setting.id}
                   className={cn(
-                    "bg-surface-panel/40 border border-border-base/30 rounded-xl overflow-hidden shadow-subtle hover:border-border-base/60 transition-all",
-                    !isEnabled && "opacity-75 grayscale-[0.5]"
+                    'bg-surface-panel/40 border border-border-base/30 rounded-xl overflow-hidden shadow-subtle hover:border-border-base/60 transition-all',
+                    !isEnabled && 'opacity-75 grayscale-[0.5]',
                   )}
                 >
                   <div className="p-4 flex flex-col gap-4">
@@ -322,17 +325,17 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-bold text-text-base text-[15px]">
-                              {plugin ? plugin.manifest.name : "Unknown Plugin"}
+                              {plugin ? plugin.manifest.name : 'Unknown Plugin'}
                             </span>
                             <span className="text-[9px] px-2 py-0.5 rounded-full bg-surface-base/60 text-text-muted border border-border-base/50 uppercase font-bold tracking-widest shadow-sm">
-                              {plugin ? plugin.manifest.type : "MISSING"} {setting.isBuiltin ? "" : "(Custom)"}
+                              {plugin ? plugin.manifest.type : 'MISSING'} {setting.isBuiltin ? '' : '(Custom)'}
                             </span>
-                            {plugin?.manifest.type === "python_library" && (
+                            {plugin?.manifest.type === 'python_library' && (
                               <span className="text-[9px] px-2 py-0.5 rounded-full bg-accent-automation/15 text-accent-automation border border-accent-automation/30 uppercase font-bold tracking-wider shadow-sm">
                                 Shared Library
                               </span>
                             )}
-                            {plugin?.manifest.type === "pipeline" && (
+                            {plugin?.manifest.type === 'pipeline' && (
                               <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary-base/20 text-primary-base border border-primary-base/40 uppercase font-bold tracking-wider shadow-sm flex items-center gap-1">
                                 <Workflow size={10} />
                                 Pipeline
@@ -392,17 +395,13 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                           <ChevronDown size={16} />
                         </Button>
 
-                        {(!setting.isBuiltin || !plugin) && (
-                          <div className="w-px h-4 bg-border-base/20 mx-1" />
-                        )}
+                        {(!setting.isBuiltin || !plugin) && <div className="w-px h-4 bg-border-base/20 mx-1" />}
                         {(!setting.isBuiltin || !plugin) && (
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => {
-                              const newSettings = pluginSettings.filter(
-                                (s) => s.id !== setting.id,
-                              );
+                              const newSettings = pluginSettings.filter((s) => s.id !== setting.id);
                               setPluginSettings(newSettings);
                             }}
                             className="h-7 w-7 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
@@ -419,18 +418,24 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                         <FieldLabel>Plugin Icon</FieldLabel>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-surface-base/50 border border-border-base/40 flex items-center justify-center shrink-0 overflow-hidden shadow-subtle group/icon">
-                            {setting.icon?.startsWith("data:image/") ? (
+                            {setting.icon?.startsWith('data:image/') ? (
                               <img src={setting.icon} alt="icon" className="w-full h-full object-contain" />
                             ) : (
                               (() => {
-                                const iconName = setting.icon || plugin?.manifest?.icon || "Puzzle";
+                                const iconName = setting.icon || plugin?.manifest?.icon || 'Puzzle';
                                 switch (iconName) {
-                                  case "Sparkles": return <Sparkles size={20} className="text-primary-base" />;
-                                  case "Map": return <Map size={20} className="text-primary-base" />;
-                                  case "PenTool": return <PenTool size={20} className="text-primary-base" />;
-                                  case "Wand2": return <Wand2 size={20} className="text-primary-base" />;
-                                  case "ImageIcon": return <ImageIcon size={20} className="text-primary-base" />;
-                                  default: return <Puzzle size={20} className="text-primary-base" />;
+                                  case 'Sparkles':
+                                    return <Sparkles size={20} className="text-primary-base" />;
+                                  case 'Map':
+                                    return <Map size={20} className="text-primary-base" />;
+                                  case 'PenTool':
+                                    return <PenTool size={20} className="text-primary-base" />;
+                                  case 'Wand2':
+                                    return <Wand2 size={20} className="text-primary-base" />;
+                                  case 'ImageIcon':
+                                    return <ImageIcon size={20} className="text-primary-base" />;
+                                  default:
+                                    return <Puzzle size={20} className="text-primary-base" />;
                                 }
                               })()
                             )}
@@ -439,12 +444,14 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                             <div className="flex gap-2">
                               <Select
                                 className="h-8 text-[11px] py-0"
-                                value={setting.icon?.startsWith("data:image/") ? "custom" : (setting.icon || "default")}
+                                value={setting.icon?.startsWith('data:image/') ? 'custom' : setting.icon || 'default'}
                                 onChange={(e) => {
                                   const val = e.target.value;
-                                  if (val === "custom") return;
-                                  const newFallback = val === "default" ? undefined : val;
-                                  const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, icon: newFallback } : s);
+                                  if (val === 'custom') return;
+                                  const newFallback = val === 'default' ? undefined : val;
+                                  const newSettings = pluginSettings.map((s) =>
+                                    s.id === setting.id ? { ...s, icon: newFallback } : s,
+                                  );
                                   setPluginSettings(newSettings);
                                 }}
                               >
@@ -455,26 +462,31 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                                 <option value="PenTool">PenTool</option>
                                 <option value="Wand2">Wand</option>
                                 <option value="ImageIcon">Image</option>
-                                {setting.icon?.startsWith("data:image/") && <option value="custom">Custom Image</option>}
+                                {setting.icon?.startsWith('data:image/') && (
+                                  <option value="custom">Custom Image</option>
+                                )}
                               </Select>
                               <Button
                                 variant="secondary"
                                 className="h-8 px-3 shrink-0 text-[10px]"
                                 onClick={async () => {
-                                  const { DialogAPI, BackendAPI } = await import("../../../api");
+                                  const { DialogAPI, BackendAPI } = await import('../../../api');
                                   const selectedPath = await DialogAPI.open({
                                     multiple: false,
-                                    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "svg", "webp"] }]
+                                    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'svg', 'webp'] }],
                                   });
                                   if (selectedPath) {
-                                    const pathStr = typeof selectedPath === "string" ? selectedPath : (selectedPath as any).path;
+                                    const pathStr =
+                                      typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
                                     try {
                                       const base64Data = await BackendAPI.readImageBase64(pathStr);
-                                      const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, icon: base64Data } : s);
+                                      const newSettings = pluginSettings.map((s) =>
+                                        s.id === setting.id ? { ...s, icon: base64Data } : s,
+                                      );
                                       setPluginSettings(newSettings);
                                     } catch (err) {
-                                      console.error("Failed to read image", err);
-                                      alert("画像の読み込みに失敗しました。");
+                                      console.error('Failed to read image', err);
+                                      alert('画像の読み込みに失敗しました。');
                                     }
                                   }
                                 }}
@@ -486,7 +498,9 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => {
-                                    const newSettings = pluginSettings.map(s => s.id === setting.id ? { ...s, icon: undefined } : s);
+                                    const newSettings = pluginSettings.map((s) =>
+                                      s.id === setting.id ? { ...s, icon: undefined } : s,
+                                    );
                                     setPluginSettings(newSettings);
                                   }}
                                   className="h-8 w-8 text-danger-base/60 hover:text-danger-base hover:bg-danger-base/10"
@@ -500,37 +514,37 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                       </div>
 
                       {/* Interpreter Override */}
-                      {plugin && (plugin.manifest.type === "python" || plugin.manifest.type === "python_library") && (
+                      {plugin && (plugin.manifest.type === 'python' || plugin.manifest.type === 'python_library') && (
                         <div className="col-span-12 md:col-span-7 space-y-2.5">
-                            <FieldLabel>Python Interpreter Override</FieldLabel>
-                            <BrowseInput
-                              value={setting.pythonOverridePath || ""}
-                              onChange={(val) => {
-                                const newSettings = pluginSettings.map((s) =>
-                                  s.id === setting.id ? { ...s, pythonOverridePath: val } : s
-                                );
-                                setPluginSettings(newSettings);
-                                if (updatePluginSetting) {
-                                  updatePluginSetting(setting.id, { pythonOverridePath: val });
-                                }
-                              }}
-                              placeholder={`Global: ${globalPythonPath}`}
-                              list="python-envs"
-                              size="sm"
-                              inputClassName="font-mono"
-                            />
-                         </div>
+                          <FieldLabel>Python Interpreter Override</FieldLabel>
+                          <BrowseInput
+                            value={setting.pythonOverridePath || ''}
+                            onChange={(val) => {
+                              const newSettings = pluginSettings.map((s) =>
+                                s.id === setting.id ? { ...s, pythonOverridePath: val } : s,
+                              );
+                              setPluginSettings(newSettings);
+                              if (updatePluginSetting) {
+                                updatePluginSetting(setting.id, { pythonOverridePath: val });
+                              }
+                            }}
+                            placeholder={`Global: ${globalPythonPath}`}
+                            list="python-envs"
+                            size="sm"
+                            inputClassName="font-mono"
+                          />
+                        </div>
                       )}
                     </div>
 
                     {/* Status Info */}
-                    {plugin && (plugin.manifest.type === "python" || plugin.manifest.type === "python_library") && (
+                    {plugin && (plugin.manifest.type === 'python' || plugin.manifest.type === 'python_library') && (
                       <div className="mt-1 flex items-center gap-3">
                         <div className="flex items-center gap-2">
                           {plugin.is_builtin ? (
                             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-accent-automation/10 text-accent-automation border border-accent-automation/20 text-[10px] font-bold">
                               <Check size={10} />
-                              <span>SDK Bundled {bundledSdkVersion ? `v${bundledSdkVersion}` : ""}</span>
+                              <span>SDK Bundled {bundledSdkVersion ? `v${bundledSdkVersion}` : ''}</span>
                             </div>
                           ) : plugin.sdk_version ? (
                             plugin.sdk_version === bundledSdkVersion ? (
@@ -542,23 +556,24 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                               <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-warning/10 text-status-warning border border-status-warning/20 text-[10px] font-bold">
                                   <AlertCircle size={10} />
-                                  <span>SDK v{plugin.sdk_version} (v{bundledSdkVersion} available)</span>
+                                  <span>
+                                    SDK v{plugin.sdk_version} (v{bundledSdkVersion} available)
+                                  </span>
                                 </div>
                                 <button
                                   onClick={async () => {
                                     try {
-                                      const { BackendAPI } = await import("../../../api");
-                                      const newVersion = await BackendAPI.updatePluginSdk(
-                                        plugin.folder_path,
-                                      );
+                                      const { BackendAPI } = await import('../../../api');
+                                      const newVersion = await BackendAPI.updatePluginSdk(plugin.folder_path);
                                       const refreshed = await BackendAPI.fetchInstalledPlugins();
                                       const newMap: Record<string, any> = {};
-                                      refreshed.forEach((p: any) => { newMap[p.id] = p; });
+                                      refreshed.forEach((p: any) => {
+                                        newMap[p.id] = p;
+                                      });
                                       pluginSettings
                                         .filter((s) => !s.isBuiltin)
                                         .forEach((s) => {
-                                          if (!newMap[s.id] && plugins[s.id])
-                                            newMap[s.id] = plugins[s.id];
+                                          if (!newMap[s.id] && plugins[s.id]) newMap[s.id] = plugins[s.id];
                                         });
                                       setPlugins(newMap);
                                       alert(`SDK を v${newVersion} に更新しました。`);
@@ -583,122 +598,130 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                     )}
 
                     {/* Plugin Dependencies Status */}
-                    {plugin && (() => {
-                      const hasPluginDeps = Boolean(
-                        (plugin.manifest?.plugin_dependencies && plugin.manifest.plugin_dependencies.length > 0) ||
-                        (plugin.manifest?.type === 'pipeline' && plugin.manifest?.pipeline?.steps && plugin.manifest.pipeline.steps.length > 0)
-                      );
-                      if (!hasPluginDeps) return null;
+                    {plugin &&
+                      (() => {
+                        const hasPluginDeps = Boolean(
+                          (plugin.manifest?.plugin_dependencies && plugin.manifest.plugin_dependencies.length > 0) ||
+                          (plugin.manifest?.type === 'pipeline' &&
+                            plugin.manifest?.pipeline?.steps &&
+                            plugin.manifest.pipeline.steps.length > 0),
+                        );
+                        if (!hasPluginDeps) return null;
 
-                      const depReport = resolvePluginDependencies(plugin, plugins);
-                      const isExpanded = Boolean(expandedDepIssues[setting.id]);
+                        const depReport = resolvePluginDependencies(plugin, plugins);
+                        const isExpanded = Boolean(expandedDepIssues[setting.id]);
 
-                      return (
-                        <div className="mt-2 flex flex-col gap-1.5">
-                          <div className="flex items-center gap-2">
-                            {depReport.isValid ? (
-                              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-success/10 text-status-success border border-status-success/20 text-[10px] font-bold">
-                                <Check size={10} />
-                                <span>Dependencies OK</span>
+                        return (
+                          <div className="mt-2 flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              {depReport.isValid ? (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-success/10 text-status-success border border-status-success/20 text-[10px] font-bold">
+                                  <Check size={10} />
+                                  <span>Dependencies OK</span>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedDepIssues((prev) => ({
+                                      ...prev,
+                                      [setting.id]: !prev[setting.id],
+                                    }))
+                                  }
+                                  className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-warning/15 text-status-warning border border-status-warning/30 text-[10px] font-bold hover:bg-status-warning/20 transition-colors cursor-pointer"
+                                >
+                                  <AlertTriangle size={10} />
+                                  <span>Dependency Issues ({depReport.issues.length})</span>
+                                  {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                                </button>
+                              )}
+                            </div>
+
+                            {!depReport.isValid && isExpanded && (
+                              <div className="p-2 rounded bg-surface-base/60 border border-border-base/40 text-[11px] space-y-1">
+                                {depReport.issues.map((iss, i) => (
+                                  <div key={i} className="text-status-warning flex items-start gap-1">
+                                    <span className="text-[10px] leading-tight">•</span>
+                                    <span>{iss.message}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setExpandedDepIssues((prev) => ({
-                                    ...prev,
-                                    [setting.id]: !prev[setting.id],
-                                  }))
-                                }
-                                className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-status-warning/15 text-status-warning border border-status-warning/30 text-[10px] font-bold hover:bg-status-warning/20 transition-colors cursor-pointer"
-                              >
-                                <AlertTriangle size={10} />
-                                <span>Dependency Issues ({depReport.issues.length})</span>
-                                {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                              </button>
                             )}
                           </div>
-
-                          {!depReport.isValid && isExpanded && (
-                            <div className="p-2 rounded bg-surface-base/60 border border-border-base/40 text-[11px] space-y-1">
-                              {depReport.issues.map((iss, i) => (
-                                <div key={i} className="text-status-warning flex items-start gap-1">
-                                  <span className="text-[10px] leading-tight">•</span>
-                                  <span>{iss.message}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                        );
+                      })()}
 
                     {/* Python Dependencies & Venv Setup */}
-                    {plugin && (plugin.manifest?.type === "python" || plugin.manifest?.type === "python_library") && (() => {
-                      const pythonDeps = plugin.manifest?.python_dependencies || [];
-                      if (pythonDeps.length === 0) return null;
+                    {plugin &&
+                      (plugin.manifest?.type === 'python' || plugin.manifest?.type === 'python_library') &&
+                      (() => {
+                        const pythonDeps = plugin.manifest?.python_dependencies || [];
+                        if (pythonDeps.length === 0) return null;
 
-                      const pkgResults = packageCheckResults[plugin.id] || {};
-                      const isChecking = isCheckingPackages[plugin.id];
-                      const missingPackages = pythonDeps.filter((d: any) => {
-                        const name = typeof d === "string" ? d : d.name;
-                        return pkgResults[name] === false;
-                      });
-                      const hasMissing = missingPackages.length > 0;
+                        const pkgResults = packageCheckResults[plugin.id] || {};
+                        const isChecking = isCheckingPackages[plugin.id];
+                        const missingPackages = pythonDeps.filter((d: any) => {
+                          const name = typeof d === 'string' ? d : d.name;
+                          return pkgResults[name] === false;
+                        });
+                        const hasMissing = missingPackages.length > 0;
 
-                      return (
-                        <div className="mt-2.5 pt-2.5 border-t border-border-base/20 space-y-2">
-                          <div className="flex justify-between items-center flex-wrap gap-2">
-                            <span className="text-[11px] font-semibold text-text-muted flex items-center gap-1.5">
-                              <Package size={12} className="text-primary-base" />
-                              Python Packages ({pythonDeps.length})
-                            </span>
-                            {hasMissing && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => setVenvModalPlugin(plugin)}
-                                className="h-6 text-[10px] gap-1 text-primary-base border-primary-base/30 hover:bg-primary-base/10"
-                              >
-                                <Terminal size={11} />
-                                Setup venv (仮想環境の作成)
-                              </Button>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap gap-1.5">
-                            {pythonDeps.map((dep: any) => {
-                              const name = typeof dep === "string" ? dep : dep.name;
-                              const ver = typeof dep === "string" ? "" : dep.version;
-                              const isInstalled = pkgResults[name];
-
-                              return (
-                                <span
-                                  key={name}
-                                  className={cn(
-                                    "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border",
-                                    isChecking
-                                      ? "bg-surface-base/40 text-text-muted border-border-base/30"
-                                      : isInstalled
-                                      ? "bg-status-success/10 text-status-success border-status-success/20"
-                                      : "bg-danger-base/10 text-danger-base border-danger-base/20 font-semibold"
-                                  )}
+                        return (
+                          <div className="mt-2.5 pt-2.5 border-t border-border-base/20 space-y-2">
+                            <div className="flex justify-between items-center flex-wrap gap-2">
+                              <span className="text-[11px] font-semibold text-text-muted flex items-center gap-1.5">
+                                <Package size={12} className="text-primary-base" />
+                                Python Packages ({pythonDeps.length})
+                              </span>
+                              {hasMissing && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => setVenvModalPlugin(plugin)}
+                                  className="h-6 text-[10px] gap-1 text-primary-base border-primary-base/30 hover:bg-primary-base/10"
                                 >
-                                  {isChecking ? (
-                                    <Loader2 size={10} className="animate-spin text-text-muted" />
-                                  ) : isInstalled ? (
-                                    <Check size={10} className="text-status-success" />
-                                  ) : (
-                                    <AlertTriangle size={10} className="text-danger-base" />
-                                  )}
-                                  <span>{name}{ver ? `@${ver}` : ""}</span>
-                                </span>
-                              );
-                            })}
+                                  <Terminal size={11} />
+                                  Setup venv (仮想環境の作成)
+                                </Button>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap gap-1.5">
+                              {pythonDeps.map((dep: any) => {
+                                const name = typeof dep === 'string' ? dep : dep.name;
+                                const ver = typeof dep === 'string' ? '' : dep.version;
+                                const isInstalled = pkgResults[name];
+
+                                return (
+                                  <span
+                                    key={name}
+                                    className={cn(
+                                      'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono border',
+                                      isChecking
+                                        ? 'bg-surface-base/40 text-text-muted border-border-base/30'
+                                        : isInstalled
+                                          ? 'bg-status-success/10 text-status-success border-status-success/20'
+                                          : 'bg-danger-base/10 text-danger-base border-danger-base/20 font-semibold',
+                                    )}
+                                  >
+                                    {isChecking ? (
+                                      <Loader2 size={10} className="animate-spin text-text-muted" />
+                                    ) : isInstalled ? (
+                                      <Check size={10} className="text-status-success" />
+                                    ) : (
+                                      <AlertTriangle size={10} className="text-danger-base" />
+                                    )}
+                                    <span>
+                                      {name}
+                                      {ver ? `@${ver}` : ''}
+                                    </span>
+                                  </span>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })()}
+                        );
+                      })()}
 
                     {!plugin && (
                       <AlertBox variant="danger" title="Source Not Found">
@@ -720,9 +743,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
           globalPythonPath={globalPythonPath}
           onComplete={async (venvPythonPath) => {
             const p = venvModalPlugin;
-            const names = (p.manifest.python_dependencies || []).map((d: any) =>
-              typeof d === "string" ? d : d.name
-            );
+            const names = (p.manifest.python_dependencies || []).map((d: any) => (typeof d === 'string' ? d : d.name));
             try {
               const res = await BackendAPI.checkPythonPackages(venvPythonPath, names);
               setPackageCheckResults((prev) => ({ ...prev, [p.id]: res }));

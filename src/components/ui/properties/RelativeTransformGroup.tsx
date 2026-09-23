@@ -1,10 +1,10 @@
-import { useMemo } from "react";
-import { useAppStore } from "../../../stores/appStore";
-import { WaypointNode } from "../../../types/store";
-import { quaternionToYaw } from "../../../utils/transformUtils";
-import { getFlattenedWaypointIds } from "../../../utils/treeUtils";
-import { TransformField } from "./TransformField";
-import { PropertySectionHeader } from "./PropertySectionHeader";
+import { useMemo } from 'react';
+import { useAppStore } from '../../../stores/appStore';
+import { WaypointNode } from '../../../types/store';
+import { quaternionToYaw } from '../../../utils/transformUtils';
+import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { TransformField } from './TransformField';
+import { PropertySectionHeader } from './PropertySectionHeader';
 
 interface RelativeTransformGroupProps {
   node: WaypointNode;
@@ -23,10 +23,7 @@ export function RelativeTransformGroup({
   const nodes = useAppStore((state) => state.nodes);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
 
-  const flatWaypointIds = useMemo(
-    () => getFlattenedWaypointIds(rootNodeIds, nodes),
-    [rootNodeIds, nodes]
-  );
+  const flatWaypointIds = useMemo(() => getFlattenedWaypointIds(rootNodeIds, nodes), [rootNodeIds, nodes]);
 
   const prevNodeId = flatWaypointIds[nodeIndex - 1];
   const prevNode = propPrevNode || (prevNodeId ? nodes[prevNodeId] : undefined);
@@ -41,7 +38,7 @@ export function RelativeTransformGroup({
   const dx = (node.transform.x ?? 0) - px;
   const dy = (node.transform.y ?? 0) - py;
   const dz = (node.transform.z ?? 0) - pz;
-  
+
   const relX = dx * Math.cos(pYaw) + dy * Math.sin(pYaw);
   const relY = -dx * Math.sin(pYaw) + dy * Math.cos(pYaw);
   let relYaw = cYaw - pYaw;
@@ -50,20 +47,20 @@ export function RelativeTransformGroup({
   while (relYaw > Math.PI) relYaw -= 2 * Math.PI;
   while (relYaw < -Math.PI) relYaw += 2 * Math.PI;
 
-  const handleFieldChange = (field: "x" | "y" | "z", val: number) => {
-    if (field === "x") {
+  const handleFieldChange = (field: 'x' | 'y' | 'z', val: number) => {
+    if (field === 'x') {
       const newDx = val * Math.cos(pYaw) - relY * Math.sin(pYaw);
       const newDy = val * Math.sin(pYaw) + relY * Math.cos(pYaw);
       handleUpdate(node.id, {
         transform: { ...node.transform!, x: px + newDx, y: py + newDy },
       });
-    } else if (field === "y") {
+    } else if (field === 'y') {
       const newDx = relX * Math.cos(pYaw) - val * Math.sin(pYaw);
       const newDy = relX * Math.sin(pYaw) + val * Math.cos(pYaw);
       handleUpdate(node.id, {
         transform: { ...node.transform!, x: px + newDx, y: py + newDy },
       });
-    } else if (field === "z") {
+    } else if (field === 'z') {
       handleUpdate(node.id, {
         transform: { ...node.transform!, z: pz + val },
       });
@@ -93,7 +90,7 @@ export function RelativeTransformGroup({
           precision={decimalPrecision}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("x", val)}
+          onChange={(val) => handleFieldChange('x', val)}
         />
         <TransformField
           label="Local Y (m)"
@@ -102,7 +99,7 @@ export function RelativeTransformGroup({
           precision={decimalPrecision}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("y", val)}
+          onChange={(val) => handleFieldChange('y', val)}
         />
         <TransformField
           label="Delta Z (m)"
@@ -111,7 +108,7 @@ export function RelativeTransformGroup({
           precision={decimalPrecision}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("z", val)}
+          onChange={(val) => handleFieldChange('z', val)}
         />
         <div className="col-span-3 grid grid-cols-2 gap-2">
           <TransformField

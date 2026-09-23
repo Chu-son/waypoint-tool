@@ -43,7 +43,7 @@ function parseAndDownsamplePGM(buffer, scaleFactor = 4) {
 
   for (let y = 0; y < newHeight; y++) {
     for (let x = 0; x < newWidth; x++) {
-      const srcIdx = (y * scaleFactor) * width + (x * scaleFactor);
+      const srcIdx = y * scaleFactor * width + x * scaleFactor;
       downsampledPixels[y * newWidth + x] = rawPixels[srcIdx] || 255;
     }
   }
@@ -74,7 +74,7 @@ function pgmToBmpBuffer(pgm) {
     for (let x = 0; x < width; x++) {
       const val = pixels[y * width + x];
       const pIdx = offset + y * rowSize + x * 3;
-      buf[pIdx] = val;     // B
+      buf[pIdx] = val; // B
       buf[pIdx + 1] = val; // G
       buf[pIdx + 2] = val; // R
     }
@@ -93,12 +93,15 @@ async function waitForServer(url, retries = 15, delayMs = 2000) {
           resolve(null);
         });
         req.on('error', reject);
-        req.setTimeout(1500, () => { req.destroy(); reject(new Error('timeout')); });
+        req.setTimeout(1500, () => {
+          req.destroy();
+          reject(new Error('timeout'));
+        });
       });
       return;
     } catch {
       console.log(`Waiting for server... (${i + 1}/${retries})`);
-      await new Promise(r => setTimeout(r, delayMs));
+      await new Promise((r) => setTimeout(r, delayMs));
     }
   }
   throw new Error(`Server not ready at ${url} after ${retries} retries`);
@@ -132,7 +135,7 @@ async function capture() {
     origin: [-130, -99, 0],
     negate: 0,
     occupied_thresh: 0.65,
-    free_thresh: 0.25
+    free_thresh: 0.25,
   };
 
   const map2Info = {
@@ -142,12 +145,12 @@ async function capture() {
     origin: [-48.35, 54.55, 0],
     negate: 0,
     occupied_thresh: 0.65,
-    free_thresh: 0.25
+    free_thresh: 0.25,
   };
 
   console.log('Starting Vite dev server...');
   const devServer = spawn('npm', ['run', 'dev'], { stdio: 'pipe' });
-  devServer.stderr.on('data', data => console.error('Vite:', data.toString()));
+  devServer.stderr.on('data', (data) => console.error('Vite:', data.toString()));
 
   try {
     await waitForServer(APP_URL);
@@ -156,8 +159,8 @@ async function capture() {
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: VIEWPORT });
 
-    page.on('console', msg => console.log('PAGE LOG:', msg.text()));
-    page.on('pageerror', err => console.error('PAGE ERROR:', err.message));
+    page.on('console', (msg) => console.log('PAGE LOG:', msg.text()));
+    page.on('pageerror', (err) => console.error('PAGE ERROR:', err.message));
 
     try {
       console.log(`Navigating to ${APP_URL}...`);
@@ -165,117 +168,126 @@ async function capture() {
       await page.waitForTimeout(2000);
 
       console.log('Loading public sample BMPs and initializing store cache...');
-      const initResult = await page.evaluate(async ({ map1Info, map2Info }) => {
-        // @ts-ignore
-        const store = window.useAppStore ? window.useAppStore.getState() : null;
-        if (!store) return 'NO_STORE';
+      const initResult = await page.evaluate(
+        async ({ map1Info, map2Info }) => {
+          // @ts-ignore
+          const store = window.useAppStore ? window.useAppStore.getState() : null;
+          if (!store) return 'NO_STORE';
 
-        const loadImageAsBase64 = (url) => {
-          return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = 'Anonymous';
-            img.onload = () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext('2d');
-              if (!ctx) return reject('No 2d context');
-              ctx.drawImage(img, 0, 0);
-              resolve(canvas.toDataURL('image/png'));
+          const loadImageAsBase64 = (url) => {
+            return new Promise((resolve, reject) => {
+              const img = new Image();
+              img.crossOrigin = 'Anonymous';
+              img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject('No 2d context');
+                ctx.drawImage(img, 0, 0);
+                resolve(canvas.toDataURL('image/png'));
+              };
+              img.onerror = () => reject(`Failed to load image from ${url}`);
+              img.src = url;
+            });
+          };
+
+          try {
+            const base64Map1 = await loadImageAsBase64('/sample_map1.bmp');
+            const base64Map2 = await loadImageAsBase64('/sample_map2.bmp');
+
+            const layer1 = {
+              id: 'map1-layer-id',
+              name: 'map1_occupancy',
+              visible: true,
+              opacity: 0.6,
+              image_base64: base64Map1,
+              info: map1Info,
+              width: map1Info.width,
+              height: map1Info.height,
+              z_index: 0,
+              blend_mode: 'overwrite',
             };
-            img.onerror = () => reject(`Failed to load image from ${url}`);
-            img.src = url;
-          });
-        };
 
-        try {
-          const base64Map1 = await loadImageAsBase64('/sample_map1.bmp');
-          const base64Map2 = await loadImageAsBase64('/sample_map2.bmp');
+            const layer2 = {
+              id: 'map2-layer-id',
+              name: 'map2_occupancy',
+              visible: true,
+              opacity: 0.6,
+              image_base64: base64Map2,
+              info: map2Info,
+              width: map2Info.width,
+              height: map2Info.height,
+              z_index: 1,
+              blend_mode: 'overwrite',
+            };
 
-          const layer1 = {
-            id: 'map1-layer-id',
-            name: 'map1_occupancy',
-            visible: true,
-            opacity: 0.6,
-            image_base64: base64Map1,
-            info: map1Info,
-            width: map1Info.width,
-            height: map1Info.height,
-            z_index: 0,
-            blend_mode: 'overwrite'
-          };
+            const makeNode = (id, x, y, yaw) => ({
+              id,
+              type: 'manual',
+              transform: {
+                x,
+                y,
+                z: 0,
+                qx: 0,
+                qy: 0,
+                qz: Math.sin(yaw / 2),
+                qw: Math.cos(yaw / 2),
+              },
+            });
 
-          const layer2 = {
-            id: 'map2-layer-id',
-            name: 'map2_occupancy',
-            visible: true,
-            opacity: 0.6,
-            image_base64: base64Map2,
-            info: map2Info,
-            width: map2Info.width,
-            height: map2Info.height,
-            z_index: 1,
-            blend_mode: 'overwrite'
-          };
+            // @ts-ignore
+            window.__MAP_LAYERS__ = [layer1, layer2];
+            // @ts-ignore
+            window.__SAMPLE_NODES__ = [
+              makeNode('node-1', -90, -60, 0.5),
+              makeNode('node-2', -70, -45, 0.8),
+              makeNode('node-3', -50, -30, 1.2),
+              makeNode('node-4', -30, -15, 1.57),
+              makeNode('node-5', -10, 0, 2.1),
+              makeNode('node-6', 10, 15, 2.8),
+            ];
 
-          const makeNode = (id, x, y, yaw) => ({
-            id,
-            type: 'manual',
-            transform: {
-              x, y, z: 0,
-              qx: 0, qy: 0,
-              qz: Math.sin(yaw / 2),
-              qw: Math.cos(yaw / 2)
-            }
-          });
-
-          // @ts-ignore
-          window.__MAP_LAYERS__ = [layer1, layer2];
-          // @ts-ignore
-          window.__SAMPLE_NODES__ = [
-            makeNode('node-1', -90, -60, 0.5),
-            makeNode('node-2', -70, -45, 0.8),
-            makeNode('node-3', -50, -30, 1.2),
-            makeNode('node-4', -30, -15, 1.57),
-            makeNode('node-5', -10, 0, 2.1),
-            makeNode('node-6', 10, 15, 2.8)
-          ];
-
-          return 'STORE_CACHE_INITIALIZED';
-        } catch (err) {
-          return `ERROR: ${err}`;
-        }
-      }, { map1Info, map2Info });
+            return 'STORE_CACHE_INITIALIZED';
+          } catch (err) {
+            return `ERROR: ${err}`;
+          }
+        },
+        { map1Info, map2Info },
+      );
 
       console.log('Init result:', initResult);
       await page.waitForTimeout(1000);
 
       const ensureScene = async (selectNode = false) => {
-        const sceneStatus = await page.evaluate(({ selectNode }) => {
-          // @ts-ignore
-          const store = window.useAppStore ? window.useAppStore.getState() : null;
-          // @ts-ignore
-          const layers = window.__MAP_LAYERS__;
-          // @ts-ignore
-          const nodes = window.__SAMPLE_NODES__;
-          if (!store || !layers) return 'NO_STORE_OR_LAYERS';
+        const sceneStatus = await page.evaluate(
+          ({ selectNode }) => {
+            // @ts-ignore
+            const store = window.useAppStore ? window.useAppStore.getState() : null;
+            // @ts-ignore
+            const layers = window.__MAP_LAYERS__;
+            // @ts-ignore
+            const nodes = window.__SAMPLE_NODES__;
+            if (!store || !layers) return 'NO_STORE_OR_LAYERS';
 
-          store.setMapLayers(layers);
+            store.setMapLayers(layers);
 
-          if (nodes && nodes.length > 0) {
-            nodes.forEach((n) => {
-              if (!store.nodes[n.id]) {
-                store.addNode(n);
+            if (nodes && nodes.length > 0) {
+              nodes.forEach((n) => {
+                if (!store.nodes[n.id]) {
+                  store.addNode(n);
+                }
+              });
+              if (selectNode) {
+                store.selectNodes([nodes[0].id]);
               }
-            });
-            if (selectNode) {
-              store.selectNodes([nodes[0].id]);
             }
-          }
 
-          store.triggerFitToMaps();
-          return `SYNC_OK: ${store.mapLayers.length} layers, ${store.rootNodeIds.length} nodes`;
-        }, { selectNode });
+            store.triggerFitToMaps();
+            return `SYNC_OK: ${store.mapLayers.length} layers, ${store.rootNodeIds.length} nodes`;
+          },
+          { selectNode },
+        );
 
         console.log('Scene sync status:', sceneStatus);
         await page.waitForTimeout(1200);
@@ -360,7 +372,7 @@ async function capture() {
   }
 }
 
-capture().catch(err => {
+capture().catch((err) => {
   console.error('Screenshot capture failed:', err);
   process.exit(1);
 });

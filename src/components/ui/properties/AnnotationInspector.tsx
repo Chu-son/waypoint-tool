@@ -98,7 +98,7 @@ function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
             existingExecutionId: group.source_execution_id,
             targetAnnotationGroupId: group.id,
           });
-        }
+        },
       );
     } catch (err: any) {
       console.error('Annotation group regeneration failed:', err);
@@ -217,11 +217,13 @@ function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
               variant="ghost"
               size="sm"
               onClick={() =>
-                useAppStore.getState().openPluginDataModal(
-                  `アノテーショングループ: ${group.name}`,
-                  group.plugin_data,
-                  `プラグイン: ${group.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`
-                )
+                useAppStore
+                  .getState()
+                  .openPluginDataModal(
+                    `アノテーショングループ: ${group.name}`,
+                    group.plugin_data,
+                    `プラグイン: ${group.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`,
+                  )
               }
               className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
             >
@@ -238,11 +240,7 @@ function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
 
       {/* Group Operations */}
       <div className="space-y-2 pt-2 border-t border-border-base/30">
-        <Button
-          variant="secondary"
-          onClick={() => explodeAnnotationGroup(group.id)}
-          className="w-full gap-2 text-xs"
-        >
+        <Button variant="secondary" onClick={() => explodeAnnotationGroup(group.id)} className="w-full gap-2 text-xs">
           <Unlink size={13} className="text-accent-anchor" />
           <span>グループ解除 (Explode)</span>
         </Button>
@@ -285,9 +283,7 @@ function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject }) {
             <div key={opt.name} className="space-y-1">
               <Label className="text-[11px] flex items-center justify-between">
                 <span>{opt.label || opt.name}</span>
-                <span className="opacity-50 text-[10px] uppercase font-normal">
-                  ({opt.type})
-                </span>
+                <span className="opacity-50 text-[10px] uppercase font-normal">({opt.type})</span>
               </Label>
 
               {opt.type === 'list' ? (
@@ -319,11 +315,7 @@ function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject }) {
                   className="h-8 text-xs font-mono"
                 />
               ) : opt.type === 'string' && opt.enum_values && opt.enum_values.length > 0 ? (
-                <Select
-                  value={String(optVal)}
-                  onChange={(e) => handleChange(e.target.value)}
-                  className="h-8 text-xs"
-                >
+                <Select value={String(optVal)} onChange={(e) => handleChange(e.target.value)} className="h-8 text-xs">
                   {opt.enum_values.map((v: string) => (
                     <option key={v} value={v}>
                       {v}
@@ -345,10 +337,7 @@ function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject }) {
               ) : opt.type === 'boolean' ? (
                 <div className="flex items-center justify-between bg-surface-panel/40 p-2 rounded-lg border border-border-base/30">
                   <span className="text-xs text-text-muted">{opt.label || opt.name}</span>
-                  <ToggleSwitch
-                    checked={Boolean(optVal)}
-                    onChange={(checked) => handleChange(checked)}
-                  />
+                  <ToggleSwitch checked={Boolean(optVal)} onChange={(checked) => handleChange(checked)} />
                 </div>
               ) : (
                 <Input
@@ -378,9 +367,7 @@ export function AnnotationInspector() {
   if (selectedAnnotationIds.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
-        <EmptyState
-          message="アノテーション未選択：リストまたはマップ上でアノテーションを選択するとプロパティが表示されます。"
-        />
+        <EmptyState message="アノテーション未選択：リストまたはマップ上でアノテーションを選択するとプロパティが表示されます。" />
       </div>
     );
   }
@@ -400,9 +387,7 @@ export function AnnotationInspector() {
             <span>一括削除 ({selectedAnnotationIds.length})</span>
           </Button>
         </div>
-        <p className="text-xs text-text-muted">
-          {selectedAnnotationIds.length} 個のアノテーションが選択されています。
-        </p>
+        <p className="text-xs text-text-muted">{selectedAnnotationIds.length} 個のアノテーションが選択されています。</p>
       </div>
     );
   }
@@ -412,8 +397,7 @@ export function AnnotationInspector() {
   const targetGroup = annotationGroups[selectedId];
   const obj = annotationObjects[selectedId];
   const parentGroup = obj?.group_id ? annotationGroups[obj.group_id] : null;
-  const pipelineMeta =
-    targetGroup?.pipeline_metadata || obj?.pipeline_metadata || parentGroup?.pipeline_metadata;
+  const pipelineMeta = targetGroup?.pipeline_metadata || obj?.pipeline_metadata || parentGroup?.pipeline_metadata;
 
   if (pipelineMeta) {
     return (
@@ -432,9 +416,7 @@ export function AnnotationInspector() {
   if (!obj) {
     return (
       <div className="flex-1 overflow-y-auto w-full p-4">
-        <EmptyState
-          message="アノテーション未選択：リストまたはマップ上でアノテーションを選択するとプロパティが表示されます。"
-        />
+        <EmptyState message="アノテーション未選択：リストまたはマップ上でアノテーションを選択するとプロパティが表示されます。" />
       </div>
     );
   }
@@ -597,9 +579,7 @@ export function AnnotationInspector() {
                 value={(((obj as OrientedPointAnnotation).yaw || 0) * 180) / Math.PI}
                 precision={1}
                 step={5}
-                onChange={(valDeg) =>
-                  updateAnnotationObject(obj.id, { yaw: (valDeg * Math.PI) / 180 })
-                }
+                onChange={(valDeg) => updateAnnotationObject(obj.id, { yaw: (valDeg * Math.PI) / 180 })}
               />
               <LabeledNumericInput
                 label="Yaw (rad)"
@@ -706,9 +686,7 @@ export function AnnotationInspector() {
                 value={(((obj as RectAnnotation).angle || 0) * 180) / Math.PI}
                 precision={1}
                 step={5}
-                onChange={(valDeg) =>
-                  updateAnnotationObject(obj.id, { angle: (valDeg * Math.PI) / 180 })
-                }
+                onChange={(valDeg) => updateAnnotationObject(obj.id, { angle: (valDeg * Math.PI) / 180 })}
               />
               <LabeledNumericInput
                 label="Angle (rad)"
@@ -776,11 +754,13 @@ export function AnnotationInspector() {
                 variant="ghost"
                 size="sm"
                 onClick={() =>
-                  useAppStore.getState().openPluginDataModal(
-                    `アノテーション: ${obj.name}`,
-                    obj.plugin_data,
-                    `タイプ: ${obj.type} • 内部メタデータ (Read-only)`
-                  )
+                  useAppStore
+                    .getState()
+                    .openPluginDataModal(
+                      `アノテーション: ${obj.name}`,
+                      obj.plugin_data,
+                      `タイプ: ${obj.type} • 内部メタデータ (Read-only)`,
+                    )
                 }
                 className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
               >

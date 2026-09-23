@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { Download, FolderOpen } from "lucide-react";
-import { useAppStore } from "../../stores/appStore";
-import { BackendAPI, DialogAPI } from "../../api";
-import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
-import { Button } from "./common/Button";
-import { Checkbox } from "./common/Checkbox";
-import { Input } from "./common/Input";
-import { OptionCard } from "./common/OptionCard";
-import { FieldLabel } from "./common/FieldLabel";
-import { EmptyState } from "./common/EmptyState";
-import { prepareLayersForExport } from "../../utils/mapRasterize";
+import { useState } from 'react';
+import { Download, FolderOpen } from 'lucide-react';
+import { useAppStore } from '../../stores/appStore';
+import { BackendAPI, DialogAPI } from '../../api';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from './common/Modal';
+import { Button } from './common/Button';
+import { Checkbox } from './common/Checkbox';
+import { Input } from './common/Input';
+import { OptionCard } from './common/OptionCard';
+import { FieldLabel } from './common/FieldLabel';
+import { EmptyState } from './common/EmptyState';
+import { prepareLayersForExport } from '../../utils/mapRasterize';
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);
@@ -23,19 +23,19 @@ export function ExportMapsModal() {
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [selectedRegions, setSelectedRegions] = useState<Record<string, boolean>>(
-    exportRegions.reduce((acc, r) => ({ ...acc, [r.id]: true }), {})
+    exportRegions.reduce((acc, r) => ({ ...acc, [r.id]: true }), {}),
   );
-  
+
   const [exportFormat, setExportFormat] = useState<'ros_standard' | 'png_only'>('ros_standard');
-  const [mapListFilename, setMapListFilename] = useState("map_list.txt");
+  const [mapListFilename, setMapListFilename] = useState('map_list.txt');
   const [outputMapList, setOutputMapList] = useState(true);
 
   if (!isOpen) return null;
 
   const handleExport = async () => {
-    const selectedRegionIds = Object.keys(selectedRegions).filter(id => selectedRegions[id]);
+    const selectedRegionIds = Object.keys(selectedRegions).filter((id) => selectedRegions[id]);
     if (selectedRegionIds.length === 0) {
-      alert("At least one export region must be selected.");
+      alert('At least one export region must be selected.');
       return;
     }
 
@@ -47,13 +47,13 @@ export function ExportMapsModal() {
       });
 
       if (saveDir) {
-        const dirPath = typeof saveDir === "string" ? saveDir : (saveDir as any).path;
+        const dirPath = typeof saveDir === 'string' ? saveDir : (saveDir as any).path;
         if (!dirPath) return;
         setLastDirectory(dirPath);
 
         const regionsToExport = exportRegions
-          .filter(r => selectedRegions[r.id])
-          .map(r => ({
+          .filter((r) => selectedRegions[r.id])
+          .map((r) => ({
             name: r.name,
             rect: r.rect,
             layerVisibility: {},
@@ -61,7 +61,7 @@ export function ExportMapsModal() {
 
         await runWithLoading(
           {
-            message: "マップをエクスポート中...",
+            message: 'マップをエクスポート中...',
             detail: `${regionsToExport.length} 件のマップ領域を出力中`,
             blocking: true,
           },
@@ -75,14 +75,14 @@ export function ExportMapsModal() {
               regions: regionsToExport,
               layers: layersToExport,
             });
-          }
+          },
         );
 
-        alert("マップのエクスポートが完了しました。");
+        alert('マップのエクスポートが完了しました。');
         onClose();
       }
     } catch (err) {
-      console.error("Failed to export maps:", err);
+      console.error('Failed to export maps:', err);
       alert(`マップのエクスポートに失敗しました。\nエラー詳細: ${String(err)}`);
     }
   };
@@ -101,18 +101,18 @@ export function ExportMapsModal() {
             <FieldLabel>Export Format</FieldLabel>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input 
-                  type="radio" 
-                  checked={exportFormat === 'ros_standard'} 
+                <input
+                  type="radio"
+                  checked={exportFormat === 'ros_standard'}
                   onChange={() => setExportFormat('ros_standard')}
                   className="accent-primary-base"
                 />
                 ROS Standard (.pgm + .yaml)
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-sm">
-                <input 
-                  type="radio" 
-                  checked={exportFormat === 'png_only'} 
+                <input
+                  type="radio"
+                  checked={exportFormat === 'png_only'}
                   onChange={() => setExportFormat('png_only')}
                   className="accent-primary-base"
                 />
@@ -130,13 +130,13 @@ export function ExportMapsModal() {
                   size="sm"
                   className="h-6 text-[10px] uppercase font-bold text-text-muted hover:text-primary-base hover:bg-primary-base/10 px-2"
                   onClick={() => {
-                    const allSelected = exportRegions.every(r => selectedRegions[r.id]);
+                    const allSelected = exportRegions.every((r) => selectedRegions[r.id]);
                     const newSelected = { ...selectedRegions };
-                    exportRegions.forEach(r => newSelected[r.id] = !allSelected);
+                    exportRegions.forEach((r) => (newSelected[r.id] = !allSelected));
                     setSelectedRegions(newSelected);
                   }}
                 >
-                  {exportRegions.every(r => selectedRegions[r.id]) ? "Deselect All" : "Select All"}
+                  {exportRegions.every((r) => selectedRegions[r.id]) ? 'Deselect All' : 'Select All'}
                 </Button>
               )}
             </div>
@@ -144,12 +144,15 @@ export function ExportMapsModal() {
               <EmptyState message="No export regions defined. Use the 'Add Export Region' tool to draw regions on the canvas first." />
             ) : (
               <div className="space-y-2">
-                {exportRegions.map(region => (
-                  <div key={region.id} className="bg-surface-panel/40 border border-border-base/20 rounded-lg p-3 flex items-center justify-between">
+                {exportRegions.map((region) => (
+                  <div
+                    key={region.id}
+                    className="bg-surface-panel/40 border border-border-base/20 rounded-lg p-3 flex items-center justify-between"
+                  >
                     <label className="flex items-center gap-3 cursor-pointer">
                       <Checkbox
                         checked={selectedRegions[region.id] || false}
-                        onChange={(e) => setSelectedRegions(prev => ({ ...prev, [region.id]: e.target.checked }))}
+                        onChange={(e) => setSelectedRegions((prev) => ({ ...prev, [region.id]: e.target.checked }))}
                       />
                       <span className="font-bold text-sm text-text-base">{region.name}</span>
                     </label>
@@ -181,17 +184,13 @@ export function ExportMapsModal() {
       </ModalContent>
 
       <ModalFooter>
-        <Button
-          variant="ghost"
-          onClick={onClose}
-          className="px-6 text-text-muted font-bold"
-        >
+        <Button variant="ghost" onClick={onClose} className="px-6 text-text-muted font-bold">
           Cancel
         </Button>
         <Button
           variant="primary"
           onClick={handleExport}
-          disabled={exportRegions.length === 0 || Object.values(selectedRegions).every(v => !v)}
+          disabled={exportRegions.length === 0 || Object.values(selectedRegions).every((v) => !v)}
           className="min-w-40"
         >
           <FolderOpen size={16} className="mr-2" />

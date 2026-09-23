@@ -76,7 +76,8 @@ export function PluginDataModal() {
               <div>
                 <p className="text-xs font-semibold text-text-base">内部プロパティ（plugin_data）はありません</p>
                 <p className="text-[11px] text-text-muted mt-1 max-w-sm">
-                  このオブジェクトを生成したプラグインは、内部メタデータ（<code>plugin_data</code>）を出力していないか、データが空です。
+                  このオブジェクトを生成したプラグインは、内部メタデータ（<code>plugin_data</code>
+                  ）を出力していないか、データが空です。
                 </p>
               </div>
             </div>
@@ -87,23 +88,13 @@ export function PluginDataModal() {
         <div className="px-5 py-3 border-t border-border-base/40 flex items-center justify-between bg-surface-panel/80">
           <div>
             {hasData && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleCopyAll}
-                className="gap-1.5 text-xs shadow-xs"
-              >
+              <Button variant="secondary" size="sm" onClick={handleCopyAll} className="gap-1.5 text-xs shadow-xs">
                 {copied ? <Check size={13} className="text-status-success" /> : <Copy size={13} />}
                 <span>{copied ? 'コピー完了' : 'JSON をコピー'}</span>
               </Button>
             )}
           </div>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={closePluginDataModal}
-            className="px-5 text-xs font-semibold"
-          >
+          <Button variant="primary" size="sm" onClick={closePluginDataModal} className="px-5 text-xs font-semibold">
             閉じる
           </Button>
         </div>

@@ -1,17 +1,39 @@
-import { useState, useEffect, useRef } from "react";
-import { Eye, EyeOff, Trash2, FolderOpen, ChevronUp, ChevronDown, Crop, ScanEye, Pencil, Sparkles, Settings2, Plus, SlidersHorizontal, RotateCcw, RotateCw, FlipHorizontal2, Move, Palette, Bookmark, Code2, Target } from "lucide-react";
-import { useAppStore } from "../../stores/appStore";
-import { DialogAPI, BackendAPI } from "../../api";
-import { Button } from "./common/Button";
-import { Slider } from "./common/Slider";
-import { Select } from "./common/Select";
-import { Input } from "./common/Input";
-import { LabeledNumericInput } from "./common/LabeledNumericInput";
-import { FieldLabel } from "./common/FieldLabel";
-import { EmptyState } from "./common/EmptyState";
-import { ProjectMapLayer, CustomLayer, ExportRegion } from "../../types/store";
-import { NewCustomLayerModal } from "./NewCustomLayerModal";
-import { cn } from "../../utils/cn";
+import { useState, useEffect, useRef } from 'react';
+import {
+  Eye,
+  EyeOff,
+  Trash2,
+  FolderOpen,
+  ChevronUp,
+  ChevronDown,
+  Crop,
+  ScanEye,
+  Pencil,
+  Sparkles,
+  Settings2,
+  Plus,
+  SlidersHorizontal,
+  RotateCcw,
+  RotateCw,
+  FlipHorizontal2,
+  Move,
+  Palette,
+  Bookmark,
+  Code2,
+  Target,
+} from 'lucide-react';
+import { useAppStore } from '../../stores/appStore';
+import { DialogAPI, BackendAPI } from '../../api';
+import { Button } from './common/Button';
+import { Slider } from './common/Slider';
+import { Select } from './common/Select';
+import { Input } from './common/Input';
+import { LabeledNumericInput } from './common/LabeledNumericInput';
+import { FieldLabel } from './common/FieldLabel';
+import { EmptyState } from './common/EmptyState';
+import { ProjectMapLayer, CustomLayer, ExportRegion } from '../../types/store';
+import { NewCustomLayerModal } from './NewCustomLayerModal';
+import { cn } from '../../utils/cn';
 
 function CardFrame({
   visible = true,
@@ -33,9 +55,9 @@ function CardFrame({
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={cn(
-        "bg-surface-panel/40 backdrop-blur-sm border rounded-lg p-3 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer",
-        isActive ? "border-primary-base/80 bg-primary-base/5 ring-1 ring-primary-base/30" : "border-border-base/30",
-        className
+        'bg-surface-panel/40 backdrop-blur-sm border rounded-lg p-3 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative cursor-pointer',
+        isActive ? 'border-primary-base/80 bg-primary-base/5 ring-1 ring-primary-base/30' : 'border-border-base/30',
+        className,
       )}
     >
       {!visible && (
@@ -83,17 +105,17 @@ function LayerCardShell({
   headerActions,
   showSettings,
   onToggleSettings,
-  settingsTooltip = "Settings",
+  settingsTooltip = 'Settings',
   onToggleVisible,
   onRemove,
-  removeTooltip = "Remove",
+  removeTooltip = 'Remove',
   children,
 }: LayerCardShellProps) {
   const hasReorder = !!onMoveUp && !!onMoveDown;
 
   return (
     <CardFrame visible={visible} isActive={isActive} onClick={onClick} onContextMenu={onContextMenu}>
-      <div className={cn("flex items-center justify-between relative z-10", showSettings ? "mb-2.5" : "mb-0")}>
+      <div className={cn('flex items-center justify-between relative z-10', showSettings ? 'mb-2.5' : 'mb-0')}>
         <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-1.5">
           {hasReorder && (
             <div className="flex flex-col gap-0.5 shrink-0">
@@ -101,7 +123,10 @@ function LayerCardShell({
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
-                onClick={(e) => { e.stopPropagation(); onMoveUp?.(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveUp?.();
+                }}
                 disabled={isFirst}
                 title="Move Up"
               >
@@ -111,7 +136,10 @@ function LayerCardShell({
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5 text-text-muted hover:text-text-base hover:bg-surface-hover/50 disabled:opacity-30 p-0"
-                onClick={(e) => { e.stopPropagation(); onMoveDown?.(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveDown?.();
+                }}
                 disabled={isLast}
                 title="Move Down"
               >
@@ -125,11 +153,7 @@ function LayerCardShell({
               {icon}
               {title}
             </div>
-            {subBadges && (
-              <div className="flex items-center gap-1.5 mt-0.5">
-                {subBadges}
-              </div>
-            )}
+            {subBadges && <div className="flex items-center gap-1.5 mt-0.5">{subBadges}</div>}
           </div>
         </div>
 
@@ -137,11 +161,11 @@ function LayerCardShell({
           {headerActions}
 
           <Button
-            variant={showSettings ? "secondary" : "ghost"}
+            variant={showSettings ? 'secondary' : 'ghost'}
             size="icon"
             className={cn(
-              "h-7 w-7 text-text-muted hover:text-text-base transition-all",
-              showSettings && "text-accent-reference bg-accent-reference/10 border border-accent-reference/20"
+              'h-7 w-7 text-text-muted hover:text-text-base transition-all',
+              showSettings && 'text-accent-reference bg-accent-reference/10 border border-accent-reference/20',
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -157,7 +181,10 @@ function LayerCardShell({
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
-            onClick={(e) => { e.stopPropagation(); onToggleVisible(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleVisible();
+            }}
             title="Toggle Visibility"
           >
             {visible ? <Eye size={15} /> : <EyeOff size={15} />}
@@ -167,7 +194,10 @@ function LayerCardShell({
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
             title={removeTooltip}
           >
             <Trash2 size={15} />
@@ -226,7 +256,7 @@ export function LayerPanel() {
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
   const [isExportRegionsOpen, setIsExportRegionsOpen] = useState(true);
   const [contextMenu, setContextMenu] = useState<{
-    type: "custom" | "map";
+    type: 'custom' | 'map';
     id: string;
     x: number;
     y: number;
@@ -239,8 +269,8 @@ export function LayerPanel() {
         setContextMenu(null);
       }
     };
-    window.addEventListener("mousedown", handleClickOutside);
-    return () => window.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleLoadMap = async () => {
@@ -248,42 +278,30 @@ export function LayerPanel() {
       const selectedPath = await DialogAPI.open({
         multiple: false,
         defaultPath: lastDirectory || undefined,
-        filters: [{ name: "ROS Map YAML", extensions: ["yaml"] }],
+        filters: [{ name: 'ROS Map YAML', extensions: ['yaml'] }],
       });
       if (selectedPath) {
-        const pathStr =
-          typeof selectedPath === "string"
-            ? selectedPath
-            : (selectedPath as any).path;
+        const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
         if (!pathStr) return;
-        const lastSlash = Math.max(
-          pathStr.lastIndexOf("/"),
-          pathStr.lastIndexOf("\\"),
-        );
+        const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
         const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
         setLastDirectory(dir);
 
         await runWithLoading(
           {
-            message: "マップを読み込み中...",
+            message: 'マップを読み込み中...',
             detail: pathStr.split(/[/\\]/).pop() || pathStr,
             blocking: true,
           },
           async () => {
             const result = await BackendAPI.loadROSMap(pathStr);
-            const filename = pathStr.split(/[/\\]/).pop() || "Map";
-            addMapLayer(
-              filename,
-              result.info,
-              result.image_data_b64,
-              result.width,
-              result.height,
-            );
-          }
+            const filename = pathStr.split(/[/\\]/).pop() || 'Map';
+            addMapLayer(filename, result.info, result.image_data_b64, result.width, result.height);
+          },
         );
       }
     } catch (err) {
-      console.error("Failed to load map:", err);
+      console.error('Failed to load map:', err);
       alert(`マップの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
     }
   };
@@ -339,13 +357,17 @@ export function LayerPanel() {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all",
+                  'h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all',
                   showOccupancyHighlight
                     ? 'text-accent-reference bg-accent-reference/20 hover:bg-accent-reference/30 border border-accent-reference/40 shadow-sm'
-                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
+                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50',
                 )}
                 onClick={() => setShowOccupancyHighlight(!showOccupancyHighlight)}
-                title={showOccupancyHighlight ? "Occupancy Highlight: ON (3値色分けプレビュー解除)" : "Occupancy Highlight: OFF (3値色分けプレビュー表示)"}
+                title={
+                  showOccupancyHighlight
+                    ? 'Occupancy Highlight: ON (3値色分けプレビュー解除)'
+                    : 'Occupancy Highlight: OFF (3値色分けプレビュー表示)'
+                }
               >
                 <Palette size={13} />
                 <span>Occupancy</span>
@@ -355,13 +377,17 @@ export function LayerPanel() {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all",
+                  'h-7 px-2 text-[11px] font-semibold gap-1.5 transition-all',
                   isExportPreview
                     ? 'text-accent-generator bg-accent-generator/20 hover:bg-accent-generator/30 border border-accent-generator/40 shadow-sm'
-                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50'
+                    : 'text-text-muted hover:text-text-base hover:bg-surface-hover/50',
                 )}
                 onClick={() => setIsExportPreview(!isExportPreview)}
-                title={isExportPreview ? "Merged Map Preview: ON (クリックで解除)" : "Merged Map Preview: OFF (クリックで有効化)"}
+                title={
+                  isExportPreview
+                    ? 'Merged Map Preview: ON (クリックで解除)'
+                    : 'Merged Map Preview: OFF (クリックで有効化)'
+                }
               >
                 <ScanEye size={13} />
                 <span>Merged</span>
@@ -381,7 +407,7 @@ export function LayerPanel() {
             </div>
             {customLayers.map((layer, index) => {
               const isActive = activeCustomLayerId === layer.id;
-              const isEditing = isMapEditMode && isActive && layer.type === "manual";
+              const isEditing = isMapEditMode && isActive && layer.type === 'manual';
               return (
                 <CustomLayerCard
                   key={layer.id}
@@ -394,7 +420,7 @@ export function LayerPanel() {
                   onSelect={() => {
                     selectNodes([]);
                     setActiveCustomLayerId(layer.id);
-                    setRightPanelActiveTab("inspector");
+                    setRightPanelActiveTab('inspector');
                     setRightPanelOpen(true);
                   }}
                   onContextMenu={(e) => {
@@ -402,17 +428,17 @@ export function LayerPanel() {
                     e.stopPropagation();
                     selectNodes([]);
                     setActiveCustomLayerId(layer.id);
-                    setContextMenu({ type: "custom", id: layer.id, x: e.clientX, y: e.clientY });
+                    setContextMenu({ type: 'custom', id: layer.id, x: e.clientX, y: e.clientY });
                   }}
                   onToggleEdit={() => {
-                    if (layer.type === "manual") {
+                    if (layer.type === 'manual') {
                       if (isEditing) {
                         setMapEditMode(false);
                       } else {
                         selectNodes([]);
                         setActiveCustomLayerId(layer.id);
                         setMapEditMode(true);
-                        setRightPanelActiveTab("inspector");
+                        setRightPanelActiveTab('inspector');
                         setRightPanelOpen(true);
                       }
                     }
@@ -420,17 +446,17 @@ export function LayerPanel() {
                   onOpenInspector={() => {
                     selectNodes([]);
                     setActiveCustomLayerId(layer.id);
-                    setRightPanelActiveTab("inspector");
+                    setRightPanelActiveTab('inspector');
                     setRightPanelOpen(true);
                   }}
                   onMoveUp={() => moveUpCustom(index)}
                   onMoveDown={() => moveDownCustom(index)}
                   onToggleVisible={() => updateCustomLayer(layer.id, { visible: !layer.visible })}
                   onRemove={async () => {
-                    const confirmed = await DialogAPI.ask(
-                      `Remove custom layer '${layer.name}'?`,
-                      { title: "Remove Custom Layer", kind: "warning" }
-                    );
+                    const confirmed = await DialogAPI.ask(`Remove custom layer '${layer.name}'?`, {
+                      title: 'Remove Custom Layer',
+                      kind: 'warning',
+                    });
                     if (confirmed) {
                       removeCustomLayer(layer.id);
                       if (activeCustomLayerId === layer.id) {
@@ -450,7 +476,7 @@ export function LayerPanel() {
         {mapLayers.length === 0 && customLayers.length === 0 ? (
           <EmptyState message="No maps or custom layers. Click above to add." />
         ) : mapLayers.length > 0 ? (
-          <div className={cn("space-y-4", customLayers.length > 0 && "pt-4 border-t border-border-base/20")}>
+          <div className={cn('space-y-4', customLayers.length > 0 && 'pt-4 border-t border-border-base/20')}>
             <div className="flex items-center gap-2 ml-1">
               <FieldLabel className="flex items-center gap-2 flex-1">
                 Map Layers
@@ -474,16 +500,16 @@ export function LayerPanel() {
                   onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setContextMenu({ type: "map", id: layer.id, x: e.clientX, y: e.clientY });
+                    setContextMenu({ type: 'map', id: layer.id, x: e.clientX, y: e.clientY });
                   }}
                   onMoveUp={() => moveUpMap(index)}
                   onMoveDown={() => moveDownMap(index)}
                   onToggleVisible={() => updateMapLayer(layer.id, { visible: !layer.visible })}
                   onRemove={async () => {
-                    const confirmed = await DialogAPI.ask(
-                      `Remove map layer '${layer.name}'?`,
-                      { title: "Remove Map", kind: "warning" }
-                    );
+                    const confirmed = await DialogAPI.ask(`Remove map layer '${layer.name}'?`, {
+                      title: 'Remove Map',
+                      kind: 'warning',
+                    });
                     if (confirmed) {
                       removeMapLayer(layer.id);
                       if (activeMapLayerId === layer.id) {
@@ -509,8 +535,8 @@ export function LayerPanel() {
                 <ChevronDown
                   size={13}
                   className={cn(
-                    "text-text-muted group-hover:text-text-base transition-transform shrink-0",
-                    !isExportRegionsOpen && "-rotate-90"
+                    'text-text-muted group-hover:text-text-base transition-transform shrink-0',
+                    !isExportRegionsOpen && '-rotate-90',
                   )}
                 />
                 <FieldLabel className="flex items-center gap-2 flex-1 cursor-pointer">
@@ -526,33 +552,31 @@ export function LayerPanel() {
                 size="icon"
                 className="h-6 w-6 ml-2 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
                 onClick={() => {
-                  const allVisible = exportRegions.every(r => r.visible);
-                  exportRegions.forEach(r => updateExportRegion(r.id, { visible: !allVisible }));
+                  const allVisible = exportRegions.every((r) => r.visible);
+                  exportRegions.forEach((r) => updateExportRegion(r.id, { visible: !allVisible }));
                 }}
-                title={exportRegions.every(r => r.visible) ? "Hide All Regions" : "Show All Regions"}
+                title={exportRegions.every((r) => r.visible) ? 'Hide All Regions' : 'Show All Regions'}
               >
-                {exportRegions.every(r => r.visible) ? <Eye size={14} /> : <EyeOff size={14} />}
+                {exportRegions.every((r) => r.visible) ? <Eye size={14} /> : <EyeOff size={14} />}
               </Button>
             </div>
-            {isExportRegionsOpen && exportRegions.map((region, index) => (
-              <RegionCard
-                key={region.id}
-                region={region}
-                index={index}
-                onToggleVisible={() => updateExportRegion(region.id, { visible: !region.visible })}
-                onRemove={() => removeExportRegion(region.id)}
-                onUpdateRegion={(updates) => updateExportRegion(region.id, updates)}
-              />
-            ))}
+            {isExportRegionsOpen &&
+              exportRegions.map((region, index) => (
+                <RegionCard
+                  key={region.id}
+                  region={region}
+                  index={index}
+                  onToggleVisible={() => updateExportRegion(region.id, { visible: !region.visible })}
+                  onRemove={() => removeExportRegion(region.id)}
+                  onUpdateRegion={(updates) => updateExportRegion(region.id, updates)}
+                />
+              ))}
           </div>
         )}
       </div>
 
       {/* New Custom Layer Modal */}
-      <NewCustomLayerModal
-        isOpen={isNewCustomLayerModalOpen}
-        onClose={() => setIsNewCustomLayerModalOpen(false)}
-      />
+      <NewCustomLayerModal isOpen={isNewCustomLayerModalOpen} onClose={() => setIsNewCustomLayerModalOpen(false)} />
 
       {/* Layer Context Menu */}
       {contextMenu && (
@@ -561,169 +585,182 @@ export function LayerPanel() {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 w-52 text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
         >
-          {contextMenu.type === "custom" && (() => {
-            const layer = customLayers.find((l) => l.id === contextMenu.id);
-            if (!layer) return null;
-            const isManual = layer.type === "manual";
-            const isEditing = isMapEditMode && activeCustomLayerId === layer.id && isManual;
+          {contextMenu.type === 'custom' &&
+            (() => {
+              const layer = customLayers.find((l) => l.id === contextMenu.id);
+              if (!layer) return null;
+              const isManual = layer.type === 'manual';
+              const isEditing = isMapEditMode && activeCustomLayerId === layer.id && isManual;
 
-            return (
-              <>
-                {/* 内部プロパティ / インスペクター表示 */}
-                {!isManual ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        openPluginDataModal(
-                          `カスタムレイヤー: ${layer.name}`,
-                          layer.plugin_data,
-                          `プラグイン: ${layer.plugin_id || 'Unknown'} • 内部メタデータ (Read-only)`
-                        );
-                        setContextMenu(null);
-                      }}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                    >
-                      <Code2 size={13} className="text-accent-automation" />
-                      <span>内部プロパティを表示</span>
-                    </button>
+              return (
+                <>
+                  {/* 内部プロパティ / インスペクター表示 */}
+                  {!isManual ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          openPluginDataModal(
+                            `カスタムレイヤー: ${layer.name}`,
+                            layer.plugin_data,
+                            `プラグイン: ${layer.plugin_id || 'Unknown'} • 内部メタデータ (Read-only)`,
+                          );
+                          setContextMenu(null);
+                        }}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                      >
+                        <Code2 size={13} className="text-accent-automation" />
+                        <span>内部プロパティを表示</span>
+                      </button>
 
+                      <button
+                        onClick={() => {
+                          selectNodes([]);
+                          setActiveCustomLayerId(layer.id);
+                          setRightPanelActiveTab('inspector');
+                          setRightPanelOpen(true);
+                          setContextMenu(null);
+                        }}
+                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                      >
+                        <Settings2 size={13} className="text-text-muted" />
+                        <span>パラメータ編集 / 再生成</span>
+                      </button>
+                    </>
+                  ) : (
                     <button
                       onClick={() => {
                         selectNodes([]);
                         setActiveCustomLayerId(layer.id);
-                        setRightPanelActiveTab("inspector");
+                        setMapEditMode(!isEditing);
+                        setRightPanelActiveTab('inspector');
                         setRightPanelOpen(true);
                         setContextMenu(null);
                       }}
                       className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                     >
-                      <Settings2 size={13} className="text-text-muted" />
-                      <span>パラメータ編集 / 再生成</span>
+                      <Pencil size={13} className="text-primary-base" />
+                      <span>{isEditing ? 'ベクター編集を終了' : 'ベクター編集を開始'}</span>
                     </button>
-                  </>
-                ) : (
+                  )}
+
+                  {/* 参照レイヤー切り替え */}
                   <button
                     onClick={() => {
-                      selectNodes([]);
-                      setActiveCustomLayerId(layer.id);
-                      setMapEditMode(!isEditing);
-                      setRightPanelActiveTab("inspector");
-                      setRightPanelOpen(true);
+                      updateCustomLayer(layer.id, { is_reference: !layer.is_reference });
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Pencil size={13} className="text-primary-base" />
-                    <span>{isEditing ? "ベクター編集を終了" : "ベクター編集を開始"}</span>
+                    <Bookmark
+                      size={13}
+                      className={layer.is_reference ? 'fill-accent-reference text-accent-reference' : 'text-text-muted'}
+                    />
+                    <span>{layer.is_reference ? '参照レイヤー解除' : '参照レイヤーに設定'}</span>
                   </button>
-                )}
 
-                {/* 参照レイヤー切り替え */}
-                <button
-                  onClick={() => {
-                    updateCustomLayer(layer.id, { is_reference: !layer.is_reference });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Bookmark size={13} className={layer.is_reference ? "fill-accent-reference text-accent-reference" : "text-text-muted"} />
-                  <span>{layer.is_reference ? "参照レイヤー解除" : "参照レイヤーに設定"}</span>
-                </button>
+                  {/* 表示 / 非表示 */}
+                  <button
+                    onClick={() => {
+                      updateCustomLayer(layer.id, { visible: !layer.visible });
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    {layer.visible ? (
+                      <EyeOff size={13} className="text-text-muted" />
+                    ) : (
+                      <Eye size={13} className="text-text-base" />
+                    )}
+                    <span>{layer.visible ? '非表示にする' : '表示する'}</span>
+                  </button>
 
-                {/* 表示 / 非表示 */}
-                <button
-                  onClick={() => {
-                    updateCustomLayer(layer.id, { visible: !layer.visible });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  {layer.visible ? <EyeOff size={13} className="text-text-muted" /> : <Eye size={13} className="text-text-base" />}
-                  <span>{layer.visible ? "非表示にする" : "表示する"}</span>
-                </button>
+                  <div className="h-px bg-border-base/30 my-0.5" />
 
-                <div className="h-px bg-border-base/30 my-0.5" />
-
-                {/* 削除 */}
-                <button
-                  onClick={async () => {
-                    setContextMenu(null);
-                    const confirmed = await DialogAPI.ask(
-                      `Remove custom layer '${layer.name}'?`,
-                      { title: "Remove Custom Layer", kind: "warning" }
-                    );
-                    if (confirmed) {
-                      removeCustomLayer(layer.id);
-                      if (activeCustomLayerId === layer.id) {
-                        setActiveCustomLayerId(null);
-                        setMapEditMode(false);
+                  {/* 削除 */}
+                  <button
+                    onClick={async () => {
+                      setContextMenu(null);
+                      const confirmed = await DialogAPI.ask(`Remove custom layer '${layer.name}'?`, {
+                        title: 'Remove Custom Layer',
+                        kind: 'warning',
+                      });
+                      if (confirmed) {
+                        removeCustomLayer(layer.id);
+                        if (activeCustomLayerId === layer.id) {
+                          setActiveCustomLayerId(null);
+                          setMapEditMode(false);
+                        }
                       }
-                    }
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
-                >
-                  <Trash2 size={13} />
-                  <span>削除 (Delete)</span>
-                </button>
-              </>
-            );
-          })()}
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    <span>削除 (Delete)</span>
+                  </button>
+                </>
+              );
+            })()}
 
-          {contextMenu.type === "map" && (() => {
-            const layer = mapLayers.find((l) => l.id === contextMenu.id);
-            if (!layer) return null;
+          {contextMenu.type === 'map' &&
+            (() => {
+              const layer = mapLayers.find((l) => l.id === contextMenu.id);
+              if (!layer) return null;
 
-            return (
-              <>
-                {/* 編集対象マップに設定 */}
-                <button
-                  onClick={() => {
-                    setActiveMapLayerId(layer.id);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Crop size={13} className="text-primary-base" />
-                  <span>編集対象マップに設定</span>
-                </button>
+              return (
+                <>
+                  {/* 編集対象マップに設定 */}
+                  <button
+                    onClick={() => {
+                      setActiveMapLayerId(layer.id);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Crop size={13} className="text-primary-base" />
+                    <span>編集対象マップに設定</span>
+                  </button>
 
-                {/* 表示 / 非表示 */}
-                <button
-                  onClick={() => {
-                    updateMapLayer(layer.id, { visible: !layer.visible });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  {layer.visible ? <EyeOff size={13} className="text-text-muted" /> : <Eye size={13} className="text-text-base" />}
-                  <span>{layer.visible ? "非表示にする" : "表示する"}</span>
-                </button>
+                  {/* 表示 / 非表示 */}
+                  <button
+                    onClick={() => {
+                      updateMapLayer(layer.id, { visible: !layer.visible });
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    {layer.visible ? (
+                      <EyeOff size={13} className="text-text-muted" />
+                    ) : (
+                      <Eye size={13} className="text-text-base" />
+                    )}
+                    <span>{layer.visible ? '非表示にする' : '表示する'}</span>
+                  </button>
 
-                <div className="h-px bg-border-base/30 my-0.5" />
+                  <div className="h-px bg-border-base/30 my-0.5" />
 
-                {/* 削除 */}
-                <button
-                  onClick={async () => {
-                    setContextMenu(null);
-                    const confirmed = await DialogAPI.ask(
-                      `Remove map layer '${layer.name}'?`,
-                      { title: "Remove Map", kind: "warning" }
-                    );
-                    if (confirmed) {
-                      removeMapLayer(layer.id);
-                      if (activeMapLayerId === layer.id) {
-                        setActiveMapLayerId(null);
+                  {/* 削除 */}
+                  <button
+                    onClick={async () => {
+                      setContextMenu(null);
+                      const confirmed = await DialogAPI.ask(`Remove map layer '${layer.name}'?`, {
+                        title: 'Remove Map',
+                        kind: 'warning',
+                      });
+                      if (confirmed) {
+                        removeMapLayer(layer.id);
+                        if (activeMapLayerId === layer.id) {
+                          setActiveMapLayerId(null);
+                        }
                       }
-                    }
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
-                >
-                  <Trash2 size={13} />
-                  <span>削除 (Delete)</span>
-                </button>
-              </>
-            );
-          })()}
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    <span>削除 (Delete)</span>
+                  </button>
+                </>
+              );
+            })()}
         </div>
       )}
     </div>
@@ -767,7 +804,7 @@ function CustomLayerCard({
   onRemove,
   onUpdateLayer,
 }: CustomLayerCardProps) {
-  const isManual = layer.type === "manual";
+  const isManual = layer.type === 'manual';
   const [showSettings, setShowSettings] = useState(false);
 
   return (
@@ -799,11 +836,11 @@ function CustomLayerCard({
         <>
           <span
             className={cn(
-              "text-[9px] font-bold uppercase px-1 py-0.2 rounded",
-              isManual ? "bg-primary-base/15 text-primary-base" : "bg-accent-automation/20 text-accent-automation"
+              'text-[9px] font-bold uppercase px-1 py-0.2 rounded',
+              isManual ? 'bg-primary-base/15 text-primary-base' : 'bg-accent-automation/20 text-accent-automation',
             )}
           >
-            {isManual ? "Manual" : "Plugin"}
+            {isManual ? 'Manual' : 'Plugin'}
           </span>
           {layer.is_reference && (
             <span
@@ -814,7 +851,7 @@ function CustomLayerCard({
             </span>
           )}
           <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
-            Layer {index + 1} {isManual ? `• ${layer.editObjects.length} obj` : ""}
+            Layer {index + 1} {isManual ? `• ${layer.editObjects.length} obj` : ''}
           </span>
         </>
       }
@@ -824,10 +861,10 @@ function CustomLayerCard({
             variant="ghost"
             size="icon"
             className={cn(
-              "h-7 w-7 transition-all",
+              'h-7 w-7 transition-all',
               layer.is_reference
-                ? "text-accent-reference bg-accent-reference/20 hover:bg-accent-reference/30 border border-accent-reference/40"
-                : "text-text-muted hover:text-accent-reference hover:bg-accent-reference/10"
+                ? 'text-accent-reference bg-accent-reference/20 hover:bg-accent-reference/30 border border-accent-reference/40'
+                : 'text-text-muted hover:text-accent-reference hover:bg-accent-reference/10',
             )}
             onClick={(e) => {
               e.stopPropagation();
@@ -835,25 +872,25 @@ function CustomLayerCard({
             }}
             title={
               layer.is_reference
-                ? "Reference Layer: ON (マージ除外・オーバーレイ参照用)"
-                : "Reference Layer: OFF (通常レイヤー)"
+                ? 'Reference Layer: ON (マージ除外・オーバーレイ参照用)'
+                : 'Reference Layer: OFF (通常レイヤー)'
             }
           >
-            <Bookmark size={14} className={layer.is_reference ? "fill-accent-reference" : ""} />
+            <Bookmark size={14} className={layer.is_reference ? 'fill-accent-reference' : ''} />
           </Button>
 
           {isManual ? (
             <Button
-              variant={isEditing ? "primary" : "ghost"}
+              variant={isEditing ? 'primary' : 'ghost'}
               size="icon"
               className="h-7 w-7 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleEdit();
               }}
-              title={isEditing ? "Stop Vector Editing" : "Start Vector Editing"}
+              title={isEditing ? 'Stop Vector Editing' : 'Start Vector Editing'}
             >
-              <Pencil size={14} className={isEditing ? "text-primary-base" : ""} />
+              <Pencil size={14} className={isEditing ? 'text-primary-base' : ''} />
             </Button>
           ) : (
             <Button
@@ -894,13 +931,13 @@ function CustomLayerCard({
         <div className="flex flex-col gap-1 mt-1">
           <FieldLabel>Blend Mode</FieldLabel>
           <Select
-            value={layer.blend_mode || "overwrite"}
+            value={layer.blend_mode || 'overwrite'}
             disabled={!!layer.is_reference}
             onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              "h-7 text-xs bg-surface-base border-border-base/50",
-              layer.is_reference && "opacity-50 cursor-not-allowed bg-surface-base/30"
+              'h-7 text-xs bg-surface-base border-border-base/50',
+              layer.is_reference && 'opacity-50 cursor-not-allowed bg-surface-base/30',
             )}
           >
             <option value="overwrite">Overwrite</option>
@@ -908,9 +945,7 @@ function CustomLayerCard({
             <option value="merge_free">Merge Free Space</option>
           </Select>
           {layer.is_reference && (
-            <p className="text-[9px] text-accent-reference/80 text-right">
-              ※ 参照レイヤーのため合成されません
-            </p>
+            <p className="text-[9px] text-accent-reference/80 text-right">※ 参照レイヤーのため合成されません</p>
           )}
         </div>
       </div>
@@ -923,7 +958,7 @@ function CustomLayerCard({
           </span>
         ) : (
           <span className="text-[10px] text-text-muted truncate">
-            Plugin: <span className="font-semibold text-text-base">{layer.plugin_id || "Generator"}</span>
+            Plugin: <span className="font-semibold text-text-base">{layer.plugin_id || 'Generator'}</span>
           </span>
         )}
         {!isManual && (
@@ -985,14 +1020,16 @@ function LayerCard({
 
   // Origin & Initial Origin handling
   const rawOrigin = layer.info?.origin;
-  const origin: [number, number, number] = Array.isArray(rawOrigin) && rawOrigin.length >= 2
-    ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
-    : [0, 0, 0];
+  const origin: [number, number, number] =
+    Array.isArray(rawOrigin) && rawOrigin.length >= 2
+      ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
+      : [0, 0, 0];
 
   const rawInitialOrigin = layer.info?.initial_origin;
-  const initialOrigin: [number, number, number] = Array.isArray(rawInitialOrigin) && rawInitialOrigin.length >= 2
-    ? [Number(rawInitialOrigin[0]) || 0, Number(rawInitialOrigin[1]) || 0, Number(rawInitialOrigin[2]) || 0]
-    : [...origin];
+  const initialOrigin: [number, number, number] =
+    Array.isArray(rawInitialOrigin) && rawInitialOrigin.length >= 2
+      ? [Number(rawInitialOrigin[0]) || 0, Number(rawInitialOrigin[1]) || 0, Number(rawInitialOrigin[2]) || 0]
+      : [...origin];
 
   const deltaX = origin[0] - initialOrigin[0];
   const deltaY = origin[1] - initialOrigin[1];
@@ -1030,7 +1067,7 @@ function LayerCard({
 
   const handleRotateDelta = (stepDeg: number) => {
     let newDeg = Math.round((deltaYawDeg + stepDeg) / 90) * 90;
-    newDeg = ((newDeg + 180) % 360 + 360) % 360 - 180;
+    newDeg = ((((newDeg + 180) % 360) + 360) % 360) - 180;
     handleUpdateDelta({ deltaYawDeg: newDeg });
   };
 
@@ -1069,10 +1106,7 @@ function LayerCard({
       isFirst={isFirst}
       isLast={isLast}
       title={
-        <span
-          className="text-sm font-bold text-text-base truncate block max-w-[140px]"
-          title={layer.name}
-        >
+        <span className="text-sm font-bold text-text-base truncate block max-w-[140px]" title={layer.name}>
           {layer.name}
         </span>
       }
@@ -1084,9 +1118,7 @@ function LayerCard({
               Target Map
             </span>
           )}
-          <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
-            Layer {index + 1}
-          </span>
+          <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">Layer {index + 1}</span>
         </>
       }
       showSettings={showSettings}
@@ -1182,7 +1214,8 @@ function LayerCard({
           className="text-[9px] text-text-muted truncate font-mono px-0.5"
           title={`YAML Origin: [${initialOrigin[0]}, ${initialOrigin[1]}, ${initialOrigin[2]}]`}
         >
-          YAML Origin: [{initialOrigin[0].toFixed(2)}, {initialOrigin[1].toFixed(2)}, {(initialOrigin[2] * (180 / Math.PI)).toFixed(1)}°]
+          YAML Origin: [{initialOrigin[0].toFixed(2)}, {initialOrigin[1].toFixed(2)},{' '}
+          {(initialOrigin[2] * (180 / Math.PI)).toFixed(1)}°]
         </div>
       </div>
 
@@ -1305,13 +1338,7 @@ interface RegionCardProps {
   onUpdateRegion: (updates: Partial<ExportRegion>) => void;
 }
 
-function RegionCard({
-  region,
-  index,
-  onToggleVisible,
-  onRemove,
-  onUpdateRegion,
-}: RegionCardProps) {
+function RegionCard({ region, index, onToggleVisible, onRemove, onUpdateRegion }: RegionCardProps) {
   const [showSettings, setShowSettings] = useState(false);
 
   return (
@@ -1377,4 +1404,3 @@ function RegionCard({
     </LayerCardShell>
   );
 }
-

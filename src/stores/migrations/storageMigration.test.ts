@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  migrateStorage,
-  DEFAULT_STORAGE_STATE,
-  STORAGE_VERSION,
-} from './storageMigration';
+import { migrateStorage, DEFAULT_STORAGE_STATE, STORAGE_VERSION } from './storageMigration';
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 
 describe('storageMigration', () => {
@@ -155,4 +151,3 @@ describe('storageMigration', () => {
     expect(migrated.panelLayout!.rightTabs).toContain('layers');
   });
 });
-

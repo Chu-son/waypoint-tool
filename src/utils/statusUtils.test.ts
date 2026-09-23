@@ -190,7 +190,7 @@ describe('statusUtils', () => {
       expect(
         computeTotalPathDistance(['wp1'], {
           wp1: { id: 'wp1', name: '1', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } },
-        })
+        }),
       ).toBe(0);
     });
 

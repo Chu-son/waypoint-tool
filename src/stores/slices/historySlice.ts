@@ -50,7 +50,10 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   nodes: state.nodes,
   rootNodeIds: state.rootNodeIds,
   selectedNodeIds: state.selectedNodeIds,
-  selection: cloneSelection(state.selection ?? (state.selectedNodeIds?.length ? { type: 'nodes', ids: state.selectedNodeIds } : { type: 'none' })),
+  selection: cloneSelection(
+    state.selection ??
+      (state.selectedNodeIds?.length ? { type: 'nodes', ids: state.selectedNodeIds } : { type: 'none' }),
+  ),
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
@@ -108,11 +111,11 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       const restoredTarget = validateAndCorrectInsertionTarget(
         snapshot.insertionTarget ?? null,
         snapshot.rootNodeIds,
-        snapshot.nodes
+        snapshot.nodes,
       );
-      const restoredSelection: ActiveSelection = snapshot.selection ?? (
-        snapshot.selectedNodeIds?.length ? { type: 'nodes', ids: snapshot.selectedNodeIds } : { type: 'none' }
-      );
+      const restoredSelection: ActiveSelection =
+        snapshot.selection ??
+        (snapshot.selectedNodeIds?.length ? { type: 'nodes', ids: snapshot.selectedNodeIds } : { type: 'none' });
 
       return {
         historyPast: nextPast,
@@ -141,14 +144,14 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       const nextFuture = [...state.historyFuture];
       const snapshot = nextFuture.pop()!;
       const nextPast = [...state.historyPast, captureSnapshot(state)];
-    const restoredTarget = validateAndCorrectInsertionTarget(
-      snapshot.insertionTarget ?? null,
-      snapshot.rootNodeIds,
-      snapshot.nodes
-    );
-    const restoredSelection: ActiveSelection = snapshot.selection ?? (
-      snapshot.selectedNodeIds?.length ? { type: 'nodes', ids: snapshot.selectedNodeIds } : { type: 'none' }
-    );
+      const restoredTarget = validateAndCorrectInsertionTarget(
+        snapshot.insertionTarget ?? null,
+        snapshot.rootNodeIds,
+        snapshot.nodes,
+      );
+      const restoredSelection: ActiveSelection =
+        snapshot.selection ??
+        (snapshot.selectedNodeIds?.length ? { type: 'nodes', ids: snapshot.selectedNodeIds } : { type: 'none' });
 
       return {
         historyPast: nextPast,

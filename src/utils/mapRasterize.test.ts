@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest";
-import { prepareLayersForExport, getEditLayerBoundingBox } from "./mapRasterize";
-import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer } from "../types/store";
+import { describe, it, expect } from 'vitest';
+import { prepareLayersForExport, getEditLayerBoundingBox } from './mapRasterize';
+import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer } from '../types/store';
 
-describe("prepareLayersForExport ordering and z_index tests", () => {
-  it("assigns higher z_index to higher layers in list, and custom layers always have z_index >= 1000", async () => {
+describe('prepareLayersForExport ordering and z_index tests', () => {
+  it('assigns higher z_index to higher layers in list, and custom layers always have z_index >= 1000', async () => {
     const mockMapLayers: ProjectMapLayer[] = [
       {
-        id: "map-top",
-        name: "Top Map",
+        id: 'map-top',
+        name: 'Top Map',
         info: { resolution: 0.05, origin: [0, 0, 0] },
-        image_base64: "data:image/png;base64,top",
+        image_base64: 'data:image/png;base64,top',
         width: 100,
         height: 100,
         visible: true,
@@ -17,10 +17,10 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
         z_index: 0,
       },
       {
-        id: "map-bottom",
-        name: "Bottom Map",
+        id: 'map-bottom',
+        name: 'Bottom Map',
         info: { resolution: 0.05, origin: [0, 0, 0] },
-        image_base64: "data:image/png;base64,bottom",
+        image_base64: 'data:image/png;base64,bottom',
         width: 100,
         height: 100,
         visible: true,
@@ -31,24 +31,24 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
 
     const mockCustomLayers: (ManualCustomLayer | PluginCustomLayer)[] = [
       {
-        id: "custom-top",
-        name: "Top Custom Plugin",
-        type: "plugin",
-        plugin_id: "test",
+        id: 'custom-top',
+        name: 'Top Custom Plugin',
+        type: 'plugin',
+        plugin_id: 'test',
         params: {},
-        image_base64: "data:image/png;base64,custom-top",
+        image_base64: 'data:image/png;base64,custom-top',
         info: { resolution: 0.05, origin: [0, 0, 0], width: 100, height: 100 },
         visible: true,
         opacity: 1.0,
         z_index: 0,
       },
       {
-        id: "custom-bottom",
-        name: "Bottom Custom Plugin",
-        type: "plugin",
-        plugin_id: "test",
+        id: 'custom-bottom',
+        name: 'Bottom Custom Plugin',
+        type: 'plugin',
+        plugin_id: 'test',
         params: {},
-        image_base64: "data:image/png;base64,custom-bottom",
+        image_base64: 'data:image/png;base64,custom-bottom',
         info: { resolution: 0.05, origin: [0, 0, 0], width: 100, height: 100 },
         visible: true,
         opacity: 1.0,
@@ -58,10 +58,10 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
 
     const result = await prepareLayersForExport(mockMapLayers, mockCustomLayers);
 
-    const mapTop = result.find(l => l.id === "map-top")!;
-    const mapBottom = result.find(l => l.id === "map-bottom")!;
-    const customTop = result.find(l => l.id === "custom-top")!;
-    const customBottom = result.find(l => l.id === "custom-bottom")!;
+    const mapTop = result.find((l) => l.id === 'map-top')!;
+    const mapBottom = result.find((l) => l.id === 'map-bottom')!;
+    const customTop = result.find((l) => l.id === 'custom-top')!;
+    const customBottom = result.find((l) => l.id === 'custom-bottom')!;
 
     // 1. Map Layers ordering: top in list has higher z_index than bottom in list
     expect(mapTop.z_index).toBe(1);
@@ -77,13 +77,13 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
     expect(customBottom.z_index).toBeGreaterThan(mapTop.z_index);
   });
 
-  it("updates z_index correctly when layers are reordered", async () => {
+  it('updates z_index correctly when layers are reordered', async () => {
     const mockMapLayers: ProjectMapLayer[] = [
       {
-        id: "map-1",
-        name: "Map 1",
+        id: 'map-1',
+        name: 'Map 1',
         info: { resolution: 0.05, origin: [0, 0, 0] },
-        image_base64: "data:image/png;base64,1",
+        image_base64: 'data:image/png;base64,1',
         width: 100,
         height: 100,
         visible: true,
@@ -91,10 +91,10 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
         z_index: 0,
       },
       {
-        id: "map-2",
-        name: "Map 2",
+        id: 'map-2',
+        name: 'Map 2',
         info: { resolution: 0.05, origin: [0, 0, 0] },
-        image_base64: "data:image/png;base64,2",
+        image_base64: 'data:image/png;base64,2',
         width: 100,
         height: 100,
         visible: true,
@@ -105,28 +105,28 @@ describe("prepareLayersForExport ordering and z_index tests", () => {
 
     // Initial order: [map-1, map-2]
     const res1 = await prepareLayersForExport(mockMapLayers, []);
-    expect(res1.find(l => l.id === "map-1")!.z_index).toBe(1);
-    expect(res1.find(l => l.id === "map-2")!.z_index).toBe(0);
+    expect(res1.find((l) => l.id === 'map-1')!.z_index).toBe(1);
+    expect(res1.find((l) => l.id === 'map-2')!.z_index).toBe(0);
 
     // Reordered: [map-2, map-1]
     const reorderedMapLayers = [mockMapLayers[1], mockMapLayers[0]];
     const res2 = await prepareLayersForExport(reorderedMapLayers, []);
-    expect(res2.find(l => l.id === "map-2")!.z_index).toBe(1);
-    expect(res2.find(l => l.id === "map-1")!.z_index).toBe(0);
+    expect(res2.find((l) => l.id === 'map-2')!.z_index).toBe(1);
+    expect(res2.find((l) => l.id === 'map-1')!.z_index).toBe(0);
   });
 
-  it("calculates bounding box correctly for line edit objects", () => {
+  it('calculates bounding box correctly for line edit objects', () => {
     const editLayer: ManualCustomLayer = {
-      id: "manual-1",
-      name: "Manual Layer",
-      type: "manual",
+      id: 'manual-1',
+      name: 'Manual Layer',
+      type: 'manual',
       visible: true,
       opacity: 1.0,
       z_index: 0,
       editObjects: [
         {
-          id: "line-1",
-          type: "line",
+          id: 'line-1',
+          type: 'line',
           x1: 2.0,
           y1: 3.0,
           x2: 8.0,

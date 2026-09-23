@@ -458,13 +458,20 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
       const isModalActuallyOpen = (modal: ModalType): boolean => {
         const s = get();
         switch (modal) {
-          case 'settings': return s.isSettingsModalOpen;
-          case 'export': return s.isExportModalOpen;
-          case 'import': return s.isImportModalOpen;
-          case 'export_maps': return s.isExportMapsModalOpen;
-          case 'shortcuts': return s.isShortcutsModalOpen;
-          case 'welcome': return s.isWelcomeModalOpen;
-          case 'plugin_data': return !!s.pluginDataModalState?.isOpen;
+          case 'settings':
+            return s.isSettingsModalOpen;
+          case 'export':
+            return s.isExportModalOpen;
+          case 'import':
+            return s.isImportModalOpen;
+          case 'export_maps':
+            return s.isExportMapsModalOpen;
+          case 'shortcuts':
+            return s.isShortcutsModalOpen;
+          case 'welcome':
+            return s.isWelcomeModalOpen;
+          case 'plugin_data':
+            return !!s.pluginDataModalState?.isOpen;
         }
       };
 
@@ -572,10 +579,8 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
       const state = get();
       if (state.selectedNodeIds.length > 0) {
         const flatNodeIds = getFlattenedNodeIds(state.rootNodeIds, state.nodes);
-        const topLevelIds = filterTopLevelIds(
-          state.selectedNodeIds,
-          flatNodeIds,
-          (id) => collectDescendantIds(id, state.nodes)
+        const topLevelIds = filterTopLevelIds(state.selectedNodeIds, flatNodeIds, (id) =>
+          collectDescendantIds(id, state.nodes),
         );
         if (topLevelIds.length === 0) return false;
 

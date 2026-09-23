@@ -22,12 +22,8 @@ describe('PipelineInspector', () => {
         name: 'Step 1 Layer Generator',
         type: 'python',
         executable: 'step1.py',
-        inputs: [
-          { id: 'roi', name: 'roi', label: 'ROI Region', type: 'rectangle' },
-        ],
-        properties: [
-          { name: 'threshold', label: 'Threshold', type: 'number', default: 50 },
-        ],
+        inputs: [{ id: 'roi', name: 'roi', label: 'ROI Region', type: 'rectangle' }],
+        properties: [{ name: 'threshold', label: 'Threshold', type: 'number', default: 50 }],
       },
       folder_path: '/path/1',
     },
@@ -38,12 +34,8 @@ describe('PipelineInspector', () => {
         name: 'Step 2 Sweep Planner',
         type: 'python',
         executable: 'step2.py',
-        inputs: [
-          { id: 'input_roi', name: 'input_roi', label: 'Input ROI', type: 'rectangle' },
-        ],
-        properties: [
-          { name: 'num_lines', label: 'Num Lines', type: 'number', default: 6 },
-        ],
+        inputs: [{ id: 'input_roi', name: 'input_roi', label: 'Input ROI', type: 'rectangle' }],
+        properties: [{ name: 'num_lines', label: 'Num Lines', type: 'number', default: 6 }],
       },
       folder_path: '/path/2',
     },

@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 export function filterTopLevelIds(
   selectedIds: string[],
   flatOrderedIds: string[],
-  getDescendantIds: (id: string) => string[]
+  getDescendantIds: (id: string) => string[],
 ): string[] {
   if (!selectedIds || selectedIds.length === 0) return [];
 
@@ -59,7 +59,7 @@ export function remapHierarchicalIds<T extends { id: string; children_ids?: stri
   options?: {
     parentRefField?: keyof T;
     onCloneItem?: (cloned: T, origId: string, newId: string) => void;
-  }
+  },
 ): IdRemapResult<T> {
   const idMap = new Map<string, string>();
   const allTargetIds: string[] = [];
@@ -93,9 +93,7 @@ export function remapHierarchicalIds<T extends { id: string; children_ids?: stri
     cloned.id = newId;
 
     if (cloned.children_ids && cloned.children_ids.length > 0) {
-      cloned.children_ids = cloned.children_ids
-        .map((cid) => idMap.get(cid) || cid)
-        .filter(Boolean);
+      cloned.children_ids = cloned.children_ids.map((cid) => idMap.get(cid) || cid).filter(Boolean);
     }
 
     if (parentRefField && cloned[parentRefField]) {
@@ -113,9 +111,7 @@ export function remapHierarchicalIds<T extends { id: string; children_ids?: stri
     newItems[newId] = cloned;
   });
 
-  const newTopLevelIds = topLevelIds
-    .map((tid) => idMap.get(tid)!)
-    .filter(Boolean);
+  const newTopLevelIds = topLevelIds.map((tid) => idMap.get(tid)!).filter(Boolean);
 
   return {
     idMap,
@@ -134,10 +130,7 @@ export interface NameResolutionOptions {
  * - forceCopySuffix が true: 必ず "(Copy)" または "(Copy N)" を付与
  * - forceCopySuffix が false: 既存名と衝突する場合のみ "(Copy)" を付与、衝突がなければ元の名前を維持
  */
-export function resolveMapElementName(
-  name: string | undefined,
-  options: NameResolutionOptions
-): string | undefined {
+export function resolveMapElementName(name: string | undefined, options: NameResolutionOptions): string | undefined {
   if (!name) return undefined;
 
   const { existingNames, forceCopySuffix } = options;

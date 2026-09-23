@@ -29,13 +29,11 @@ export const BackgroundLoadingBadge: React.FC<BackgroundLoadingBadgeProps> = ({ 
       aria-label={currentTask.message}
       className={cn(
         'absolute top-4 right-4 z-20 pointer-events-none select-none flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-panel/90 backdrop-blur-md border border-border-base text-text-base text-xs shadow-lg animate-in fade-in slide-in-from-top-2 duration-200',
-        className
+        className,
       )}
     >
       <Loader2 size={13} className="animate-spin text-primary-base flex-shrink-0" />
-      <span className="font-medium truncate max-w-[200px]">
-        {currentTask.message}
-      </span>
+      <span className="font-medium truncate max-w-[200px]">{currentTask.message}</span>
     </div>
   );
 };

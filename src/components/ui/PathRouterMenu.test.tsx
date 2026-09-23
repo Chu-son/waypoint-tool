@@ -16,11 +16,9 @@ describe('PathRouterMenu', () => {
         category: 'path_calculator',
         type: 'python',
         description: 'Calculates path with obstacle avoidance',
-        properties: [
-          { name: 'safety_margin', label: 'Safety Margin', type: 'float', default: 0.15 }
-        ],
-      }
-    }
+        properties: [{ name: 'safety_margin', label: 'Safety Margin', type: 'float', default: 0.15 }],
+      },
+    },
   };
 
   const mockSetActivePluginId = vi.fn();
@@ -41,7 +39,7 @@ describe('PathRouterMenu', () => {
         setAutoRecalculatePath: mockSetAutoRecalculatePath,
         isCalculatingPath: false,
         recalculatePath: mockRecalculatePath,
-      })
+      }),
     );
   });
 

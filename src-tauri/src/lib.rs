@@ -1,7 +1,7 @@
-pub mod models;
-pub mod map;
-pub mod io;
 pub mod commands;
+pub mod io;
+pub mod map;
+pub mod models;
 pub mod plugins;
 
 use tauri_plugin_window_state::StateFlags;

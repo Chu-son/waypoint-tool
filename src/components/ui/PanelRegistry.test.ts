@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { resolvePanelTabs, useInspectorPanelComponent, resolveInspectorComponent, resolveBuiltinPanelTab } from './PanelRegistry';
+import {
+  resolvePanelTabs,
+  useInspectorPanelComponent,
+  resolveInspectorComponent,
+  resolveBuiltinPanelTab,
+} from './PanelRegistry';
 import { PanelTab } from './PanelContainer';
 import { PluginParamsPanel } from './PluginParamsPanel';
 import { CustomLayerInspector } from './properties/CustomLayerInspector';
@@ -28,7 +33,7 @@ describe('PanelRegistry', () => {
         { type: 'builtin', id: 'project', title: 'Custom Objects' },
         { type: 'builtin', id: 'layers', title: 'Custom Layers' },
       ],
-      fallbackTabs
+      fallbackTabs,
     );
 
     expect(tabs.length).toBe(4);
@@ -53,10 +58,7 @@ describe('PanelRegistry', () => {
   });
 
   it('resolves workflow tab', () => {
-    const tabs = resolvePanelTabs(
-      [{ type: 'workflow', id: 'workflow', title: 'Workflow Guide' }],
-      fallbackTabs
-    );
+    const tabs = resolvePanelTabs([{ type: 'workflow', id: 'workflow', title: 'Workflow Guide' }], fallbackTabs);
 
     expect(tabs.length).toBe(1);
     expect(tabs[0].id).toBe('workflow');
@@ -69,7 +71,7 @@ describe('PanelRegistry', () => {
         { type: 'html_file', id: 'custom_html', title: 'Custom HTML', src: './panel.html' },
         { type: 'url', id: 'custom_url', title: 'Fleet URL', url: 'http://localhost' },
       ],
-      fallbackTabs
+      fallbackTabs,
     );
 
     expect(tabs.length).toBe(2);
@@ -117,7 +119,17 @@ describe('PanelRegistry', () => {
         activeTool: 'select',
         activePluginId: null,
         activeCustomLayerId: 'layer-123',
-        customLayers: [{ id: 'layer-123', name: 'Regular Layer', type: 'manual', editObjects: [], visible: true, opacity: 1, z_index: 0 }],
+        customLayers: [
+          {
+            id: 'layer-123',
+            name: 'Regular Layer',
+            type: 'manual',
+            editObjects: [],
+            visible: true,
+            opacity: 1,
+            z_index: 0,
+          },
+        ],
       });
 
       const { result } = renderHook(() => useInspectorPanelComponent());
@@ -201,7 +213,7 @@ describe('PanelRegistry', () => {
       const el = resolveInspectorComponent(
         { mode: 'generator_add', pluginId: 'map-gen' },
         { type: 'none' },
-        { manifest: { category: 'map_layer_generator' } }
+        { manifest: { category: 'map_layer_generator' } },
       );
       expect(el.type).toBe(CustomLayerInspector);
     });
@@ -210,7 +222,7 @@ describe('PanelRegistry', () => {
       const el = resolveInspectorComponent(
         { mode: 'generator_add', pluginId: 'wp-gen' },
         { type: 'none' },
-        { manifest: { category: 'waypoint_generator' } }
+        { manifest: { category: 'waypoint_generator' } },
       );
       expect(el.type).toBe(PluginParamsPanel);
     });
@@ -218,24 +230,18 @@ describe('PanelRegistry', () => {
     it('returns CustomLayerInspector when selection is custom_layer', () => {
       const el = resolveInspectorComponent(
         { mode: 'select' },
-        { type: 'custom_layer', layerId: 'l1', selectedObjectId: null }
+        { type: 'custom_layer', layerId: 'l1', selectedObjectId: null },
       );
       expect(el.type).toBe(CustomLayerInspector);
     });
 
     it('returns AnnotationInspector when selection is annotations', () => {
-      const el = resolveInspectorComponent(
-        { mode: 'select' },
-        { type: 'annotations', ids: ['ann-1'] }
-      );
+      const el = resolveInspectorComponent({ mode: 'select' }, { type: 'annotations', ids: ['ann-1'] });
       expect(el.type).toBe(AnnotationInspector);
     });
 
     it('returns PropertiesPanel when selection is nodes', () => {
-      const el = resolveInspectorComponent(
-        { mode: 'select' },
-        { type: 'nodes', ids: ['node-1'] }
-      );
+      const el = resolveInspectorComponent({ mode: 'select' }, { type: 'nodes', ids: ['node-1'] });
       expect(el.type).toBe(PropertiesPanel);
     });
 
@@ -243,7 +249,7 @@ describe('PanelRegistry', () => {
       const el = resolveInspectorComponent(
         { mode: 'plugin_interaction', pluginId: 'wp-gen', inputKey: 'pos' },
         { type: 'none' },
-        { manifest: { category: 'waypoint_generator' } }
+        { manifest: { category: 'waypoint_generator' } },
       );
       expect(el.type).toBe(PluginParamsPanel);
     });
@@ -251,7 +257,7 @@ describe('PanelRegistry', () => {
     it('returns CustomLayerInspector for custom_layer_edit mode regardless of selection', () => {
       const el = resolveInspectorComponent(
         { mode: 'custom_layer_edit', targetLayerId: 'l1', subTool: 'rect', fillValue: 100, brushSize: 5 },
-        { type: 'none' }
+        { type: 'none' },
       );
       expect(el.type).toBe(CustomLayerInspector);
     });
@@ -259,18 +265,14 @@ describe('PanelRegistry', () => {
     it('returns AnnotationInspector for annotation_edit mode even when selection is none', () => {
       const el = resolveInspectorComponent(
         { mode: 'annotation_edit', subTool: 'rect', targetGroupId: null },
-        { type: 'none' }
+        { type: 'none' },
       );
       expect(el.type).toBe(AnnotationInspector);
     });
 
     it('returns PropertiesPanel when selection is none', () => {
-      const el = resolveInspectorComponent(
-        { mode: 'select' },
-        { type: 'none' }
-      );
+      const el = resolveInspectorComponent({ mode: 'select' }, { type: 'none' });
       expect(el.type).toBe(PropertiesPanel);
     });
   });
 });
-

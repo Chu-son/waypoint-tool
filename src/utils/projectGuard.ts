@@ -8,11 +8,8 @@ import { useAppStore } from '../stores/appStore';
  */
 export async function confirmDiscardChanges(): Promise<boolean> {
   if (!useAppStore.getState().isDirty) return true;
-  return await DialogAPI.ask(
-    '未保存の変更があります。破棄して続行しますか？',
-    {
-      title: '未保存の変更の確認',
-      kind: 'warning',
-    }
-  );
+  return await DialogAPI.ask('未保存の変更があります。破棄して続行しますか？', {
+    title: '未保存の変更の確認',
+    kind: 'warning',
+  });
 }

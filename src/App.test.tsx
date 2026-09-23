@@ -20,8 +20,6 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }));
 
-
-
 // Mock the backend API
 vi.mock('./api', () => ({
   DialogAPI: {
@@ -72,7 +70,7 @@ describe('App Integration', () => {
     expect(screen.getByText('Annotations')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByTestId('mock-map-canvas')).toBeInTheDocument();
-    
+
     // The default right panel tab is 'Inspector'
     expect(screen.getByText('Inspector')).toBeInTheDocument();
     expect(screen.getByText('Layers')).toBeInTheDocument();
@@ -89,10 +87,17 @@ describe('App Integration', () => {
 
     // Make the backend mock map load
     const mockedMapData = {
-      info: { image: 'map.png', resolution: 0.05, origin: [0, 0, 0], negate: 0, occupied_thresh: 0.65, free_thresh: 0.196 },
+      info: {
+        image: 'map.png',
+        resolution: 0.05,
+        origin: [0, 0, 0],
+        negate: 0,
+        occupied_thresh: 0.65,
+        free_thresh: 0.196,
+      },
       image_data_b64: 'mockbase64',
       width: 100,
-      height: 100
+      height: 100,
     };
     (BackendAPI.loadROSMap as any).mockResolvedValue(mockedMapData);
 
@@ -103,7 +108,7 @@ describe('App Integration', () => {
     act(() => {
       layersTab.click();
     });
-    
+
     // The button should now be visible
     const loadMapBtn = screen.getByText('Load Map');
     act(() => {

@@ -1,11 +1,11 @@
-import { RotateCcw, FlipHorizontal2, RotateCw } from "lucide-react";
-import { useAppStore } from "../../../stores/appStore";
-import { WaypointNode, Transform } from "../../../types/store";
-import { quaternionToYaw, yawToQuaternion } from "../../../utils/transformUtils";
-import { ElementCopyField } from "../../../stores/slices/uiSlice";
-import { Button } from "../common/Button";
-import { TransformField } from "./TransformField";
-import { PropertySectionHeader } from "./PropertySectionHeader";
+import { RotateCcw, FlipHorizontal2, RotateCw } from 'lucide-react';
+import { useAppStore } from '../../../stores/appStore';
+import { WaypointNode, Transform } from '../../../types/store';
+import { quaternionToYaw, yawToQuaternion } from '../../../utils/transformUtils';
+import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import { Button } from '../common/Button';
+import { TransformField } from './TransformField';
+import { PropertySectionHeader } from './PropertySectionHeader';
 
 interface TransformGroupProps {
   isMultiSelection: boolean;
@@ -23,16 +23,14 @@ export function TransformGroup({
   isCopyingField,
 }: TransformGroupProps) {
   const visibleAttributes = useAppStore((state) => state.visibleAttributes);
-  const toggleAttributeVisibility = useAppStore(
-    (state) => state.toggleAttributeVisibility,
-  );
+  const toggleAttributeVisibility = useAppStore((state) => state.toggleAttributeVisibility);
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const nodes = useAppStore((state) => state.nodes);
 
   const currentYaw = node?.transform ? quaternionToYaw(node.transform) : 0;
 
-  const handleFieldChange = (field: "x" | "y" | "z", val: number) => {
+  const handleFieldChange = (field: 'x' | 'y' | 'z', val: number) => {
     useAppStore.getState().runInHistoryTransaction(() => {
       if (isMultiSelection) {
         selectedNodeIds.forEach((id) => {
@@ -147,8 +145,8 @@ export function TransformGroup({
 
       <PropertySectionHeader
         title="Transform (World)"
-        isVisible={visibleAttributes.includes("transform")}
-        onToggleVisible={() => toggleAttributeVisibility("transform")}
+        isVisible={visibleAttributes.includes('transform')}
+        onToggleVisible={() => toggleAttributeVisibility('transform')}
         toggleTitle="Toggle Transform on Canvas"
       />
 
@@ -158,36 +156,36 @@ export function TransformGroup({
           fieldId="x"
           value={isMultiSelection ? 0 : (node?.transform?.x ?? 0)}
           precision={decimalPrecision}
-          placeholder={isMultiSelection ? "Mixed" : ""}
-          isCopying={isCopyingField?.("x")}
-          onContextMenu={(e) => onContextMenuLabel?.("x", e)}
+          placeholder={isMultiSelection ? 'Mixed' : ''}
+          isCopying={isCopyingField?.('x')}
+          onContextMenu={(e) => onContextMenuLabel?.('x', e)}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("x", val)}
+          onChange={(val) => handleFieldChange('x', val)}
         />
         <TransformField
           label="Y (m)"
           fieldId="y"
           value={isMultiSelection ? 0 : (node?.transform?.y ?? 0)}
           precision={decimalPrecision}
-          placeholder={isMultiSelection ? "Mixed" : ""}
-          isCopying={isCopyingField?.("y")}
-          onContextMenu={(e) => onContextMenuLabel?.("y", e)}
+          placeholder={isMultiSelection ? 'Mixed' : ''}
+          isCopying={isCopyingField?.('y')}
+          onContextMenu={(e) => onContextMenuLabel?.('y', e)}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("y", val)}
+          onChange={(val) => handleFieldChange('y', val)}
         />
         <TransformField
           label="Z (m)"
           fieldId="z"
           value={isMultiSelection ? 0 : (node?.transform?.z ?? 0)}
           precision={decimalPrecision}
-          placeholder={isMultiSelection ? "Mixed" : ""}
-          isCopying={isCopyingField?.("z")}
-          onContextMenu={(e) => onContextMenuLabel?.("z", e)}
+          placeholder={isMultiSelection ? 'Mixed' : ''}
+          isCopying={isCopyingField?.('z')}
+          onContextMenu={(e) => onContextMenuLabel?.('z', e)}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("z", val)}
+          onChange={(val) => handleFieldChange('z', val)}
         />
         <div className="col-span-3 grid grid-cols-2 gap-2">
           <TransformField
@@ -195,10 +193,10 @@ export function TransformGroup({
             fieldId="yaw"
             value={isMultiSelection ? 0 : currentYaw}
             precision={decimalPrecision}
-            placeholder={isMultiSelection ? "Mixed" : ""}
+            placeholder={isMultiSelection ? 'Mixed' : ''}
             step="0.01"
-            isCopying={isCopyingField?.("yaw")}
-            onContextMenu={(e) => onContextMenuLabel?.("yaw", e)}
+            isCopying={isCopyingField?.('yaw')}
+            onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
             onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
             onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => handleYawChange(val, false)}
@@ -208,10 +206,10 @@ export function TransformGroup({
             fieldId="yaw"
             value={isMultiSelection ? 0 : currentYaw * (180.0 / Math.PI)}
             precision={decimalPrecision}
-            placeholder={isMultiSelection ? "Mixed" : ""}
+            placeholder={isMultiSelection ? 'Mixed' : ''}
             step="1"
-            isCopying={isCopyingField?.("yaw")}
-            onContextMenu={(e) => onContextMenuLabel?.("yaw", e)}
+            isCopying={isCopyingField?.('yaw')}
+            onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
             onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
             onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
             onChange={(val) => handleYawChange(val, true)}

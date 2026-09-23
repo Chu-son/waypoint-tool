@@ -27,17 +27,17 @@ describe('PluginListPanel', () => {
   const mockPlugins = {
     'plugin-1': {
       id: 'plugin-1',
-      manifest: { name: 'Line Sweep', description: 'Draws lines', category: 'path' }
+      manifest: { name: 'Line Sweep', description: 'Draws lines', category: 'path' },
     },
     'plugin-2': {
       id: 'plugin-2',
-      manifest: { name: 'Rectangle Sweep', description: 'Draws area', category: 'area' }
-    }
+      manifest: { name: 'Rectangle Sweep', description: 'Draws area', category: 'area' },
+    },
   };
 
   const mockSettings = [
     { id: 'plugin-1', enabled: true },
-    { id: 'plugin-2', enabled: true }
+    { id: 'plugin-2', enabled: true },
   ];
 
   const mockSetActiveTool = vi.fn();
@@ -49,18 +49,20 @@ describe('PluginListPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      plugins: mockPlugins,
-      pluginSettings: mockSettings,
-      activePluginId: null,
-      activeTool: 'select',
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-      setSettingsModalOpen: mockSetSettingsModalOpen,
-      selectNodes: mockSelectNodes,
-      setRightPanelActiveTab: mockSetRightPanelActiveTab,
-      setRightPanelOpen: mockSetRightPanelOpen,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        plugins: mockPlugins,
+        pluginSettings: mockSettings,
+        activePluginId: null,
+        activeTool: 'select',
+        setActiveTool: mockSetActiveTool,
+        setActivePlugin: mockSetActivePlugin,
+        setSettingsModalOpen: mockSetSettingsModalOpen,
+        selectNodes: mockSelectNodes,
+        setRightPanelActiveTab: mockSetRightPanelActiveTab,
+        setRightPanelOpen: mockSetRightPanelOpen,
+      }),
+    );
 
     (useAppStore.getState as any).mockReturnValue({
       setActiveTool: mockSetActiveTool,
@@ -106,7 +108,7 @@ describe('PluginListPanel', () => {
     const pipelinePlugins = {
       'p-1': {
         id: 'p-1',
-        manifest: { name: 'Step 1 Plugin', version: '1.0.0', type: 'python', category: 'path' }
+        manifest: { name: 'Step 1 Plugin', version: '1.0.0', type: 'python', category: 'path' },
       },
       'pipeline-test': {
         id: 'pipeline-test',
@@ -116,29 +118,31 @@ describe('PluginListPanel', () => {
           pipeline: {
             steps: [
               { step_id: 'step1', plugin_id: 'p-1' },
-              { step_id: 'step2', plugin_id: 'missing-plugin' }
-            ]
-          }
-        }
-      }
+              { step_id: 'step2', plugin_id: 'missing-plugin' },
+            ],
+          },
+        },
+      },
     };
     const settings = [
       { id: 'p-1', enabled: true },
-      { id: 'pipeline-test', enabled: true }
+      { id: 'pipeline-test', enabled: true },
     ];
 
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      plugins: pipelinePlugins,
-      pluginSettings: settings,
-      activePluginId: null,
-      activeTool: 'select',
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-      setSettingsModalOpen: mockSetSettingsModalOpen,
-      selectNodes: mockSelectNodes,
-      setRightPanelActiveTab: mockSetRightPanelActiveTab,
-      setRightPanelOpen: mockSetRightPanelOpen,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        plugins: pipelinePlugins,
+        pluginSettings: settings,
+        activePluginId: null,
+        activeTool: 'select',
+        setActiveTool: mockSetActiveTool,
+        setActivePlugin: mockSetActivePlugin,
+        setSettingsModalOpen: mockSetSettingsModalOpen,
+        selectNodes: mockSelectNodes,
+        setRightPanelActiveTab: mockSetRightPanelActiveTab,
+        setRightPanelOpen: mockSetRightPanelOpen,
+      }),
+    );
 
     render(<PluginListPanel />);
 

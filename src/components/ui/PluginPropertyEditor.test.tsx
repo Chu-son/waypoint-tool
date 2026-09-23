@@ -11,13 +11,7 @@ describe('PluginPropertyEditor', () => {
 
   it('renders float property correctly', () => {
     const prop = { name: 'speed', label: 'Speed', type: 'float', default: 1.0 };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value={1.5}
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value={1.5} onChange={mockOnChange} />);
 
     const input = screen.getByDisplayValue('1.5');
     expect(input).toBeInTheDocument();
@@ -29,36 +23,24 @@ describe('PluginPropertyEditor', () => {
 
   it('renders boolean property correctly', () => {
     const prop = { name: 'enable', label: 'Enable', type: 'boolean' };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value={true}
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value={true} onChange={mockOnChange} />);
 
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox).toBeChecked();
-    
+
     fireEvent.click(checkbox);
     expect(mockOnChange).toHaveBeenCalledWith(false);
   });
 
   it('renders select property correctly', () => {
-    const prop = { 
-      name: 'mode', 
-      label: 'Mode', 
-      type: 'string', 
-      options: ['Auto', 'Manual'], 
-      default: 'Auto' 
+    const prop = {
+      name: 'mode',
+      label: 'Mode',
+      type: 'string',
+      options: ['Auto', 'Manual'],
+      default: 'Auto',
     };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value='Manual'
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value="Manual" onChange={mockOnChange} />);
 
     const select = screen.getByRole('combobox');
     expect(select).toHaveValue('Manual');
@@ -68,18 +50,12 @@ describe('PluginPropertyEditor', () => {
   });
 
   it('renders string property with description', () => {
-    const prop = { 
-      name: 'desc', 
-      type: 'string', 
-      description: 'Help text' 
+    const prop = {
+      name: 'desc',
+      type: 'string',
+      description: 'Help text',
     };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value='test'
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value="test" onChange={mockOnChange} />);
 
     expect(screen.getByText('Help text')).toBeInTheDocument();
   });
@@ -91,13 +67,7 @@ describe('PluginPropertyEditor', () => {
       type: 'color',
       default: '#22c55e',
     };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value='#3b82f6'
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value="#3b82f6" onChange={mockOnChange} />);
 
     expect(screen.getByText('Layer Color')).toBeInTheDocument();
     const textInput = screen.getByPlaceholderText('#22c55e');
@@ -115,13 +85,7 @@ describe('PluginPropertyEditor', () => {
       enum_values: ['remove_obstacles', 'fill_holes', 'both'],
       default: 'remove_obstacles',
     };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value='fill_holes'
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value="fill_holes" onChange={mockOnChange} />);
 
     const select = screen.getByRole('combobox');
     expect(select).toHaveValue('fill_holes');
@@ -145,13 +109,7 @@ describe('PluginPropertyEditor', () => {
       ],
       default: 'disk',
     };
-    render(
-      <PluginPropertyEditor
-        property={prop}
-        value='disk'
-        onChange={mockOnChange}
-      />
-    );
+    render(<PluginPropertyEditor property={prop} value="disk" onChange={mockOnChange} />);
 
     const select = screen.getByRole('combobox');
     expect(select).toHaveValue('disk');
@@ -163,4 +121,3 @@ describe('PluginPropertyEditor', () => {
     expect(mockOnChange).toHaveBeenCalledWith('square');
   });
 });
-

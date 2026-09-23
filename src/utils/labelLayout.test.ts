@@ -4,7 +4,7 @@ vi.mock('pixi.js', () => ({
   CanvasTextMetrics: {
     measureText: (text: string) => {
       const lines = text.split('\n');
-      const width = Math.max(...lines.map(line => line.length)) * 7;
+      const width = Math.max(...lines.map((line) => line.length)) * 7;
       const height = lines.length * 16;
       return { width, height };
     },
@@ -27,7 +27,10 @@ function getRect(candidate: LabelCandidate, layout: LabelLayout) {
   return { left, top, width: layout.width, height: layout.height };
 }
 
-function intersects(a: { left: number; top: number; width: number; height: number }, b: { left: number; top: number; width: number; height: number }) {
+function intersects(
+  a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number },
+) {
   return a.left < b.left + b.width && a.left + a.width > b.left && a.top < b.top + b.height && a.top + a.height > b.top;
 }
 
@@ -41,9 +44,7 @@ describe('measureLabelLines', () => {
 
 describe('computeLabelOffsets', () => {
   it('単独のWaypointはデフォルトオフセット(15px相当)のまま配置される', () => {
-    const candidates: LabelCandidate[] = [
-      { id: 'a', worldX: 0, worldY: 0, lines: ['Index: [0]'] },
-    ];
+    const candidates: LabelCandidate[] = [{ id: 'a', worldX: 0, worldY: 0, lines: ['Index: [0]'] }];
     const result = computeLabelOffsets(candidates, scale, style);
     const layout = result.get('a')!;
     expect(layout.x).toBeCloseTo(15);
@@ -70,13 +71,13 @@ describe('computeLabelOffsets', () => {
     }));
     const result = computeLabelOffsets(candidates, scale, style, { maxAttempts: 3 });
     expect(result.size).toBe(10);
-    candidates.forEach(candidate => {
+    candidates.forEach((candidate) => {
       const layout = result.get(candidate.id)!;
       expect(Number.isFinite(layout.x)).toBe(true);
       expect(Number.isFinite(layout.y)).toBe(true);
     });
 
-    const rects = candidates.map(candidate => getRect(candidate, result.get(candidate.id)!));
+    const rects = candidates.map((candidate) => getRect(candidate, result.get(candidate.id)!));
     const overlappingPairs = rects.slice(1).some((rect, i) => intersects(rect, rects[i]));
     expect(overlappingPairs).toBe(true);
   });

@@ -121,7 +121,7 @@ describe('workflowActions', () => {
       expect.objectContaining({
         plugin: mockPlugin,
         properties: expect.objectContaining({ step_size: 0.2 }),
-      })
+      }),
     );
   });
 
@@ -140,12 +140,8 @@ describe('workflowActions', () => {
       pluginId: 'non_existent_plugin',
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(
-      expect.stringContaining('プラグインが見つかりません: non_existent_plugin')
-    );
-    expect(alertSpy).toHaveBeenCalledWith(
-      expect.stringContaining('existing_plugin')
-    );
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('プラグインが見つかりません: non_existent_plugin'));
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('existing_plugin'));
     alertSpy.mockRestore();
   });
 
@@ -185,7 +181,7 @@ describe('workflowActions', () => {
         interactionData: expect.objectContaining({
           sweep_rect: mockRectAnno,
         }),
-      })
+      }),
     );
   });
 
@@ -221,7 +217,13 @@ describe('workflowActions', () => {
     useAppStore.setState({
       plugins: { path_planner: mockPlugin },
       annotationGroups: {
-        'grp-obs': { id: 'grp-obs', type: 'manual_group', name: '障害物グループ', children_ids: ['p1', 'p2'], visible: true },
+        'grp-obs': {
+          id: 'grp-obs',
+          type: 'manual_group',
+          name: '障害物グループ',
+          children_ids: ['p1', 'p2'],
+          visible: true,
+        },
       },
       annotationObjects: { p1: mockPoint1, p2: mockPoint2 },
       workflowVariables: {
@@ -251,7 +253,7 @@ describe('workflowActions', () => {
             { x: 3.5, y: 4.5, name: 'pt2' },
           ],
         }),
-      })
+      }),
     );
 
     // Verify stepExecutionId was recorded for regeneration
@@ -266,7 +268,7 @@ describe('workflowActions', () => {
     expect(mockExecute).toHaveBeenLastCalledWith(
       expect.objectContaining({
         existingExecutionId: 'exec_regen_1',
-      })
+      }),
     );
   });
 

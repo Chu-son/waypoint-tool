@@ -99,9 +99,7 @@ export const createMeasureSlice: StateCreator<AppState, [], [], MeasureSlice> = 
     if (!measureStartPoint || !measureEndPoint) return null;
 
     // 連番形式で名前を生成（固定の距離文字列は含めず、動的バッジに任せる）
-    const existingCount = Object.values(annotationObjects).filter(
-      (a) => a.name && a.name.startsWith('計測')
-    ).length;
+    const existingCount = Object.values(annotationObjects).filter((a) => a.name && a.name.startsWith('計測')).length;
     const name = `計測 ${existingCount + 1}`;
 
     const lineId = uuidv4();

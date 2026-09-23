@@ -120,7 +120,7 @@ export function useAnnotationEdit() {
         }
       }
     },
-    [activeAnnotationSubTool, defaultAnnotationColor]
+    [activeAnnotationSubTool, defaultAnnotationColor],
   );
 
   // 2. Drawing Move
@@ -215,7 +215,7 @@ export function useAnnotationEdit() {
         }
       }
     },
-    [drawStartPos, activeAnnotationSubTool, defaultAnnotationColor]
+    [drawStartPos, activeAnnotationSubTool, defaultAnnotationColor],
   );
 
   // 3. Drawing End
@@ -291,7 +291,7 @@ export function useAnnotationEdit() {
             cy: isDragged ? rect.cy : pt.y,
             width: isDragged ? rect.width : 2.0,
             height: isDragged ? rect.height : 2.0,
-            angle: isDragged ? (rect.angle || 0) : 0,
+            angle: isDragged ? rect.angle || 0 : 0,
             visible: true,
             labelVisible: true,
             color,
@@ -324,55 +324,68 @@ export function useAnnotationEdit() {
       setDrawStartPos(null);
       setAnnotationPreview(null);
     },
-    [drawStartPos, annotationPreview, activeAnnotationSubTool, defaultAnnotationColor, addAnnotationObject, selectAnnotationObjects]
+    [
+      drawStartPos,
+      annotationPreview,
+      activeAnnotationSubTool,
+      defaultAnnotationColor,
+      addAnnotationObject,
+      selectAnnotationObjects,
+    ],
   );
 
   // 4. Moving and transforming existing objects
-  const handleStartMoveAnnotation = useCallback((id: string, worldPos: { x: number; y: number }) => {
-    const obj = useAppStore.getState().annotationObjects[id];
-    if (!obj) return;
-    beginHistoryTransaction();
-    movingAnnotation.current = {
-      id,
-      startMouseWorld: worldPos,
-      initialObj: structuredClone(obj),
-    };
-  }, [beginHistoryTransaction]);
+  const handleStartMoveAnnotation = useCallback(
+    (id: string, worldPos: { x: number; y: number }) => {
+      const obj = useAppStore.getState().annotationObjects[id];
+      if (!obj) return;
+      beginHistoryTransaction();
+      movingAnnotation.current = {
+        id,
+        startMouseWorld: worldPos,
+        initialObj: structuredClone(obj),
+      };
+    },
+    [beginHistoryTransaction],
+  );
 
-  const handleMoveAnnotationMove = useCallback((worldPos: { x: number; y: number }) => {
-    if (!movingAnnotation.current) return;
-    const { id, startMouseWorld, initialObj } = movingAnnotation.current;
-    const dx = worldPos.x - startMouseWorld.x;
-    const dy = worldPos.y - startMouseWorld.y;
+  const handleMoveAnnotationMove = useCallback(
+    (worldPos: { x: number; y: number }) => {
+      if (!movingAnnotation.current) return;
+      const { id, startMouseWorld, initialObj } = movingAnnotation.current;
+      const dx = worldPos.x - startMouseWorld.x;
+      const dy = worldPos.y - startMouseWorld.y;
 
-    switch (initialObj.type) {
-      case 'point':
-      case 'oriented_point': {
-        updateAnnotationObject(id, {
-          x: initialObj.x + dx,
-          y: initialObj.y + dy,
-        });
-        break;
+      switch (initialObj.type) {
+        case 'point':
+        case 'oriented_point': {
+          updateAnnotationObject(id, {
+            x: initialObj.x + dx,
+            y: initialObj.y + dy,
+          });
+          break;
+        }
+        case 'line': {
+          updateAnnotationObject(id, {
+            x1: initialObj.x1 + dx,
+            y1: initialObj.y1 + dy,
+            x2: initialObj.x2 + dx,
+            y2: initialObj.y2 + dy,
+          });
+          break;
+        }
+        case 'rect':
+        case 'circle': {
+          updateAnnotationObject(id, {
+            cx: initialObj.cx + dx,
+            cy: initialObj.cy + dy,
+          });
+          break;
+        }
       }
-      case 'line': {
-        updateAnnotationObject(id, {
-          x1: initialObj.x1 + dx,
-          y1: initialObj.y1 + dy,
-          x2: initialObj.x2 + dx,
-          y2: initialObj.y2 + dy,
-        });
-        break;
-      }
-      case 'rect':
-      case 'circle': {
-        updateAnnotationObject(id, {
-          cx: initialObj.cx + dx,
-          cy: initialObj.cy + dy,
-        });
-        break;
-      }
-    }
-  }, [updateAnnotationObject]);
+    },
+    [updateAnnotationObject],
+  );
 
   const handleMoveAnnotationEnd = useCallback(() => {
     if (movingAnnotation.current) {
@@ -393,7 +406,7 @@ export function useAnnotationEdit() {
         initialObj: structuredClone(obj),
       };
     },
-    [beginHistoryTransaction]
+    [beginHistoryTransaction],
   );
 
   const handleTransformAnnotationMove = useCallback(
@@ -475,7 +488,7 @@ export function useAnnotationEdit() {
         }
       }
     },
-    [updateAnnotationObject]
+    [updateAnnotationObject],
   );
 
   const handleTransformAnnotationEnd = useCallback(() => {

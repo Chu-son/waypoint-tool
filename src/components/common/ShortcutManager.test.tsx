@@ -63,21 +63,21 @@ describe('ShortcutManager', () => {
       removeNodes: mockRemoveNodes,
     });
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'Delete' });
     expect(mockRemoveNodes).toHaveBeenCalledWith(['node-1']);
   });
 
   it('triggers selectAllNodes on Ctrl+A', () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'a', ctrlKey: true });
     expect(mockSelectAllNodes).toHaveBeenCalled();
   });
 
   it('triggers saveProject on Ctrl+S', () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: false });
     expect(mockSaveProject).toHaveBeenCalled();
     expect(mockSaveProjectAs).not.toHaveBeenCalled();
@@ -85,7 +85,7 @@ describe('ShortcutManager', () => {
 
   it('triggers saveProjectAs on Ctrl+Shift+S', () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: true });
     expect(mockSaveProjectAs).toHaveBeenCalled();
     expect(mockSaveProject).not.toHaveBeenCalled();
@@ -93,7 +93,7 @@ describe('ShortcutManager', () => {
 
   it('triggers loadProject on Ctrl+O', async () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'o', ctrlKey: true });
     await waitFor(() => {
       expect(mockLoadProject).toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('ShortcutManager', () => {
 
   it('triggers resetProject on Ctrl+N', async () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
     await waitFor(() => {
       expect(mockResetProject).toHaveBeenCalled();
@@ -113,7 +113,7 @@ describe('ShortcutManager', () => {
     (useAppStore as any).getState = vi.fn().mockReturnValue({ isDirty: true });
     (DialogAPI.ask as any).mockResolvedValueOnce(false);
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'n', ctrlKey: true });
     await waitFor(() => {
       expect(DialogAPI.ask).toHaveBeenCalled();
@@ -125,7 +125,7 @@ describe('ShortcutManager', () => {
     (useAppStore as any).getState = vi.fn().mockReturnValue({ isDirty: true });
     (DialogAPI.ask as any).mockResolvedValueOnce(false);
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'o', ctrlKey: true });
     await waitFor(() => {
       expect(DialogAPI.ask).toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe('ShortcutManager', () => {
 
   it('switches tool via V and P shortcuts', () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'v' });
     expect(mockSetActiveTool).toHaveBeenCalledWith('select');
 
@@ -145,7 +145,7 @@ describe('ShortcutManager', () => {
 
   it('triggers setExportModalOpen on Ctrl+E', () => {
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'e', ctrlKey: true });
     expect(mockSetExportModalOpen).toHaveBeenCalledWith(true);
   });
@@ -174,9 +174,9 @@ describe('ShortcutManager', () => {
       setRightPanelActiveTab: mockSetRightPanelActiveTab,
     });
     render(<ShortcutManager />);
-    
+
     fireEvent.keyDown(window, { key: 'Escape' });
-    
+
     expect(mockSelectNodes).toHaveBeenCalledWith([]);
     expect(mockSetActiveTool).toHaveBeenCalledWith('select');
     expect(mockSetActivePlugin).toHaveBeenCalledWith(null);
@@ -188,14 +188,14 @@ describe('ShortcutManager', () => {
 
   it('ignores shortcuts when focused on INPUT', () => {
     render(<ShortcutManager />);
-    
+
     const input = document.createElement('input');
     document.body.appendChild(input);
     input.focus();
 
     fireEvent.keyDown(window, { key: 'Delete' });
     expect(mockRemoveNodes).not.toHaveBeenCalled();
-    
+
     document.body.removeChild(input);
   });
 
@@ -220,4 +220,3 @@ describe('ShortcutManager', () => {
     expect(mockSelectAllNodes).not.toHaveBeenCalled();
   });
 });
-

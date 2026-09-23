@@ -41,7 +41,7 @@ export function resolveInspectorComponent(
   appMode?: AppModeState,
   selection?: ActiveSelection,
   activePlugin?: any,
-  pipelineTarget?: PipelineInspectorTarget | null
+  pipelineTarget?: PipelineInspectorTarget | null,
 ): ReactElement {
   // 0. Pipeline artifact selection takes highest priority to avoid intermediate inspectors mounting and executing conflicting side effects
   if (pipelineTarget?.pipelineMetadata) {
@@ -161,7 +161,7 @@ export function resolveBuiltinPanelTab(
   id: string,
   customTitle?: string,
   customIcon?: string,
-  inspectorComponent?: ReactNode
+  inspectorComponent?: ReactNode,
 ): PanelTab | null {
   switch (id) {
     case 'waypoints':
@@ -214,7 +214,7 @@ export function resolveBuiltinPanelTab(
 export function resolvePanelTabs(
   tabsDef: CustomUiPanelTabDef[] | undefined,
   fallbackTabs: PanelTab[],
-  inspectorComponent?: ReactNode
+  inspectorComponent?: ReactNode,
 ): PanelTab[] {
   if (!tabsDef || tabsDef.length === 0) {
     return fallbackTabs;

@@ -19,7 +19,12 @@ import {
 import { Slider } from './common/Slider';
 import { Kbd } from './common/Kbd';
 import { getPrecedingManualWaypoint, getFlattenedWaypointIds } from '../../utils/treeUtils';
-import { computeStatusInteraction, computeTotalPathDistance, StatusIconType, StatusModeVariant } from '../../utils/statusUtils';
+import {
+  computeStatusInteraction,
+  computeTotalPathDistance,
+  StatusIconType,
+  StatusModeVariant,
+} from '../../utils/statusUtils';
 import { cn } from '../../utils/cn';
 
 function ModeIcon({ icon }: { icon: StatusIconType }) {
@@ -66,37 +71,37 @@ function getModeBadgeClasses(variant: StatusModeVariant): string {
 }
 
 export const StatusBar: React.FC = () => {
-  const cursorPosition = useAppStore(state => state.cursorPosition);
-  const mapScale = useAppStore(state => state.mapScale);
-  const nodes = useAppStore(state => state.nodes);
-  const rootNodeIds = useAppStore(state => state.rootNodeIds);
-  const selection = useAppStore(state => state.selection);
-  const appMode = useAppStore(state => state.appMode);
-  const insertionTarget = useAppStore(state => state.insertionTarget);
-  const modalStack = useAppStore(state => state.modalStack);
-  const isSettingsModalOpen = useAppStore(state => state.isSettingsModalOpen);
-  const isExportModalOpen = useAppStore(state => state.isExportModalOpen);
-  const isImportModalOpen = useAppStore(state => state.isImportModalOpen);
-  const isExportMapsModalOpen = useAppStore(state => state.isExportMapsModalOpen);
-  const isShortcutsModalOpen = useAppStore(state => state.isShortcutsModalOpen);
-  const isWelcomeModalOpen = useAppStore(state => state.isWelcomeModalOpen);
-  const isInitialLaunch = useAppStore(state => state.isInitialLaunch);
-  const pluginDataModalState = useAppStore(state => state.pluginDataModalState);
-  const customLayers = useAppStore(state => state.customLayers);
-  const mapLayers = useAppStore(state => state.mapLayers);
-  const enableSnapping = useAppStore(state => state.enableSnapping);
-  const setEnableSnapping = useAppStore(state => state.setEnableSnapping);
-  const isDirty = useAppStore(state => state.isDirty);
-  const saveProject = useAppStore(state => state.saveProject);
-  const triggerFitToMaps = useAppStore(state => state.triggerFitToMaps);
-  const handleGlobalEscape = useAppStore(state => state.handleGlobalEscape);
+  const cursorPosition = useAppStore((state) => state.cursorPosition);
+  const mapScale = useAppStore((state) => state.mapScale);
+  const nodes = useAppStore((state) => state.nodes);
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
+  const selection = useAppStore((state) => state.selection);
+  const appMode = useAppStore((state) => state.appMode);
+  const insertionTarget = useAppStore((state) => state.insertionTarget);
+  const modalStack = useAppStore((state) => state.modalStack);
+  const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
+  const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
+  const isImportModalOpen = useAppStore((state) => state.isImportModalOpen);
+  const isExportMapsModalOpen = useAppStore((state) => state.isExportMapsModalOpen);
+  const isShortcutsModalOpen = useAppStore((state) => state.isShortcutsModalOpen);
+  const isWelcomeModalOpen = useAppStore((state) => state.isWelcomeModalOpen);
+  const isInitialLaunch = useAppStore((state) => state.isInitialLaunch);
+  const pluginDataModalState = useAppStore((state) => state.pluginDataModalState);
+  const customLayers = useAppStore((state) => state.customLayers);
+  const mapLayers = useAppStore((state) => state.mapLayers);
+  const enableSnapping = useAppStore((state) => state.enableSnapping);
+  const setEnableSnapping = useAppStore((state) => state.setEnableSnapping);
+  const isDirty = useAppStore((state) => state.isDirty);
+  const saveProject = useAppStore((state) => state.saveProject);
+  const triggerFitToMaps = useAppStore((state) => state.triggerFitToMaps);
+  const handleGlobalEscape = useAppStore((state) => state.handleGlobalEscape);
 
-  const showOccupancyHighlight = useAppStore(state => state.showOccupancyHighlight);
-  const occupancyHighlightAlpha = useAppStore(state => state.occupancyHighlightAlpha);
-  const setOccupancyHighlightAlpha = useAppStore(state => state.setOccupancyHighlightAlpha);
-  const activeLoadingTasks = useAppStore(state => state.activeLoadingTasks);
+  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
+  const occupancyHighlightAlpha = useAppStore((state) => state.occupancyHighlightAlpha);
+  const setOccupancyHighlightAlpha = useAppStore((state) => state.setOccupancyHighlightAlpha);
+  const activeLoadingTasks = useAppStore((state) => state.activeLoadingTasks);
 
-  const backgroundTasks = Object.values(activeLoadingTasks || {}).filter(t => t.blocking === false);
+  const backgroundTasks = Object.values(activeLoadingTasks || {}).filter((t) => t.blocking === false);
   const activeBgTask = backgroundTasks.sort((a, b) => b.createdAt - a.createdAt)[0];
 
   // 状態機械に基づくモード・Escアクションの計算
@@ -119,7 +124,7 @@ export const StatusBar: React.FC = () => {
   // 直前のマニュアルウェイポイント（相対座標計算用）
   const latestNode = getPrecedingManualWaypoint(rootNodeIds, nodes, insertionTarget);
 
-  let relativeText = "";
+  let relativeText = '';
   if (latestNode && latestNode.transform && cursorPosition) {
     const transform = latestNode.transform;
     const Wx = transform.x ?? 0;
@@ -128,7 +133,7 @@ export const StatusBar: React.FC = () => {
     const qy = transform.qy ?? 0;
     const qz = transform.qz ?? 0;
     const qw = transform.qw ?? 1;
-    
+
     let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
     if (!isFinite(yaw)) yaw = 0;
 
@@ -141,7 +146,7 @@ export const StatusBar: React.FC = () => {
     // Convert to local coordinate frame of the latest waypoint
     const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
     const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-    
+
     relativeText = `(Rel) Δ: ${dist.toFixed(2)}m (${angleDeg.toFixed(0)}°) [X: ${localX.toFixed(2)} Y: ${localY.toFixed(2)}]`;
   }
 
@@ -151,7 +156,7 @@ export const StatusBar: React.FC = () => {
   const totalDistance = computeTotalPathDistance(rootNodeIds, nodes);
 
   // マップ解像度
-  const activeMapLayer = mapLayers.find(l => l.visible) || mapLayers[0];
+  const activeMapLayer = mapLayers.find((l) => l.visible) || mapLayers[0];
   const mapResolution = activeMapLayer?.info?.resolution;
 
   return (
@@ -193,8 +198,8 @@ export const StatusBar: React.FC = () => {
             {/* Mode Badge */}
             <span
               className={cn(
-                "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border shrink-0 transition-colors",
-                getModeBadgeClasses(statusInfo.modeVariant)
+                'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium border shrink-0 transition-colors',
+                getModeBadgeClasses(statusInfo.modeVariant),
               )}
               title={statusInfo.hintText || statusInfo.modeBadgeText}
             >
@@ -234,7 +239,10 @@ export const StatusBar: React.FC = () => {
               (World) X: {cursorPosition.x.toFixed(3)}m Y: {cursorPosition.y.toFixed(3)}m
             </span>
             {relativeText && (
-              <span className="font-mono text-primary-base/90 hidden md:inline-block" title="直前ノードからの相対距離・方位・ローカル座標">
+              <span
+                className="font-mono text-primary-base/90 hidden md:inline-block"
+                title="直前ノードからの相対距離・方位・ローカル座標"
+              >
                 {relativeText}
               </span>
             )}
@@ -251,7 +259,10 @@ export const StatusBar: React.FC = () => {
             title="クリックで挿入位置指定を解除"
           >
             <MapPin size={11} className="text-primary-base shrink-0" />
-            <span>挿入: {insertionTarget.parentId ? (nodes[insertionTarget.parentId]?.name || 'Group') : 'ルート'} [{insertionTarget.index}]</span>
+            <span>
+              挿入: {insertionTarget.parentId ? nodes[insertionTarget.parentId]?.name || 'Group' : 'ルート'} [
+              {insertionTarget.index}]
+            </span>
             <X size={10} className="shrink-0 text-primary-base ml-0.5" />
           </button>
         )}
@@ -284,12 +295,12 @@ export const StatusBar: React.FC = () => {
           type="button"
           onClick={() => setEnableSnapping(!enableSnapping)}
           className={cn(
-            "flex items-center gap-1 px-1.5 py-0.5 rounded border text-[11px] transition-colors shrink-0",
+            'flex items-center gap-1 px-1.5 py-0.5 rounded border text-[11px] transition-colors shrink-0',
             enableSnapping
-              ? "bg-primary-base/15 border-primary-base/40 text-primary-base"
-              : "bg-surface-base border-border-base text-text-muted/60 hover:text-text-base"
+              ? 'bg-primary-base/15 border-primary-base/40 text-primary-base'
+              : 'bg-surface-base border-border-base text-text-muted/60 hover:text-text-base',
           )}
-          title={enableSnapping ? "スナップ有効 (クリックで無効化)" : "スナップ無効 (クリックで有効化)"}
+          title={enableSnapping ? 'スナップ有効 (クリックで無効化)' : 'スナップ無効 (クリックで有効化)'}
         >
           <Magnet size={11} />
           <span>Snap</span>
@@ -307,7 +318,10 @@ export const StatusBar: React.FC = () => {
             <span>未保存</span>
           </button>
         ) : (
-          <span className="hidden sm:flex items-center gap-1 text-text-muted/70 text-[11px] shrink-0" title="すべての変更が保存されています">
+          <span
+            className="hidden sm:flex items-center gap-1 text-text-muted/70 text-[11px] shrink-0"
+            title="すべての変更が保存されています"
+          >
             <Check size={11} className="text-status-success" />
             <span>保存済</span>
           </span>

@@ -18,7 +18,7 @@ const DEFAULT_THRESHOLDS: ResponsiveThresholds = {
  * の3段階のレスポンシブティアを動的に返します。
  */
 export function useResponsiveContainer<T extends HTMLElement = HTMLDivElement>(
-  thresholds: ResponsiveThresholds = DEFAULT_THRESHOLDS
+  thresholds: ResponsiveThresholds = DEFAULT_THRESHOLDS,
 ) {
   const containerRef = useRef<T>(null);
   const [tier, setTier] = useState<ResponsiveTier>('wide');
@@ -61,5 +61,12 @@ export function useResponsiveContainer<T extends HTMLElement = HTMLDivElement>(
     return () => observer.disconnect();
   }, [thresholds.compact, thresholds.normal]);
 
-  return { containerRef, tier, width, isCompact: tier === 'compact', isNormal: tier === 'normal', isWide: tier === 'wide' };
+  return {
+    containerRef,
+    tier,
+    width,
+    isCompact: tier === 'compact',
+    isNormal: tier === 'normal',
+    isWide: tier === 'wide',
+  };
 }

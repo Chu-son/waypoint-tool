@@ -1,11 +1,11 @@
+use crate::map::blending::{blend_layers_to_image, LayerInput, RectRegion};
+use crate::map::export_maps::{ExportLayer, ExportRegion};
+use base64::{engine::general_purpose, Engine as _};
+use handlebars::Handlebars;
+use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use base64::{engine::general_purpose, Engine as _};
-use image::{codecs::pnm, ImageEncoder, ExtendedColorType};
-use handlebars::Handlebars;
-use crate::map::blending::{blend_layers_to_image, LayerInput, RectRegion};
-use crate::map::export_maps::{ExportRegion, ExportLayer};
 
 #[derive(Debug, Deserialize)]
 pub struct ExportPackageOptions {
@@ -27,7 +27,7 @@ pub struct PackageWaypointItem {
 #[derive(Debug, Deserialize)]
 pub struct PackageMapItem {
     pub save_path: String, // Absolute base path without extension (e.g. /path/to/maps/warehouse)
-    pub format: String, // "ros_standard" | "png_only"
+    pub format: String,    // "ros_standard" | "png_only"
     pub region: ExportRegion,
     pub layers: Vec<ExportLayer>,
 }
@@ -94,8 +94,7 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
                 .map_err(|e| format!("JSON serialization error for {}: {}", wp_item.path, e))?
         };
 
-        fs::write(target_path, content)
-            .map_err(|e| format!("File write error for {}: {}", wp_item.path, e))?;
+        fs::write(target_path, content).map_err(|e| format!("File write error for {}: {}", wp_item.path, e))?;
         exported_count += 1;
 
         // Image attachment
@@ -107,10 +106,10 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
                 backup_file_if_exists(&png_path_str, &options.session_timestamp, &mut backed_up_files)?;
             }
 
-            let decoded = general_purpose::STANDARD.decode(b64)
+            let decoded = general_purpose::STANDARD
+                .decode(b64)
                 .map_err(|e| format!("Base64 decode error for {}: {}", png_path_str, e))?;
-            fs::write(&png_path, decoded)
-                .map_err(|e| format!("Image write error for {}: {}", png_path_str, e))?;
+            fs::write(&png_path, decoded).map_err(|e| format!("Image write error for {}: {}", png_path_str, e))?;
             exported_count += 1;
         }
     }
@@ -191,14 +190,16 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             let luma_img = image::DynamicImage::ImageRgba8(out_img).into_luma8();
             let mut pgm_file = fs::File::create(Path::new(&pgm_path_str))
                 .map_err(|e| format!("Failed to create pgm file {}: {}", pgm_path_str, e))?;
-            let encoder = pnm::PnmEncoder::new(&mut pgm_file)
-                .with_subtype(pnm::PnmSubtype::Graymap(pnm::SampleEncoding::Binary));
-            encoder.write_image(
-                luma_img.as_raw(),
-                luma_img.width(),
-                luma_img.height(),
-                ExtendedColorType::L8
-            ).map_err(|e| format!("Failed to save pgm {}: {}", pgm_path_str, e))?;
+            let encoder =
+                pnm::PnmEncoder::new(&mut pgm_file).with_subtype(pnm::PnmSubtype::Graymap(pnm::SampleEncoding::Binary));
+            encoder
+                .write_image(
+                    luma_img.as_raw(),
+                    luma_img.width(),
+                    luma_img.height(),
+                    ExtendedColorType::L8,
+                )
+                .map_err(|e| format!("Failed to save pgm {}: {}", pgm_path_str, e))?;
             exported_count += 1;
 
             // Save YAML with image path pointing to the generated PGM filename
@@ -221,7 +222,8 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
                 backup_file_if_exists(&png_path_str, &options.session_timestamp, &mut backed_up_files)?;
             }
 
-            out_img.save(Path::new(&png_path_str))
+            out_img
+                .save(Path::new(&png_path_str))
                 .map_err(|e| format!("Failed to save png {}: {}", png_path_str, e))?;
             exported_count += 1;
         }
@@ -245,10 +247,7 @@ mod tests {
         let file2 = tmp.path().join("file2.txt");
         fs::write(&file1, "hello").unwrap();
 
-        let list = vec![
-            file1.to_string_lossy().to_string(),
-            file2.to_string_lossy().to_string(),
-        ];
+        let list = vec![file1.to_string_lossy().to_string(), file2.to_string_lossy().to_string()];
         let existing = check_export_conflicts(list);
         assert_eq!(existing.len(), 1);
         assert_eq!(existing[0], file1.to_string_lossy().to_string());
@@ -265,14 +264,12 @@ mod tests {
             root_dir: tmp.path().to_string_lossy().to_string(),
             conflict_resolution: "backup_file".to_string(),
             session_timestamp: "20260912_110000".to_string(),
-            waypoint_items: vec![
-                PackageWaypointItem {
-                    path: wp_path.to_string_lossy().to_string(),
-                    waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
-                    template: None,
-                    image_data_b64: None,
-                },
-            ],
+            waypoint_items: vec![PackageWaypointItem {
+                path: wp_path.to_string_lossy().to_string(),
+                waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
+                template: None,
+                image_data_b64: None,
+            }],
             map_items: vec![],
         };
 

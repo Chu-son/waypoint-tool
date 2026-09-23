@@ -130,7 +130,12 @@ describe('NodeSlice - duplicateNodes', () => {
       elementType: 'waypoint' as const,
       topLevelIds: ['w1'],
       nodes: {
-        w1: { id: 'w1', type: 'manual' as const, name: 'Pasted WP', transform: { x: 10, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        w1: {
+          id: 'w1',
+          type: 'manual' as const,
+          name: 'Pasted WP',
+          transform: { x: 10, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 },
+        },
       },
     };
 
@@ -157,7 +162,12 @@ describe('NodeSlice - duplicateNodes', () => {
       elementType: 'waypoint' as const,
       topLevelIds: ['w1'],
       nodes: {
-        w1: { id: 'w1', type: 'manual' as const, name: 'Pasted WP', transform: { x: 10, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        w1: {
+          id: 'w1',
+          type: 'manual' as const,
+          name: 'Pasted WP',
+          transform: { x: 10, y: 10, qx: 0, qy: 0, qz: 0, qw: 1 },
+        },
       },
     };
 
@@ -292,15 +302,7 @@ describe('NodeSlice - duplicateNodes', () => {
       useAppStore.getState().reorderMultipleNodes(['node-2', 'node-4', 'node-6'], 'node-7', 'after');
 
       const state = useAppStore.getState();
-      expect(state.rootNodeIds).toEqual([
-        'node-1',
-        'node-3',
-        'node-5',
-        'node-7',
-        'node-2',
-        'node-4',
-        'node-6',
-      ]);
+      expect(state.rootNodeIds).toEqual(['node-1', 'node-3', 'node-5', 'node-7', 'node-2', 'node-4', 'node-6']);
       expect(state.isDirty).toBe(true);
     });
 
@@ -321,15 +323,7 @@ describe('NodeSlice - duplicateNodes', () => {
       useAppStore.getState().reorderMultipleNodes(['node-2', 'node-4', 'node-6'], 'node-1', 'before');
 
       const state = useAppStore.getState();
-      expect(state.rootNodeIds).toEqual([
-        'node-2',
-        'node-4',
-        'node-6',
-        'node-1',
-        'node-3',
-        'node-5',
-        'node-7',
-      ]);
+      expect(state.rootNodeIds).toEqual(['node-2', 'node-4', 'node-6', 'node-1', 'node-3', 'node-5', 'node-7']);
     });
 
     it('moves nodes to intermediate position correctly', () => {
@@ -347,13 +341,7 @@ describe('NodeSlice - duplicateNodes', () => {
       // Move [node-1, node-5] to before node-3 -> [node-2, node-1, node-5, node-3, node-4]
       useAppStore.getState().reorderMultipleNodes(['node-1', 'node-5'], 'node-3', 'before');
 
-      expect(useAppStore.getState().rootNodeIds).toEqual([
-        'node-2',
-        'node-1',
-        'node-5',
-        'node-3',
-        'node-4',
-      ]);
+      expect(useAppStore.getState().rootNodeIds).toEqual(['node-2', 'node-1', 'node-5', 'node-3', 'node-4']);
     });
   });
 });
@@ -399,7 +387,12 @@ describe('NodeSlice - groupNodes and ungroupNode', () => {
     const wp2: WaypointNode = { id: 'wp-2', type: 'manual' };
     const subWp1: WaypointNode = { id: 'sub-wp-1', type: 'manual' };
     const subWp2: WaypointNode = { id: 'sub-wp-2', type: 'manual' };
-    const group1: WaypointNode = { id: 'group-1', type: 'manual_group', name: 'Group 1', children_ids: ['sub-wp-1', 'sub-wp-2'] };
+    const group1: WaypointNode = {
+      id: 'group-1',
+      type: 'manual_group',
+      name: 'Group 1',
+      children_ids: ['sub-wp-1', 'sub-wp-2'],
+    };
 
     useAppStore.setState({
       nodes: { 'wp-1': wp1, 'wp-2': wp2, 'group-1': group1, 'sub-wp-1': subWp1, 'sub-wp-2': subWp2 },
@@ -682,7 +675,11 @@ describe('NodeSlice - insertionTarget & group selection', () => {
   it('prevents duplicate cloning of parent and descendant, and inserts at insertionTarget', () => {
     const child1: WaypointNode = { id: 'c1', type: 'manual', transform: { x: 1, y: 1, qx: 0, qy: 0, qz: 0, qw: 1 } };
     const group: WaypointNode = { id: 'grp', type: 'manual_group', children_ids: ['c1'] };
-    const rootWp: WaypointNode = { id: 'root-wp', type: 'manual', transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } };
+    const rootWp: WaypointNode = {
+      id: 'root-wp',
+      type: 'manual',
+      transform: { x: 0, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+    };
 
     useAppStore.setState({
       nodes: { c1: child1, grp: group, 'root-wp': rootWp },

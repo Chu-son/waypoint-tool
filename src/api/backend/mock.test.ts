@@ -17,9 +17,9 @@ describe('MockBackendAPI', () => {
   });
 
   it('runPlugin returns a simple waypoint', async () => {
-    const plugin: any = { 
+    const plugin: any = {
       id: 'test',
-      manifest: { name: 'Test Plugin', inputs: [], properties: [] }
+      manifest: { name: 'Test Plugin', inputs: [], properties: [] },
     };
     const res = await api.runPlugin(plugin, {});
     expect(res).toBeInstanceOf(Array);
@@ -27,7 +27,7 @@ describe('MockBackendAPI', () => {
 
   it('getPythonEnvironments returns a dummy list', async () => {
     const envs = await api.getPythonEnvironments();
-    expect(envs.some(e => e.includes('python3'))).toBe(true);
+    expect(envs.some((e) => e.includes('python3'))).toBe(true);
   });
 
   it('checkPythonPackages returns a map of package statuses', async () => {

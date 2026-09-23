@@ -1,7 +1,7 @@
-use tauri::{command, AppHandle};
-use std::fs;
+use crate::{io, map};
 use base64::{engine::general_purpose, Engine as _};
-use crate::{map, io};
+use std::fs;
+use tauri::{command, AppHandle};
 
 pub mod export_pipeline;
 
@@ -11,7 +11,9 @@ pub fn check_export_conflicts(files: Vec<String>) -> Vec<String> {
 }
 
 #[command]
-pub fn execute_export_package(options: export_pipeline::ExportPackageOptions) -> Result<export_pipeline::ExportResultSummary, String> {
+pub fn execute_export_package(
+    options: export_pipeline::ExportPackageOptions,
+) -> Result<export_pipeline::ExportResultSummary, String> {
     export_pipeline::execute_export_package(options)
 }
 
@@ -46,7 +48,12 @@ pub fn load_options_schema(yaml_path: String) -> Result<crate::models::options::
 }
 
 #[command]
-pub fn export_waypoints(path: String, waypoints: Vec<serde_json::Value>, template: Option<String>, image_data_b64: Option<String>) -> Result<(), String> {
+pub fn export_waypoints(
+    path: String,
+    waypoints: Vec<serde_json::Value>,
+    template: Option<String>,
+    image_data_b64: Option<String>,
+) -> Result<(), String> {
     io::export_waypoints(&path, waypoints, template, image_data_b64)
 }
 
@@ -63,7 +70,7 @@ pub fn infer_import_mapping(template: String) -> Result<serde_json::Value, Strin
 #[command]
 pub fn read_image_base64(path: String) -> Result<String, String> {
     let bytes = fs::read(&path).map_err(|e| format!("Failed to read image file: {}", e))?;
-    
+
     // Determine mime type from extension
     let mime_type = match std::path::Path::new(&path)
         .extension()
@@ -78,7 +85,7 @@ pub fn read_image_base64(path: String) -> Result<String, String> {
         Some("webp") => "image/webp",
         _ => "application/octet-stream",
     };
-    
+
     let base64_str = general_purpose::STANDARD.encode(&bytes);
     Ok(format!("data:{};base64,{}", mime_type, base64_str))
 }

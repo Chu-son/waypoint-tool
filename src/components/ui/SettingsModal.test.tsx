@@ -9,7 +9,7 @@ vi.mock('../../api', () => ({
     getPythonEnvironments: vi.fn().mockResolvedValue([]),
     loadOptionsSchema: vi.fn(),
     scanCustomPlugin: vi.fn(),
-    checkSdkVersion: vi.fn().mockResolvedValue("1.0.0"),
+    checkSdkVersion: vi.fn().mockResolvedValue('1.0.0'),
     readImageBase64: vi.fn(),
     scaffoldPlugin: vi.fn(),
     fetchInstalledPlugins: vi.fn().mockResolvedValue([]),
@@ -83,11 +83,17 @@ describe('SettingsModal UI', () => {
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
 
     const optionsTab = screen.getByText('Option Schema');
-    act(() => { optionsTab.click(); });
+    act(() => {
+      optionsTab.click();
+    });
 
     const addBtn = screen.getByRole('button', { name: /Add Field/i });
-    act(() => { addBtn.click(); });
-    act(() => { addBtn.click(); });
+    act(() => {
+      addBtn.click();
+    });
+    act(() => {
+      addBtn.click();
+    });
 
     // Two new option rows should exist with Key Name inputs
     const nameInputs = screen.getAllByPlaceholderText('e.g. velocity');
@@ -99,14 +105,22 @@ describe('SettingsModal UI', () => {
   it('allows editing export template suffix in the Export Templates tab', async () => {
     useAppStore.setState({
       exportTemplates: [
-        { id: 'tmpl1', name: 'ROS Template', extension: 'yaml', suffix: '_ros', content: '{{#each waypoints}}...{{/each}}' },
+        {
+          id: 'tmpl1',
+          name: 'ROS Template',
+          extension: 'yaml',
+          suffix: '_ros',
+          content: '{{#each waypoints}}...{{/each}}',
+        },
       ],
     });
 
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
 
     const templatesTab = screen.getByText('Export Templates');
-    act(() => { templatesTab.click(); });
+    act(() => {
+      templatesTab.click();
+    });
 
     // The template name should be visible
     expect(screen.getByDisplayValue('ROS Template')).toBeInTheDocument();
@@ -234,25 +248,21 @@ describe('SettingsModal UI', () => {
       appearanceTab.click();
     });
 
-    expect(
-      screen.getByText(/Custom UI theme is active and overriding default appearance/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Custom UI theme is active and overriding default appearance/i)).toBeInTheDocument();
   });
 
   it('handles plugin management in the Plugins tab', async () => {
     const mockUpdatePluginSetting = vi.fn();
     useAppStore.setState({
       plugins: {
-        'p1': { 
-          id: 'p1', 
+        p1: {
+          id: 'p1',
           manifest: { name: 'My Plugin', type: 'python', executable: 'main.py', inputs: [], properties: [] },
           folder_path: '/p',
-          is_builtin: false
-        } as any
+          is_builtin: false,
+        } as any,
       },
-      pluginSettings: [
-        { id: 'p1', enabled: true, order: 0, pythonOverridePath: '', isBuiltin: false }
-      ],
+      pluginSettings: [{ id: 'p1', enabled: true, order: 0, pythonOverridePath: '', isBuiltin: false }],
       updatePluginSetting: mockUpdatePluginSetting,
     });
 
@@ -272,25 +282,25 @@ describe('SettingsModal UI', () => {
     // Python Override Path
     const overrideInput = await screen.findByPlaceholderText(/global: python/i);
     fireEvent.change(overrideInput, { target: { value: '/venv/bin/python' } });
-    
+
     await waitFor(() => {
       const settings = useAppStore.getState().pluginSettings;
-      expect(settings.find(s => s.id === 'p1')?.pythonOverridePath).toBe('/venv/bin/python');
+      expect(settings.find((s) => s.id === 'p1')?.pythonOverridePath).toBe('/venv/bin/python');
     });
   });
-  
+
   it('shows cleanup banner when settings have missing plugins and removes them on click', async () => {
     // Setup state with a missing plugin (p2 is not in plugins map)
     useAppStore.setState({
       plugins: {
-        'p1': { 
-          id: 'p1', 
-          manifest: { name: 'Exists' } 
-        } as any
+        p1: {
+          id: 'p1',
+          manifest: { name: 'Exists' },
+        } as any,
       },
       pluginSettings: [
         { id: 'p1', enabled: true, order: 0, isBuiltin: false },
-        { id: 'p2', enabled: true, order: 1, isBuiltin: false } // p2's source is missing
+        { id: 'p2', enabled: true, order: 1, isBuiltin: false }, // p2's source is missing
       ],
     });
 
@@ -315,22 +325,20 @@ describe('SettingsModal UI', () => {
     await waitFor(() => {
       const settings = useAppStore.getState().pluginSettings;
       expect(settings.length).toBe(1);
-      expect(settings.find(s => s.id === 'p2')).toBeUndefined();
+      expect(settings.find((s) => s.id === 'p2')).toBeUndefined();
     });
   });
 
   it('allows changing plugin icons', async () => {
     useAppStore.setState({
       plugins: {
-        'p1': { 
-          id: 'p1', 
+        p1: {
+          id: 'p1',
           manifest: { name: 'My Plugin', icon: 'Puzzle' },
           folder_path: '/p',
-        } as any
+        } as any,
       },
-      pluginSettings: [
-        { id: 'p1', enabled: true, order: 0, icon: 'Puzzle', isBuiltin: false }
-      ],
+      pluginSettings: [{ id: 'p1', enabled: true, order: 0, icon: 'Puzzle', isBuiltin: false }],
     });
 
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
@@ -339,24 +347,24 @@ describe('SettingsModal UI', () => {
     // Select a different icon
     const iconSelect = await screen.findByRole('combobox');
     fireEvent.change(iconSelect, { target: { value: 'Sparkles' } });
-    
+
     await waitFor(() => {
       const settings = useAppStore.getState().pluginSettings;
-      expect(settings.find(s => s.id === 'p1')?.icon).toBe('Sparkles');
+      expect(settings.find((s) => s.id === 'p1')?.icon).toBe('Sparkles');
     });
   });
 
   it('handles custom icon browsing via base64', async () => {
     // Mock confirm for security warning
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    
+
     const { BackendAPI, DialogAPI } = await import('../../api');
-    
+
     vi.mocked(DialogAPI.open).mockResolvedValue('/path/to/icon.png');
     vi.mocked(BackendAPI.readImageBase64).mockResolvedValue('data:image/png;base64,fake');
 
     useAppStore.setState({
-      plugins: { 'p1': { id: 'p1', manifest: { name: 'P' } } as any },
+      plugins: { p1: { id: 'p1', manifest: { name: 'P' } } as any },
       pluginSettings: [{ id: 'p1', enabled: true, order: 0, isBuiltin: false }],
     });
 
@@ -366,26 +374,29 @@ describe('SettingsModal UI', () => {
     const browseBtn = (await screen.findAllByText('Browse'))[0];
     fireEvent.click(browseBtn);
 
-    await waitFor(() => {
-      const settings = useAppStore.getState().pluginSettings;
-      expect(settings.find(s => s.id === 'p1')?.icon).toBe('data:image/png;base64,fake');
-    }, { timeout: 3000 });
-    
+    await waitFor(
+      () => {
+        const settings = useAppStore.getState().pluginSettings;
+        expect(settings.find((s) => s.id === 'p1')?.icon).toBe('data:image/png;base64,fake');
+      },
+      { timeout: 3000 },
+    );
+
     confirmSpy.mockRestore();
   });
 
   it('triggers create new plugin flow', async () => {
     const { BackendAPI, DialogAPI } = await import('../../api');
-    
+
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('New Cool Plugin');
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.stubGlobal('alert', vi.fn());
-    
+
     vi.mocked(DialogAPI.open).mockResolvedValue('/dev/plugins');
     vi.mocked(BackendAPI.scaffoldPlugin).mockResolvedValue({
       id: 'new-p',
       manifest: { name: 'New Cool Plugin' },
-      folder_path: '/dev/plugins/new-p'
+      folder_path: '/dev/plugins/new-p',
     } as any);
 
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
@@ -394,10 +405,13 @@ describe('SettingsModal UI', () => {
     const createBtn = await screen.findByText('Create New');
     fireEvent.click(createBtn);
 
-    await waitFor(() => {
-      expect(useAppStore.getState().plugins['new-p']).toBeDefined();
-    }, { timeout: 3000 });
-    
+    await waitFor(
+      () => {
+        expect(useAppStore.getState().plugins['new-p']).toBeDefined();
+      },
+      { timeout: 3000 },
+    );
+
     expect(DialogAPI.open).toHaveBeenCalled();
     expect(promptSpy).toHaveBeenCalled();
     promptSpy.mockRestore();

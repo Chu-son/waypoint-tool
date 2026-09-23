@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { Modal, ModalHeader, ModalContent } from "./common/Modal";
-import { Button } from "./common/Button";
-import { EmptyState } from "./common/EmptyState";
-import { useAppStore } from "../../stores/appStore";
-import { MousePointer2, Plus, FolderOpen, Clock, FileText } from "lucide-react";
-import { getVersion } from "@tauri-apps/api/app";
-import { cn } from "../../utils/cn";
-import { confirmDiscardChanges } from "../../utils/projectGuard";
+import { useState, useEffect } from 'react';
+import { Modal, ModalHeader, ModalContent } from './common/Modal';
+import { Button } from './common/Button';
+import { EmptyState } from './common/EmptyState';
+import { useAppStore } from '../../stores/appStore';
+import { MousePointer2, Plus, FolderOpen, Clock, FileText } from 'lucide-react';
+import { getVersion } from '@tauri-apps/api/app';
+import { cn } from '../../utils/cn';
+import { confirmDiscardChanges } from '../../utils/projectGuard';
 
 export interface WelcomeModalProps {
   isOpen: boolean;
@@ -22,12 +22,12 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
   const loadProject = useAppStore((state) => state.loadProject);
   const loadProjectFromPath = useAppStore((state) => state.loadProjectFromPath);
 
-  const [version, setVersion] = useState<string>("");
+  const [version, setVersion] = useState<string>('');
 
   useEffect(() => {
     getVersion()
       .then((v) => setVersion(v))
-      .catch(() => setVersion(""));
+      .catch(() => setVersion(''));
   }, []);
 
   const handleClose = () => {
@@ -73,16 +73,9 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     >
       <ModalHeader onClose={isInitialLaunch ? undefined : handleClose}>
         <div className="flex items-center gap-2">
-          <MousePointer2
-            size={18}
-            className="text-primary-base rotate-45 transform fill-primary-base"
-          />
+          <MousePointer2 size={18} className="text-primary-base rotate-45 transform fill-primary-base" />
           <span className="font-bold text-text-base">Waypoint Tool</span>
-          {version && (
-            <span className="text-xs text-text-muted font-mono font-normal ml-1">
-              v{version}
-            </span>
-          )}
+          {version && <span className="text-xs text-text-muted font-mono font-normal ml-1">v{version}</span>}
         </div>
       </ModalHeader>
 
@@ -118,9 +111,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
             </div>
           </div>
 
-          <div className="text-[11px] text-text-muted/60 text-center font-mono">
-            ROS 2 Waypoint & Path Planning
-          </div>
+          <div className="text-[11px] text-text-muted/60 text-center font-mono">ROS 2 Waypoint & Path Planning</div>
         </div>
 
         {/* Right Pane: Recent Projects */}
@@ -130,11 +121,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
               <Clock size={15} className="text-text-muted" />
               <span>最近開いたプロジェクト</span>
             </div>
-            {recentProjects.length > 0 && (
-              <span className="text-xs text-text-muted">
-                {recentProjects.length} 件
-              </span>
-            )}
+            {recentProjects.length > 0 && <span className="text-xs text-text-muted">{recentProjects.length} 件</span>}
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -148,7 +135,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                   key={item.path}
                   onClick={() => handleOpenRecent(item.path)}
                   className={cn(
-                    "w-full text-left p-3.5 rounded-lg border border-border-base/40 bg-surface-panel/40 hover:bg-surface-hover hover:border-primary-base/40 transition-all flex items-start gap-3 group shadow-sm"
+                    'w-full text-left p-3.5 rounded-lg border border-border-base/40 bg-surface-panel/40 hover:bg-surface-hover hover:border-primary-base/40 transition-all flex items-start gap-3 group shadow-sm',
                   )}
                 >
                   <div className="p-2 rounded bg-surface-base/60 text-text-muted group-hover:text-primary-base transition-colors shrink-0 mt-0.5">
@@ -158,10 +145,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                     <div className="font-semibold text-sm text-text-base group-hover:text-primary-base transition-colors truncate">
                       {item.name}
                     </div>
-                    <div
-                      className="text-xs text-text-muted truncate mt-0.5"
-                      title={item.path}
-                    >
+                    <div className="text-xs text-text-muted truncate mt-0.5" title={item.path}>
                       {item.path}
                     </div>
                   </div>

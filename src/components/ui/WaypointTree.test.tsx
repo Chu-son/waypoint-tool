@@ -43,36 +43,38 @@ describe('WaypointTree', () => {
     'wp-2': { id: 'wp-2', type: 'manual' },
     'wp-3': { id: 'wp-3', type: 'manual' },
     'gen-1': { id: 'gen-1', type: 'generator', children_ids: ['c1', 'c2'], plugin_id: 'p1' },
-    'c1': { id: 'c1', type: 'manual' },
-    'c2': { id: 'c2', type: 'manual' },
+    c1: { id: 'c1', type: 'manual' },
+    c2: { id: 'c2', type: 'manual' },
   };
 
   const mockPlugins: any = {
-    'p1': { manifest: { name: 'Test Plugin' } }
+    p1: { manifest: { name: 'Test Plugin' } },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: [],
-      nodes: {},
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-      copySelectedMapElements: vi.fn(),
-      cutSelectedMapElements: vi.fn(),
-      pasteMapElements: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: [],
+        nodes: {},
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+        copySelectedMapElements: vi.fn(),
+        cutSelectedMapElements: vi.fn(),
+        pasteMapElements: vi.fn(),
+      }),
+    );
   });
 
   it('renders empty state', () => {
@@ -81,29 +83,31 @@ describe('WaypointTree', () => {
   });
 
   it('displays mixed node types and correct indexing', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['wp-1', 'gen-1', 'wp-2'],
-      nodes: mockNodes,
-      plugins: mockPlugins,
-      selectedNodeIds: [],
-      indexStartIndex: 10, // Offset
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['wp-1', 'gen-1', 'wp-2'],
+        nodes: mockNodes,
+        plugins: mockPlugins,
+        selectedNodeIds: [],
+        indexStartIndex: 10, // Offset
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
     // wp-1: [10]
     expect(screen.getByText('[10]')).toBeInTheDocument();
-    
+
     // gen-1 item
     expect(screen.getByText('Test Plugin')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
@@ -113,26 +117,28 @@ describe('WaypointTree', () => {
   });
 
   it('handles expansion and showing children with correct indices', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['gen-1'],
-      nodes: mockNodes,
-      plugins: mockPlugins,
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['gen-1'],
+        nodes: mockNodes,
+        plugins: mockPlugins,
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
-    
+
     // Initially children are hidden
     expect(screen.queryByText(/\[0\]/)).not.toBeInTheDocument();
 
@@ -146,23 +152,25 @@ describe('WaypointTree', () => {
   });
 
   it('handles grouping from context menu on multi-selected items', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
-      nodes: mockNodes,
-      plugins: mockPlugins,
-      selectedNodeIds: ['wp-1', 'wp-2'],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
+        nodes: mockNodes,
+        plugins: mockPlugins,
+        selectedNodeIds: ['wp-1', 'wp-2'],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -180,23 +188,25 @@ describe('WaypointTree', () => {
 
   it('renders insertion bar and allows reset when insertionTarget is active', () => {
     const mockSetInsertionTarget = vi.fn();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
-      nodes: mockNodes,
-      plugins: mockPlugins,
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: null, index: 1 },
-      setInsertionTarget: mockSetInsertionTarget,
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
+        nodes: mockNodes,
+        plugins: mockPlugins,
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: null, index: 1 },
+        setInsertionTarget: mockSetInsertionTarget,
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -215,23 +225,25 @@ describe('WaypointTree', () => {
   });
 
   it('renders insertion bar in empty tree state', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: [],
-      nodes: {},
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: [],
+        nodes: {},
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
     expect(screen.getByText(/no items yet/i)).toBeInTheDocument();
@@ -240,25 +252,27 @@ describe('WaypointTree', () => {
   });
 
   it('does NOT include insertion bar pseudo ID during shift range selection', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
-      nodes: mockNodes,
-      plugins: mockPlugins,
-      selectedNodeIds: ['wp-1'],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: null, index: 1 }, // Insertion bar between wp-1 and wp-2
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-      setRightPanelActiveTab: vi.fn(),
-      setRightPanelOpen: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['wp-1', 'wp-2', 'wp-3'],
+        nodes: mockNodes,
+        plugins: mockPlugins,
+        selectedNodeIds: ['wp-1'],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: null, index: 1 }, // Insertion bar between wp-1 and wp-2
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+        setRightPanelActiveTab: vi.fn(),
+        setRightPanelOpen: vi.fn(),
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -278,27 +292,29 @@ describe('WaypointTree', () => {
 
   it('hides insert-at-start menu for generator but shows for manual_group', () => {
     const mockSetTarget = vi.fn();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['gen-1', 'grp-1'],
-      nodes: {
-        'gen-1': { id: 'gen-1', type: 'generator', name: 'Generator 1', children_ids: ['c1'] },
-        'c1': { id: 'c1', type: 'manual', name: 'WP Child' },
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: [] },
-      },
-      plugins: { p1: { manifest: { name: 'P1' } } },
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: mockSetTarget,
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['gen-1', 'grp-1'],
+        nodes: {
+          'gen-1': { id: 'gen-1', type: 'generator', name: 'Generator 1', children_ids: ['c1'] },
+          c1: { id: 'c1', type: 'manual', name: 'WP Child' },
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: [] },
+        },
+        plugins: { p1: { manifest: { name: 'P1' } } },
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: mockSetTarget,
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -322,26 +338,28 @@ describe('WaypointTree', () => {
 
   it('escapes insertion target outside generator when clicking insert-after on generator child', () => {
     const mockSetTarget = vi.fn();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['gen-1'],
-      nodes: {
-        'gen-1': { id: 'gen-1', type: 'generator', name: 'Gen 1', children_ids: ['c1'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child WP' },
-      },
-      plugins: { p1: { manifest: { name: 'P1' } } },
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: mockSetTarget,
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['gen-1'],
+        nodes: {
+          'gen-1': { id: 'gen-1', type: 'generator', name: 'Gen 1', children_ids: ['c1'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child WP' },
+        },
+        plugins: { p1: { manifest: { name: 'P1' } } },
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: mockSetTarget,
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -361,28 +379,30 @@ describe('WaypointTree', () => {
   });
 
   it('places insertion bar directly after expanded group children when insertionTarget is after the group at root', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1', 'wp-3'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child 1' },
-        'c2': { id: 'c2', type: 'manual', name: 'Child 2' },
-        'wp-3': { id: 'wp-3', type: 'manual', name: 'Waypoint 3' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: null, index: 1 }, // Right after grp-1 at root level
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1', 'wp-3'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child 1' },
+          c2: { id: 'c2', type: 'manual', name: 'Child 2' },
+          'wp-3': { id: 'wp-3', type: 'manual', name: 'Waypoint 3' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: null, index: 1 }, // Right after grp-1 at root level
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -408,28 +428,30 @@ describe('WaypointTree', () => {
   });
 
   it('places insertion bar after nested expanded group children when insertionTarget is inside a group', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['subgrp-1', 'wp-sibling'] },
-        'subgrp-1': { id: 'subgrp-1', type: 'manual_group', name: 'Sub Group', children_ids: ['sub-c1'] },
-        'sub-c1': { id: 'sub-c1', type: 'manual', name: 'Sub Child 1' },
-        'wp-sibling': { id: 'wp-sibling', type: 'manual', name: 'WP Sibling' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: 'grp-1', index: 1 }, // After subgrp-1 inside grp-1
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['subgrp-1', 'wp-sibling'] },
+          'subgrp-1': { id: 'subgrp-1', type: 'manual_group', name: 'Sub Group', children_ids: ['sub-c1'] },
+          'sub-c1': { id: 'sub-c1', type: 'manual', name: 'Sub Child 1' },
+          'wp-sibling': { id: 'wp-sibling', type: 'manual', name: 'WP Sibling' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: 'grp-1', index: 1 }, // After subgrp-1 inside grp-1
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -452,27 +474,29 @@ describe('WaypointTree', () => {
   });
 
   it('places insertion bar at start of group when insertionTarget is index 0 inside a group', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child 1' },
-        'c2': { id: 'c2', type: 'manual', name: 'Child 2' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: 'grp-1', index: 0 }, // At start of grp-1
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child 1' },
+          c2: { id: 'c2', type: 'manual', name: 'Child 2' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: 'grp-1', index: 0 }, // At start of grp-1
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -490,28 +514,30 @@ describe('WaypointTree', () => {
   });
 
   it('keeps insertion bar attached directly below collapsed group when target is inside the collapsed group', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1', 'wp-other'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child 1' },
-        'c2': { id: 'c2', type: 'manual', name: 'Child 2' },
-        'wp-other': { id: 'wp-other', type: 'manual', name: 'Other Waypoint' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: 'grp-1', index: 2 }, // After c2 inside grp-1
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1', 'wp-other'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child 1' },
+          c2: { id: 'c2', type: 'manual', name: 'Child 2' },
+          'wp-other': { id: 'wp-other', type: 'manual', name: 'Other Waypoint' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: 'grp-1', index: 2 }, // After c2 inside grp-1
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -537,28 +563,30 @@ describe('WaypointTree', () => {
   });
 
   it('anchors insertion bar to nearest visible ancestor when target is in a deeply nested collapsed group', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['top-grp', 'wp-end'],
-      nodes: {
-        'top-grp': { id: 'top-grp', type: 'manual_group', name: 'Top Group', children_ids: ['sub-grp'] },
-        'sub-grp': { id: 'sub-grp', type: 'manual_group', name: 'Sub Group', children_ids: ['sub-c1'] },
-        'sub-c1': { id: 'sub-c1', type: 'manual', name: 'Sub Child 1' },
-        'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: 'sub-grp', index: 1 }, // Inside sub-grp
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['top-grp', 'wp-end'],
+        nodes: {
+          'top-grp': { id: 'top-grp', type: 'manual_group', name: 'Top Group', children_ids: ['sub-grp'] },
+          'sub-grp': { id: 'sub-grp', type: 'manual_group', name: 'Sub Group', children_ids: ['sub-c1'] },
+          'sub-c1': { id: 'sub-c1', type: 'manual', name: 'Sub Child 1' },
+          'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: 'sub-grp', index: 1 }, // Inside sub-grp
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -572,27 +600,29 @@ describe('WaypointTree', () => {
 
   it('automatically escapes insertionTarget to outside group when collapsing a group containing the insertionTarget', () => {
     const mockSetInsertionTarget = vi.fn();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1', 'wp-end'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child 1' },
-        'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: 'grp-1', index: 1 }, // Target is inside grp-1
-      setInsertionTarget: mockSetInsertionTarget,
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1', 'wp-end'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child 1' },
+          'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: 'grp-1', index: 1 }, // Target is inside grp-1
+        setInsertionTarget: mockSetInsertionTarget,
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -608,28 +638,30 @@ describe('WaypointTree', () => {
   });
 
   it('renders insertion bar with depth 0 (no indent) when insertionTarget is at root level after an expanded group', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1', 'wp-end'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child 1' },
-        'c2': { id: 'c2', type: 'manual', name: 'Child 2' },
-        'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: null, index: 1 }, // At root level after grp-1
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1', 'wp-end'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child 1' },
+          c2: { id: 'c2', type: 'manual', name: 'Child 2' },
+          'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: null, index: 1 }, // At root level after grp-1
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -646,28 +678,30 @@ describe('WaypointTree', () => {
   });
 
   it('renders insertion bar with depth 1 (indented) when insertionTarget is inside group at end', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1', 'wp-end'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
-        'c1': { id: 'c1', type: 'manual', name: 'Child 1' },
-        'c2': { id: 'c2', type: 'manual', name: 'Child 2' },
-        'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
-      },
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: { parentId: 'grp-1', index: 2 }, // Inside grp-1 at end
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1', 'wp-end'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'Group 1', children_ids: ['c1', 'c2'] },
+          c1: { id: 'c1', type: 'manual', name: 'Child 1' },
+          c2: { id: 'c2', type: 'manual', name: 'Child 2' },
+          'wp-end': { id: 'wp-end', type: 'manual', name: 'End Waypoint' },
+        },
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: { parentId: 'grp-1', index: 2 }, // Inside grp-1 at end
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -685,24 +719,26 @@ describe('WaypointTree', () => {
 
   it('moves dragged node to end of root when dropped on insertion bar with null insertionTarget', () => {
     const mockMoveNodes = vi.fn();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['wp-1', 'wp-2'],
-      nodes: mockNodes,
-      plugins: {},
-      selectedNodeIds: ['wp-1'],
-      indexStartIndex: 0,
-      insertionTarget: null, // End of root
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      moveNodesInTree: mockMoveNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['wp-1', 'wp-2'],
+        nodes: mockNodes,
+        plugins: {},
+        selectedNodeIds: ['wp-1'],
+        indexStartIndex: 0,
+        insertionTarget: null, // End of root
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        moveNodesInTree: mockMoveNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     render(<WaypointTree />);
 
@@ -712,24 +748,26 @@ describe('WaypointTree', () => {
   });
 
   it('highlights parent group and shows dot indicator when child node is selected', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: ['grp-1'],
-      nodes: {
-        'grp-1': { id: 'grp-1', type: 'manual_group', name: 'My Group', children_ids: ['wp-child'] },
-        'wp-child': { id: 'wp-child', type: 'manual', name: 'Child Point' },
-      },
-      plugins: {},
-      selectedNodeIds: ['wp-child'], // Child is selected!
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: ['grp-1'],
+        nodes: {
+          'grp-1': { id: 'grp-1', type: 'manual_group', name: 'My Group', children_ids: ['wp-child'] },
+          'wp-child': { id: 'wp-child', type: 'manual', name: 'Child Point' },
+        },
+        plugins: {},
+        selectedNodeIds: ['wp-child'], // Child is selected!
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -749,26 +787,28 @@ describe('WaypointTree', () => {
 
   it('shows paste and paste-as-group menu on blank area right-click', () => {
     const mockPasteMapElements = vi.fn();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      rootNodeIds: [],
-      nodes: {},
-      plugins: {},
-      selectedNodeIds: [],
-      indexStartIndex: 0,
-      insertionTarget: null,
-      setInsertionTarget: vi.fn(),
-      selectNodes: mockSelectNodes,
-      duplicateNodes: mockDuplicateNodes,
-      removeNodes: mockRemoveNodes,
-      reorderNodes: mockReorderNodes,
-      reorderMultipleNodes: mockReorderMultipleNodes,
-      groupNodes: mockGroupNodes,
-      ungroupNode: mockUngroupNode,
-      renameNode: mockRenameNode,
-      copySelectedMapElements: vi.fn(),
-      cutSelectedMapElements: vi.fn(),
-      pasteMapElements: mockPasteMapElements,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        rootNodeIds: [],
+        nodes: {},
+        plugins: {},
+        selectedNodeIds: [],
+        indexStartIndex: 0,
+        insertionTarget: null,
+        setInsertionTarget: vi.fn(),
+        selectNodes: mockSelectNodes,
+        duplicateNodes: mockDuplicateNodes,
+        removeNodes: mockRemoveNodes,
+        reorderNodes: mockReorderNodes,
+        reorderMultipleNodes: mockReorderMultipleNodes,
+        groupNodes: mockGroupNodes,
+        ungroupNode: mockUngroupNode,
+        renameNode: mockRenameNode,
+        copySelectedMapElements: vi.fn(),
+        cutSelectedMapElements: vi.fn(),
+        pasteMapElements: mockPasteMapElements,
+      }),
+    );
 
     const { container } = render(<WaypointTree />);
 
@@ -787,5 +827,3 @@ describe('WaypointTree', () => {
     expect(mockPasteMapElements).toHaveBeenCalledWith({ asGroup: false });
   });
 });
-
-

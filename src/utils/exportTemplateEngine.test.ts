@@ -106,9 +106,7 @@ describe('exportTemplateEngine', () => {
         { id: 'reg-2', name: 'living_room' },
       ],
       templates: [],
-      defaultFormats: [
-        { id: '__default_yaml__', name: 'Standard YAML', extension: 'yaml' },
-      ],
+      defaultFormats: [{ id: '__default_yaml__', name: 'Standard YAML', extension: 'yaml' }],
     };
 
     it('resolves all files with PGM+YAML pairs and PNG image attachment', () => {

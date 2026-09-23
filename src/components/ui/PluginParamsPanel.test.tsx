@@ -51,29 +51,27 @@ describe('PluginParamsPanel', () => {
       name: 'Test Generator',
       description: 'A test plugin',
       type: 'python',
-      inputs: [
-        { id: 'in-1', name: 'start', type: 'point', label: 'Start Point', required: true }
-      ],
-      properties: [
-        { name: 'count', type: 'integer', default: 5, label: 'Count' }
-      ]
-    }
+      inputs: [{ id: 'in-1', name: 'start', type: 'point', label: 'Start Point', required: true }],
+      properties: [{ name: 'count', type: 'integer', default: 5, label: 'Count' }],
+    },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'add_generator',
-      activePluginId: 'test-plugin',
-      plugins: { 'test-plugin': mockPlugin },
-      pluginSettings: [{ id: 'test-plugin', enabled: true }],
-      pluginInteractionData: {},
-      activeInputIndex: 0,
-      nodes: {},
-      selectedNodeIds: [],
-      decimalPrecision: 2,
-      runWithLoading: async (_: any, fn: any) => await fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        activeTool: 'add_generator',
+        activePluginId: 'test-plugin',
+        plugins: { 'test-plugin': mockPlugin },
+        pluginSettings: [{ id: 'test-plugin', enabled: true }],
+        pluginInteractionData: {},
+        activeInputIndex: 0,
+        nodes: {},
+        selectedNodeIds: [],
+        decimalPrecision: 2,
+        runWithLoading: async (_: any, fn: any) => await fn(),
+      }),
+    );
 
     (useAppStore.getState as any).mockReturnValue({
       addNode: vi.fn(),
@@ -89,7 +87,7 @@ describe('PluginParamsPanel', () => {
           params.plugin,
           { properties: params.properties, interaction_data: params.interactionData },
           'python3',
-          layers as any
+          layers as any,
         );
         return { success: true, executionId: 'exec-1', parentWaypointId: 'p-1', customLayerIds: [] };
       }),
@@ -97,11 +95,13 @@ describe('PluginParamsPanel', () => {
   });
 
   it('renders nothing if activeTool is not add_generator', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'select',
-      activePluginId: 'test-plugin',
-      plugins: { 'test-plugin': mockPlugin },
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        activeTool: 'select',
+        activePluginId: 'test-plugin',
+        plugins: { 'test-plugin': mockPlugin },
+      }),
+    );
     const { container } = render(<PluginParamsPanel />);
     expect(container.firstChild).toBeNull();
   });
@@ -115,18 +115,20 @@ describe('PluginParamsPanel', () => {
 
   it('disables generate button if script requires selection but none is present', () => {
     const pluginWithSelect = {
-        ...mockPlugin,
-        manifest: { ...mockPlugin.manifest, needs: ['selected_points'] }
+      ...mockPlugin,
+      manifest: { ...mockPlugin.manifest, needs: ['selected_points'] },
     };
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'add_generator',
-      activePluginId: 'test-plugin',
-      plugins: { 'test-plugin': pluginWithSelect },
-      selectedNodeIds: [],
-      pluginInteractionData: {},
-      pluginSettings: [],
-      activeInputIndex: 0,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        activeTool: 'add_generator',
+        activePluginId: 'test-plugin',
+        plugins: { 'test-plugin': pluginWithSelect },
+        selectedNodeIds: [],
+        pluginInteractionData: {},
+        pluginSettings: [],
+        activeInputIndex: 0,
+      }),
+    );
 
     render(<PluginParamsPanel />);
     const executeBtn = screen.getByRole('button', { name: /generate path/i });
@@ -151,7 +153,7 @@ describe('PluginParamsPanel', () => {
         await BackendAPI.runPlugin(
           params.plugin,
           { properties: params.properties, interaction_data: params.interactionData },
-          'python3'
+          'python3',
         );
         mockAddNode();
         mockSelectNodes(['new-uuid']);
@@ -160,9 +162,7 @@ describe('PluginParamsPanel', () => {
       }),
     });
 
-    (BackendAPI.runPlugin as any).mockResolvedValue([
-      { x: 10, y: 20, yaw: 0 }
-    ]);
+    (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 10, y: 20, yaw: 0 }]);
 
     render(<PluginParamsPanel />);
     const executeBtn = screen.getByText('Generate Path');
@@ -200,27 +200,37 @@ describe('PluginParamsPanel', () => {
         type: 'python',
         needs: ['occupancy_grid'],
         inputs: [],
-        properties: []
-      }
+        properties: [],
+      },
     };
 
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'add_generator',
-      activePluginId: 'occ-plugin',
-      plugins: { 'occ-plugin': occPlugin },
-      pluginSettings: [],
-      globalPythonPath: '',
-      pluginInteractionData: {},
-      activeInputIndex: 0,
-      nodes: {},
-      mapLayers: [
-        { id: 'm1', name: 'Map', visible: true, opacity: 1, z_index: 0, image_base64: 'b64', info: { resolution: 0.05, origin: [0, 0, 0] } }
-      ],
-      customLayers: [],
-      selectedNodeIds: [],
-      decimalPrecision: 4,
-      runWithLoading: async (_: any, fn: any) => await fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        activeTool: 'add_generator',
+        activePluginId: 'occ-plugin',
+        plugins: { 'occ-plugin': occPlugin },
+        pluginSettings: [],
+        globalPythonPath: '',
+        pluginInteractionData: {},
+        activeInputIndex: 0,
+        nodes: {},
+        mapLayers: [
+          {
+            id: 'm1',
+            name: 'Map',
+            visible: true,
+            opacity: 1,
+            z_index: 0,
+            image_base64: 'b64',
+            info: { resolution: 0.05, origin: [0, 0, 0] },
+          },
+        ],
+        customLayers: [],
+        selectedNodeIds: [],
+        decimalPrecision: 4,
+        runWithLoading: async (_: any, fn: any) => await fn(),
+      }),
+    );
 
     (useAppStore.getState as any).mockReturnValue({
       addNode: vi.fn(),
@@ -236,15 +246,13 @@ describe('PluginParamsPanel', () => {
           params.plugin,
           { properties: params.properties, interaction_data: params.interactionData },
           'python3',
-          [{ id: 'm1', visible: true }] as any
+          [{ id: 'm1', visible: true }] as any,
         );
         return { success: true, executionId: 'exec-1', parentWaypointId: 'p-1', customLayerIds: [] };
       }),
     });
 
-    (BackendAPI.runPlugin as any).mockResolvedValue([
-      { x: 1, y: 2, yaw: 0 }
-    ]);
+    (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 1, y: 2, yaw: 0 }]);
 
     render(<PluginParamsPanel />);
     const executeBtn = screen.getByText('Generate Path');
@@ -255,9 +263,7 @@ describe('PluginParamsPanel', () => {
         occPlugin,
         expect.anything(),
         'python3',
-        expect.arrayContaining([
-          expect.objectContaining({ id: 'm1', visible: true })
-        ])
+        expect.arrayContaining([expect.objectContaining({ id: 'm1', visible: true })]),
       );
     });
   });
@@ -269,11 +275,9 @@ describe('PluginParamsPanel', () => {
         name: 'Combined Pipeline',
         type: 'pipeline',
         pipeline: {
-          steps: [
-            { step_id: 's1', plugin_id: 'test-plugin', name: 'Inner Generator' }
-          ]
-        }
-      }
+          steps: [{ step_id: 's1', plugin_id: 'test-plugin', name: 'Inner Generator' }],
+        },
+      },
     };
 
     const state = {

@@ -2,23 +2,26 @@ import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent } from 'pixi.js';
 import { CanvasHandle } from '../common/CanvasHandle';
 
-
 interface PluginLayerProps {
   scale: number;
-  onRectDragCornerDown: (e: FederatedPointerEvent, key: string, corner: 'min'|'max'|'topRight'|'bottomLeft') => void;
+  onRectDragCornerDown: (
+    e: FederatedPointerEvent,
+    key: string,
+    corner: 'min' | 'max' | 'topRight' | 'bottomLeft',
+  ) => void;
   onRectRotationDown: (e: FederatedPointerEvent, key: string) => void;
 }
 
 export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }: PluginLayerProps) {
-  const activeTool = useAppStore(state => state.activeTool);
-  const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
-  const nodes = useAppStore(state => state.nodes);
-  const pluginInteractionData = useAppStore(state => state.pluginInteractionData);
-  const plugins = useAppStore(state => state.plugins);
-  const activePluginId = useAppStore(state => state.activePluginId);
-  const pluginActiveProperties = useAppStore(state => state.pluginActiveProperties);
-  const activeCustomLayerId = useAppStore(state => state.activeCustomLayerId);
-  const activePipelineInputRef = useAppStore(state => state.activePipelineInputRef);
+  const activeTool = useAppStore((state) => state.activeTool);
+  const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
+  const nodes = useAppStore((state) => state.nodes);
+  const pluginInteractionData = useAppStore((state) => state.pluginInteractionData);
+  const plugins = useAppStore((state) => state.plugins);
+  const activePluginId = useAppStore((state) => state.activePluginId);
+  const pluginActiveProperties = useAppStore((state) => state.pluginActiveProperties);
+  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
+  const activePipelineInputRef = useAppStore((state) => state.activePipelineInputRef);
 
   const shouldRender =
     activeTool === 'add_generator' ||
@@ -38,17 +41,17 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
         if (data.center && typeof data.width === 'number') {
           const { center, width, height, yaw = 0 } = data;
           if (!isFinite(center.x) || !isFinite(center.y) || !isFinite(width) || !isFinite(height)) return null;
-          
+
           const halfW = width / 2;
           const halfH = height / 2;
-          
+
           const corners = [
             { cx: -halfW, cy: halfH, corner: 'min' as const },
             { cx: halfW, cy: -halfH, corner: 'max' as const },
             { cx: halfW, cy: halfH, corner: 'topRight' as const },
             { cx: -halfW, cy: -halfH, corner: 'bottomLeft' as const },
           ];
-          
+
           return (
             <pixiContainer key={`rect-${key}`} x={center.x} y={center.y} rotation={yaw}>
               <pixiGraphics
@@ -60,13 +63,17 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                   g.strokeStyle = { width: 2 / safeScale, color: 0xec4899 };
                   const dashLen = 8 / safeScale;
                   const sides = [
-                    [-halfW, -halfH, halfW, -halfH], [halfW, -halfH, halfW, halfH],
-                    [halfW, halfH, -halfW, halfH], [-halfW, halfH, -halfW, -halfH],
+                    [-halfW, -halfH, halfW, -halfH],
+                    [halfW, -halfH, halfW, halfH],
+                    [halfW, halfH, -halfW, halfH],
+                    [-halfW, halfH, -halfW, -halfH],
                   ];
                   sides.forEach(([sx, sy, ex, ey]) => {
-                    const dx = ex - sx, dy = ey - sy;
+                    const dx = ex - sx,
+                      dy = ey - sy;
                     const len = Math.sqrt(dx * dx + dy * dy);
-                    const nx = dx / len, ny = dy / len;
+                    const nx = dx / len,
+                      ny = dy / len;
                     let d = 0;
                     let draw = true;
                     while (d < len) {
@@ -111,17 +118,17 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                       g.moveTo(0, stemLen);
                       g.lineTo(0, 0);
                       g.stroke();
-                      
+
                       g.fillStyle = { color: 0xffffff, alpha: 0.001 };
                       g.circle(0, 0, 15 / safeScale);
                       g.fill();
-                      
+
                       g.fillStyle = { color: 0xffffff, alpha: 0.9 };
                       g.strokeStyle = { width: 1.5 / safeScale, color: 0xec4899 };
                       g.circle(0, 0, handleR);
                       g.fill();
                       g.stroke();
-                      
+
                       g.strokeStyle = { width: 1.2 / safeScale, color: 0xec4899 };
                       const arcR = handleR * 0.55;
                       const arcSteps = 10;
@@ -132,7 +139,7 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                         g.lineTo(Math.cos(a2) * arcR, Math.sin(a2) * arcR);
                       }
                       g.stroke();
-                      
+
                       const lastAngle = -0.3 + 4.8;
                       const tipX = Math.cos(lastAngle) * arcR;
                       const tipY = Math.sin(lastAngle) * arcR;
@@ -155,7 +162,7 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                 let startCorner = '';
                 let sweepDir = '';
 
-                activePlugin?.manifest?.properties?.forEach(prop => {
+                activePlugin?.manifest?.properties?.forEach((prop) => {
                   if (prop.interaction_hint?.target_input === key) {
                     const val = pluginActiveProperties[prop.name] ?? prop.default;
                     if (prop.interaction_hint.type === 'start_corner') startCorner = String(val || '');
@@ -167,24 +174,35 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
 
                 if (!startCorner) startCorner = 'Bottom-Left';
                 if (!sweepDir) sweepDir = 'Horizontal';
-                
-                let cx = 0, cy = 0;
-                if (startCorner === 'Bottom-Left') { cx = -halfW; cy = -halfH; }
-                else if (startCorner === 'Bottom-Right') { cx = halfW; cy = -halfH; }
-                else if (startCorner === 'Top-Left') { cx = -halfW; cy = halfH; }
-                else if (startCorner === 'Top-Right') { cx = halfW; cy = halfH; }
-                
-                let dirX = 0, dirY = 0;
+
+                let cx = 0,
+                  cy = 0;
+                if (startCorner === 'Bottom-Left') {
+                  cx = -halfW;
+                  cy = -halfH;
+                } else if (startCorner === 'Bottom-Right') {
+                  cx = halfW;
+                  cy = -halfH;
+                } else if (startCorner === 'Top-Left') {
+                  cx = -halfW;
+                  cy = halfH;
+                } else if (startCorner === 'Top-Right') {
+                  cx = halfW;
+                  cy = halfH;
+                }
+
+                let dirX = 0,
+                  dirY = 0;
                 const arrowLen = 12 / safeScale;
                 if (sweepDir === 'Horizontal') {
                   dirX = cx < 0 ? arrowLen : -arrowLen;
                 } else {
                   dirY = cy < 0 ? arrowLen : -arrowLen;
                 }
-                
+
                 const triSize = 5 / safeScale;
                 const angle = Math.atan2(dirY, dirX);
-                
+
                 return (
                   <pixiGraphics
                     x={cx}
@@ -198,8 +216,14 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                       const perpX = -Math.sin(angle) * triSize;
                       const perpY = Math.cos(angle) * triSize;
                       g.moveTo(tipX, tipY);
-                      g.lineTo(tipX - Math.cos(angle) * triSize * 2 + perpX, tipY - Math.sin(angle) * triSize * 2 + perpY);
-                      g.lineTo(tipX - Math.cos(angle) * triSize * 2 - perpX, tipY - Math.sin(angle) * triSize * 2 - perpY);
+                      g.lineTo(
+                        tipX - Math.cos(angle) * triSize * 2 + perpX,
+                        tipY - Math.sin(angle) * triSize * 2 + perpY,
+                      );
+                      g.lineTo(
+                        tipX - Math.cos(angle) * triSize * 2 - perpX,
+                        tipY - Math.sin(angle) * triSize * 2 - perpY,
+                      );
                       g.lineTo(tipX, tipY);
                       g.fill();
                       g.stroke();
@@ -218,7 +242,10 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
               {data.map((pt, idx) => {
                 if (!pt || typeof pt.x !== 'number' || !isFinite(pt.x) || !isFinite(pt.y)) return null;
                 const ptKey = pt.id || `pt-${key}-${idx}`;
-                const pqw = pt.qw ?? 1, pqz = pt.qz ?? 0, pqx = pt.qx ?? 0, pqy = pt.qy ?? 0;
+                const pqw = pt.qw ?? 1,
+                  pqz = pt.qz ?? 0,
+                  pqx = pt.qx ?? 0,
+                  pqy = pt.qy ?? 0;
                 let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
                 if (!isFinite(yaw)) yaw = 0;
 
@@ -279,12 +306,14 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                         x={4}
                         y={2}
                         anchor={0.5}
-                        style={{
-                          fontFamily: 'system-ui, sans-serif',
-                          fontSize: 9,
-                          fontWeight: 'bold',
-                          fill: '#f472b6',
-                        } as any}
+                        style={
+                          {
+                            fontFamily: 'system-ui, sans-serif',
+                            fontSize: 9,
+                            fontWeight: 'bold',
+                            fill: '#f472b6',
+                          } as any
+                        }
                       />
                     </pixiContainer>
                   </pixiContainer>
@@ -296,12 +325,15 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
 
         // Single Point data
         if (typeof data.x !== 'number' || !isFinite(data.x) || !isFinite(data.y)) return null;
-        const pqw = data.qw ?? 1, pqz = data.qz ?? 0, pqx = data.qx ?? 0, pqy = data.qy ?? 0;
+        const pqw = data.qw ?? 1,
+          pqz = data.qz ?? 0,
+          pqx = data.qx ?? 0,
+          pqy = data.qy ?? 0;
         let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
         if (!isFinite(yaw)) yaw = 0;
-        
+
         return (
-          <pixiGraphics 
+          <pixiGraphics
             key={key}
             x={data.x}
             y={data.y}

@@ -14,7 +14,17 @@ import { InteractionSlice, createInteractionSlice } from './slices/interactionSl
 import { MeasureSlice, createMeasureSlice } from './slices/measureSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 
-export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice & InteractionSlice & MeasureSlice;
+export type AppState = NodeSlice &
+  UISlice &
+  PluginSlice &
+  MapSlice &
+  ProjectSlice &
+  HistorySlice &
+  CustomUISlice &
+  WorkflowSlice &
+  AnnotationSlice &
+  InteractionSlice &
+  MeasureSlice;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -40,7 +50,7 @@ export const useAppStore = create<AppState>()(
         lastDirectory: state.lastDirectory,
         recentProjects: state.recentProjects,
         enableSnapping: state.enableSnapping,
-        exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'), // Treat undefined as global by default
+        exportTemplates: state.exportTemplates.filter((t) => t.scope !== 'local'), // Treat undefined as global by default
         defaultExportFormats: state.defaultExportFormats,
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,
@@ -63,8 +73,8 @@ export const useAppStore = create<AppState>()(
         leftPanelActiveTab: state.leftPanelActiveTab,
         rightPanelActiveTab: state.rightPanelActiveTab,
       }),
-    }
-  )
+    },
+  ),
 );
 
 if (typeof window !== 'undefined') {

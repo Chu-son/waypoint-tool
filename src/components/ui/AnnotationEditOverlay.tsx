@@ -29,8 +29,7 @@ export function AnnotationEditOverlay() {
 
   if (!isAnnotationEditMode) return null;
 
-  const selectedObj =
-    selectedAnnotationIds.length === 1 ? annotationObjects[selectedAnnotationIds[0]] : null;
+  const selectedObj = selectedAnnotationIds.length === 1 ? annotationObjects[selectedAnnotationIds[0]] : null;
 
   const currentColor = selectedObj?.color || defaultAnnotationColor;
 
@@ -56,16 +55,23 @@ export function AnnotationEditOverlay() {
     { type: 'select', label: '選択', shortLabel: '選択', icon: <MousePointer size={14} /> },
   ];
 
-  const subtools = isCustomUiMode && allowedAnnotationSubTools && allowedAnnotationSubTools.length > 0
-    ? allSubtools.filter((st) => st.type === 'select' || allowedAnnotationSubTools.includes(st.type))
-    : allSubtools;
+  const subtools =
+    isCustomUiMode && allowedAnnotationSubTools && allowedAnnotationSubTools.length > 0
+      ? allSubtools.filter((st) => st.type === 'select' || allowedAnnotationSubTools.includes(st.type))
+      : allSubtools;
 
   return (
     <FloatingActionBanner
       ref={containerRef}
       icon={<Palette size={16} className="animate-pulse text-primary-base" />}
       title={isCompact ? 'アノテーション' : 'アノテーション配置・編集モード'}
-      subtitle={selectedObj ? `選択中: ${selectedObj.name} (${selectedObj.type})` : (isCompact ? undefined : 'ドラッグまたはクリックで配置')}
+      subtitle={
+        selectedObj
+          ? `選択中: ${selectedObj.name} (${selectedObj.type})`
+          : isCompact
+            ? undefined
+            : 'ドラッグまたはクリックで配置'
+      }
       statusText={
         <div className="flex items-center gap-1.5 sm:gap-2 px-1 flex-nowrap shrink-0">
           {/* Subtool Selector */}
@@ -80,18 +86,14 @@ export function AnnotationEditOverlay() {
                 title={`${st.label}ツールを選択`}
               >
                 {st.icon}
-                {!isCompact && (
-                  <span>{isWide ? st.label : st.shortLabel}</span>
-                )}
+                {!isCompact && <span>{isWide ? st.label : st.shortLabel}</span>}
               </Button>
             ))}
           </div>
 
           {/* Color Presets & Picker */}
           <div className="flex items-center gap-1 border-l border-border-base/30 pl-1.5 sm:pl-2 flex-shrink-0">
-            {!isCompact && (
-              <span className="text-[11px] font-semibold text-text-muted">カラー:</span>
-            )}
+            {!isCompact && <span className="text-[11px] font-semibold text-text-muted">カラー:</span>}
             <div className="flex items-center gap-0.5">
               {ANNOTATION_COLOR_PRESETS.map((preset) => (
                 <button

@@ -43,11 +43,11 @@ export type UISlice = {
   elementCopyState: ElementCopyState;
   setElementCopyState: (state: ElementCopyState) => void;
   clearElementCopyState: () => void;
-  
+
   treeRevealTarget: TreeRevealTarget | null;
   revealInTree: (type: 'node' | 'annotation', id: string) => void;
   clearTreeRevealTarget: () => void;
-  
+
   leftPanelWidth: number;
   rightPanelWidth: number;
   showProperties: boolean;
@@ -63,7 +63,7 @@ export type UISlice = {
   reorderTab: (panel: 'left' | 'right', fromIndex: number, toIndex: number) => void;
   activateTab: (tabId: string) => void;
   resetPanelLayout: () => void;
-  
+
   isSettingsModalOpen: boolean;
   isExportModalOpen: boolean;
   isImportModalOpen: boolean;
@@ -104,7 +104,7 @@ export type UISlice = {
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
   setIsDirty: (dirty: boolean) => void;
-  
+
   setLeftPanelActiveTab: (tab: string) => void;
   setRightPanelActiveTab: (tab: string) => void;
   setLeftPanelViewMode: (mode: 'tabs' | 'split') => void;
@@ -115,22 +115,25 @@ export type UISlice = {
   setRightPanelWidth: (width: number) => void;
   setShowProperties: (show: boolean) => void;
   resetWindowLayout: () => void;
-  
-  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles') => void;
+
+  setSettingsModalOpen: (
+    open: boolean,
+    tab?: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles',
+  ) => void;
   setExportModalOpen: (open: boolean) => void;
   setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;
   setShortcutsModalOpen: (open: boolean) => void;
   setWelcomeModalOpen: (open: boolean) => void;
   setIsInitialLaunch: (initial: boolean) => void;
-  
+
   // Loading Tasks State
   activeLoadingTasks: Record<string, LoadingTask>;
   startLoading: (task: { id?: string; message: string; detail?: string; blocking?: boolean }) => string;
   stopLoading: (id: string) => void;
   runWithLoading: <T>(
     options: { id?: string; message: string; detail?: string; blocking?: boolean },
-    fn: () => Promise<T>
+    fn: () => Promise<T>,
   ) => Promise<T>;
 
   // Note: setDirty is mapped to setIsDirty in original store
@@ -190,10 +193,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       preset === 'roomba'
         ? 'emerald'
         : preset === 'dark'
-        ? 'default'
-        : VALID_DARK_THEME_PRESET_IDS.includes(preset)
-        ? preset
-        : 'default';
+          ? 'default'
+          : VALID_DARK_THEME_PRESET_IDS.includes(preset)
+            ? preset
+            : 'default';
     set({ themePreset: normalized });
   },
   isDirty: false,
@@ -365,12 +368,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     }
   },
 
-  toggleAttributeVisibility: (attr: string) => set((state) => {
-    const next = state.visibleAttributes.includes(attr) 
-      ? state.visibleAttributes.filter(a => a !== attr)
-      : [...state.visibleAttributes, attr];
-    return { visibleAttributes: next, isDirty: true };
-  }),
+  toggleAttributeVisibility: (attr: string) =>
+    set((state) => {
+      const next = state.visibleAttributes.includes(attr)
+        ? state.visibleAttributes.filter((a) => a !== attr)
+        : [...state.visibleAttributes, attr];
+      return { visibleAttributes: next, isDirty: true };
+    }),
 
   setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
 
@@ -501,7 +505,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setLeftPanelWidth: (width) => set({ leftPanelWidth: width, isDirty: true }),
   setRightPanelWidth: (width) => set({ rightPanelWidth: width, isDirty: true }),
   setShowProperties: (show) => set({ showProperties: show, isDirty: true }),
-  
+
   resetWindowLayout: () => {
     get().resetPanelLayout();
     set({

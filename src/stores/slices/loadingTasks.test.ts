@@ -51,14 +51,13 @@ describe('Loading Tasks (uiSlice)', () => {
 
   it('runs async task with runWithLoading and cleans up on success', async () => {
     let executed = false;
-    const result = await useAppStore.getState().runWithLoading(
-      { id: 'async-task', message: 'Running...' },
-      async () => {
+    const result = await useAppStore
+      .getState()
+      .runWithLoading({ id: 'async-task', message: 'Running...' }, async () => {
         executed = true;
         expect(useAppStore.getState().activeLoadingTasks['async-task']).toBeDefined();
         return 'success';
-      }
-    );
+      });
 
     expect(executed).toBe(true);
     expect(result).toBe('success');
@@ -68,12 +67,9 @@ describe('Loading Tasks (uiSlice)', () => {
   it('cleans up task with runWithLoading even when an error occurs', async () => {
     let errorThrown = false;
     try {
-      await useAppStore.getState().runWithLoading(
-        { id: 'error-task', message: 'Failing...' },
-        async () => {
-          throw new Error('Something went wrong');
-        }
-      );
+      await useAppStore.getState().runWithLoading({ id: 'error-task', message: 'Failing...' }, async () => {
+        throw new Error('Something went wrong');
+      });
     } catch (err: any) {
       errorThrown = true;
       expect(err.message).toBe('Something went wrong');

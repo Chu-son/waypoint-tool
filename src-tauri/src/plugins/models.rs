@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -39,8 +39,8 @@ pub struct OccupancyGridData {
     pub width: u32,
     pub height: u32,
     pub resolution: f64,
-    pub origin: [f64; 3],  // [x, y, yaw]
-    pub data: String,      // zlib + base64 encoded string
+    pub origin: [f64; 3], // [x, y, yaw]
+    pub data: String,     // zlib + base64 encoded string
     #[serde(default = "default_encoding")]
     pub encoding: String,
     #[serde(default)]
@@ -220,7 +220,10 @@ mod tests {
         }"#;
         let manifest: PluginManifest = serde_json::from_str(json).unwrap();
         assert_eq!(manifest.name, "Sweep Generator");
-        assert_eq!(manifest.description.as_deref(), Some("Generates a sweep path from a start point."));
+        assert_eq!(
+            manifest.description.as_deref(),
+            Some("Generates a sweep path from a start point.")
+        );
         assert_eq!(manifest.plugin_type, "python");
         assert_eq!(manifest.inputs.len(), 1);
         assert_eq!(manifest.properties.len(), 1);
@@ -327,7 +330,10 @@ mod tests {
             "legacy_ids": ["SweepOffsetLinesGenerator", "SweepGeneratorRS"]
         }"#;
         let manifest: PluginManifest = serde_json::from_str(json).unwrap();
-        assert_eq!(manifest.legacy_ids, vec!["SweepOffsetLinesGenerator", "SweepGeneratorRS"]);
+        assert_eq!(
+            manifest.legacy_ids,
+            vec!["SweepOffsetLinesGenerator", "SweepGeneratorRS"]
+        );
     }
 
     #[test]
@@ -360,7 +366,10 @@ mod tests {
         assert_eq!(manifest.python_dependencies[0].name, "numpy");
         assert_eq!(manifest.python_dependencies[0].version.as_deref(), Some(">=1.20"));
         assert_eq!(manifest.python_dependencies[0].optional, Some(false));
-        assert_eq!(manifest.python_dependencies[0].description.as_deref(), Some("For array operations"));
+        assert_eq!(
+            manifest.python_dependencies[0].description.as_deref(),
+            Some("For array operations")
+        );
         assert_eq!(manifest.python_dependencies[1].name, "scipy");
         assert_eq!(manifest.python_dependencies[1].version, None);
         assert_eq!(manifest.python_dependencies[1].optional, Some(true));
@@ -435,7 +444,12 @@ mod tests {
         assert_eq!(pipeline.steps[0].name.as_deref(), Some("Generate Drivable Area"));
         assert_eq!(pipeline.steps[0].bindings.get("seed_points").unwrap(), "start_point");
         assert_eq!(
-            pipeline.steps[0].property_overrides.as_ref().unwrap().get("expansion").unwrap(),
+            pipeline.steps[0]
+                .property_overrides
+                .as_ref()
+                .unwrap()
+                .get("expansion")
+                .unwrap(),
             2.5
         );
         let exports = pipeline.steps[0].exports.as_ref().unwrap();
@@ -481,4 +495,3 @@ mod tests {
         assert!(!dep_caret.matches_version("2.0.0"));
     }
 }
-

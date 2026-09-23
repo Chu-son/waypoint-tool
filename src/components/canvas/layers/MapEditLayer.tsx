@@ -28,7 +28,7 @@ function renderSingleEditObject(
   isReference = false,
   onObjectPointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string) => void,
   onObjectHandlePointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string) => void,
-  onObjectResizeHandlePointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string, handle: string) => void
+  onObjectResizeHandlePointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string, handle: string) => void,
 ) {
   const safeScale = Math.max(scale, 0.001);
   const isEffectiveExportPreview = isExportPreview && !isReference;
@@ -298,9 +298,7 @@ function renderSingleEditObject(
               type="square"
               colorHex={CANVAS_ACCENT_COLOR}
               cursor="crosshair"
-              onPointerDown={(e: FederatedPointerEvent) =>
-                onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'end')
-              }
+              onPointerDown={(e: FederatedPointerEvent) => onObjectResizeHandlePointerDown?.(e, layerId, obj.id, 'end')}
             />
             <CanvasHandle
               x={midX}
@@ -349,8 +347,8 @@ export function MapEditSingleLayer({
           !!layer.is_reference,
           onObjectPointerDown,
           onObjectHandlePointerDown,
-          onObjectResizeHandlePointerDown
-        )
+          onObjectResizeHandlePointerDown,
+        ),
       )}
     </pixiContainer>
   );
@@ -380,16 +378,7 @@ export function MapEditToolOverlay({
     <>
       {/* Preview object being created */}
       {previewObject &&
-        renderSingleEditObject(
-          'preview',
-          previewObject,
-          0.7,
-          scale,
-          null,
-          isExportPreview,
-          true,
-          false
-        )}
+        renderSingleEditObject('preview', previewObject, 0.7, scale, null, isExportPreview, true, false)}
 
       {/* Brush cursor preview for freehand tool */}
       {!isExportPreview && brushPreviewPos && brushPreviewRadius > 0 && (
@@ -439,9 +428,7 @@ export function MapEditLayer({
   onObjectHandlePointerDown,
   onObjectResizeHandlePointerDown,
 }: MapEditLayerProps) {
-  const visibleLayers = editLayers
-    .filter((l) => l.visible)
-    .sort((a, b) => a.z_index - b.z_index);
+  const visibleLayers = editLayers.filter((l) => l.visible).sort((a, b) => a.z_index - b.z_index);
 
   return (
     <>

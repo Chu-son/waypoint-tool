@@ -1,41 +1,38 @@
-import "./App.css";
-import { useEffect, useCallback, useMemo } from "react";
-import { ToolPanel } from "./components/ui/ToolPanel";
-import { TopMenu } from "./components/ui/TopMenu";
-import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
-import { MapCanvas } from "./components/canvas/MapCanvas";
-import { SettingsModal } from "./components/ui/SettingsModal";
-import { ExportModal } from "./components/ui/ExportModal";
-import { ImportModal } from "./components/ui/ImportModal";
-import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
-import { ExportMapsModal } from "./components/ui/ExportMapsModal";
-import { WelcomeModal } from "./components/ui/WelcomeModal";
-import { PluginDataModal } from "./components/ui/PluginDataModal";
-import { StatusBar } from "./components/ui/StatusBar";
-import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
-import { MapEditOverlay } from "./components/ui/MapEditOverlay";
-import { AnnotationEditOverlay } from "./components/ui/AnnotationEditOverlay";
-import { MeasureOverlay } from "./components/ui/MeasureOverlay";
-import { LoadingOverlay } from "./components/ui/common/LoadingOverlay";
-import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoadingBadge";
-import { ShortcutManager } from "./components/common/ShortcutManager";
-import { ErrorBoundary } from "./components/common/ErrorBoundary";
-import { ThemeInjector } from "./components/ui/ThemeInjector";
-import { resolvePanelTabs, resolveBuiltinPanelTab, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
-import { useAppStore } from "./stores/appStore";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-} from "lucide-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
-import { DialogAPI, BackendAPI } from "./api";
-import { Button } from "./components/ui/common/Button";
-import { extractProjectName, formatWindowTitle } from "./utils/projectUtils";
+import './App.css';
+import { useEffect, useCallback, useMemo } from 'react';
+import { ToolPanel } from './components/ui/ToolPanel';
+import { TopMenu } from './components/ui/TopMenu';
+import { PanelContainer, PanelTab } from './components/ui/PanelContainer';
+import { MapCanvas } from './components/canvas/MapCanvas';
+import { SettingsModal } from './components/ui/SettingsModal';
+import { ExportModal } from './components/ui/ExportModal';
+import { ImportModal } from './components/ui/ImportModal';
+import { KeyboardShortcutsModal } from './components/ui/KeyboardShortcutsModal';
+import { ExportMapsModal } from './components/ui/ExportMapsModal';
+import { WelcomeModal } from './components/ui/WelcomeModal';
+import { PluginDataModal } from './components/ui/PluginDataModal';
+import { StatusBar } from './components/ui/StatusBar';
+import { ElementCopyOverlay } from './components/ui/ElementCopyOverlay';
+import { MapEditOverlay } from './components/ui/MapEditOverlay';
+import { AnnotationEditOverlay } from './components/ui/AnnotationEditOverlay';
+import { MeasureOverlay } from './components/ui/MeasureOverlay';
+import { LoadingOverlay } from './components/ui/common/LoadingOverlay';
+import { BackgroundLoadingBadge } from './components/ui/common/BackgroundLoadingBadge';
+import { ShortcutManager } from './components/common/ShortcutManager';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ThemeInjector } from './components/ui/ThemeInjector';
+import { resolvePanelTabs, resolveBuiltinPanelTab, useInspectorPanelComponent } from './components/ui/PanelRegistry';
+import { useAppStore } from './stores/appStore';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
+import { DialogAPI, BackendAPI } from './api';
+import { Button } from './components/ui/common/Button';
+import { extractProjectName, formatWindowTitle } from './utils/projectUtils';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
-import { PluginInstance } from "./types/store";
+import { PluginInstance } from './types/store';
 
 function App() {
   // Sidebar States from Store
@@ -59,7 +56,7 @@ function App() {
 
   const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
-  
+
   const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
   const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
 
@@ -118,9 +115,7 @@ function App() {
         for (const setting of storeSettings) {
           if (!setting.isBuiltin && setting.path && setting.enabled !== false) {
             try {
-              const customPlugin = await BackendAPI.scanCustomPlugin(
-                setting.path,
-              );
+              const customPlugin = await BackendAPI.scanCustomPlugin(setting.path);
               pluginMap[customPlugin.id] = customPlugin;
               // If ID changed or wasn't set somehow, fix it up
               if (setting.id !== customPlugin.id) {
@@ -128,10 +123,7 @@ function App() {
                 settingsChanged = true;
               }
             } catch (err) {
-              console.warn(
-                `Failed to load custom plugin from ${setting.path}:`,
-                err,
-              );
+              console.warn(`Failed to load custom plugin from ${setting.path}:`, err);
             }
           }
         }
@@ -164,7 +156,7 @@ function App() {
           useAppStore.getState().setPluginSettings(uniqueSettings);
         }
       } catch (e) {
-        console.error("Failed to load plugins:", e);
+        console.error('Failed to load plugins:', e);
       }
     };
     initApp();
@@ -173,15 +165,20 @@ function App() {
   // Update window title based on project name, dirty state, and brand
   useEffect(() => {
     if (!isTauri()) return;
-    const brandName = (isCustomUiMode && customUiConfig?.brand?.windowTitle)
-      ? customUiConfig.brand.windowTitle
-      : (typeof getEffectiveBrandName === 'function' ? getEffectiveBrandName() : "Waypoint Tool");
+    const brandName =
+      isCustomUiMode && customUiConfig?.brand?.windowTitle
+        ? customUiConfig.brand.windowTitle
+        : typeof getEffectiveBrandName === 'function'
+          ? getEffectiveBrandName()
+          : 'Waypoint Tool';
     const projectName = extractProjectName(currentProjectPath);
     const title = formatWindowTitle(projectName, isDirty, brandName);
-    getCurrentWindow().setTitle(title).catch(() => {});
+    getCurrentWindow()
+      .setTitle(title)
+      .catch(() => {});
   }, [isCustomUiMode, customUiConfig, currentProjectPath, isDirty, getEffectiveBrandName]);
 
-  // Initialization moved to ShortcutManager for shortcuts, 
+  // Initialization moved to ShortcutManager for shortcuts,
   // though basic initialization remains in App for now.
 
   useEffect(() => {
@@ -191,13 +188,10 @@ function App() {
       event.preventDefault();
 
       if (useAppStore.getState().isDirty) {
-        const confirmed = await DialogAPI.ask(
-          "未保存の変更があります。保存せずに終了してもよろしいですか？",
-          {
-            title: "終了の確認",
-            kind: "warning",
-          },
-        );
+        const confirmed = await DialogAPI.ask('未保存の変更があります。保存せずに終了してもよろしいですか？', {
+          title: '終了の確認',
+          kind: 'warning',
+        });
 
         if (!confirmed) {
           return; // Abort close
@@ -208,15 +202,14 @@ function App() {
       useAppStore.getState().setIsDirty(false);
       try {
         // Explicitly trigger window state saving before we force destroy
-        const { saveWindowState, StateFlags } =
-          await import("@tauri-apps/plugin-window-state");
+        const { saveWindowState, StateFlags } = await import('@tauri-apps/plugin-window-state');
         await saveWindowState(StateFlags.ALL);
       } catch (err) {
-        console.error("Failed to save window state", err);
+        console.error('Failed to save window state', err);
       }
 
       setTimeout(() => {
-        invoke("force_exit");
+        invoke('force_exit');
       }, 50);
     });
 
@@ -236,13 +229,13 @@ function App() {
         setLeftWidth(Math.max(180, Math.min(newWidth, 600)));
       };
       const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        document.body.style.cursor = "default";
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'default';
       };
-      document.body.style.cursor = "col-resize";
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     },
     [leftWidth],
   );
@@ -258,13 +251,13 @@ function App() {
         setRightWidth(Math.max(200, Math.min(newWidth, 800)));
       };
       const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        document.body.style.cursor = "default";
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'default';
       };
-      document.body.style.cursor = "col-resize";
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     },
     [rightWidth],
   );
@@ -346,7 +339,7 @@ function App() {
           <BackgroundLoadingBadge />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
-            {(!isLeftPanelOpen && leftPanels.length > 0) ? (
+            {!isLeftPanelOpen && leftPanels.length > 0 ? (
               <Button
                 variant="secondary"
                 size="icon"
@@ -360,7 +353,7 @@ function App() {
               <div />
             )}
 
-            {(!isRightPanelOpen && rightPanels.length > 0) ? (
+            {!isRightPanelOpen && rightPanels.length > 0 ? (
               <Button
                 variant="secondary"
                 size="icon"
@@ -413,32 +406,17 @@ function App() {
       </div>
       <StatusBar />
       <ErrorBoundary fallbackTitle="設定画面の表示中にエラーが発生しました">
-        <SettingsModal
-          isOpen={isSettingsModalOpen}
-          onClose={() => setSettingsModalOpen(false)}
-        />
+        <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} />
       </ErrorBoundary>
       <ErrorBoundary fallbackTitle="エクスポート画面の表示中にエラーが発生しました">
-        <ExportModal
-          isOpen={isExportModalOpen}
-          onClose={() => setExportModalOpen(false)}
-        />
+        <ExportModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} />
       </ErrorBoundary>
       <ErrorBoundary fallbackTitle="インポート画面の表示中にエラーが発生しました">
-        <ImportModal
-          isOpen={isImportModalOpen}
-          onClose={() => setImportModalOpen(false)}
-        />
+        <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} />
       </ErrorBoundary>
       <ExportMapsModal />
-      <KeyboardShortcutsModal
-        isOpen={isShortcutsModalOpen}
-        onClose={() => setShortcutsModalOpen(false)}
-      />
-      <WelcomeModal
-        isOpen={isWelcomeModalOpen}
-        onClose={() => setWelcomeModalOpen(false)}
-      />
+      <KeyboardShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setShortcutsModalOpen(false)} />
+      <WelcomeModal isOpen={isWelcomeModalOpen} onClose={() => setWelcomeModalOpen(false)} />
       <PluginDataModal />
       <LoadingOverlay />
     </div>

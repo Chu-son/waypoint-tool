@@ -111,9 +111,7 @@ describe('WelcomeModal UI', () => {
     } as any);
 
     useAppStore.setState({
-      recentProjects: [
-        { path: '/path/to/robot_route.wptroj', name: 'robot_route', lastOpened: Date.now() }
-      ]
+      recentProjects: [{ path: '/path/to/robot_route.wptroj', name: 'robot_route', lastOpened: Date.now() }],
     });
 
     render(<WelcomeModal isOpen={true} onClose={vi.fn()} />);

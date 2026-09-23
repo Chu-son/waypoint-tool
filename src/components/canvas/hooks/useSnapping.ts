@@ -30,13 +30,13 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
     forcedSign: null,
   });
 
-  const activeTool = useAppStore(state => state.activeTool);
-  const appMode = useAppStore(state => state.appMode);
-  const nodes = useAppStore(state => state.nodes);
+  const activeTool = useAppStore((state) => state.activeTool);
+  const appMode = useAppStore((state) => state.appMode);
+  const nodes = useAppStore((state) => state.nodes);
 
-  const addNode = useAppStore(state => state.addNode);
-  const updateNode = useAppStore(state => state.updateNode);
-  const selectNodes = useAppStore(state => state.selectNodes);
+  const addNode = useAppStore((state) => state.addNode);
+  const updateNode = useAppStore((state) => state.updateNode);
+  const selectNodes = useAppStore((state) => state.selectNodes);
 
   const snapInput = appMode.mode === 'waypoint_add' ? appMode.snapInput : localSnapInput;
   const setSnapInput = useCallback((valOrFn: string | ((prev: string) => string)) => {
@@ -60,7 +60,7 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
   useEffect(() => {
     if (appMode.mode === 'waypoint_add') {
       if (appMode.lockedWaypointId === null) {
-        setSnapState(prev => ({
+        setSnapState((prev) => ({
           ...prev,
           isSnapped: false,
           axis: null,
@@ -87,36 +87,44 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
 
   const setSnapInputSynced = setSnapInput;
 
-  const setSnapStateSynced = useCallback((valOrFn: SnapState | ((prev: SnapState) => SnapState)) => {
-    const prev = effectiveSnapState;
-    const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
-    setSnapState(next);
+  const setSnapStateSynced = useCallback(
+    (valOrFn: SnapState | ((prev: SnapState) => SnapState)) => {
+      const prev = effectiveSnapState;
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      setSnapState(next);
 
-    const currentMode = useAppStore.getState().appMode;
-    if (currentMode.mode === 'waypoint_add') {
-      if (
-        currentMode.lockedWaypointId !== next.lockedWaypointId ||
-        currentMode.forcedAxis !== next.forcedAxis ||
-        currentMode.forcedSign !== next.forcedSign
-      ) {
-        useAppStore.getState().updateAppMode({
-          lockedWaypointId: next.lockedWaypointId,
-          forcedAxis: next.forcedAxis,
-          forcedSign: next.forcedSign,
-        });
+      const currentMode = useAppStore.getState().appMode;
+      if (currentMode.mode === 'waypoint_add') {
+        if (
+          currentMode.lockedWaypointId !== next.lockedWaypointId ||
+          currentMode.forcedAxis !== next.forcedAxis ||
+          currentMode.forcedSign !== next.forcedSign
+        ) {
+          useAppStore.getState().updateAppMode({
+            lockedWaypointId: next.lockedWaypointId,
+            forcedAxis: next.forcedAxis,
+            forcedSign: next.forcedSign,
+          });
+        }
       }
-    }
-  }, [effectiveSnapState]);
+    },
+    [effectiveSnapState],
+  );
 
   const getRenderableNodesList = useCallback(() => {
     const currentState = useAppStore.getState();
     const currentNodes = currentState.nodes;
     const currentRootIds = currentState.rootNodeIds;
-    
-    const renderableNodes: { id: string, node: typeof currentNodes[string]; parentIsGenerator: boolean; globalIndex: number }[] = [];
+
+    const renderableNodes: {
+      id: string;
+      node: (typeof currentNodes)[string];
+      parentIsGenerator: boolean;
+      globalIndex: number;
+    }[] = [];
     let globalIdx = 0;
     const flatIds = getFlattenedWaypointIds(currentRootIds, currentNodes);
-    flatIds.forEach(id => {
+    flatIds.forEach((id) => {
       const node = currentNodes[id];
       if (node && node.transform) {
         renderableNodes.push({ id, node, parentIsGenerator: false, globalIndex: globalIdx++ });
@@ -174,95 +182,119 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
     return renderableNodes;
   }, []);
 
-  const applySnapping = useCallback((worldX: number, worldY: number, prevTransform: import('../../../types/store').Transform | null, lockedId: string | null) => {
-    if (!enableSnapping || !prevTransform) {
-      if (snapState.isSnapped) {
-        setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
+  const applySnapping = useCallback(
+    (
+      worldX: number,
+      worldY: number,
+      prevTransform: import('../../../types/store').Transform | null,
+      lockedId: string | null,
+    ) => {
+      if (!enableSnapping || !prevTransform) {
+        if (snapState.isSnapped) {
+          setSnapState((prev) => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
+        }
+        return { x: worldX, y: worldY };
       }
-      return { x: worldX, y: worldY };
-    }
 
-    const { x: ox, y: oy, qx, qy, qz, qw } = prevTransform;
-    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-    if (!isFinite(yaw)) yaw = 0;
+      const { x: ox, y: oy, qx, qy, qz, qw } = prevTransform;
+      let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+      if (!isFinite(yaw)) yaw = 0;
 
-    const dx = worldX - ox;
-    const dy = worldY - oy;
-    
-    const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-    const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
+      const dx = worldX - ox;
+      const dy = worldY - oy;
 
-    const snapThresholdWorld = 20 / scale;
-    
-    let snapped = false;
-    let axis: 'X' | 'Y' | null = null;
-    let newLocalX = localX;
-    let newLocalY = localY;
+      const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
+      const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
 
-    if (snapState.forcedAxis) {
-      snapped = true;
-      axis = snapState.forcedAxis;
-      if (axis === 'X') {
+      const snapThresholdWorld = 20 / scale;
+
+      let snapped = false;
+      let axis: 'X' | 'Y' | null = null;
+      let newLocalX = localX;
+      let newLocalY = localY;
+
+      if (snapState.forcedAxis) {
+        snapped = true;
+        axis = snapState.forcedAxis;
+        if (axis === 'X') {
+          newLocalY = 0;
+          if (snapInput) {
+            const val = parseFloat(snapInput);
+            if (!isNaN(val)) newLocalX = val * (snapState.forcedSign || 1);
+          }
+        } else {
+          newLocalX = 0;
+          if (snapInput) {
+            const val = parseFloat(snapInput);
+            if (!isNaN(val)) newLocalY = val * (snapState.forcedSign || 1);
+          }
+        }
+      } else if (Math.abs(localY) < snapThresholdWorld) {
+        // Snap to local X axis (forward/back)
+        snapped = true;
+        axis = 'X';
         newLocalY = 0;
         if (snapInput) {
           const val = parseFloat(snapInput);
-          if (!isNaN(val)) newLocalX = val * (snapState.forcedSign || 1);
+          if (!isNaN(val)) newLocalX = val;
         }
-      } else {
+      } else if (Math.abs(localX) < snapThresholdWorld) {
+        // Snap to local Y axis (left/right)
+        snapped = true;
+        axis = 'Y';
         newLocalX = 0;
         if (snapInput) {
           const val = parseFloat(snapInput);
-          if (!isNaN(val)) newLocalY = val * (snapState.forcedSign || 1);
+          if (!isNaN(val)) newLocalY = val;
         }
       }
-    } else if (Math.abs(localY) < snapThresholdWorld) {
-      // Snap to local X axis (forward/back)
-      snapped = true;
-      axis = 'X';
-      newLocalY = 0;
-      if (snapInput) {
-        const val = parseFloat(snapInput);
-        if (!isNaN(val)) newLocalX = val;
-      }
-    } else if (Math.abs(localX) < snapThresholdWorld) {
-      // Snap to local Y axis (left/right)
-      snapped = true;
-      axis = 'Y';
-      newLocalX = 0;
-      if (snapInput) {
-        const val = parseFloat(snapInput);
-        if (!isNaN(val)) newLocalY = val;
-      }
-    }
 
-    let finalX = ox + newLocalX * Math.cos(yaw) - newLocalY * Math.sin(yaw);
-    let finalY = oy + newLocalX * Math.sin(yaw) + newLocalY * Math.cos(yaw);
-    
-    if (snapped) {
-      const newWorldX = ox + (newLocalX * Math.cos(yaw) - newLocalY * Math.sin(yaw));
-      const newWorldY = oy + (newLocalX * Math.sin(yaw) + newLocalY * Math.cos(yaw));
-      
-      setSnapState(prev => ({
-        ...prev,
-        isSnapped: true,
-        axis,
-        origin: { x: ox, y: oy, yaw },
-        snappedWorldPos: { x: newWorldX, y: newWorldY },
-        lockedWaypointId: lockedId
-      }));
-      return { x: newWorldX, y: newWorldY };
-    } else {
-      if (snapState.isSnapped || snapState.lockedWaypointId !== lockedId) {
-        setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: { x: ox, y: oy, yaw }, snappedWorldPos: null, lockedWaypointId: lockedId }));
+      let finalX = ox + newLocalX * Math.cos(yaw) - newLocalY * Math.sin(yaw);
+      let finalY = oy + newLocalX * Math.sin(yaw) + newLocalY * Math.cos(yaw);
+
+      if (snapped) {
+        const newWorldX = ox + (newLocalX * Math.cos(yaw) - newLocalY * Math.sin(yaw));
+        const newWorldY = oy + (newLocalX * Math.sin(yaw) + newLocalY * Math.cos(yaw));
+
+        setSnapState((prev) => ({
+          ...prev,
+          isSnapped: true,
+          axis,
+          origin: { x: ox, y: oy, yaw },
+          snappedWorldPos: { x: newWorldX, y: newWorldY },
+          lockedWaypointId: lockedId,
+        }));
+        return { x: newWorldX, y: newWorldY };
+      } else {
+        if (snapState.isSnapped || snapState.lockedWaypointId !== lockedId) {
+          setSnapState((prev) => ({
+            ...prev,
+            isSnapped: false,
+            axis: null,
+            origin: { x: ox, y: oy, yaw },
+            snappedWorldPos: null,
+            lockedWaypointId: lockedId,
+          }));
+        }
+        return { x: finalX, y: finalY };
       }
-      return { x: finalX, y: finalY };
-    }
-  }, [enableSnapping, scale, snapState.isSnapped, snapState.axis, snapState.snappedWorldPos?.x, snapState.snappedWorldPos?.y, snapState.forcedAxis, snapState.lockedWaypointId]);
+    },
+    [
+      enableSnapping,
+      scale,
+      snapState.isSnapped,
+      snapState.axis,
+      snapState.snappedWorldPos?.x,
+      snapState.snappedWorldPos?.y,
+      snapState.forcedAxis,
+      snapState.lockedWaypointId,
+    ],
+  );
 
   // Expose an effect for keyboard events that needs MapCanvas refs
   const useSnappingKeyboardEvents = (
     interactionMode: React.MutableRefObject<string>,
-    activeNodeId: React.MutableRefObject<string | null>
+    activeNodeId: React.MutableRefObject<string | null>,
   ) => {
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -280,35 +312,44 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
         }
 
         const isTab = e.key === 'Tab' || e.code === 'Tab';
-        const isRelevantKey = e.key === 'Backspace' || e.key === 'Enter' || isTab || e.key.startsWith('Arrow') || /^[0-9.-]$/.test(e.key);
+        const isRelevantKey =
+          e.key === 'Backspace' || e.key === 'Enter' || isTab || e.key.startsWith('Arrow') || /^[0-9.-]$/.test(e.key);
 
         if (isTab) {
           if (activeTool === 'add_point' && interactionMode.current === 'none') {
-             e.stopPropagation();
-             e.preventDefault();
-             
-             const list = getRenderableNodesList();
-             if (list.length > 0) {
-               let curIdx = list.findIndex(r => r.id === effectiveSnapState.lockedWaypointId);
-               if (curIdx === -1) curIdx = list.length - 1;
+            e.stopPropagation();
+            e.preventDefault();
 
-               if (e.shiftKey) {
-                 curIdx = (curIdx + 1) % list.length;
-               } else {
-                 curIdx = (curIdx - 1 + list.length) % list.length;
-               }
-               
-               const newLockedId = list[curIdx].id;
-               const prev = list[curIdx].node.transform || null;
-               
-               if (prev) {
-                 const { x: ox, y: oy, qx, qy, qz, qw } = prev;
-                 let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-                 if (!isFinite(yaw)) yaw = 0;
-                 setSnapStateSynced(s => ({ ...s, lockedWaypointId: newLockedId, origin: { x: ox, y: oy, yaw }, forcedAxis: null, forcedSign: null, isSnapped: false, axis: null }));
-               }
-             }
-             return;
+            const list = getRenderableNodesList();
+            if (list.length > 0) {
+              let curIdx = list.findIndex((r) => r.id === effectiveSnapState.lockedWaypointId);
+              if (curIdx === -1) curIdx = list.length - 1;
+
+              if (e.shiftKey) {
+                curIdx = (curIdx + 1) % list.length;
+              } else {
+                curIdx = (curIdx - 1 + list.length) % list.length;
+              }
+
+              const newLockedId = list[curIdx].id;
+              const prev = list[curIdx].node.transform || null;
+
+              if (prev) {
+                const { x: ox, y: oy, qx, qy, qz, qw } = prev;
+                let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+                if (!isFinite(yaw)) yaw = 0;
+                setSnapStateSynced((s) => ({
+                  ...s,
+                  lockedWaypointId: newLockedId,
+                  origin: { x: ox, y: oy, yaw },
+                  forcedAxis: null,
+                  forcedSign: null,
+                  isSnapped: false,
+                  axis: null,
+                }));
+              }
+            }
+            return;
           }
         }
 
@@ -316,7 +357,7 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
           if (snapInput !== '') setSnapInputSynced('');
           return;
         }
-        
+
         if (isRelevantKey) {
           e.stopPropagation();
           if (e.key === 'Backspace' || e.key === 'Tab' || e.key.startsWith('Arrow')) {
@@ -327,24 +368,24 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
         }
 
         if (e.key.startsWith('Arrow') && snapInput !== '') {
-          if (e.key === 'ArrowUp') setSnapStateSynced(prev => ({ ...prev, forcedAxis: 'X', forcedSign: 1 }));
-          else if (e.key === 'ArrowDown') setSnapStateSynced(prev => ({ ...prev, forcedAxis: 'X', forcedSign: -1 }));
-          else if (e.key === 'ArrowRight') setSnapStateSynced(prev => ({ ...prev, forcedAxis: 'Y', forcedSign: -1 }));
-          else if (e.key === 'ArrowLeft') setSnapStateSynced(prev => ({ ...prev, forcedAxis: 'Y', forcedSign: 1 }));
+          if (e.key === 'ArrowUp') setSnapStateSynced((prev) => ({ ...prev, forcedAxis: 'X', forcedSign: 1 }));
+          else if (e.key === 'ArrowDown') setSnapStateSynced((prev) => ({ ...prev, forcedAxis: 'X', forcedSign: -1 }));
+          else if (e.key === 'ArrowRight') setSnapStateSynced((prev) => ({ ...prev, forcedAxis: 'Y', forcedSign: -1 }));
+          else if (e.key === 'ArrowLeft') setSnapStateSynced((prev) => ({ ...prev, forcedAxis: 'Y', forcedSign: 1 }));
           return;
         }
-        
+
         if (e.key === 'Enter') {
           if (snapInput === '') return;
-          
+
           const { origin, axis } = effectiveSnapState;
           const effectiveAxis = effectiveSnapState.forcedAxis || axis;
-          
+
           if (!origin || !effectiveAxis) return;
-          
+
           let finalWorldX = effectiveSnapState.snappedWorldPos?.x ?? origin.x;
           let finalWorldY = effectiveSnapState.snappedWorldPos?.y ?? origin.y;
-          
+
           const val = parseFloat(snapInput);
           const effectiveSign = effectiveSnapState.forcedSign || 1;
 
@@ -363,18 +404,28 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
             addNode({
               id,
               type: 'manual',
-              transform: { 
-                x: finalWorldX, 
-                y: finalWorldY, 
-                qx: 0, qy: 0, 
-                qz: Math.sin(origin.yaw / 2), 
-                qw: Math.cos(origin.yaw / 2) 
+              transform: {
+                x: finalWorldX,
+                y: finalWorldY,
+                qx: 0,
+                qy: 0,
+                qz: Math.sin(origin.yaw / 2),
+                qw: Math.cos(origin.yaw / 2),
               },
-              options: {}
+              options: {},
             });
             selectNodes([id]);
             setSnapInputSynced('');
-            setSnapStateSynced(prev => ({ ...prev, isSnapped: false, axis: null, origin: { x: finalWorldX, y: finalWorldY, yaw: origin.yaw }, snappedWorldPos: null, lockedWaypointId: id, forcedAxis: null, forcedSign: null }));
+            setSnapStateSynced((prev) => ({
+              ...prev,
+              isSnapped: false,
+              axis: null,
+              origin: { x: finalWorldX, y: finalWorldY, yaw: origin.yaw },
+              snappedWorldPos: null,
+              lockedWaypointId: id,
+              forcedAxis: null,
+              forcedSign: null,
+            }));
           } else if (interactionMode.current === 'drag_node' && activeNodeId.current) {
             updateNode(activeNodeId.current, {
               transform: {
@@ -385,25 +436,38 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
                 qy: nodes[activeNodeId.current]?.transform?.qy ?? 0,
                 qz: nodes[activeNodeId.current]?.transform?.qz ?? 0,
                 qw: nodes[activeNodeId.current]?.transform?.qw ?? 1,
-              } as any
+              } as any,
             });
             setSnapInputSynced('');
             interactionMode.current = 'none';
             activeNodeId.current = null;
             if (document.activeElement instanceof HTMLElement) {
-               document.activeElement.blur();
+              document.activeElement.blur();
             }
           }
         } else if (e.key === 'Backspace') {
-          setSnapInputSynced(prev => prev.slice(0, -1));
+          setSnapInputSynced((prev) => prev.slice(0, -1));
         } else if (/^[0-9.-]$/.test(e.key)) {
-          setSnapInputSynced(prev => prev + e.key);
+          setSnapInputSynced((prev) => prev + e.key);
         }
       };
 
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [effectiveSnapState, snapInput, activeTool, addNode, selectNodes, updateNode, nodes, getRenderableNodesList, interactionMode, activeNodeId, setSnapInputSynced, setSnapStateSynced]);
+    }, [
+      effectiveSnapState,
+      snapInput,
+      activeTool,
+      addNode,
+      selectNodes,
+      updateNode,
+      nodes,
+      getRenderableNodesList,
+      interactionMode,
+      activeNodeId,
+      setSnapInputSynced,
+      setSnapStateSynced,
+    ]);
   };
 
   return {
@@ -413,6 +477,6 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
     setSnapState: setSnapStateSynced,
     applySnapping,
     getRenderableNodesList,
-    useSnappingKeyboardEvents
+    useSnappingKeyboardEvents,
   };
 }

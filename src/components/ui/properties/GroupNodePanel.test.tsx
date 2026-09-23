@@ -34,7 +34,7 @@ describe('GroupNodePanel', () => {
         selectNodes: mockSelectNodes,
         ungroupNode: mockUngroupNode,
         nodes: mockNodes,
-      })
+      }),
     );
   });
 

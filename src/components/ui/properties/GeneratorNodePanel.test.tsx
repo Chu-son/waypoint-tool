@@ -64,7 +64,7 @@ describe('GeneratorNodePanel', () => {
         nodes: {},
         decimalPrecision: 2,
         runWithLoading: mockRunWithLoading,
-      })
+      }),
     );
 
     render(<GeneratorNodePanel node={generatorNode} />);
@@ -97,7 +97,7 @@ describe('GeneratorNodePanel', () => {
         nodes: { 'gen-1': generatorNode, 'child-1': childNode },
         decimalPrecision: 2,
         runWithLoading: mockRunWithLoading,
-      })
+      }),
     );
 
     render(<GeneratorNodePanel node={generatorNode} />);
@@ -111,7 +111,7 @@ describe('GeneratorNodePanel', () => {
         expect.objectContaining({
           plugin: mockPlugin,
           stashToApply: undefined,
-        })
+        }),
       );
     });
 
@@ -147,7 +147,7 @@ describe('GeneratorNodePanel', () => {
         nodes: { 'gen-1': generatorNode, 'child-1': childNode },
         decimalPrecision: 2,
         runWithLoading: mockRunWithLoading,
-      })
+      }),
     );
 
     render(<GeneratorNodePanel node={generatorNode} />);
@@ -178,7 +178,7 @@ describe('GeneratorNodePanel', () => {
               deltaY: expect.closeTo(0.2),
             }),
           }),
-        })
+        }),
       );
     });
   });
@@ -211,7 +211,7 @@ describe('GeneratorNodePanel', () => {
         nodes: { 'gen-1': generatorNode, 'child-1': childNode },
         decimalPrecision: 2,
         runWithLoading: mockRunWithLoading,
-      })
+      }),
     );
 
     render(<GeneratorNodePanel node={generatorNode} />);
@@ -228,7 +228,7 @@ describe('GeneratorNodePanel', () => {
         expect.objectContaining({
           plugin: mockPlugin,
           stashToApply: undefined,
-        })
+        }),
       );
     });
   });
@@ -261,7 +261,7 @@ describe('GeneratorNodePanel', () => {
         nodes: { 'gen-1': generatorNode, 'child-1': childNode },
         decimalPrecision: 2,
         runWithLoading: mockRunWithLoading,
-      })
+      }),
     );
 
     render(<GeneratorNodePanel node={generatorNode} />);

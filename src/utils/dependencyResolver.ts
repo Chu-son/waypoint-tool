@@ -214,7 +214,7 @@ function findCycles(startId: string, allPlugins: Record<string, PluginInstance>)
  */
 export function resolvePluginDependencies(
   plugin: PluginInstance,
-  allPlugins: Record<string, PluginInstance>
+  allPlugins: Record<string, PluginInstance>,
 ): DependencyReport {
   const report: DependencyReport = {
     pluginId: plugin.id,
@@ -227,9 +227,7 @@ export function resolvePluginDependencies(
   };
 
   // Collect direct dependencies: plugin_dependencies + pipeline steps
-  const directDeps: PluginDependencyDef[] = [
-    ...(plugin.manifest?.plugin_dependencies || []),
-  ];
+  const directDeps: PluginDependencyDef[] = [...(plugin.manifest?.plugin_dependencies || [])];
 
   if (plugin.manifest?.pipeline?.steps) {
     for (const step of plugin.manifest.pipeline.steps) {
@@ -296,17 +294,14 @@ export function resolvePluginDependencies(
     report.issues.push({
       type: 'circular',
       pluginId: plugin.id,
-      dependencyId: cycle[0] === plugin.id ? (cycle[1] || plugin.id) : cycle[0],
+      dependencyId: cycle[0] === plugin.id ? cycle[1] || plugin.id : cycle[0],
       requiredVersion: '',
       cycle,
       message,
     });
   }
 
-  report.isValid =
-    report.missing.length === 0 &&
-    report.mismatches.length === 0 &&
-    report.circular.length === 0;
+  report.isValid = report.missing.length === 0 && report.mismatches.length === 0 && report.circular.length === 0;
 
   return report;
 }

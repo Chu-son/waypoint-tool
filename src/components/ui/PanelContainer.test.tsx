@@ -27,7 +27,7 @@ describe('PanelContainer', () => {
         onTabChange={handleTabChange}
         viewMode="tabs"
         onViewModeChange={handleViewModeChange}
-      />
+      />,
     );
 
     expect(screen.getByText('Waypoints')).toBeDefined();
@@ -47,7 +47,7 @@ describe('PanelContainer', () => {
         onTabChange={handleTabChange}
         viewMode="tabs"
         onViewModeChange={handleViewModeChange}
-      />
+      />,
     );
 
     const pluginsTab = screen.getByText('Plugins');
@@ -66,12 +66,12 @@ describe('PanelContainer', () => {
         onTabChange={handleTabChange}
         viewMode="tabs"
         onViewModeChange={handleViewModeChange}
-      />
+      />,
     );
 
     // Open menu (MoreHorizontal icon button)
     const menuButtons = container.querySelectorAll('button');
-    const menuButton = Array.from(menuButtons).find(btn => !btn.textContent);
+    const menuButton = Array.from(menuButtons).find((btn) => !btn.textContent);
     expect(menuButton).toBeDefined();
     if (menuButton) {
       fireEvent.click(menuButton);
@@ -95,7 +95,7 @@ describe('PanelContainer', () => {
         onTabChange={handleTabChange}
         viewMode="split"
         onViewModeChange={handleViewModeChange}
-      />
+      />,
     );
 
     expect(screen.getByTestId('panel-content-tab1')).toBeDefined();
@@ -113,12 +113,12 @@ describe('PanelContainer', () => {
         onTabChange={handleTabChange}
         viewMode="tabs"
         onViewModeChange={handleViewModeChange}
-      />
+      />,
     );
 
     // Open menu
     const menuButtons = container.querySelectorAll('button');
-    const menuButton = Array.from(menuButtons).find(btn => !btn.textContent);
+    const menuButton = Array.from(menuButtons).find((btn) => !btn.textContent);
     expect(menuButton).toBeDefined();
     if (menuButton) {
       fireEvent.click(menuButton);
@@ -144,7 +144,7 @@ describe('PanelContainer', () => {
         onViewModeChange={vi.fn()}
         onClose={handleClose}
         closeIcon={<span data-testid="close-icon">X</span>}
-      />
+      />,
     );
 
     const closeBtn = screen.getByTestId('close-icon').closest('button');
@@ -169,7 +169,7 @@ describe('PanelContainer', () => {
         side="left"
         onMoveTabToPanel={handleMove}
         onReorderTab={handleReorder}
-      />
+      />,
     );
 
     const tab1Btn = screen.getByText('Waypoints').closest('button');
@@ -193,11 +193,11 @@ describe('PanelContainer', () => {
         onViewModeChange={vi.fn()}
         side="left"
         onResetLayout={handleReset}
-      />
+      />,
     );
 
     const menuButtons = container.querySelectorAll('button');
-    const menuButton = Array.from(menuButtons).find(btn => !btn.textContent);
+    const menuButton = Array.from(menuButtons).find((btn) => !btn.textContent);
     expect(menuButton).toBeDefined();
     fireEvent.click(menuButton!);
 
@@ -216,11 +216,10 @@ describe('PanelContainer', () => {
         viewMode="tabs"
         onViewModeChange={vi.fn()}
         side="left"
-      />
+      />,
     );
 
     expect(screen.getByText('No tabs docked')).toBeDefined();
     expect(screen.getByText(/No tabs docked in this panel/)).toBeDefined();
   });
 });
-

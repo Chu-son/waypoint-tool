@@ -22,12 +22,8 @@ describe('PipelineSetupView', () => {
         name: 'Step 1 Generator',
         type: 'python',
         executable: 'step1.py',
-        inputs: [
-          { id: 'start_point', name: 'start_point', label: 'Start Point', type: 'point', required: true },
-        ],
-        properties: [
-          { name: 'speed', label: 'Speed', type: 'number', default: 1.5 },
-        ],
+        inputs: [{ id: 'start_point', name: 'start_point', label: 'Start Point', type: 'point', required: true }],
+        properties: [{ name: 'speed', label: 'Speed', type: 'number', default: 1.5 }],
       },
       folder_path: '/path/to/step1',
     },
@@ -38,12 +34,8 @@ describe('PipelineSetupView', () => {
         name: 'Step 2 Filter',
         type: 'python',
         executable: 'step2.py',
-        inputs: [
-          { id: 'input_layer', name: 'input_layer', label: 'Input Layer', type: 'custom_layer' },
-        ],
-        properties: [
-          { name: 'tolerance', label: 'Tolerance', type: 'number', default: 0.1 },
-        ],
+        inputs: [{ id: 'input_layer', name: 'input_layer', label: 'Input Layer', type: 'custom_layer' }],
+        properties: [{ name: 'tolerance', label: 'Tolerance', type: 'number', default: 0.1 }],
       },
       folder_path: '/path/to/step2',
     },

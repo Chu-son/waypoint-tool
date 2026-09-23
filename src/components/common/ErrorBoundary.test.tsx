@@ -14,7 +14,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary>
         <ProblemChild shouldThrow={false} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText('Safe Child Content')).toBeInTheDocument();
   });
@@ -25,7 +25,7 @@ describe('ErrorBoundary', () => {
     render(
       <ErrorBoundary fallbackTitle="カスタムエラータイトル">
         <ProblemChild shouldThrow={true} />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
     expect(screen.getByText('カスタムエラータイトル')).toBeInTheDocument();

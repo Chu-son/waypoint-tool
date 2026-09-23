@@ -40,9 +40,7 @@ describe('exportWaypointUtils', () => {
     };
 
     const schema: OptionsSchema = {
-      options: [
-        { name: 'speed', label: 'Speed', type: 'number', default: 1.5 },
-      ],
+      options: [{ name: 'speed', label: 'Speed', type: 'number', default: 1.5 }],
     };
 
     const result = extractWaypointsForExport(['node-1', 'node-2'], nodes, schema, 1);

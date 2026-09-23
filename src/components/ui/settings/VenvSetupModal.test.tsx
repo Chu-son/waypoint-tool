@@ -47,21 +47,14 @@ describe('VenvSetupModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (BackendAPI.getPythonEnvironments as any).mockResolvedValue([
-      '/usr/bin/python3',
-      '/opt/conda/bin/python',
-    ]);
-    (BackendAPI.createVirtualenv as any).mockResolvedValue(
-      '/home/user/plugins/geo-plugin/.venv/bin/python'
-    );
-    (BackendAPI.installPipPackages as any).mockResolvedValue(
-      'Successfully installed numpy-1.24.0 shapely-2.0.0'
-    );
+    (BackendAPI.getPythonEnvironments as any).mockResolvedValue(['/usr/bin/python3', '/opt/conda/bin/python']);
+    (BackendAPI.createVirtualenv as any).mockResolvedValue('/home/user/plugins/geo-plugin/.venv/bin/python');
+    (BackendAPI.installPipPackages as any).mockResolvedValue('Successfully installed numpy-1.24.0 shapely-2.0.0');
 
     (useAppStore as any).mockImplementation((selector: any) =>
       selector({
         updatePluginSetting: mockUpdatePluginSetting,
-      })
+      }),
     );
   });
 
@@ -72,7 +65,7 @@ describe('VenvSetupModal', () => {
         onClose={mockOnClose}
         plugin={mockPlugin}
         globalPythonPath="/usr/local/bin/python3"
-      />
+      />,
     );
 
     expect(screen.getByText(/Virtual Environment Setup - Geo Analyzer/i)).toBeInTheDocument();
@@ -97,7 +90,7 @@ describe('VenvSetupModal', () => {
         plugin={mockPlugin}
         globalPythonPath="/usr/bin/python3"
         onComplete={mockOnComplete}
-      />
+      />,
     );
 
     const createBtn = screen.getByRole('button', { name: /Create & Install/i });
@@ -106,35 +99,26 @@ describe('VenvSetupModal', () => {
     await waitFor(() => {
       expect(BackendAPI.createVirtualenv).toHaveBeenCalledWith(
         '/home/user/plugins/geo-plugin/.venv',
-        '/usr/bin/python3'
+        '/usr/bin/python3',
       );
-      expect(BackendAPI.installPipPackages).toHaveBeenCalledWith(
-        '/home/user/plugins/geo-plugin/.venv/bin/python',
-        ['numpy>=1.20', 'shapely==2.0.0']
-      );
+      expect(BackendAPI.installPipPackages).toHaveBeenCalledWith('/home/user/plugins/geo-plugin/.venv/bin/python', [
+        'numpy>=1.20',
+        'shapely==2.0.0',
+      ]);
       expect(mockUpdatePluginSetting).toHaveBeenCalledWith('geo-plugin', {
         pythonOverridePath: '/home/user/plugins/geo-plugin/.venv/bin/python',
       });
-      expect(mockOnComplete).toHaveBeenCalledWith(
-        '/home/user/plugins/geo-plugin/.venv/bin/python'
-      );
+      expect(mockOnComplete).toHaveBeenCalledWith('/home/user/plugins/geo-plugin/.venv/bin/python');
     });
 
     expect(screen.getByText('Setup Completed')).toBeInTheDocument();
   });
 
   it('handles error during venv creation or installation gracefully', async () => {
-    (BackendAPI.createVirtualenv as any).mockRejectedValueOnce(
-      new Error('Failed to execute python -m venv')
-    );
+    (BackendAPI.createVirtualenv as any).mockRejectedValueOnce(new Error('Failed to execute python -m venv'));
 
     render(
-      <VenvSetupModal
-        isOpen={true}
-        onClose={mockOnClose}
-        plugin={mockPlugin}
-        globalPythonPath="/usr/bin/python3"
-      />
+      <VenvSetupModal isOpen={true} onClose={mockOnClose} plugin={mockPlugin} globalPythonPath="/usr/bin/python3" />,
     );
 
     const createBtn = screen.getByRole('button', { name: /Create & Install/i });

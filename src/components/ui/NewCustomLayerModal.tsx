@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { useAppStore } from "../../stores/appStore";
-import { Modal, ModalHeader, ModalContent } from "./common/Modal";
-import { Button } from "./common/Button";
-import { Input } from "./common/Input";
-import { Checkbox } from "./common/Checkbox";
-import { FieldLabel } from "./common/FieldLabel";
-import { Pencil, Sparkles, Plus, Bookmark } from "lucide-react";
-import { cn } from "../../utils/cn";
+import { useState } from 'react';
+import { useAppStore } from '../../stores/appStore';
+import { Modal, ModalHeader, ModalContent } from './common/Modal';
+import { Button } from './common/Button';
+import { Input } from './common/Input';
+import { Checkbox } from './common/Checkbox';
+import { FieldLabel } from './common/FieldLabel';
+import { Pencil, Sparkles, Plus, Bookmark } from 'lucide-react';
+import { cn } from '../../utils/cn';
 
 interface NewCustomLayerModalProps {
   isOpen: boolean;
@@ -25,11 +25,11 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
   const selectNodes = useAppStore((state) => state.selectNodes);
 
-  const [manualLayerName, setManualLayerName] = useState("");
+  const [manualLayerName, setManualLayerName] = useState('');
   const [isReferenceManual, setIsReferenceManual] = useState(false);
 
   const layerPlugins = Object.values(plugins).filter(
-    (p) => p && p.manifest && p.manifest.category === "map_layer_generator"
+    (p) => p && p.manifest && p.manifest.category === 'map_layer_generator',
   );
 
   const defaultManualName = `Custom Layer ${customLayers.length + 1}`;
@@ -40,29 +40,25 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
     const newLayer = addManualCustomLayer(name, isReferenceManual);
     setActiveCustomLayerId(newLayer.id);
     setMapEditMode(true);
-    setRightPanelActiveTab("inspector");
+    setRightPanelActiveTab('inspector');
     setRightPanelOpen(true);
-    setManualLayerName("");
+    setManualLayerName('');
     setIsReferenceManual(false);
     onClose();
   };
 
   const handleSelectPlugin = (pluginId: string) => {
     selectNodes([]);
-    setActiveCustomLayerId("new");
+    setActiveCustomLayerId('new');
     setActivePlugin(pluginId);
-    setActiveTool("add_generator");
-    setRightPanelActiveTab("inspector");
+    setActiveTool('add_generator');
+    setRightPanelActiveTab('inspector');
     setRightPanelOpen(true);
     onClose();
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      size="xl"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} size="xl">
       <ModalHeader title="Create Custom Layer" onClose={onClose} />
       <ModalContent className="space-y-6">
         {/* Option 1: Manual Vector Layer */}
@@ -76,7 +72,8 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
               <div className="flex-1 space-y-1">
                 <h4 className="text-sm font-bold text-text-base">Manual Vector Layer</h4>
                 <p className="text-xs text-text-muted">
-                  Draw obstacle boxes, circular forbidden zones, or freehand erase/paint brush strokes directly onto the canvas.
+                  Draw obstacle boxes, circular forbidden zones, or freehand erase/paint brush strokes directly onto the
+                  canvas.
                 </p>
               </div>
             </div>
@@ -88,7 +85,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                 placeholder={defaultManualName}
                 className="h-8 text-xs bg-surface-base flex-1"
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateManual();
+                  if (e.key === 'Enter') handleCreateManual();
                 }}
               />
               <Button
@@ -102,12 +99,12 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer text-xs text-text-muted hover:text-text-base select-none pt-1">
-              <Checkbox
-                checked={isReferenceManual}
-                onChange={(e) => setIsReferenceManual(e.target.checked)}
-              />
+              <Checkbox checked={isReferenceManual} onChange={(e) => setIsReferenceManual(e.target.checked)} />
               <span className="flex items-center gap-1.5">
-                <Bookmark size={13} className={isReferenceManual ? "text-accent-reference fill-accent-reference" : ""} />
+                <Bookmark
+                  size={13}
+                  className={isReferenceManual ? 'text-accent-reference fill-accent-reference' : ''}
+                />
                 参照用レイヤーとして作成（マップ合成・エクスポートから除外）
               </span>
             </label>
@@ -128,9 +125,9 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                   key={plugin.id}
                   onClick={() => handleSelectPlugin(plugin.id)}
                   className={cn(
-                    "p-3 rounded-lg border border-border-base/40 bg-surface-panel/30",
-                    "hover:border-accent-automation/50 hover:bg-accent-automation/5 transition-colors cursor-pointer",
-                    "flex items-center justify-between gap-3 group"
+                    'p-3 rounded-lg border border-border-base/40 bg-surface-panel/30',
+                    'hover:border-accent-automation/50 hover:bg-accent-automation/5 transition-colors cursor-pointer',
+                    'flex items-center justify-between gap-3 group',
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -142,9 +139,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
                         {plugin.manifest.name}
                       </h4>
                       {plugin.manifest.description && (
-                        <p className="text-[11px] text-text-muted line-clamp-1">
-                          {plugin.manifest.description}
-                        </p>
+                        <p className="text-[11px] text-text-muted line-clamp-1">{plugin.manifest.description}</p>
                       )}
                     </div>
                   </div>

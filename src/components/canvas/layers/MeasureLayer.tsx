@@ -29,7 +29,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
         fontWeight: 'bold',
         stroke: { color: '#000000', width: 2 },
       }),
-    []
+    [],
   );
 
   const snapLabelStyle = useMemo(
@@ -41,7 +41,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
         fontWeight: 'bold',
         stroke: { color: '#0f172a', width: 3 },
       }),
-    []
+    [],
   );
 
   // メジャーモードでない場合は何も描画しない
@@ -50,7 +50,7 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
   if (!measureStartPoint && !(isAltPressed && snappedTarget)) return null;
 
   const p1 = measureStartPoint;
-  const p2 = p1 ? (measureEndPoint || measureHoverPoint) : null;
+  const p2 = p1 ? measureEndPoint || measureHoverPoint : null;
   const isCommitted = measureEndPoint !== null;
 
   const primaryColor = 0x10b981; // Emerald 500
@@ -140,7 +140,11 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
               g.fill();
 
               // Reticle crosshair on p2
-              g.strokeStyle = { width: 1.5 / safeScale, color: isCommitted ? primaryColor : secondaryColor, alpha: 0.9 };
+              g.strokeStyle = {
+                width: 1.5 / safeScale,
+                color: isCommitted ? primaryColor : secondaryColor,
+                alpha: 0.9,
+              };
               g.moveTo(p2.x - reticleSize, p2.y);
               g.lineTo(p2.x - markerRadius - 1 / safeScale, p2.y);
               g.moveTo(p2.x + markerRadius + 1 / safeScale, p2.y);

@@ -39,7 +39,7 @@ describe('useSnapping', () => {
 
       // Set snapState so that snapping would otherwise be active
       act(() => {
-        result.current.setSnapState(prev => ({
+        result.current.setSnapState((prev) => ({
           ...prev,
           lockedWaypointId: 'wp-1',
           isSnapped: true,
@@ -81,7 +81,7 @@ describe('useSnapping', () => {
       });
 
       act(() => {
-        result.current.setSnapState(prev => ({
+        result.current.setSnapState((prev) => ({
           ...prev,
           lockedWaypointId: 'wp-1',
           isSnapped: true,
@@ -113,7 +113,7 @@ describe('useSnapping', () => {
       });
 
       act(() => {
-        result.current.setSnapState(prev => ({
+        result.current.setSnapState((prev) => ({
           ...prev,
           lockedWaypointId: 'wp-1',
           isSnapped: true,
@@ -148,7 +148,7 @@ describe('useSnapping', () => {
       });
 
       act(() => {
-        result.current.setSnapState(prev => ({
+        result.current.setSnapState((prev) => ({
           ...prev,
           lockedWaypointId: 'wp-1',
           isSnapped: true,
@@ -186,7 +186,7 @@ describe('useSnapping', () => {
       });
 
       act(() => {
-        result.current.setSnapState(prev => ({
+        result.current.setSnapState((prev) => ({
           ...prev,
           lockedWaypointId: 'wp-1',
           isSnapped: true,

@@ -7,7 +7,7 @@ import { CustomLayer, ManualCustomLayer, EditObject, ProjectMapLayer } from '../
 export function worldToPixel(
   wx: number,
   wy: number,
-  info: { resolution: number; origin: number[]; width?: number; height: number }
+  info: { resolution: number; origin: number[]; width?: number; height: number },
 ): { px: number; py: number } {
   const resolution = info.resolution || 0.05;
   const originX = info.origin?.[0] ?? 0;
@@ -29,11 +29,7 @@ export function worldRadiusToPixel(radius: number, resolution: number): number {
 /**
  * Draws a single EditObject onto an HTML2D Canvas context.
  */
-function drawEditObjectToCanvas(
-  ctx: CanvasRenderingContext2D,
-  obj: EditObject,
-  info: ProjectMapLayer['info']
-) {
+function drawEditObjectToCanvas(ctx: CanvasRenderingContext2D, obj: EditObject, info: ProjectMapLayer['info']) {
   const resolution = info.resolution || 0.05;
   const v = Math.min(255, Math.max(0, Math.round(obj.fillValue)));
   ctx.fillStyle = `rgb(${v}, ${v}, ${v})`;
@@ -86,7 +82,7 @@ function drawEditObjectToCanvas(
   } else if (obj.type === 'line') {
     const p1 = worldToPixel(obj.x1, obj.y1, info);
     const p2 = worldToPixel(obj.x2, obj.y2, info);
-    const strokeWidth = obj.lineWidth ? (obj.lineWidth / resolution) : Math.max(1, 2);
+    const strokeWidth = obj.lineWidth ? obj.lineWidth / resolution : Math.max(1, 2);
 
     ctx.save();
     ctx.lineWidth = strokeWidth;
@@ -105,7 +101,7 @@ function drawEditObjectToCanvas(
  */
 export async function compositeManualCustomLayerOntoMap(
   customLayer: ManualCustomLayer,
-  targetMapLayer: ProjectMapLayer
+  targetMapLayer: ProjectMapLayer,
 ): Promise<string> {
   if (!customLayer.editObjects.length) {
     return targetMapLayer.image_base64;
@@ -150,7 +146,7 @@ export async function compositeManualCustomLayerOntoMap(
  */
 export function getEditLayerBoundingBox(
   editLayer: ManualCustomLayer,
-  resolution = 0.05
+  resolution = 0.05,
 ): {
   minX: number;
   maxX: number;
@@ -159,7 +155,10 @@ export function getEditLayerBoundingBox(
   widthPx: number;
   heightPx: number;
 } {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
 
   for (const obj of editLayer.editObjects) {
     if (obj.type === 'rect') {
@@ -190,7 +189,10 @@ export function getEditLayerBoundingBox(
   }
 
   if (minX === Infinity) {
-    minX = -10; maxX = 10; minY = -10; maxY = 10;
+    minX = -10;
+    maxX = 10;
+    minY = -10;
+    maxY = 10;
   }
 
   minX = Math.floor(minX - 1);
@@ -209,7 +211,7 @@ export function getEditLayerBoundingBox(
  */
 export async function rasterizeManualCustomLayerToExportLayer(
   customLayer: ManualCustomLayer,
-  targetResolution?: number
+  targetResolution?: number,
 ): Promise<{
   id: string;
   name: string;
@@ -270,10 +272,7 @@ export async function rasterizeManualCustomLayerToExportLayer(
 /**
  * Prepares a CustomLayer for plugin execution by resolving its metadata and rasterized image/info if available.
  */
-export async function prepareCustomLayerPayload(
-  customLayer: CustomLayer,
-  targetResolution?: number
-): Promise<any> {
+export async function prepareCustomLayerPayload(customLayer: CustomLayer, targetResolution?: number): Promise<any> {
   const resolution = targetResolution || 0.05;
   if (customLayer.type === 'manual') {
     let imageBase64: string | undefined;
@@ -343,7 +342,7 @@ export async function enrichInteractionDataWithCustomLayers(
   interactionData: Record<string, any>,
   customLayers: CustomLayer[],
   baseResolution?: number,
-  annotationObjects?: Record<string, any>
+  annotationObjects?: Record<string, any>,
 ): Promise<Record<string, any>> {
   if (!inputs || !interactionData) return interactionData;
   const enriched = { ...interactionData };
@@ -360,7 +359,7 @@ export async function enrichInteractionDataWithCustomLayers(
             const id = typeof item === 'string' ? item : item?.id;
             const found = customLayers.find((l) => l.id === id) || (typeof item === 'object' ? item : null);
             return found ? await prepareCustomLayerPayload(found, baseResolution) : item;
-          })
+          }),
         );
       } else {
         const id = typeof rawVal === 'string' ? rawVal : rawVal?.id;
@@ -371,11 +370,11 @@ export async function enrichInteractionDataWithCustomLayers(
       if (Array.isArray(rawVal)) {
         enriched[key] = rawVal.map((item) => {
           const id = typeof item === 'string' ? item : item?.id;
-          return (id && annotationObjects[id]) ? annotationObjects[id] : item;
+          return id && annotationObjects[id] ? annotationObjects[id] : item;
         });
       } else {
         const id = typeof rawVal === 'string' ? rawVal : rawVal?.id;
-        enriched[key] = (id && annotationObjects[id]) ? annotationObjects[id] : rawVal;
+        enriched[key] = id && annotationObjects[id] ? annotationObjects[id] : rawVal;
       }
     }
   }
@@ -399,7 +398,7 @@ export type PreparedExportLayer = {
  */
 export async function prepareLayersForExport(
   mapLayers: ProjectMapLayer[],
-  customLayers: CustomLayer[]
+  customLayers: CustomLayer[],
 ): Promise<PreparedExportLayer[]> {
   const visibleMapLayers = mapLayers.filter((l) => l.visible);
   const totalMapCount = mapLayers.length;
@@ -451,11 +450,10 @@ export async function prepareLayersForExport(
             visible: true,
           };
         }
-      })
+      }),
   );
 
-  const validCustomLayers = customLayerExports
-    .filter((l): l is PreparedExportLayer => l !== null);
+  const validCustomLayers = customLayerExports.filter((l): l is PreparedExportLayer => l !== null);
 
   return [...mappedMapLayers, ...validCustomLayers];
 }
@@ -465,7 +463,7 @@ export async function prepareLayersForExport(
  */
 export async function preCompositeEditLayers(
   mapLayers: ProjectMapLayer[],
-  customLayers: ManualCustomLayer[]
+  customLayers: ManualCustomLayer[],
 ): Promise<ProjectMapLayer[]> {
   if (!customLayers.length || !mapLayers.length) {
     return mapLayers;
@@ -487,7 +485,9 @@ export async function preCompositeEditLayers(
 
     const targetIdx = result.findIndex((l) => l.id === targetMapId);
     if (targetIdx < 0) {
-      console.warn(`[mapRasterize] Target map layer "${targetMapId}" not found for edit layer "${editLayer.name || editLayer.id}". Skipping compositing.`);
+      console.warn(
+        `[mapRasterize] Target map layer "${targetMapId}" not found for edit layer "${editLayer.name || editLayer.id}". Skipping compositing.`,
+      );
       continue;
     }
 

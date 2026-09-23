@@ -60,25 +60,27 @@ describe('LayerPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [],
-      customLayers: [],
-      lastDirectory: '/test/dir',
-      occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
-      showOccupancyHighlight: false,
-      setShowOccupancyHighlight: vi.fn(),
-      updateMapLayer: mockUpdateMapLayer,
-      removeMapLayer: mockRemoveMapLayer,
-      reorderMapLayers: mockReorderMapLayers,
-      addMapLayer: mockAddMapLayer,
-      updateCustomLayer: vi.fn(),
-      removeCustomLayer: vi.fn(),
-      reorderCustomLayers: vi.fn(),
-      setLastDirectory: mockSetLastDirectory,
-      plugins: {},
-      selectNodes: vi.fn(),
-      runWithLoading: async (_: any, fn: any) => await fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: [],
+        customLayers: [],
+        lastDirectory: '/test/dir',
+        occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
+        showOccupancyHighlight: false,
+        setShowOccupancyHighlight: vi.fn(),
+        updateMapLayer: mockUpdateMapLayer,
+        removeMapLayer: mockRemoveMapLayer,
+        reorderMapLayers: mockReorderMapLayers,
+        addMapLayer: mockAddMapLayer,
+        updateCustomLayer: vi.fn(),
+        removeCustomLayer: vi.fn(),
+        reorderCustomLayers: vi.fn(),
+        setLastDirectory: mockSetLastDirectory,
+        plugins: {},
+        selectNodes: vi.fn(),
+        runWithLoading: async (_: any, fn: any) => await fn(),
+      }),
+    );
   });
 
   it('renders empty state', () => {
@@ -87,33 +89,37 @@ describe('LayerPanel', () => {
   });
 
   it('shows layers and handles visibility toggle', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: mockLayers,
-      customLayers: [],
-      updateMapLayer: mockUpdateMapLayer,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: mockLayers,
+        customLayers: [],
+        updateMapLayer: mockUpdateMapLayer,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
     expect(screen.getByText('Map 1')).toBeInTheDocument();
-    
+
     const toggleBtns = screen.getAllByTitle('Toggle Visibility');
     fireEvent.click(toggleBtns[0]);
     expect(mockUpdateMapLayer).toHaveBeenCalledWith('l1', { visible: false });
   });
 
   it('handles reordering with up/down buttons', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: mockLayers,
-      customLayers: [],
-      reorderMapLayers: mockReorderMapLayers,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: mockLayers,
+        customLayers: [],
+        reorderMapLayers: mockReorderMapLayers,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
-    
+
     // First item's Down button (second button in up/down group for first item)
     const downBtns = screen.getAllByTitle('Move Down');
     fireEvent.click(downBtns[0]);
@@ -130,35 +136,31 @@ describe('LayerPanel', () => {
     });
 
     render(<LayerPanel />);
-    
+
     const loadBtn = screen.getByText('Load Map');
     fireEvent.click(loadBtn);
 
     await waitFor(() => {
       expect(DialogAPI.open).toHaveBeenCalled();
       expect(BackendAPI.loadROSMap).toHaveBeenCalledWith('/path/to/test_map.yaml');
-      expect(mockAddMapLayer).toHaveBeenCalledWith(
-        'test_map.yaml',
-        { resolution: 0.05 },
-        'fake-base64',
-        100,
-        100
-      );
+      expect(mockAddMapLayer).toHaveBeenCalledWith('test_map.yaml', { resolution: 0.05 }, 'fake-base64', 100, 100);
       expect(mockSetLastDirectory).toHaveBeenCalledWith('/path/to');
     });
   });
 
   it('removes layer after confirmation', async () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: mockLayers,
-      customLayers: [],
-      removeMapLayer: mockRemoveMapLayer,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: mockLayers,
+        customLayers: [],
+        removeMapLayer: mockRemoveMapLayer,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
-    
+
     const removeBtns = screen.getAllByTitle('Remove Map');
     fireEvent.click(removeBtns[0]);
 
@@ -195,13 +197,15 @@ describe('LayerPanel', () => {
       },
     ];
 
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [],
-      customLayers: mockCustomLayers,
-      updateCustomLayer: mockUpdateCustomLayer,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: [],
+        customLayers: mockCustomLayers,
+        updateCustomLayer: mockUpdateCustomLayer,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
     expect(screen.getByDisplayValue('Ref Layer')).toBeInTheDocument();
@@ -243,13 +247,15 @@ describe('LayerPanel', () => {
       },
     ];
 
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [],
-      customLayers: mockCustomLayers,
-      updateCustomLayer: mockUpdateCustomLayer,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: [],
+        customLayers: mockCustomLayers,
+        updateCustomLayer: mockUpdateCustomLayer,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
 
@@ -278,15 +284,17 @@ describe('LayerPanel', () => {
       },
     ];
 
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [],
-      customLayers: [],
-      exportRegions: mockRegions,
-      updateExportRegion: mockUpdateExportRegion,
-      removeExportRegion: mockRemoveExportRegion,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: [],
+        customLayers: [],
+        exportRegions: mockRegions,
+        updateExportRegion: mockUpdateExportRegion,
+        removeExportRegion: mockRemoveExportRegion,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
 
@@ -311,29 +319,31 @@ describe('LayerPanel', () => {
   });
 
   it('hides opacity and blend mode by default and expands settings on click', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [
-        {
-          id: 'l1',
-          name: 'Map 1',
-          visible: true,
-          opacity: 0.8,
-          blend_mode: 'overwrite',
-          info: {
-            resolution: 0.05,
-            origin: [10.0, 20.0, 0.0],
-            initial_origin: [10.0, 20.0, 0.0],
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: [
+          {
+            id: 'l1',
+            name: 'Map 1',
+            visible: true,
+            opacity: 0.8,
+            blend_mode: 'overwrite',
+            info: {
+              resolution: 0.05,
+              origin: [10.0, 20.0, 0.0],
+              initial_origin: [10.0, 20.0, 0.0],
+            },
+            width: 100,
+            height: 100,
           },
-          width: 100,
-          height: 100,
-        },
-      ],
-      customLayers: [],
-      occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
-      updateMapLayer: mockUpdateMapLayer,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+        ],
+        customLayers: [],
+        occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
+        updateMapLayer: mockUpdateMapLayer,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
 
@@ -366,29 +376,31 @@ describe('LayerPanel', () => {
   });
 
   it('allows resetting pose to YAML origin', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      mapLayers: [
-        {
-          id: 'l1',
-          name: 'Map 1',
-          visible: true,
-          opacity: 0.8,
-          blend_mode: 'overwrite',
-          info: {
-            resolution: 0.05,
-            origin: [15.0, 25.0, Math.PI / 4],
-            initial_origin: [10.0, 20.0, 0.0],
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        mapLayers: [
+          {
+            id: 'l1',
+            name: 'Map 1',
+            visible: true,
+            opacity: 0.8,
+            blend_mode: 'overwrite',
+            info: {
+              resolution: 0.05,
+              origin: [15.0, 25.0, Math.PI / 4],
+              initial_origin: [10.0, 20.0, 0.0],
+            },
+            width: 100,
+            height: 100,
           },
-          width: 100,
-          height: 100,
-        },
-      ],
-      customLayers: [],
-      occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
-      updateMapLayer: mockUpdateMapLayer,
-      plugins: {},
-      selectNodes: vi.fn(),
-    }));
+        ],
+        customLayers: [],
+        occupancySettings: { defaultOccupiedThresh: 0.65, defaultFreeThresh: 0.25, defaultNegate: 0 },
+        updateMapLayer: mockUpdateMapLayer,
+        plugins: {},
+        selectNodes: vi.fn(),
+      }),
+    );
 
     render(<LayerPanel />);
 

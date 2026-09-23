@@ -1,9 +1,9 @@
-import { ReactNode, useState, MouseEvent } from "react";
-import { MoreHorizontal, Columns, Layout, ArrowRightLeft, ArrowLeft, ArrowRight, RotateCcw } from "lucide-react";
-import { Button } from "./common/Button";
-import { FieldLabel } from "./common/FieldLabel";
-import { EmptyState } from "./common/EmptyState";
-import { cn } from "../../utils/cn";
+import { ReactNode, useState, MouseEvent } from 'react';
+import { MoreHorizontal, Columns, Layout, ArrowRightLeft, ArrowLeft, ArrowRight, RotateCcw } from 'lucide-react';
+import { Button } from './common/Button';
+import { FieldLabel } from './common/FieldLabel';
+import { EmptyState } from './common/EmptyState';
+import { cn } from '../../utils/cn';
 
 export interface PanelTab {
   id: string;
@@ -16,8 +16,8 @@ interface PanelContainerProps {
   panels: PanelTab[];
   activeTabId: string;
   onTabChange: (id: string) => void;
-  viewMode: "tabs" | "split";
-  onViewModeChange: (mode: "tabs" | "split") => void;
+  viewMode: 'tabs' | 'split';
+  onViewModeChange: (mode: 'tabs' | 'split') => void;
   onClose?: () => void;
   closeIcon?: ReactNode;
   side?: 'left' | 'right';
@@ -42,15 +42,13 @@ function TabButton({
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={cn(
-        "text-[11px] font-semibold tracking-wide px-2.5 py-1 rounded-md flex items-center gap-1.5 shrink-0 transition-all cursor-pointer select-none",
+        'text-[11px] font-semibold tracking-wide px-2.5 py-1 rounded-md flex items-center gap-1.5 shrink-0 transition-all cursor-pointer select-none',
         isActive
-          ? "text-primary-base bg-primary-base/15 font-bold shadow-sm"
-          : "text-text-muted hover:text-text-base hover:bg-surface-hover/60"
+          ? 'text-primary-base bg-primary-base/15 font-bold shadow-sm'
+          : 'text-text-muted hover:text-text-base hover:bg-surface-hover/60',
       )}
     >
-      <span className={cn("transition-transform shrink-0", isActive ? "scale-105" : "")}>
-        {panel.icon}
-      </span>
+      <span className={cn('transition-transform shrink-0', isActive ? 'scale-105' : '')}>{panel.icon}</span>
       <span className="truncate">{panel.title}</span>
     </button>
   );
@@ -74,10 +72,10 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 transition-colors cursor-pointer rounded-md disabled:opacity-40 disabled:cursor-not-allowed",
+        'w-full px-3 py-1.5 text-left text-xs flex items-center gap-2 transition-colors cursor-pointer rounded-md disabled:opacity-40 disabled:cursor-not-allowed',
         isActive
-          ? "text-primary-base font-bold bg-primary-base/10"
-          : "text-text-muted hover:bg-surface-hover hover:text-text-base"
+          ? 'text-primary-base font-bold bg-primary-base/10'
+          : 'text-text-muted hover:bg-surface-hover hover:text-text-base',
       )}
     >
       {icon && <span className="shrink-0">{icon}</span>}
@@ -141,10 +139,10 @@ export function PanelContainer({
               {closeIcon}
             </Button>
           )}
-          
+
           {panels.length === 0 ? (
             <span className="text-xs text-text-muted px-2 py-1 italic">No tabs docked</span>
-          ) : viewMode === "tabs" ? (
+          ) : viewMode === 'tabs' ? (
             <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 min-w-0 flex-1">
               {panels.map((panel) => (
                 <TabButton
@@ -170,8 +168,10 @@ export function PanelContainer({
               setIsMenuOpen(!isMenuOpen);
             }}
             className={cn(
-              "h-7 w-7 transition-colors",
-              isMenuOpen ? "bg-surface-hover text-text-base border-border-base" : "text-text-muted hover:text-text-base"
+              'h-7 w-7 transition-colors',
+              isMenuOpen
+                ? 'bg-surface-hover text-text-base border-border-base'
+                : 'text-text-muted hover:text-text-base',
             )}
             title="Panel Options"
           >
@@ -180,10 +180,7 @@ export function PanelContainer({
 
           {isMenuOpen && (
             <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setIsMenuOpen(false)} 
-              />
+              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
               <div className="absolute right-0 top-full mt-1.5 w-52 bg-surface-panel/98 backdrop-blur-md border border-border-base rounded-lg shadow-2xl p-1 z-50 animate-in fade-in zoom-in duration-100 origin-top-right">
                 {/* Tabs List */}
                 {panels.length > 0 && (
@@ -197,11 +194,11 @@ export function PanelContainer({
                           key={panel.id}
                           icon={panel.icon}
                           label={panel.title}
-                          isActive={viewMode === "tabs" && activeTabId === panel.id}
+                          isActive={viewMode === 'tabs' && activeTabId === panel.id}
                           onClick={() => {
                             onTabChange(panel.id);
-                            if (viewMode !== "tabs") {
-                              onViewModeChange("tabs");
+                            if (viewMode !== 'tabs') {
+                              onViewModeChange('tabs');
                             }
                             setIsMenuOpen(false);
                           }}
@@ -261,18 +258,18 @@ export function PanelContainer({
                       <MenuItem
                         icon={<Layout size={14} />}
                         label="Tab View"
-                        isActive={viewMode === "tabs"}
+                        isActive={viewMode === 'tabs'}
                         onClick={() => {
-                          onViewModeChange("tabs");
+                          onViewModeChange('tabs');
                           setIsMenuOpen(false);
                         }}
                       />
                       <MenuItem
                         icon={<Columns size={14} className="rotate-90" />}
                         label="Split View (Vertical)"
-                        isActive={viewMode === "split"}
+                        isActive={viewMode === 'split'}
                         onClick={() => {
-                          onViewModeChange("split");
+                          onViewModeChange('split');
                           setIsMenuOpen(false);
                         }}
                       />
@@ -375,10 +372,8 @@ export function PanelContainer({
           <div className="flex-1 flex items-center justify-center p-6">
             <EmptyState message={`No tabs docked in this panel. You can move tabs here from the other panel.`} />
           </div>
-        ) : viewMode === "tabs" ? (
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {activePanel?.component}
-          </div>
+        ) : viewMode === 'tabs' ? (
+          <div className="flex-1 overflow-hidden flex flex-col">{activePanel?.component}</div>
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col divide-y divide-border-base/50">
             {panels.map((panel) => (
@@ -386,9 +381,7 @@ export function PanelContainer({
                 <div className="px-3 py-1.5 bg-surface-panel/30 border-b border-border-base/20 flex items-center gap-2 shrink-0">
                   <FieldLabel>{panel.title}</FieldLabel>
                 </div>
-                <div className="flex-1 overflow-hidden flex flex-col">
-                  {panel.component}
-                </div>
+                <div className="flex-1 overflow-hidden flex flex-col">{panel.component}</div>
               </div>
             ))}
           </div>
@@ -397,4 +390,3 @@ export function PanelContainer({
     </div>
   );
 }
-

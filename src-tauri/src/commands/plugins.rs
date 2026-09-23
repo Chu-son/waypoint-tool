@@ -1,4 +1,4 @@
-use crate::plugins::manager::{PluginManager, detect_sdk_version, get_bundled_sdk_version};
+use crate::plugins::manager::{detect_sdk_version, get_bundled_sdk_version, PluginManager};
 use crate::plugins::models::PluginInstance;
 use tauri::{AppHandle, Manager};
 
@@ -8,7 +8,7 @@ pub fn fetch_installed_plugins(app: AppHandle) -> Result<Vec<PluginInstance>, St
         .path()
         .app_data_dir()
         .map_err(|e| format!("Could not find app_data_dir: {}", e))?;
-        
+
     let resource_dir = app.path().resource_dir().ok();
 
     let manager = PluginManager::new(&app_data_dir, resource_dir);
@@ -29,8 +29,8 @@ pub fn parse_plugin_at_dir(p: &std::path::Path) -> Result<PluginInstance, String
     let content = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("Failed to read manifest.json at {}: {}", manifest_path.display(), e))?;
 
-    let manifest: crate::plugins::models::PluginManifest = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
+    let manifest: crate::plugins::models::PluginManifest =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
 
     let id = p.file_name().unwrap_or_default().to_string_lossy().to_string();
     let sdk_version = detect_sdk_version(p);
@@ -50,12 +50,7 @@ pub fn scan_custom_plugin(path: String) -> Result<PluginInstance, String> {
     parse_plugin_at_dir(p)
 }
 
-fn scan_dir_for_plugins(
-    dir: &std::path::Path,
-    depth: usize,
-    max_depth: usize,
-    results: &mut Vec<PluginInstance>,
-) {
+fn scan_dir_for_plugins(dir: &std::path::Path, depth: usize, max_depth: usize, results: &mut Vec<PluginInstance>) {
     if depth > max_depth {
         return;
     }
@@ -129,7 +124,9 @@ pub fn scan_custom_plugins(path: String) -> Result<Vec<PluginInstance>, String> 
     scan_dir_for_plugins(p, 1, 3, &mut plugins);
 
     if plugins.is_empty() {
-        return Err("No valid plugins (manifest.json) found in the selected directory or its subdirectories.".to_string());
+        return Err(
+            "No valid plugins (manifest.json) found in the selected directory or its subdirectories.".to_string(),
+        );
     }
 
     Ok(plugins)
@@ -145,11 +142,11 @@ pub fn scaffold_plugin(app: AppHandle, plugin_name: String, target_dir: String) 
         return Err(format!("Directory already exists: {}", plugin_dir.display()));
     }
 
-    std::fs::create_dir_all(&plugin_dir)
-        .map_err(|e| format!("Failed to create plugin directory: {}", e))?;
+    std::fs::create_dir_all(&plugin_dir).map_err(|e| format!("Failed to create plugin directory: {}", e))?;
 
     // Generate manifest.json
-    let manifest_json = format!(r#"{{
+    let manifest_json = format!(
+        r#"{{
     "name": "{}",
     "version": "1.0.0",
     "description": "",
@@ -163,26 +160,27 @@ pub fn scaffold_plugin(app: AppHandle, plugin_name: String, target_dir: String) 
         {{"name": "count", "label": "Number of Points", "type": "integer", "default": 5}},
         {{"name": "spacing", "label": "Spacing (m)", "type": "float", "default": 1.0}}
     ]
-}}"#, plugin_name);
+}}"#,
+        plugin_name
+    );
 
     std::fs::write(plugin_dir.join("manifest.json"), &manifest_json)
         .map_err(|e| format!("Failed to write manifest.json: {}", e))?;
 
     // Generate main.py
-    let main_py = format!(r#""""\n{} Plugin\n"""\nimport sys\nimport os\nimport math\n\nsys.path.append(os.path.dirname(__file__))\nfrom wpt_plugin.core import WaypointGenerator\nfrom wpt_plugin.geometry import Point\n\n\nclass {}Generator(WaypointGenerator):\n    def generate(self, context):\n        # Get start point as an object\n        start = self.get_interaction_point(context, "start_point")\n        if not start:\n            return []\n\n        count = int(self.get_property(context, "count", default=5))\n        spacing = float(self.get_property(context, "spacing", default=1.0))\n\n        waypoints = []\n        for i in range(count):\n            # Use geometry helper or to_world if needed\n            wp_pt = Point(i * spacing, 0).to_world(start.x, start.y, start.yaw)\n            waypoints.append(self.make_waypoint(wp_pt.x, wp_pt.y, wp_pt.yaw))\n\n        self.log(f"Generated {{len(waypoints)}} waypoints.")\n        return waypoints\n\n\nif __name__ == "__main__":\n    {}Generator().run_from_stdin()\n"#,
+    let main_py = format!(
+        r#""""\n{} Plugin\n"""\nimport sys\nimport os\nimport math\n\nsys.path.append(os.path.dirname(__file__))\nfrom wpt_plugin.core import WaypointGenerator\nfrom wpt_plugin.geometry import Point\n\n\nclass {}Generator(WaypointGenerator):\n    def generate(self, context):\n        # Get start point as an object\n        start = self.get_interaction_point(context, "start_point")\n        if not start:\n            return []\n\n        count = int(self.get_property(context, "count", default=5))\n        spacing = float(self.get_property(context, "spacing", default=1.0))\n\n        waypoints = []\n        for i in range(count):\n            # Use geometry helper or to_world if needed\n            wp_pt = Point(i * spacing, 0).to_world(start.x, start.y, start.yaw)\n            waypoints.append(self.make_waypoint(wp_pt.x, wp_pt.y, wp_pt.yaw))\n\n        self.log(f"Generated {{len(waypoints)}} waypoints.")\n        return waypoints\n\n\nif __name__ == "__main__":\n    {}Generator().run_from_stdin()\n"#,
         plugin_name,
         plugin_name.replace(" ", "").replace("-", "").replace("_", ""),
         plugin_name.replace(" ", "").replace("-", "").replace("_", ""),
     );
 
-    std::fs::write(plugin_dir.join("main.py"), &main_py)
-        .map_err(|e| format!("Failed to write main.py: {}", e))?;
+    std::fs::write(plugin_dir.join("main.py"), &main_py).map_err(|e| format!("Failed to write main.py: {}", e))?;
 
     // Copy SDK directory from bundled resources
     let sdk_source = find_bundled_sdk_path(&app)?;
     let sdk_dest = plugin_dir.join("wpt_plugin");
-    copy_dir_recursive(&sdk_source, &sdk_dest)
-        .map_err(|e| format!("Failed to copy wpt_plugin SDK: {}", e))?;
+    copy_dir_recursive(&sdk_source, &sdk_dest).map_err(|e| format!("Failed to copy wpt_plugin SDK: {}", e))?;
 
     // Return the new plugin instance
     scan_custom_plugin(plugin_dir.to_string_lossy().to_string())
@@ -201,25 +199,23 @@ pub fn check_sdk_version(app: AppHandle) -> Result<String, String> {
 pub fn update_plugin_sdk(app: AppHandle, plugin_folder_path: String) -> Result<String, String> {
     let sdk_source = find_bundled_sdk_path(&app)?;
     let plugin_dir = std::path::Path::new(&plugin_folder_path);
-    
+
     // Remove old wpt_plugin.py if it exists (legacy)
     let old_sdk_file = plugin_dir.join("wpt_plugin.py");
     if old_sdk_file.exists() {
         let _ = std::fs::remove_file(old_sdk_file);
     }
-    
+
     // Copy new directory
     let sdk_dest = plugin_dir.join("wpt_plugin");
     if sdk_dest.exists() {
         std::fs::remove_dir_all(&sdk_dest).map_err(|e| format!("Failed to clear old SDK dir: {}", e))?;
     }
-    
-    copy_dir_recursive(&sdk_source, &sdk_dest)
-        .map_err(|e| format!("Failed to copy SDK: {}", e))?;
+
+    copy_dir_recursive(&sdk_source, &sdk_dest).map_err(|e| format!("Failed to copy SDK: {}", e))?;
 
     // Return the new version
-    detect_sdk_version(plugin_dir)
-        .ok_or_else(|| "SDK was written but version could not be read back.".to_string())
+    detect_sdk_version(plugin_dir).ok_or_else(|| "SDK was written but version could not be read back.".to_string())
 }
 
 /// Find the path to the bundled wpt_plugin package directory.
@@ -307,10 +303,7 @@ pub fn collect_python_library_paths(app: Option<&AppHandle>) -> Vec<std::path::P
     } else {
         // Fallback for tests / environment without AppHandle
         if let Ok(current_dir) = std::env::current_dir() {
-            for dev_dir in &[
-                current_dir.join("../python_sdk"),
-                current_dir.join("python_sdk"),
-            ] {
+            for dev_dir in &[current_dir.join("../python_sdk"), current_dir.join("python_sdk")] {
                 let resolved = dev_dir.canonicalize().unwrap_or_else(|_| dev_dir.clone());
                 if resolved.exists() && resolved.is_dir() {
                     plugins.extend(PluginManager::scan_plugins_in_dir(&resolved, true));
@@ -333,10 +326,7 @@ pub fn collect_python_library_paths(app: Option<&AppHandle>) -> Vec<std::path::P
             }
         }
     } else if let Ok(current_dir) = std::env::current_dir() {
-        for dev_path in &[
-            current_dir.join("../python_sdk"),
-            current_dir.join("python_sdk"),
-        ] {
+        for dev_path in &[current_dir.join("../python_sdk"), current_dir.join("python_sdk")] {
             let resolved = dev_path.canonicalize().unwrap_or_else(|_| dev_path.clone());
             if resolved.join("wpt_plugin").exists() && !paths.contains(&resolved) {
                 paths.push(resolved);
@@ -361,11 +351,15 @@ pub fn safe_log_snippet(s: &str, max_len: usize) -> String {
 pub fn validate_payload_temp_path(file_ref: &str) -> Result<std::path::PathBuf, String> {
     let path = std::path::Path::new(file_ref);
     if !path.exists() || !path.is_file() {
-        return Err(format!("Payload file does not exist or is not a regular file: {}", file_ref));
+        return Err(format!(
+            "Payload file does not exist or is not a regular file: {}",
+            file_ref
+        ));
     }
 
     // 1. Validate file name pattern: must start with 'wpt_out_' and end with '.json'
-    let file_name = path.file_name()
+    let file_name = path
+        .file_name()
         .and_then(|n| n.to_str())
         .ok_or_else(|| "Invalid file name in payload reference".to_string())?;
 
@@ -377,9 +371,11 @@ pub fn validate_payload_temp_path(file_ref: &str) -> Result<std::path::PathBuf, 
     }
 
     // 2. Validate directory boundary: must be located inside OS temp directory
-    let canonical_path = path.canonicalize()
+    let canonical_path = path
+        .canonicalize()
         .map_err(|e| format!("Failed to canonicalize payload path: {}", e))?;
-    let canonical_temp = std::env::temp_dir().canonicalize()
+    let canonical_temp = std::env::temp_dir()
+        .canonicalize()
         .map_err(|e| format!("Failed to canonicalize temp directory: {}", e))?;
 
     if !canonical_path.starts_with(&canonical_temp) {
@@ -404,7 +400,7 @@ pub fn run_plugin_sync(
     // セキュリティと拡張性、言語非依存性を重視し、「標準入出力ストリームを介したJSON通信」を採用しています。
     // プロセス間通信（IPC）にstdin/stdoutを用いることで、複雑なRPCライブラリを介さずとも
     // 開発者が使い慣れた言語で柔軟に拡張機能を作成できるよう設計されています。
-    
+
     if plugin_instance.manifest.plugin_type == "python" {
         if plugin_instance.manifest.executable.trim().is_empty() {
             return Err(format!(
@@ -414,8 +410,12 @@ pub fn run_plugin_sync(
         }
 
         use std::process::{Command, Stdio};
-        
-        let default_cmd = if cfg!(windows) { "python".to_string() } else { "python3".to_string() };
+
+        let default_cmd = if cfg!(windows) {
+            "python".to_string()
+        } else {
+            "python3".to_string()
+        };
         let py_cmd = match python_path {
             Some(p) if !p.trim().is_empty() => p.trim().to_string(),
             _ => default_cmd,
@@ -424,9 +424,15 @@ pub fn run_plugin_sync(
         // Construct clean safe PYTHONPATH containing all scanned python_library plugins
         let library_paths = collect_python_library_paths(app);
         let safe_python_path = build_safe_python_path(&library_paths);
-        
-        println!("[DEBUG/RUST] Executing plugin: {} with cmd: {}", plugin_instance.manifest.executable, py_cmd);
-        println!("[DEBUG/RUST] Using Context JSON: {}", safe_log_snippet(&context_json, 512));
+
+        println!(
+            "[DEBUG/RUST] Executing plugin: {} with cmd: {}",
+            plugin_instance.manifest.executable, py_cmd
+        );
+        println!(
+            "[DEBUG/RUST] Using Context JSON: {}",
+            safe_log_snippet(&context_json, 512)
+        );
         if !safe_python_path.is_empty() {
             println!("[DEBUG/RUST] Using safe PYTHONPATH: {}", safe_python_path);
         }
@@ -469,11 +475,13 @@ pub fn run_plugin_sync(
             Err(e) => return Err(format!("Failed to spawn python ({}): {}", py_cmd, e)),
         };
 
-        let mut context: serde_json::Value = serde_json::from_str(&context_json)
-            .map_err(|e| format!("Failed to parse context_json: {}", e))?;
+        let mut context: serde_json::Value =
+            serde_json::from_str(&context_json).map_err(|e| format!("Failed to parse context_json: {}", e))?;
 
         let needs = &plugin_instance.manifest.needs;
-        let needs_grid = needs.iter().any(|n| n == "occupancy_grid" || n == "occupancy_grid_in_region");
+        let needs_grid = needs
+            .iter()
+            .any(|n| n == "occupancy_grid" || n == "occupancy_grid_in_region");
 
         if needs_grid {
             if let Some(layers) = &map_layers {
@@ -487,8 +495,8 @@ pub fn run_plugin_sync(
             }
         }
 
-        let enriched_json = serde_json::to_string(&context)
-            .map_err(|e| format!("Failed to serialize context: {}", e))?;
+        let enriched_json =
+            serde_json::to_string(&context).map_err(|e| format!("Failed to serialize context: {}", e))?;
 
         let mut _in_temp_file = None;
         let final_stdin_bytes = if enriched_json.len() >= PAYLOAD_OFFLOAD_THRESHOLD_BYTES {
@@ -500,13 +508,19 @@ pub fn run_plugin_sync(
                 .map_err(|e| format!("Failed to create input temp file: {}", e))?;
 
             use std::io::Write;
-            temp_file.write_all(enriched_json.as_bytes())
+            temp_file
+                .write_all(enriched_json.as_bytes())
                 .map_err(|e| format!("Failed to write input temp file: {}", e))?;
-            temp_file.flush()
+            temp_file
+                .flush()
                 .map_err(|e| format!("Failed to flush input temp file: {}", e))?;
 
             let temp_path = temp_file.path().to_string_lossy().to_string();
-            println!("[DEBUG/RUST] Context size ({} bytes) exceeds threshold. Offloaded to temp file: {}", enriched_json.len(), temp_path);
+            println!(
+                "[DEBUG/RUST] Context size ({} bytes) exceeds threshold. Offloaded to temp file: {}",
+                enriched_json.len(),
+                temp_path
+            );
 
             let ref_obj = serde_json::json!({
                 PAYLOAD_FILE_REF_KEY: temp_path
@@ -517,12 +531,15 @@ pub fn run_plugin_sync(
             enriched_json.into_bytes()
         };
 
-        let stdin_handle = child.stdin.take().map(|mut stdin| std::thread::spawn(move || {
+        let stdin_handle = child.stdin.take().map(|mut stdin| {
+            std::thread::spawn(move || {
                 use std::io::Write;
                 let _ = stdin.write_all(&final_stdin_bytes);
-            }));
+            })
+        });
 
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| format!("Failed to wait for python plugin: {}", e))?;
 
         if let Some(handle) = stdin_handle {
@@ -534,23 +551,35 @@ pub fn run_plugin_sync(
 
         if !output.status.success() {
             let err_str = String::from_utf8_lossy(&output.stderr);
-            println!("[DEBUG/RUST] Execution Failed stderr:\n{}", safe_log_snippet(&err_str, 1024));
+            println!(
+                "[DEBUG/RUST] Execution Failed stderr:\n{}",
+                safe_log_snippet(&err_str, 1024)
+            );
             return Err(format!("Plugin execution failed:\n{}", err_str));
         }
 
         let stdout_str = String::from_utf8_lossy(&output.stdout);
         let stderr_str = String::from_utf8_lossy(&output.stderr);
-        println!("[DEBUG/RUST] Execution Success stdout: {}", safe_log_snippet(&stdout_str, 512));
+        println!(
+            "[DEBUG/RUST] Execution Success stdout: {}",
+            safe_log_snippet(&stdout_str, 512)
+        );
         if !stderr_str.trim().is_empty() {
-            println!("[DEBUG/RUST] Execution Success stderr: {}", safe_log_snippet(&stderr_str, 512));
+            println!(
+                "[DEBUG/RUST] Execution Success stderr: {}",
+                safe_log_snippet(&stderr_str, 512)
+            );
         }
-        
+
         let trimmed_stdout = stdout_str.trim();
-        let parsed_initial: serde_json::Value = serde_json::from_str(trimmed_stdout)
-            .map_err(|e| {
-                println!("[DEBUG/RUST] JSON Parse Error: {}", e);
-                format!("Failed to parse plugin output as JSON: {}\nOutput was:\n{}", e, safe_log_snippet(trimmed_stdout, 1024))
-            })?;
+        let parsed_initial: serde_json::Value = serde_json::from_str(trimmed_stdout).map_err(|e| {
+            println!("[DEBUG/RUST] JSON Parse Error: {}", e);
+            format!(
+                "Failed to parse plugin output as JSON: {}\nOutput was:\n{}",
+                e,
+                safe_log_snippet(trimmed_stdout, 1024)
+            )
+        })?;
 
         // Check if stdout returned a temp file reference payload
         let result = if let Some(file_ref) = parsed_initial.get(PAYLOAD_FILE_REF_KEY).and_then(|v| v.as_str()) {
@@ -570,13 +599,9 @@ pub fn run_plugin_sync(
 
         Ok(result)
     } else if plugin_instance.manifest.plugin_type == "wasm" {
-        let wasm_file = std::path::Path::new(&plugin_instance.folder_path)
-            .join(&plugin_instance.manifest.executable);
-            
-        crate::plugins::wasm_runner::run_wasm_plugin(
-            wasm_file.to_str().unwrap(),
-            &context_json
-        )
+        let wasm_file = std::path::Path::new(&plugin_instance.folder_path).join(&plugin_instance.manifest.executable);
+
+        crate::plugins::wasm_runner::run_wasm_plugin(wasm_file.to_str().unwrap(), &context_json)
     } else {
         Err("Unsupported plugin type. Only 'python' and 'wasm' are currently supported.".to_string())
     }
@@ -601,12 +626,16 @@ pub async fn run_plugin(
 pub fn get_python_environments() -> Vec<String> {
     let mut envs = Vec::new();
 
-    let std_cmds = if cfg!(windows) { vec!["python", "python3"] } else { vec!["python3", "python"] };
-    
+    let std_cmds = if cfg!(windows) {
+        vec!["python", "python3"]
+    } else {
+        vec!["python3", "python"]
+    };
+
     for cmd in std_cmds {
         let which_cmd = if cfg!(windows) { "where" } else { "which" };
         let args = if cfg!(windows) { vec![cmd] } else { vec!["-a", cmd] };
-        
+
         if let Ok(output) = std::process::Command::new(which_cmd).args(&args).output() {
             if output.status.success() {
                 let stdout = String::from_utf8_lossy(&output.stdout);
@@ -621,13 +650,18 @@ pub fn get_python_environments() -> Vec<String> {
     }
 
     // Check pyenv locations
-    let home_dir = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")).unwrap_or_default();
+    let home_dir = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_default();
     if !home_dir.is_empty() {
         let pyenv_versions = std::path::Path::new(&home_dir).join(".pyenv").join("versions");
         if pyenv_versions.exists() {
             if let Ok(entries) = std::fs::read_dir(pyenv_versions) {
                 for entry in entries.flatten() {
-                    let bin_path = entry.path().join("bin").join(if cfg!(windows) { "python.exe" } else { "python" });
+                    let bin_path = entry
+                        .path()
+                        .join("bin")
+                        .join(if cfg!(windows) { "python.exe" } else { "python" });
                     if bin_path.exists() {
                         let path_str = bin_path.to_string_lossy().to_string();
                         if !envs.contains(&path_str) {
@@ -652,8 +686,6 @@ pub fn get_python_environments() -> Vec<String> {
     envs
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -665,7 +697,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let plugin_dir = tmp.path().join("my_custom_p");
         fs::create_dir_all(&plugin_dir).unwrap();
-        
+
         let manifest = r#"{
             "name": "Custom",
             "type": "python",
@@ -688,7 +720,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let plugin_dir = tmp.path().join("no_manifest");
         fs::create_dir_all(&plugin_dir).unwrap();
-        
+
         let res = scan_custom_plugin(plugin_dir.to_string_lossy().to_string());
         assert!(res.is_err());
         assert!(res.unwrap_err().contains("manifest.json not found"));
@@ -725,12 +757,20 @@ mod tests {
         // plugin A
         let p_a = root_dir.join("plugin_a");
         fs::create_dir_all(&p_a).unwrap();
-        fs::write(p_a.join("manifest.json"), r#"{"name": "Plugin A", "type": "python", "executable": "a.py"}"#).unwrap();
+        fs::write(
+            p_a.join("manifest.json"),
+            r#"{"name": "Plugin A", "type": "python", "executable": "a.py"}"#,
+        )
+        .unwrap();
 
         // plugin B
         let p_b = root_dir.join("plugin_b");
         fs::create_dir_all(&p_b).unwrap();
-        fs::write(p_b.join("manifest.json"), r#"{"name": "Plugin B", "type": "python", "executable": "b.py"}"#).unwrap();
+        fs::write(
+            p_b.join("manifest.json"),
+            r#"{"name": "Plugin B", "type": "python", "executable": "b.py"}"#,
+        )
+        .unwrap();
 
         // directory without manifest
         let other = root_dir.join("not_a_plugin");
@@ -754,17 +794,29 @@ mod tests {
         // category/plugin_c
         let p_c = root_dir.join("category").join("plugin_c");
         fs::create_dir_all(&p_c).unwrap();
-        fs::write(p_c.join("manifest.json"), r#"{"name": "Plugin C", "type": "python", "executable": "c.py"}"#).unwrap();
+        fs::write(
+            p_c.join("manifest.json"),
+            r#"{"name": "Plugin C", "type": "python", "executable": "c.py"}"#,
+        )
+        .unwrap();
 
         // .venv/ignored_plugin should be skipped
         let ignored = root_dir.join(".venv").join("ignored_plugin");
         fs::create_dir_all(&ignored).unwrap();
-        fs::write(ignored.join("manifest.json"), r#"{"name": "Ignored", "type": "python", "executable": "i.py"}"#).unwrap();
+        fs::write(
+            ignored.join("manifest.json"),
+            r#"{"name": "Ignored", "type": "python", "executable": "i.py"}"#,
+        )
+        .unwrap();
 
         // node_modules/ignored_plugin should be skipped
         let nm = root_dir.join("node_modules").join("ignored_npm");
         fs::create_dir_all(&nm).unwrap();
-        fs::write(nm.join("manifest.json"), r#"{"name": "Ignored NPM", "type": "python", "executable": "i.py"}"#).unwrap();
+        fs::write(
+            nm.join("manifest.json"),
+            r#"{"name": "Ignored NPM", "type": "python", "executable": "i.py"}"#,
+        )
+        .unwrap();
 
         let res = scan_custom_plugins(root_dir.to_string_lossy().to_string());
         assert!(res.is_ok());
@@ -1027,6 +1079,8 @@ print(json.dumps({"__wpt_payload_ref__": temp_path}))
         let _ = fs::remove_file(&invalid_file);
 
         assert!(res.is_err());
-        assert!(res.unwrap_err().contains("Security Error: Payload file name does not match expected pattern"));
+        assert!(res
+            .unwrap_err()
+            .contains("Security Error: Payload file name does not match expected pattern"));
     }
 }

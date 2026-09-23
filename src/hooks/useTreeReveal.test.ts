@@ -24,7 +24,7 @@ describe('useTreeReveal', () => {
         treeType: 'node',
         getAncestorIds,
         setExpanded,
-      })
+      }),
     );
 
     expect(getAncestorIds).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('useTreeReveal', () => {
         setExpanded,
         scrollDelayMs: 50,
         flashDurationMs: 1000,
-      })
+      }),
     );
 
     expect(getAncestorIds).toHaveBeenCalledWith('wp-target');

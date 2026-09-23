@@ -57,50 +57,52 @@ describe('TopMenu', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: [],
-      selectedAnnotationIds: [],
-      showPaths: true,
-      showGrid: true,
-      isDirty: false,
-      currentProjectPath: null,
-      isLeftPanelOpen: true,
-      isRightPanelOpen: true,
-      showProperties: true,
-      historyPast: [],
-      historyFuture: [],
-      undo: mockUndo,
-      redo: mockRedo,
-      loadProject: mockLoadProject,
-      saveProject: mockSaveProject,
-      saveProjectAs: mockSaveProjectAs,
-      setExportModalOpen: mockSetExportModalOpen,
-      setSettingsModalOpen: mockSetSettingsModalOpen,
-      setShortcutsModalOpen: vi.fn(),
-      setWelcomeModalOpen: vi.fn(),
-      setIsInitialLaunch: vi.fn(),
-      setShowPaths: mockSetShowPaths,
-      setShowGrid: mockSetShowGrid,
-      selectAllNodes: mockSelectAllNodes,
-      removeNodes: mockRemoveNodes,
-      removeAnnotationObjects: mockRemoveAnnotationObjects,
-      setLeftPanelOpen: vi.fn(),
-      setRightPanelOpen: vi.fn(),
-      setShowProperties: vi.fn(),
-      resetWindowLayout: vi.fn(),
-      triggerFitToMaps: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: [],
+        selectedAnnotationIds: [],
+        showPaths: true,
+        showGrid: true,
+        isDirty: false,
+        currentProjectPath: null,
+        isLeftPanelOpen: true,
+        isRightPanelOpen: true,
+        showProperties: true,
+        historyPast: [],
+        historyFuture: [],
+        undo: mockUndo,
+        redo: mockRedo,
+        loadProject: mockLoadProject,
+        saveProject: mockSaveProject,
+        saveProjectAs: mockSaveProjectAs,
+        setExportModalOpen: mockSetExportModalOpen,
+        setSettingsModalOpen: mockSetSettingsModalOpen,
+        setShortcutsModalOpen: vi.fn(),
+        setWelcomeModalOpen: vi.fn(),
+        setIsInitialLaunch: vi.fn(),
+        setShowPaths: mockSetShowPaths,
+        setShowGrid: mockSetShowGrid,
+        selectAllNodes: mockSelectAllNodes,
+        removeNodes: mockRemoveNodes,
+        removeAnnotationObjects: mockRemoveAnnotationObjects,
+        setLeftPanelOpen: vi.fn(),
+        setRightPanelOpen: vi.fn(),
+        setShowProperties: vi.fn(),
+        resetWindowLayout: vi.fn(),
+        triggerFitToMaps: vi.fn(),
+      }),
+    );
 
     // Mock getState for non-hook access (handleExit)
     (useAppStore.getState as any) = vi.fn().mockReturnValue({
-        isDirty: false,
-        setIsDirty: vi.fn(),
-        resetProject: vi.fn(),
+      isDirty: false,
+      setIsDirty: vi.fn(),
+      resetProject: vi.fn(),
     });
-    
+
     (useAppStore.setState as any) = vi.fn().mockImplementation((updates) => {
-        if (updates.showPaths !== undefined) mockSetShowPaths();
-        if (updates.showGrid !== undefined) mockSetShowGrid();
+      if (updates.showPaths !== undefined) mockSetShowPaths();
+      if (updates.showGrid !== undefined) mockSetShowGrid();
     });
   });
 
@@ -157,8 +159,8 @@ describe('TopMenu', () => {
 
   it('handles dirty state exit confirmation', async () => {
     (useAppStore.getState as any).mockReturnValue({
-        isDirty: true,
-        setIsDirty: vi.fn(),
+      isDirty: true,
+      setIsDirty: vi.fn(),
     });
     (DialogAPI.ask as any).mockResolvedValue(false); // User cancels exit
 
@@ -175,14 +177,15 @@ describe('TopMenu', () => {
   it('toggles View options', () => {
     render(<TopMenu />);
     fireEvent.click(screen.getByText('View'));
-    
+
     const pathsBtn = screen.getByText(/Show Paths/i);
     fireEvent.click(pathsBtn);
     expect(mockSetShowPaths).toHaveBeenCalled();
   });
 
   it('handles "Edit" menu actions', async () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
         selectedNodeIds: ['n1'],
         removeNodes: mockRemoveNodes,
         selectAllNodes: mockSelectAllNodes,
@@ -190,45 +193,54 @@ describe('TopMenu', () => {
         historyFuture: [],
         undo: mockUndo,
         redo: mockRedo,
-    }));
+      }),
+    );
 
     render(<TopMenu />);
-    
+
     // Select All
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await waitFor(() => {
-      expect(screen.getByText('Select All')).toBeInTheDocument();
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText('Select All')).toBeInTheDocument();
+      },
+      { timeout: 2000 },
+    );
     fireEvent.click(screen.getByText('Select All'));
     expect(mockSelectAllNodes).toHaveBeenCalled();
 
     // Delete Selected - Menu might close after click, so open it again
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await waitFor(() => {
-      expect(screen.getByText('Delete Selected')).toBeInTheDocument();
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText('Delete Selected')).toBeInTheDocument();
+      },
+      { timeout: 2000 },
+    );
     fireEvent.click(screen.getByText('Delete Selected'));
     expect(mockRemoveNodes).toHaveBeenCalledWith(['n1']);
   });
 
   it('triggers removeAnnotationObjects on Delete Selected when annotations are selected', async () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: [],
-      selectedAnnotationIds: ['annot-1'],
-      showPaths: true,
-      showGrid: true,
-      isDirty: false,
-      currentProjectPath: null,
-      isLeftPanelOpen: true,
-      isRightPanelOpen: true,
-      showProperties: true,
-      historyPast: [],
-      historyFuture: [],
-      undo: mockUndo,
-      redo: mockRedo,
-      removeNodes: mockRemoveNodes,
-      removeAnnotationObjects: mockRemoveAnnotationObjects,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: [],
+        selectedAnnotationIds: ['annot-1'],
+        showPaths: true,
+        showGrid: true,
+        isDirty: false,
+        currentProjectPath: null,
+        isLeftPanelOpen: true,
+        isRightPanelOpen: true,
+        showProperties: true,
+        historyPast: [],
+        historyFuture: [],
+        undo: mockUndo,
+        redo: mockRedo,
+        removeNodes: mockRemoveNodes,
+        removeAnnotationObjects: mockRemoveAnnotationObjects,
+      }),
+    );
 
     render(<TopMenu />);
 
@@ -240,10 +252,9 @@ describe('TopMenu', () => {
     expect(mockRemoveAnnotationObjects).toHaveBeenCalledWith(['annot-1']);
   });
 
-
   it('switches menu on hover when one is open', () => {
     render(<TopMenu />);
-    
+
     const fileBtn = screen.getByText('File');
     const editBtn = screen.getByText('Edit');
 
@@ -263,20 +274,22 @@ describe('TopMenu', () => {
     });
 
     it('displays extracted project name when currentProjectPath is set', () => {
-      (useAppStore as any).mockImplementation((selector: any) => selector({
-        selectedNodeIds: [],
-        showPaths: true,
-        showGrid: true,
-        isDirty: false,
-        currentProjectPath: '/path/to/my_route_project.wptroj',
-        isLeftPanelOpen: true,
-        isRightPanelOpen: true,
-        showProperties: true,
-        historyPast: [],
-        historyFuture: [],
-        undo: mockUndo,
-        redo: mockRedo,
-      }));
+      (useAppStore as any).mockImplementation((selector: any) =>
+        selector({
+          selectedNodeIds: [],
+          showPaths: true,
+          showGrid: true,
+          isDirty: false,
+          currentProjectPath: '/path/to/my_route_project.wptroj',
+          isLeftPanelOpen: true,
+          isRightPanelOpen: true,
+          showProperties: true,
+          historyPast: [],
+          historyFuture: [],
+          undo: mockUndo,
+          redo: mockRedo,
+        }),
+      );
 
       render(<TopMenu />);
       expect(screen.getByText('my_route_project')).toBeInTheDocument();
@@ -284,20 +297,22 @@ describe('TopMenu', () => {
     });
 
     it('displays dirty indicator when isDirty is true', () => {
-      (useAppStore as any).mockImplementation((selector: any) => selector({
-        selectedNodeIds: [],
-        showPaths: true,
-        showGrid: true,
-        isDirty: true,
-        currentProjectPath: '/path/to/my_route_project.wptroj',
-        isLeftPanelOpen: true,
-        isRightPanelOpen: true,
-        showProperties: true,
-        historyPast: [],
-        historyFuture: [],
-        undo: mockUndo,
-        redo: mockRedo,
-      }));
+      (useAppStore as any).mockImplementation((selector: any) =>
+        selector({
+          selectedNodeIds: [],
+          showPaths: true,
+          showGrid: true,
+          isDirty: true,
+          currentProjectPath: '/path/to/my_route_project.wptroj',
+          isLeftPanelOpen: true,
+          isRightPanelOpen: true,
+          showProperties: true,
+          historyPast: [],
+          historyFuture: [],
+          undo: mockUndo,
+          redo: mockRedo,
+        }),
+      );
 
       render(<TopMenu />);
       expect(screen.getByText('my_route_project')).toBeInTheDocument();
@@ -305,4 +320,3 @@ describe('TopMenu', () => {
     });
   });
 });
-

@@ -1,6 +1,6 @@
-use serde::Deserialize;
-use base64::{engine::general_purpose, Engine as _};
 use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
+use base64::{engine::general_purpose, Engine as _};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct BlendPreviewLayer {
@@ -22,7 +22,8 @@ pub struct BlendPreviewResult {
 }
 
 pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewResult, String> {
-    let mut visible: Vec<_> = layers.into_iter()
+    let mut visible: Vec<_> = layers
+        .into_iter()
         .filter(|l| l.visible && l.image_base64.is_some())
         .collect();
     visible.sort_by_key(|l| l.z_index);
@@ -36,11 +37,13 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
         let b64 = layer.image_base64.as_ref().unwrap();
         let b64_data = if b64.starts_with("data:image") {
             b64.split(',').nth(1).unwrap_or(b64)
-        } else { b64 };
-        let bytes = general_purpose::STANDARD.decode(b64_data)
+        } else {
+            b64
+        };
+        let bytes = general_purpose::STANDARD
+            .decode(b64_data)
             .map_err(|e| format!("Base64 decode error: {}", e))?;
-        let img = image::load_from_memory(&bytes)
-            .map_err(|e| format!("Image load error: {}", e))?;
+        let img = image::load_from_memory(&bytes).map_err(|e| format!("Image load error: {}", e))?;
         decoded.push((layer, img));
     }
 
@@ -52,11 +55,26 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
 
     for (layer, img) in &decoded {
         let info = layer.info.as_ref();
-        let l_res = info.and_then(|i| i.get("resolution")).and_then(|v| v.as_f64()).unwrap_or(0.05);
+        let l_res = info
+            .and_then(|i| i.get("resolution"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.05);
         let l_orig = info.and_then(|i| i.get("origin")).and_then(|v| v.as_array());
-        let l_ox = l_orig.as_ref().and_then(|a| a.first()).and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let l_oy = l_orig.as_ref().and_then(|a| a.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let l_oyaw = l_orig.as_ref().and_then(|a| a.get(2)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let l_ox = l_orig
+            .as_ref()
+            .and_then(|a| a.first())
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let l_oy = l_orig
+            .as_ref()
+            .and_then(|a| a.get(1))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let l_oyaw = l_orig
+            .as_ref()
+            .and_then(|a| a.get(2))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
 
         let w_meters = img.width() as f64 * l_res;
         let h_meters = img.height() as f64 * l_res;
@@ -81,19 +99,22 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
         } else {
             let cos_yaw = l_oyaw.cos();
             let sin_yaw = l_oyaw.sin();
-            let corners = [
-                (0.0, 0.0),
-                (w_meters, 0.0),
-                (w_meters, h_meters),
-                (0.0, h_meters),
-            ];
+            let corners = [(0.0, 0.0), (w_meters, 0.0), (w_meters, h_meters), (0.0, h_meters)];
             for (cx, cy) in corners {
                 let wx = l_ox + cx * cos_yaw - cy * sin_yaw;
                 let wy = l_oy + cx * sin_yaw + cy * cos_yaw;
-                if wx < min_x { min_x = wx; }
-                if wy < min_y { min_y = wy; }
-                if wx > max_x { max_x = wx; }
-                if wy > max_y { max_y = wy; }
+                if wx < min_x {
+                    min_x = wx;
+                }
+                if wy < min_y {
+                    min_y = wy;
+                }
+                if wx > max_x {
+                    max_x = wx;
+                }
+                if wy > max_y {
+                    max_y = wy;
+                }
             }
         }
     }
@@ -108,11 +129,26 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
     let mut layer_inputs = Vec::new();
     for (layer, img) in &decoded {
         let info = layer.info.as_ref();
-        let l_res = info.and_then(|i| i.get("resolution")).and_then(|v| v.as_f64()).unwrap_or(0.05);
+        let l_res = info
+            .and_then(|i| i.get("resolution"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.05);
         let l_orig = info.and_then(|i| i.get("origin")).and_then(|v| v.as_array());
-        let l_ox = l_orig.as_ref().and_then(|a| a.first()).and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let l_oy = l_orig.as_ref().and_then(|a| a.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let l_oyaw = l_orig.as_ref().and_then(|a| a.get(2)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let l_ox = l_orig
+            .as_ref()
+            .and_then(|a| a.first())
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let l_oy = l_orig
+            .as_ref()
+            .and_then(|a| a.get(1))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let l_oyaw = l_orig
+            .as_ref()
+            .and_then(|a| a.get(2))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
 
         layer_inputs.push(LayerInput {
             id: &layer.id,

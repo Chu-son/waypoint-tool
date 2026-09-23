@@ -1,17 +1,9 @@
-import {
-  MousePointer2,
-  Hand,
-  Download,
-  Upload,
-  Settings,
-  Crop,
-  Ruler,
-} from "lucide-react";
-import { useAppStore } from "../../stores/appStore";
-import { Panel } from "./common/Panel";
-import { Button } from "./common/Button";
-import { FieldLabel } from "./common/FieldLabel";
-import { cn } from "../../utils/cn";
+import { MousePointer2, Hand, Download, Upload, Settings, Crop, Ruler } from 'lucide-react';
+import { useAppStore } from '../../stores/appStore';
+import { Panel } from './common/Panel';
+import { Button } from './common/Button';
+import { FieldLabel } from './common/FieldLabel';
+import { cn } from '../../utils/cn';
 
 function ToolIconButton({
   isActive,
@@ -28,13 +20,11 @@ function ToolIconButton({
     <Button
       onClick={onClick}
       title={title}
-      variant={isActive ? "primary" : "icon"}
+      variant={isActive ? 'primary' : 'icon'}
       size="icon"
       className={cn(
-        "rounded-md transition-colors flex-shrink-0",
-        isActive
-          ? "bg-primary-base text-text-inverse border-primary-base shadow-xs"
-          : "hover:border-border-focus/60"
+        'rounded-md transition-colors flex-shrink-0',
+        isActive ? 'bg-primary-base text-text-inverse border-primary-base shadow-xs' : 'hover:border-border-focus/60',
       )}
     >
       {children}
@@ -64,10 +54,10 @@ export function ToolPanel() {
   };
 
   const allTools = [
-    { id: "select", icon: Hand, label: "Select (V)" },
-    { id: "add_point", icon: MousePointer2, label: "Add Waypoint (P)" },
-    { id: "measure", icon: Ruler, label: "Measure Distance (M)" },
-    { id: "add_export_region", icon: Crop, label: "Add Export Region" },
+    { id: 'select', icon: Hand, label: 'Select (V)' },
+    { id: 'add_point', icon: MousePointer2, label: 'Add Waypoint (P)' },
+    { id: 'measure', icon: Ruler, label: 'Measure Distance (M)' },
+    { id: 'add_export_region', icon: Crop, label: 'Add Export Region' },
   ] as const;
 
   const toolPanelConfig = isCustomUiMode ? customUiConfig?.layout?.toolPanel : undefined;
@@ -137,10 +127,7 @@ export function ToolPanel() {
               size="icon"
               className="rounded-md mt-1"
             >
-              <Settings
-                size={16}
-                className="text-text-muted hover:text-text-base transition-colors"
-              />
+              <Settings size={16} className="text-text-muted hover:text-text-base transition-colors" />
             </Button>
           )}
         </div>

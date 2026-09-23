@@ -1,9 +1,9 @@
-use image::RgbaImage;
+use super::blending::{apply_blend_cell, CellValue};
+use crate::plugins::models::{OccupancyGridData, PluginMapLayer};
 use base64::{engine::general_purpose, Engine as _};
 use flate2::{write::ZlibEncoder, Compression};
+use image::RgbaImage;
 use std::io::Write;
-use crate::plugins::models::{PluginMapLayer, OccupancyGridData};
-use super::blending::{apply_blend_cell, CellValue};
 
 #[derive(Debug, Clone)]
 pub struct LayerForBlend {
@@ -22,7 +22,10 @@ pub struct LayerForBlend {
 pub fn parse_layer_info(info: Option<&serde_json::Value>) -> Result<(f64, [f64; 3], bool, f64, f64), String> {
     let info = info.ok_or("Map layer has no info")?;
     let resolution = info.get("resolution").and_then(|v| v.as_f64()).unwrap_or(0.05);
-    let origin_arr = info.get("origin").and_then(|v| v.as_array()).ok_or("Map info missing origin")?;
+    let origin_arr = info
+        .get("origin")
+        .and_then(|v| v.as_array())
+        .ok_or("Map info missing origin")?;
     let ox = origin_arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0);
     let oy = origin_arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0);
     let oyaw = origin_arr.get(2).and_then(|v| v.as_f64()).unwrap_or(0.0);
@@ -33,24 +36,13 @@ pub fn parse_layer_info(info: Option<&serde_json::Value>) -> Result<(f64, [f64; 
     Ok((resolution, [ox, oy, oyaw], negate, occ_thresh, free_thresh))
 }
 
-pub fn world_to_pixel(
-    world_x: f64,
-    world_y: f64,
-    origin: [f64; 3],
-    resolution: f64,
-    img_height: u32,
-) -> (i32, i32) {
+pub fn world_to_pixel(world_x: f64, world_y: f64, origin: [f64; 3], resolution: f64, img_height: u32) -> (i32, i32) {
     let col = ((world_x - origin[0]) / resolution).round() as i32;
     let row = (img_height as f64 - 1.0 - (world_y - origin[1]) / resolution).round() as i32;
     (col, row)
 }
 
-pub fn evaluate_pixel(
-    pixel: [u8; 4],
-    negate: bool,
-    occ_thresh: f64,
-    free_thresh: f64,
-) -> CellValue {
+pub fn evaluate_pixel(pixel: [u8; 4], negate: bool, occ_thresh: f64, free_thresh: f64) -> CellValue {
     if pixel[3] < 128 {
         return CellValue::Unknown;
     }
@@ -62,11 +54,7 @@ pub fn evaluate_pixel(
     }
 
     let gray = gray_raw / 255.0;
-    let normalized = if negate {
-        gray
-    } else {
-        1.0 - gray
-    };
+    let normalized = if negate { gray } else { 1.0 - gray };
     if normalized >= occ_thresh {
         CellValue::Obstacle
     } else if normalized <= free_thresh {
@@ -76,9 +64,7 @@ pub fn evaluate_pixel(
     }
 }
 
-pub fn build_occupancy_grid_from_layers(
-    layers: &[&PluginMapLayer],
-) -> Result<OccupancyGridData, String> {
+pub fn build_occupancy_grid_from_layers(layers: &[&PluginMapLayer]) -> Result<OccupancyGridData, String> {
     if layers.is_empty() {
         return Err("No map layers provided".to_string());
     }
@@ -93,8 +79,12 @@ pub fn build_occupancy_grid_from_layers(
         if b64.trim().is_empty() {
             continue;
         }
-        let bytes = general_purpose::STANDARD.decode(b64).map_err(|e| format!("Base64 decode error: {}", e))?;
-        let img = image::load_from_memory(&bytes).map_err(|e| format!("Image load error: {}", e))?.to_rgba8();
+        let bytes = general_purpose::STANDARD
+            .decode(b64)
+            .map_err(|e| format!("Base64 decode error: {}", e))?;
+        let img = image::load_from_memory(&bytes)
+            .map_err(|e| format!("Image load error: {}", e))?
+            .to_rgba8();
 
         decoded_layers.push(LayerForBlend {
             id: String::new(),
@@ -181,8 +171,12 @@ pub fn build_occupancy_grid_from_layers(
     }
 
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::fast());
-    encoder.write_all(&data_raw).map_err(|e| format!("Compression failed: {}", e))?;
-    let compressed = encoder.finish().map_err(|e| format!("Compression finish failed: {}", e))?;
+    encoder
+        .write_all(&data_raw)
+        .map_err(|e| format!("Compression failed: {}", e))?;
+    let compressed = encoder
+        .finish()
+        .map_err(|e| format!("Compression finish failed: {}", e))?;
     let b64 = general_purpose::STANDARD.encode(&compressed);
 
     Ok(OccupancyGridData {

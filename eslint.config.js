@@ -67,7 +67,10 @@ export default tseslint.config(
         'warn',
         {
           patterns: [
-            { group: ['**/stores/**', '**/components/**'], message: 'utils/types must not depend on stores or components.' },
+            {
+              group: ['**/stores/**', '**/components/**'],
+              message: 'utils/types must not depend on stores or components.',
+            },
           ],
         },
       ],
@@ -81,7 +84,8 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'warn',
         {
-          selector: "CallExpression[callee.object.name='vi'][callee.property.name='mock'][arguments.0.value=/stores\\/appStore$/]",
+          selector:
+            "CallExpression[callee.object.name='vi'][callee.property.name='mock'][arguments.0.value=/stores\\/appStore$/]",
           message: 'Do not mock the app store in tests; reset the real store with resetAppStore() instead.',
         },
       ],

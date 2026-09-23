@@ -1,18 +1,18 @@
-import { Upload, Wand2 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useAppStore } from "../../stores/appStore";
-import { BackendAPI, DialogAPI } from "../../api";
-import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
-import { Button } from "./common/Button";
-import { Label } from "./common/Label";
-import { Input } from "./common/Input";
-import { Select } from "./common/Select";
-import { OptionCard } from "./common/OptionCard";
-import { FieldLabel } from "./common/FieldLabel";
-import { BrowseInput } from "./common/BrowseInput";
-import { AlertBox } from "./common/AlertBox";
-import { ExportTemplate, ImportFieldMapping } from "../../types/store";
-import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from "../../utils/importUtils";
+import { Upload, Wand2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useAppStore } from '../../stores/appStore';
+import { BackendAPI, DialogAPI } from '../../api';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from './common/Modal';
+import { Button } from './common/Button';
+import { Label } from './common/Label';
+import { Input } from './common/Input';
+import { Select } from './common/Select';
+import { OptionCard } from './common/OptionCard';
+import { FieldLabel } from './common/FieldLabel';
+import { BrowseInput } from './common/BrowseInput';
+import { AlertBox } from './common/AlertBox';
+import { ExportTemplate, ImportFieldMapping } from '../../types/store';
+import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from '../../utils/importUtils';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -25,16 +25,20 @@ type PreviewState = {
 } | null;
 
 const MAPPING_FIELDS: { key: keyof ImportFieldMapping; label: string; hint: string }[] = [
-  { key: "itemsPath", label: "Items Path", hint: "e.g. poses (leave empty if root is the array)" },
-  { key: "x", label: "X", hint: "e.g. x or position.x" },
-  { key: "y", label: "Y", hint: "e.g. y or position.y" },
-  { key: "z", label: "Z", hint: "e.g. z or position.z" },
-  { key: "yaw", label: "Yaw", hint: "leave empty to use quaternion fields instead" },
-  { key: "qx", label: "Quaternion X", hint: "used only when Yaw is empty" },
-  { key: "qy", label: "Quaternion Y", hint: "used only when Yaw is empty" },
-  { key: "qz", label: "Quaternion Z", hint: "used only when Yaw is empty" },
-  { key: "qw", label: "Quaternion W", hint: "used only when Yaw is empty" },
-  { key: "optionsPath", label: "Options Path", hint: "only needed if the template outputs per-waypoint custom properties (e.g. options); leave empty otherwise" },
+  { key: 'itemsPath', label: 'Items Path', hint: 'e.g. poses (leave empty if root is the array)' },
+  { key: 'x', label: 'X', hint: 'e.g. x or position.x' },
+  { key: 'y', label: 'Y', hint: 'e.g. y or position.y' },
+  { key: 'z', label: 'Z', hint: 'e.g. z or position.z' },
+  { key: 'yaw', label: 'Yaw', hint: 'leave empty to use quaternion fields instead' },
+  { key: 'qx', label: 'Quaternion X', hint: 'used only when Yaw is empty' },
+  { key: 'qy', label: 'Quaternion Y', hint: 'used only when Yaw is empty' },
+  { key: 'qz', label: 'Quaternion Z', hint: 'used only when Yaw is empty' },
+  { key: 'qw', label: 'Quaternion W', hint: 'used only when Yaw is empty' },
+  {
+    key: 'optionsPath',
+    label: 'Options Path',
+    hint: 'only needed if the template outputs per-waypoint custom properties (e.g. options); leave empty otherwise',
+  },
 ];
 
 export function ImportModal({ isOpen, onClose }: ImportModalProps) {
@@ -46,17 +50,14 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [filePath, setFilePath] = useState<string | null>(null);
-  const [formatId, setFormatId] = useState<string>("__default_yaml__");
+  const [formatId, setFormatId] = useState<string>('__default_yaml__');
   const [applyOptionsSchema, setApplyOptionsSchema] = useState(true);
   const [mapping, setMapping] = useState<ImportFieldMapping>(DEFAULT_IMPORT_MAPPING);
   const [mappingError, setMappingError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PreviewState>(null);
   const [isBusy, setIsBusy] = useState(false);
 
-  const selectedTemplate = useMemo(
-    () => exportTemplates.find((t) => t.id === formatId),
-    [exportTemplates, formatId],
-  );
+  const selectedTemplate = useMemo(() => exportTemplates.find((t) => t.id === formatId), [exportTemplates, formatId]);
   const isCustomTemplate = !!selectedTemplate;
 
   if (!isOpen) return null;
@@ -92,15 +93,15 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     const selected = await DialogAPI.open({
       multiple: false,
       defaultPath: lastDirectory || undefined,
-      filters: [{ name: "Waypoint File", extensions: ["yaml", "yml", "json"] }],
+      filters: [{ name: 'Waypoint File', extensions: ['yaml', 'yml', 'json'] }],
     });
     if (selected) {
-      const pathStr = typeof selected === "string" ? selected : (selected as any).path;
+      const pathStr = typeof selected === 'string' ? selected : (selected as any).path;
       if (!pathStr) return;
       setFilePath(pathStr);
       setPreview(null);
       if (lastDirectory !== pathStr) {
-        const lastSlash = Math.max(pathStr.lastIndexOf("/"), pathStr.lastIndexOf("\\"));
+        const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
         if (lastSlash > -1) setLastDirectory(pathStr.substring(0, lastSlash));
       }
     }
@@ -108,26 +109,22 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
 
   const runParse = async () => {
     if (!filePath) {
-      alert("Please select a file to import.");
+      alert('Please select a file to import.');
       return null;
     }
     try {
       setIsBusy(true);
       return await runWithLoading(
         {
-          message: "ウェイポイントファイルを解析中...",
+          message: 'ウェイポイントファイルを解析中...',
           detail: filePath ? filePath.split('/').pop() : undefined,
           blocking: true,
         },
         async () => {
           const raw = await BackendAPI.importWaypointsRaw(filePath);
-          const { nodes, errors } = buildWaypointsFromImport(
-            raw,
-            mapping,
-            applyOptionsSchema ? optionsSchema : null,
-          );
+          const { nodes, errors } = buildWaypointsFromImport(raw, mapping, applyOptionsSchema ? optionsSchema : null);
           return { nodes, errors };
-        }
+        },
       );
     } catch (err) {
       alert(`ファイルの解析に失敗しました。\nエラー詳細: ${String(err)}`);
@@ -151,7 +148,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
       result.nodes.forEach((node) => addNode(node));
     });
 
-    const errorSummary = result.errors.length > 0 ? `\n(${result.errors.length}件をスキップしました)` : "";
+    const errorSummary = result.errors.length > 0 ? `\n(${result.errors.length}件をスキップしました)` : '';
     alert(`${result.nodes.length}件のウェイポイントをインポートしました。${errorSummary}`);
     onClose();
   };
@@ -168,11 +165,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="space-y-3">
             <FieldLabel>Source File</FieldLabel>
-            <BrowseInput
-              value={filePath ?? ""}
-              placeholder="No file selected"
-              onBrowseClick={handleSelectFile}
-            />
+            <BrowseInput value={filePath ?? ''} placeholder="No file selected" onBrowseClick={handleSelectFile} />
           </div>
 
           <div className="space-y-3">
@@ -188,7 +181,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                 ))}
               {exportTemplates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name} (.{t.extension}) {t.scope === "local" ? "[Local]" : "[Global]"}
+                  {t.name} (.{t.extension}) {t.scope === 'local' ? '[Local]' : '[Global]'}
                 </option>
               ))}
             </Select>
@@ -218,11 +211,9 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
                   <div key={key} className="space-y-1">
                     <Label className="text-[11px] text-text-muted">{label}</Label>
                     <Input
-                      value={mapping[key] ?? ""}
+                      value={mapping[key] ?? ''}
                       placeholder={hint}
-                      onChange={(e) =>
-                        setMapping((prev) => ({ ...prev, [key]: e.target.value || undefined }))
-                      }
+                      onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value || undefined }))}
                     />
                   </div>
                 ))}
@@ -241,7 +232,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
 
           {preview && (
             <AlertBox
-              variant={preview.errors.length > 0 ? "warning" : "info"}
+              variant={preview.errors.length > 0 ? 'warning' : 'info'}
               title={`${preview.count} waypoint(s) ready to import`}
             >
               {preview.errors.length > 0 && (

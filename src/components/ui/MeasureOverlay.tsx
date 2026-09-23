@@ -93,7 +93,11 @@ export function MeasureOverlay() {
     }
   } else {
     const p1Label = p1.objectName ? `${p1.objectName}` : `(${p1.x.toFixed(2)}, ${p1.y.toFixed(2)})`;
-    const p2Label = measureEndPoint?.objectName ? `${measureEndPoint.objectName}` : measureEndPoint ? `(${measureEndPoint.x.toFixed(2)}, ${measureEndPoint.y.toFixed(2)})` : '';
+    const p2Label = measureEndPoint?.objectName
+      ? `${measureEndPoint.objectName}`
+      : measureEndPoint
+        ? `(${measureEndPoint.x.toFixed(2)}, ${measureEndPoint.y.toFixed(2)})`
+        : '';
     subtitle = isCompact ? undefined : `始点: ${p1Label} → 終点: ${p2Label}`;
   }
 
@@ -128,8 +132,12 @@ export function MeasureOverlay() {
       icon={<Ruler size={16} className="text-primary-base animate-pulse" />}
       title={
         isAltPressed
-          ? (isCompact ? '距離計測 [Alt吸着]' : '実寸距離計測 [Alt吸着]')
-          : (isCompact ? '距離計測' : '実寸距離計測 (Measure)')
+          ? isCompact
+            ? '距離計測 [Alt吸着]'
+            : '実寸距離計測 [Alt吸着]'
+          : isCompact
+            ? '距離計測'
+            : '実寸距離計測 (Measure)'
       }
       subtitle={subtitle}
       valueDisplay={distance !== null ? `${distance.toFixed(decimalPrecision)} m` : '--- m'}

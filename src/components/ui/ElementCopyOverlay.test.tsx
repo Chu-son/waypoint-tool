@@ -53,9 +53,7 @@ describe('ElementCopyOverlay', () => {
     fireEvent.click(confirmBtn);
 
     expect(mockUpdateNode).toHaveBeenCalledWith('node-2', expect.anything());
-    expect(mockSetElementCopyState).toHaveBeenCalledWith(
-      expect.objectContaining({ previewNodeId: null })
-    );
+    expect(mockSetElementCopyState).toHaveBeenCalledWith(expect.objectContaining({ previewNodeId: null }));
   });
 
   it('triggers clearElementCopyState when cancel button is clicked', () => {

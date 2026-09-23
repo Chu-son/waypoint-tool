@@ -22,7 +22,7 @@ describe('FloatingActionBanner', () => {
             onClick: handleAction,
           },
         ]}
-      />
+      />,
     );
 
     expect(screen.getByText('TEST MODE')).toBeInTheDocument();
@@ -46,7 +46,7 @@ describe('FloatingActionBanner', () => {
           { label: 'Cancel', variant: 'secondary', onClick: handleSecondary },
           { label: 'Delete', variant: 'danger', onClick: handleDanger },
         ]}
-      />
+      />,
     );
 
     const cancelBtn = screen.getByRole('button', { name: /Cancel/ });
@@ -60,10 +60,8 @@ describe('FloatingActionBanner', () => {
     render(
       <FloatingActionBanner
         title="PRIMARY ACTION"
-        actions={[
-          { label: 'Save', variant: 'primary', onClick: vi.fn() },
-        ]}
-      />
+        actions={[{ label: 'Save', variant: 'primary', onClick: vi.fn() }]}
+      />,
     );
 
     const saveBtn = screen.getByRole('button', { name: /Save/ });

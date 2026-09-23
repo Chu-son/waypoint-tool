@@ -185,5 +185,3 @@ describe('AnnotationTree', () => {
     expect(mockPasteMapElements).toHaveBeenCalledWith({ asGroup: false });
   });
 });
-
-

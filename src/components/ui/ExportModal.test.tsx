@@ -22,13 +22,11 @@ describe('ExportModal UI', () => {
   beforeEach(() => {
     useAppStore.setState({
       nodes: {
-        'wp1': { id: 'wp1', type: 'manual', transform: { x: 1, y: 2, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        wp1: { id: 'wp1', type: 'manual', transform: { x: 1, y: 2, qx: 0, qy: 0, qz: 0, qw: 1 } },
       },
       rootNodeIds: ['wp1'],
       selectedNodeIds: [],
-      exportRegions: [
-        { id: 'reg1', name: 'area_1', rect: { x: 0, y: 0, width: 10, height: 10 }, visible: true },
-      ],
+      exportRegions: [{ id: 'reg1', name: 'area_1', rect: { x: 0, y: 0, width: 10, height: 10 }, visible: true }],
       exportTemplates: [],
       defaultExportFormats: [
         { id: '__default_yaml__', name: 'YAML Document', extension: 'yaml', suffix: '_yaml', enabled: true },

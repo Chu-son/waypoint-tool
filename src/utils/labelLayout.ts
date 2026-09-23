@@ -57,19 +57,14 @@ export function computeLabelOffsets(
   candidates: LabelCandidate[],
   scale: number,
   style: TextStyle,
-  options: ComputeLabelOffsetsOptions = {}
+  options: ComputeLabelOffsetsOptions = {},
 ): Map<string, LabelLayout> {
-  const {
-    baseOffsetX = 15,
-    baseOffsetY = 15,
-    margin = 2,
-    maxAttempts = 20,
-  } = options;
+  const { baseOffsetX = 15, baseOffsetY = 15, margin = 2, maxAttempts = 20 } = options;
 
   const safeScale = Math.max(scale, 0.001);
   const result = new Map<string, LabelLayout>();
 
-  const items = candidates.map(candidate => {
+  const items = candidates.map((candidate) => {
     const { width, height } = measureLabelLines(candidate.lines, style);
     const sx = candidate.worldX * safeScale;
     const sy = -candidate.worldY * safeScale;
@@ -79,7 +74,7 @@ export function computeLabelOffsets(
     return { id: candidate.id, sx, sy, width, height, left, top };
   });
 
-  items.sort((a, b) => (a.top - b.top) || (a.left - b.left));
+  items.sort((a, b) => a.top - b.top || a.left - b.left);
 
   const placed: LabelRect[] = [];
 
@@ -87,7 +82,7 @@ export function computeLabelOffsets(
     let rect: LabelRect = { left: item.left, top: item.top, width: item.width, height: item.height };
     let attempts = 0;
     while (attempts < maxAttempts) {
-      const collision = placed.find(p => rectsIntersect(rect, p, margin));
+      const collision = placed.find((p) => rectsIntersect(rect, p, margin));
       if (!collision) break;
       rect = { ...rect, top: collision.top + collision.height + margin };
       attempts++;

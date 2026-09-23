@@ -1,7 +1,7 @@
-import React from "react";
-import { Label } from "../common/Label";
-import { NumericInput } from "../NumericInput";
-import { cn } from "../../../utils/cn";
+import React from 'react';
+import { Label } from '../common/Label';
+import { NumericInput } from '../NumericInput';
+import { cn } from '../../../utils/cn';
 
 interface TransformFieldProps {
   label: string;
@@ -10,7 +10,7 @@ interface TransformFieldProps {
   precision: number;
   placeholder?: string;
   step?: string;
-  variant?: "world" | "anchor";
+  variant?: 'world' | 'anchor';
   isCopying?: boolean;
   onContextMenu?: (e: React.MouseEvent) => void;
   onChange: (value: number) => void;
@@ -26,7 +26,7 @@ export function TransformField({
   precision,
   placeholder,
   step,
-  variant = "world",
+  variant = 'world',
   isCopying = false,
   onContextMenu,
   onChange,
@@ -34,18 +34,18 @@ export function TransformField({
   onEditEnd,
   className,
 }: TransformFieldProps) {
-  const isAnchor = variant === "anchor";
+  const isAnchor = variant === 'anchor';
 
   return (
     <div className={className}>
       <Label
         className={cn(
-          "block text-xs mb-1 cursor-context-menu select-none",
+          'block text-xs mb-1 cursor-context-menu select-none',
           isCopying
             ? isAnchor
-              ? "text-accent-anchor font-bold"
-              : "text-primary-base font-bold"
-            : "text-text-muted hover:text-text-base"
+              ? 'text-accent-anchor font-bold'
+              : 'text-primary-base font-bold'
+            : 'text-text-muted hover:text-text-base',
         )}
         onContextMenu={(e) => {
           if (onContextMenu) {
@@ -63,7 +63,7 @@ export function TransformField({
         step={step}
         className={cn(
           isCopying &&
-            (isAnchor ? "border-accent-anchor bg-accent-anchor/20" : "border-primary-base bg-primary-base/10")
+            (isAnchor ? 'border-accent-anchor bg-accent-anchor/20' : 'border-primary-base bg-primary-base/10'),
         )}
         onEditStart={onEditStart}
         onEditEnd={onEditEnd}

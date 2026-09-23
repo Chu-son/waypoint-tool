@@ -1,15 +1,15 @@
-import React, { useState } from "react";
-import { Label } from "./common/Label";
-import { cn } from "../../utils/cn";
-import { useAppStore } from "../../stores/appStore";
+import React, { useState } from 'react';
+import { Label } from './common/Label';
+import { cn } from '../../utils/cn';
+import { useAppStore } from '../../stores/appStore';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
-import { Select } from "./common/Select";
-import { Input } from "./common/Input";
-import { Button } from "./common/Button";
-import { LabeledNumericInput } from "./common/LabeledNumericInput";
-import { quaternionToYaw } from "../../utils/transformUtils";
-import { Trash2, Plus, Crosshair, Layers, X } from "lucide-react";
-import { v4 as uuidv4 } from "uuid";
+import { Select } from './common/Select';
+import { Input } from './common/Input';
+import { Button } from './common/Button';
+import { LabeledNumericInput } from './common/LabeledNumericInput';
+import { quaternionToYaw } from '../../utils/transformUtils';
+import { Trash2, Plus, Crosshair, Layers, X } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface PluginInput {
   id: string;
@@ -29,7 +29,7 @@ interface PluginInputEditorProps {
   input: PluginInput;
   interactionData: any;
   onUpdate: (data: any) => void;
-  mode: "creation" | "edit";
+  mode: 'creation' | 'edit';
   index?: number;
   totalSteps?: number;
   isActive?: boolean;
@@ -56,26 +56,30 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
 
   const key = input.name || input.id;
   const label = input.label || key;
-  const isPointsType = input.type === "points" || input.type === "point_list";
+  const isPointsType = input.type === 'points' || input.type === 'point_list';
 
-  if (mode === "creation") {
+  if (mode === 'creation') {
     return (
       <div
         onClick={onSelect}
         className={cn(
-          "space-y-2 rounded-lg p-2.5 transition-all border",
-          onSelect && "cursor-pointer",
+          'space-y-2 rounded-lg p-2.5 transition-all border',
+          onSelect && 'cursor-pointer',
           isActive
-            ? "bg-primary-base/10 border-primary-base ring-2 ring-primary-base/30 shadow-sm"
-            : "bg-surface-base/40 border-border-base/40 hover:bg-surface-hover/60"
+            ? 'bg-primary-base/10 border-primary-base ring-2 ring-primary-base/30 shadow-sm'
+            : 'bg-surface-base/40 border-border-base/40 hover:bg-surface-hover/60',
         )}
       >
         <Label className="text-[13px] font-semibold text-text-base flex items-center gap-2 cursor-pointer">
           {totalSteps > 1 && (
             <span
               className={cn(
-                "w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0",
-                isActive ? "bg-primary-base text-text-inverse shadow-sm" : hasData ? "bg-status-success text-text-inverse" : "bg-surface-hover text-text-muted"
+                'w-5 h-5 rounded-full text-[10px] flex items-center justify-center font-bold shrink-0',
+                isActive
+                  ? 'bg-primary-base text-text-inverse shadow-sm'
+                  : hasData
+                    ? 'bg-status-success text-text-inverse'
+                    : 'bg-surface-hover text-text-muted',
               )}
             >
               {index + 1}
@@ -86,38 +90,28 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
 
         {isActive && !hasData && (
           <p className="text-[10px] text-primary-base font-medium opacity-80">
-            {input.type === "rectangle"
-              ? "▶ Click and drag on map to draw"
+            {input.type === 'rectangle'
+              ? '▶ Click and drag on map to draw'
               : isPointsType
-                ? "▶ Click on map to add points"
-                : input.type === "point"
-                  ? "▶ Click on map to place"
-                  : input.type === "waypoint"
-                    ? "▶ Select a waypoint from list or map"
-                    : input.type === "annotation"
-                      ? "▶ Select annotation object(s)"
-                      : ""}
+                ? '▶ Click on map to add points'
+                : input.type === 'point'
+                  ? '▶ Click on map to place'
+                  : input.type === 'waypoint'
+                    ? '▶ Select a waypoint from list or map'
+                    : input.type === 'annotation'
+                      ? '▶ Select annotation object(s)'
+                      : ''}
           </p>
         )}
 
-        {input.description && (
-          <p className="text-[10px] text-text-muted/70 leading-tight mb-1">
-            {input.description}
-          </p>
-        )}
+        {input.description && <p className="text-[10px] text-text-muted/70 leading-tight mb-1">{input.description}</p>}
 
-        {input.type === "point" && (
+        {input.type === 'point' && (
           <div className="bg-surface-base p-2 rounded-md border border-border-base/50">
             {interactionData ? (
-              <PointForm
-                data={interactionData}
-                onChange={onUpdate}
-                precision={decimalPrecision}
-              />
+              <PointForm data={interactionData} onChange={onUpdate} precision={decimalPrecision} />
             ) : (
-              <div className="py-1 text-center text-text-muted/50 italic text-[11px]">
-                Click on map to define
-              </div>
+              <div className="py-1 text-center text-text-muted/50 italic text-[11px]">Click on map to define</div>
             )}
           </div>
         )}
@@ -135,15 +129,10 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
           </div>
         )}
 
-        {input.type === "rectangle" && (
+        {input.type === 'rectangle' && (
           <div className="bg-surface-base p-2 rounded-md border border-border-base/50">
             {interactionData?.center ? (
-              <RectangleForm
-                data={interactionData}
-                onChange={onUpdate}
-                precision={decimalPrecision}
-                showFooterHint
-              />
+              <RectangleForm data={interactionData} onChange={onUpdate} precision={decimalPrecision} showFooterHint />
             ) : (
               <div className="py-1 text-center text-text-muted/50 italic text-[11px]">
                 Click and drag on map to draw
@@ -152,7 +141,7 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
           </div>
         )}
 
-        {input.type === "waypoint" && (
+        {input.type === 'waypoint' && (
           <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
             <WaypointSelectForm
               value={interactionData}
@@ -165,23 +154,15 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
           </div>
         )}
 
-        {input.type === "annotation" && (
+        {input.type === 'annotation' && (
           <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
-            <AnnotationSelectForm
-              input={input}
-              value={interactionData}
-              onChange={onUpdate}
-            />
+            <AnnotationSelectForm input={input} value={interactionData} onChange={onUpdate} />
           </div>
         )}
 
-        {input.type === "custom_layer" && (
+        {input.type === 'custom_layer' && (
           <div className="bg-surface-base border border-border-base/50 rounded-md p-2">
-            <CustomLayerSelectForm
-              input={input}
-              value={interactionData}
-              onChange={onUpdate}
-            />
+            <CustomLayerSelectForm input={input} value={interactionData} onChange={onUpdate} />
           </div>
         )}
       </div>
@@ -194,11 +175,23 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
       <Label className="text-[13px] font-bold text-primary-base flex items-center justify-between uppercase tracking-tight">
         <span>{label}</span>
         <span className="text-[10px] text-text-muted font-normal opacity-70 normal-case">
-          ({input.type === "point" ? "Point" : isPointsType ? "Points List" : input.type === "waypoint" ? "Waypoint Reference" : input.type === "annotation" ? "Annotation Reference" : input.type === "custom_layer" ? "Custom Layer Reference" : "Rectangle Area"})
+          (
+          {input.type === 'point'
+            ? 'Point'
+            : isPointsType
+              ? 'Points List'
+              : input.type === 'waypoint'
+                ? 'Waypoint Reference'
+                : input.type === 'annotation'
+                  ? 'Annotation Reference'
+                  : input.type === 'custom_layer'
+                    ? 'Custom Layer Reference'
+                    : 'Rectangle Area'}
+          )
         </span>
       </Label>
 
-      {input.type === "waypoint" && (
+      {input.type === 'waypoint' && (
         <div className="space-y-2">
           <WaypointSelectForm
             value={interactionData}
@@ -210,27 +203,19 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         </div>
       )}
 
-      {input.type === "annotation" && (
+      {input.type === 'annotation' && (
         <div className="space-y-2">
-          <AnnotationSelectForm
-            input={input}
-            value={interactionData}
-            onChange={onUpdate}
-          />
+          <AnnotationSelectForm input={input} value={interactionData} onChange={onUpdate} />
         </div>
       )}
 
-      {input.type === "custom_layer" && (
+      {input.type === 'custom_layer' && (
         <div className="space-y-2">
-          <CustomLayerSelectForm
-            input={input}
-            value={interactionData}
-            onChange={onUpdate}
-          />
+          <CustomLayerSelectForm input={input} value={interactionData} onChange={onUpdate} />
         </div>
       )}
 
-      {input.type === "point" && interactionData && (
+      {input.type === 'point' && interactionData && (
         <PointForm
           data={interactionData}
           onChange={onUpdate}
@@ -253,13 +238,8 @@ export const PluginInputEditor: React.FC<PluginInputEditorProps> = ({
         />
       )}
 
-      {input.type === "rectangle" && (interactionData?.center || interactionData?.origin) && (
-        <RectangleForm
-          data={interactionData}
-          onChange={onUpdate}
-          precision={decimalPrecision}
-          inputSize="md"
-        />
+      {input.type === 'rectangle' && (interactionData?.center || interactionData?.origin) && (
+        <RectangleForm data={interactionData} onChange={onUpdate} precision={decimalPrecision} inputSize="md" />
       )}
     </div>
   );
@@ -275,7 +255,7 @@ interface PointFormProps {
   precision?: number;
   includeYaw?: boolean;
   columns?: number;
-  inputSize?: "sm" | "md";
+  inputSize?: 'sm' | 'md';
 }
 
 function PointForm({
@@ -284,10 +264,10 @@ function PointForm({
   precision = 2,
   includeYaw = false,
   columns = 2,
-  inputSize = "sm",
+  inputSize = 'sm',
 }: PointFormProps) {
-  const inputClassName = inputSize === "md" ? "h-8 text-xs" : "h-7 text-[11px]";
-  const gridClass = columns === 3 ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2";
+  const inputClassName = inputSize === 'md' ? 'h-8 text-xs' : 'h-7 text-[11px]';
+  const gridClass = columns === 3 ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-2 gap-2';
 
   return (
     <div className={gridClass}>
@@ -328,7 +308,7 @@ interface RectangleFormProps {
   onChange: (val: any) => void;
   precision?: number;
   showFooterHint?: boolean;
-  inputSize?: "sm" | "md";
+  inputSize?: 'sm' | 'md';
 }
 
 function RectangleForm({
@@ -336,9 +316,9 @@ function RectangleForm({
   onChange,
   precision = 2,
   showFooterHint = false,
-  inputSize = "sm",
+  inputSize = 'sm',
 }: RectangleFormProps) {
-  const inputClassName = inputSize === "md" ? "h-8 text-xs" : "h-7 text-[11px]";
+  const inputClassName = inputSize === 'md' ? 'h-8 text-xs' : 'h-7 text-[11px]';
 
   return (
     <div className="space-y-2">
@@ -361,18 +341,14 @@ function RectangleForm({
           label="Center X"
           value={data.center?.x ?? 0}
           precision={precision}
-          onChange={(val) =>
-            onChange({ ...data, center: { ...data.center, x: val } })
-          }
+          onChange={(val) => onChange({ ...data, center: { ...data.center, x: val } })}
           inputClassName={inputClassName}
         />
         <LabeledNumericInput
           label="Center Y"
           value={data.center?.y ?? 0}
           precision={precision}
-          onChange={(val) =>
-            onChange({ ...data, center: { ...data.center, y: val } })
-          }
+          onChange={(val) => onChange({ ...data, center: { ...data.center, y: val } })}
           inputClassName={inputClassName}
         />
         <div className="col-span-2">
@@ -414,9 +390,9 @@ function WaypointSelectForm({
   return (
     <>
       <Select
-        value={value ?? ""}
+        value={value ?? ''}
         onChange={(e) => {
-          const val = e.target.value === "" ? null : parseInt(e.target.value);
+          const val = e.target.value === '' ? null : parseInt(e.target.value);
           onChange(val);
         }}
         className="h-8 text-[11px] mb-2"
@@ -424,7 +400,7 @@ function WaypointSelectForm({
         <option value="">-- Select Waypoint --</option>
         {rootNodeIds.map((id, idx) => {
           const n = nodes[id];
-          if (n && n.type === "manual") {
+          if (n && n.type === 'manual') {
             return (
               <option key={id} value={idx}>
                 Waypoint {idx + indexStartIndex}
@@ -441,7 +417,7 @@ function WaypointSelectForm({
             type="number"
             min={indexStartIndex}
             max={rootNodeIds.length - 1 + indexStartIndex}
-            value={value !== null ? value + indexStartIndex : ""}
+            value={value !== null ? value + indexStartIndex : ''}
             onChange={(e) => {
               const val = parseInt(e.target.value);
               if (!isNaN(val)) {
@@ -473,7 +449,7 @@ interface PointsListFormProps {
   allowYaw?: boolean;
   maxPoints?: number;
   minPoints?: number;
-  inputSize?: "sm" | "md";
+  inputSize?: 'sm' | 'md';
 }
 
 function PointsListForm({
@@ -483,10 +459,10 @@ function PointsListForm({
   allowYaw = false,
   maxPoints = 50,
   minPoints = 1,
-  inputSize = "sm",
+  inputSize = 'sm',
 }: PointsListFormProps) {
   const points = Array.isArray(data) ? data : [];
-  const inputClassName = inputSize === "md" ? "h-7 text-xs" : "h-6 text-[11px]";
+  const inputClassName = inputSize === 'md' ? 'h-7 text-xs' : 'h-6 text-[11px]';
 
   const handleUpdatePoint = (idx: number, updated: any) => {
     const next = [...points];
@@ -524,7 +500,7 @@ function PointsListForm({
         <span className="text-text-muted font-medium flex items-center gap-1.5">
           <Crosshair className="w-3.5 h-3.5 text-primary-base" />
           <span>
-            {points.length} {points.length === 1 ? "point" : "points"}
+            {points.length} {points.length === 1 ? 'point' : 'points'}
             {maxPoints && <span className="opacity-60"> / {maxPoints} max</span>}
           </span>
         </span>
@@ -557,7 +533,7 @@ function PointsListForm({
 
       {minPoints > 0 && points.length < minPoints && (
         <p className="text-[10px] text-status-warning/90 font-medium">
-          At least {minPoints} {minPoints === 1 ? "point is" : "points are"} required.
+          At least {minPoints} {minPoints === 1 ? 'point is' : 'points are'} required.
         </p>
       )}
 
@@ -581,7 +557,7 @@ function PointsListForm({
                   {idx + 1}
                 </span>
 
-                <div className={cn("grid gap-1 flex-1", allowYaw ? "grid-cols-3" : "grid-cols-2")}>
+                <div className={cn('grid gap-1 flex-1', allowYaw ? 'grid-cols-3' : 'grid-cols-2')}>
                   <LabeledNumericInput
                     label="X"
                     value={pt.x ?? 0}
@@ -730,9 +706,7 @@ function CustomLayerSelectForm({ input, value, onChange }: CustomLayerSelectForm
 
   if (customLayers.length === 0) {
     return (
-      <div className="text-xs text-text-muted/60 italic py-1 text-center">
-        利用可能なカスタムレイヤーがありません
-      </div>
+      <div className="text-xs text-text-muted/60 italic py-1 text-center">利用可能なカスタムレイヤーがありません</div>
     );
   }
 
@@ -760,9 +734,7 @@ function CustomLayerSelectForm({ input, value, onChange }: CustomLayerSelectForm
         {/* Selected custom layers list */}
         <div className="space-y-1 max-h-36 overflow-y-auto p-1 bg-surface-base/40 rounded border border-border-base/30">
           {selectedList.length === 0 ? (
-            <div className="text-xs text-text-muted/50 italic py-1 text-center">
-              レイヤーが選択されていません
-            </div>
+            <div className="text-xs text-text-muted/50 italic py-1 text-center">レイヤーが選択されていません</div>
           ) : (
             selectedList.map((item) => {
               const layerId = typeof item === 'string' ? item : item?.id;
@@ -848,5 +820,3 @@ function CustomLayerSelectForm({ input, value, onChange }: CustomLayerSelectForm
     </Select>
   );
 }
-
-

@@ -1,6 +1,18 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../appStore';
-import { PluginInstance, PluginSetting, PluginCustomLayer, AnnotationGroup, AnnotationObject, WaypointBaselineItem, GeneratorStash, Transform, WaypointNode, PipelineMetadata, InsertionTarget } from '../../types/store';
+import {
+  PluginInstance,
+  PluginSetting,
+  PluginCustomLayer,
+  AnnotationGroup,
+  AnnotationObject,
+  WaypointBaselineItem,
+  GeneratorStash,
+  Transform,
+  WaypointNode,
+  PipelineMetadata,
+  InsertionTarget,
+} from '../../types/store';
 import { BackendAPI } from '../../api';
 import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../utils/mapRasterize';
 import { applyGeneratorStash, computeGeneratorStash } from '../../utils/generatorStashUtils';
@@ -9,9 +21,7 @@ import { findNodeParentId } from '../../utils/treeUtils';
 import { cloneSelection } from './historySlice';
 import { v4 as uuidv4 } from 'uuid';
 
-export type PluginPlacement =
-  | { type: 'replace_ids'; ids: string[] }
-  | { type: 'use_insertion_target' };
+export type PluginPlacement = { type: 'replace_ids'; ids: string[] } | { type: 'use_insertion_target' };
 
 export interface ExecutePluginParams {
   plugin: PluginInstance;
@@ -72,11 +82,7 @@ export type PluginSlice = {
     error?: string;
   }>;
 
-  detachFromPipeline: (params: {
-    nodeId?: string;
-    customLayerId?: string;
-    annotationGroupId?: string;
-  }) => void;
+  detachFromPipeline: (params: { nodeId?: string; customLayerId?: string; annotationGroupId?: string }) => void;
 
   setActivePathCalculatorPluginId: (pluginId: string | null) => void;
   setPathCalculatorParams: (params: Record<string, any>) => void;
@@ -109,7 +115,7 @@ function getPathValue(obj: any, path: string): any {
 function resolveBindingExpression(
   expr: string,
   stepOutputs: Record<string, any>,
-  manualInputs: Record<string, Record<string, any>>
+  manualInputs: Record<string, Record<string, any>>,
 ): any {
   if (expr.startsWith('$steps.')) {
     const rest = expr.slice(7);
@@ -131,7 +137,9 @@ function resolveBindingExpression(
       if (path.startsWith('inputs.') || path.startsWith('inputs[')) {
         return undefined;
       }
-      throw new Error(`Binding "${expr}" could not be resolved: path "${path}" in step "${stepId}" evaluated to undefined.`);
+      throw new Error(
+        `Binding "${expr}" could not be resolved: path "${path}" in step "${stepId}" evaluated to undefined.`,
+      );
     }
 
     return val;
@@ -199,7 +207,11 @@ export function extractWaypointsFromRawResult(rawResult: any): ParsedWaypointsRe
       pluginData = wp.plugin_data;
       groupName = wp.name;
     }
-  } else if (Array.isArray(rawResult) && rawResult.length > 0 && (rawResult[0].transform || rawResult[0].x !== undefined)) {
+  } else if (
+    Array.isArray(rawResult) &&
+    rawResult.length > 0 &&
+    (rawResult[0].transform || rawResult[0].x !== undefined)
+  ) {
     items = rawResult;
   }
 
@@ -234,64 +246,68 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
     set({ plugins: merged });
   },
-  
+
   setPluginSettings: (settings) => set({ pluginSettings: Array.isArray(settings) ? settings : [], isDirty: true }),
-  
-  updatePluginSetting: (id, updates) => set((state) => {
-    const list = Array.isArray(state.pluginSettings) ? state.pluginSettings : [];
-    const index = list.findIndex((p) => p.id === id);
-    if (index >= 0) {
+
+  updatePluginSetting: (id, updates) =>
+    set((state) => {
+      const list = Array.isArray(state.pluginSettings) ? state.pluginSettings : [];
+      const index = list.findIndex((p) => p.id === id);
+      if (index >= 0) {
+        return {
+          pluginSettings: list.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+          isDirty: true,
+        };
+      }
+      const newSetting: PluginSetting = {
+        id,
+        enabled: true,
+        order: list.length,
+        isBuiltin: false,
+        ...updates,
+      };
       return {
-        pluginSettings: list.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        pluginSettings: [...list, newSetting],
         isDirty: true,
       };
-    }
-    const newSetting: PluginSetting = {
-      id,
-      enabled: true,
-      order: list.length,
-      isBuiltin: false,
-      ...updates,
-    };
-    return {
-      pluginSettings: [...list, newSetting],
-      isDirty: true,
-    };
-  }),
-  
-  setActivePlugin: (pluginId) => set((state) => {
-    if (state.activePluginId === pluginId) {
-      return { isAnnotationEditMode: false, activePipelineInputRef: null };
-    }
-    const plugin = pluginId && state.plugins ? state.plugins[pluginId] : null;
-    const isMapLayerGen = plugin?.manifest?.category === 'map_layer_generator';
-    return {
-      activePluginId: pluginId,
+    }),
+
+  setActivePlugin: (pluginId) =>
+    set((state) => {
+      if (state.activePluginId === pluginId) {
+        return { isAnnotationEditMode: false, activePipelineInputRef: null };
+      }
+      const plugin = pluginId && state.plugins ? state.plugins[pluginId] : null;
+      const isMapLayerGen = plugin?.manifest?.category === 'map_layer_generator';
+      return {
+        activePluginId: pluginId,
+        pluginInteractionData: {},
+        pluginActiveProperties: {},
+        activeInputIndex: 0,
+        activePipelineInputRef: null,
+        isAnnotationEditMode: false,
+        ...(!isMapLayerGen ? { activeCustomLayerId: null, isMapEditMode: false } : {}),
+      };
+    }),
+
+  updatePluginInteractionData: (inputId, data) =>
+    set((state) => ({
+      pluginInteractionData: {
+        ...state.pluginInteractionData,
+        [inputId]: data,
+      },
+    })),
+
+  clearPluginInteractionData: () =>
+    set({
       pluginInteractionData: {},
       pluginActiveProperties: {},
       activeInputIndex: 0,
       activePipelineInputRef: null,
-      isAnnotationEditMode: false,
-      ...(!isMapLayerGen ? { activeCustomLayerId: null, isMapEditMode: false } : {}),
-    };
-  }),
-  
-  updatePluginInteractionData: (inputId, data) => set((state) => ({
-    pluginInteractionData: {
-      ...state.pluginInteractionData,
-      [inputId]: data
-    }
-  })),
-    
-  clearPluginInteractionData: () => set({ 
-    pluginInteractionData: {}, 
-    pluginActiveProperties: {},
-    activeInputIndex: 0,
-    activePipelineInputRef: null,
-  }),
-  
+    }),
+
   setPluginActiveProperties: (props) => set({ pluginActiveProperties: props }),
-  
+
   setActiveInputIndex: (index) => set({ activeInputIndex: index }),
 
   setActivePipelineInputRef: (ref) => set({ activePipelineInputRef: ref }),
@@ -341,9 +357,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
 
     if (needsSelection) {
-      contextData.selected_points = selectedNodeIds
-        .map((id) => nodes[id]?.transform)
-        .filter(Boolean);
+      contextData.selected_points = selectedNodeIds.map((id) => nodes[id]?.transform).filter(Boolean);
     }
 
     if (plugin.manifest.needs?.includes('robot_footprint')) {
@@ -359,12 +373,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     }
 
     const needsOccupancyGrid = plugin.manifest.needs?.some(
-      (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+      (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
     );
 
-    const layersToPass = needsOccupancyGrid
-      ? await prepareLayersForExport(mapLayers, customLayers)
-      : undefined;
+    const layersToPass = needsOccupancyGrid ? await prepareLayersForExport(mapLayers, customLayers) : undefined;
 
     const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
     const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
@@ -372,7 +384,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       contextData.interaction_data || {},
       customLayers,
       baseRes,
-      annotationObjects
+      annotationObjects,
     );
 
     const finalContextData = {
@@ -380,12 +392,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       interaction_data: enrichedInteractionData,
     };
 
-    const rawResult: any = await BackendAPI.runPlugin(
-      plugin,
-      finalContextData,
-      pythonPathToUse,
-      layersToPass
-    );
+    const rawResult: any = await BackendAPI.runPlugin(plugin, finalContextData, pythonPathToUse, layersToPass);
 
     let resultingParentWaypointId: string | undefined = undefined;
     const resultingCustomLayerIds: string[] = [];
@@ -397,8 +404,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       // ----------------------------------------------------
       // 1. Waypoint Output Handling
       // ----------------------------------------------------
-      const { items: waypointItems, pluginData: waypointPluginData, groupName: waypointGroupName } =
-        extractWaypointsFromRawResult(rawResult);
+      const {
+        items: waypointItems,
+        pluginData: waypointPluginData,
+        groupName: waypointGroupName,
+      } = extractWaypointsFromRawResult(rawResult);
 
       if (waypointItems && waypointItems.length > 0) {
         const baselineWaypoints: WaypointBaselineItem[] = waypointItems.map((wp) => {
@@ -432,7 +442,9 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         let parentId = targetParentWaypointId;
         if (!parentId && existingExecutionId) {
           // Find parent node with matching execution_id
-          const found = Object.values(store.nodes).find(n => n.type === 'generator' && n.source_execution_id === existingExecutionId);
+          const found = Object.values(store.nodes).find(
+            (n) => n.type === 'generator' && n.source_execution_id === existingExecutionId,
+          );
           if (found) parentId = found.id;
         }
 
@@ -454,11 +466,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         } else {
           // New parent generator node
           parentId = uuidv4();
-          const placement: PluginPlacement = params.placement || (
-            (idsToConsume && idsToConsume.length > 0)
+          const placement: PluginPlacement =
+            params.placement ||
+            (idsToConsume && idsToConsume.length > 0
               ? { type: 'replace_ids', ids: idsToConsume }
-              : { type: 'use_insertion_target' }
-          );
+              : { type: 'use_insertion_target' });
 
           let targetParentId: string | null | undefined = undefined;
           let targetIndex: number | undefined = undefined;
@@ -469,7 +481,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             const currentRootIds = get().rootNodeIds;
             const parentOfFirst = findNodeParentId(firstId, currentRootIds, currentNodes);
             targetParentId = parentOfFirst;
-            const siblings = parentOfFirst ? (currentNodes[parentOfFirst]?.children_ids || []) : currentRootIds;
+            const siblings = parentOfFirst ? currentNodes[parentOfFirst]?.children_ids || [] : currentRootIds;
             const idx = siblings.indexOf(firstId);
             if (idx !== -1) {
               targetIndex = idx;
@@ -494,9 +506,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
 
         // Apply stash if provided
-        const waypointsToInstantiate = stashToApply
-          ? applyGeneratorStash(waypointItems, stashToApply)
-          : waypointItems;
+        const waypointsToInstantiate = stashToApply ? applyGeneratorStash(waypointItems, stashToApply) : waypointItems;
 
         // Add child waypoint nodes in a single atomic batch
         const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => {
@@ -547,7 +557,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         let existingLayerId = targetCustomLayerId;
         if (!existingLayerId && existingExecutionId) {
           const found = store.customLayers.find(
-            (l) => l.type === 'plugin' && (l as any).source_execution_id === existingExecutionId
+            (l) => l.type === 'plugin' && (l as any).source_execution_id === existingExecutionId,
           );
           if (found) existingLayerId = found.id;
         }
@@ -613,7 +623,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         let groupId = targetAnnotationGroupId;
         if (!groupId && existingExecutionId) {
           const found = Object.values(store.annotationGroups).find(
-            (g) => g.source_execution_id === existingExecutionId
+            (g) => g.source_execution_id === existingExecutionId,
           );
           if (found) groupId = found.id;
         }
@@ -703,12 +713,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
   },
 
   executePipeline: async (params) => {
-    const {
-      pipelinePlugin,
-      manualInputs,
-      manualProperties,
-      existingExecutionId,
-    } = params;
+    const { pipelinePlugin, manualInputs, manualProperties, existingExecutionId } = params;
 
     const recipe = pipelinePlugin.manifest?.pipeline;
     const steps = recipe?.steps || [];
@@ -775,18 +780,19 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
     if (existingExecutionId) {
       const existingLayer = get().customLayers.find(
-        (l) => l.pipeline_metadata?.pipeline_execution_id === existingExecutionId && l.pipeline_metadata?.pipeline_inputs
+        (l) =>
+          l.pipeline_metadata?.pipeline_execution_id === existingExecutionId && l.pipeline_metadata?.pipeline_inputs,
       );
       const existingNode = Object.values(get().nodes).find(
-        (n) => n.pipeline_metadata?.pipeline_execution_id === existingExecutionId && n.pipeline_metadata?.pipeline_inputs
+        (n) =>
+          n.pipeline_metadata?.pipeline_execution_id === existingExecutionId && n.pipeline_metadata?.pipeline_inputs,
       );
       const existingGroup = Object.values(get().annotationGroups).find(
-        (g) => g.pipeline_metadata?.pipeline_execution_id === existingExecutionId && g.pipeline_metadata?.pipeline_inputs
+        (g) =>
+          g.pipeline_metadata?.pipeline_execution_id === existingExecutionId && g.pipeline_metadata?.pipeline_inputs,
       );
       const metaWithSnapshots =
-        existingLayer?.pipeline_metadata ||
-        existingNode?.pipeline_metadata ||
-        existingGroup?.pipeline_metadata;
+        existingLayer?.pipeline_metadata || existingNode?.pipeline_metadata || existingGroup?.pipeline_metadata;
 
       if (metaWithSnapshots) {
         previousInputsSnapshot = metaWithSnapshots.pipeline_inputs;
@@ -853,19 +859,15 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           const resolvedValue = resolveBindingExpression(expr, stepOutputs, manualInputs);
           if (targetKey.startsWith('inputs.')) {
             const rawKey = targetKey.slice(7);
-            const matchingInp = targetPlugin.manifest?.inputs?.find(
-              (i) => i.id === rawKey || i.name === rawKey
-            );
-            const canonicalKey = matchingInp ? (matchingInp.name || matchingInp.id) : rawKey;
+            const matchingInp = targetPlugin.manifest?.inputs?.find((i) => i.id === rawKey || i.name === rawKey);
+            const canonicalKey = matchingInp ? matchingInp.name || matchingInp.id : rawKey;
             stepInteractionData[canonicalKey] = resolvedValue;
             stepInteractionData[rawKey] = resolvedValue;
           } else if (targetKey.startsWith('properties.')) {
             const key = targetKey.slice(11);
             stepProperties[key] = resolvedValue;
           } else {
-            const matchingInp = targetPlugin.manifest?.inputs?.find(
-              (i) => i.id === targetKey || i.name === targetKey
-            );
+            const matchingInp = targetPlugin.manifest?.inputs?.find((i) => i.id === targetKey || i.name === targetKey);
             if (matchingInp) {
               const canonicalKey = matchingInp.name || matchingInp.id;
               stepInteractionData[canonicalKey] = resolvedValue;
@@ -894,10 +896,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             stepInteractionData[canonicalKey] !== undefined
               ? stepInteractionData[canonicalKey]
               : inp.id && stepInteractionData[inp.id] !== undefined
-              ? stepInteractionData[inp.id]
-              : inp.name && stepInteractionData[inp.name] !== undefined
-              ? stepInteractionData[inp.name]
-              : undefined;
+                ? stepInteractionData[inp.id]
+                : inp.name && stepInteractionData[inp.name] !== undefined
+                  ? stepInteractionData[inp.name]
+                  : undefined;
           if (canonicalKey && val !== undefined && val !== null && val !== '') {
             contextData.interaction_data[canonicalKey] = val;
           }
@@ -923,7 +925,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         // 6. Pass map layers and custom layers (including intermediate non-exported layers)
         const allAvailableCustomLayers = [...get().customLayers, ...intermediateLayers];
         const needsOccupancyGrid = targetPlugin.manifest?.needs?.some(
-          (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+          (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
         );
         const layersToPass = needsOccupancyGrid
           ? await prepareLayersForExport(get().mapLayers, allAvailableCustomLayers)
@@ -935,7 +937,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           contextData.interaction_data || {},
           allAvailableCustomLayers,
           baseRes,
-          get().annotationObjects
+          get().annotationObjects,
         );
 
         const finalContextData = {
@@ -958,16 +960,17 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         const inputsChanged = JSON.stringify(currentStepInputs) !== JSON.stringify(prevStepInputs);
 
         const currentStepProps = manualProperties[stepId] || manualProperties[targetPlugin.id] || {};
-        const prevStepProps = previousPropertiesSnapshot?.[stepId] || previousPropertiesSnapshot?.[targetPlugin.id] || {};
+        const prevStepProps =
+          previousPropertiesSnapshot?.[stepId] || previousPropertiesSnapshot?.[targetPlugin.id] || {};
         const propertiesChanged = JSON.stringify(currentStepProps) !== JSON.stringify(prevStepProps);
 
         const existingStepLayers = existingExecutionId
-          ? (get().customLayers.filter(
+          ? get().customLayers.filter(
               (l): l is PluginCustomLayer =>
                 l.type === 'plugin' &&
                 l.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                l.pipeline_metadata?.step_id === stepId
-            ))
+                l.pipeline_metadata?.step_id === stepId,
+            )
           : [];
 
         const existingParent = existingExecutionId
@@ -975,7 +978,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               (n) =>
                 n.type === 'generator' &&
                 n.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                n.pipeline_metadata?.step_id === stepId
+                n.pipeline_metadata?.step_id === stepId,
             )
           : undefined;
 
@@ -983,13 +986,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           ? Object.values(get().annotationGroups).find(
               (g) =>
                 g.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                g.pipeline_metadata?.step_id === stepId
+                g.pipeline_metadata?.step_id === stepId,
             )
           : undefined;
 
-        const hasExistingArtifacts = Boolean(
-          existingStepLayers.length > 0 || existingParent || existingGroup
-        );
+        const hasExistingArtifacts = Boolean(existingStepLayers.length > 0 || existingParent || existingGroup);
 
         const isStepDirty =
           !existingExecutionId ||
@@ -1014,9 +1015,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         let annotationGroupName: string | undefined = undefined;
 
         if (!isStepDirty) {
-          console.info(
-            `[PIPELINE] Step "${stepId}" is clean. Skipping backend execution and reusing cached outputs.`
-          );
+          console.info(`[PIPELINE] Step "${stepId}" is clean. Skipping backend execution and reusing cached outputs.`);
 
           if (existingStepLayers.length > 0) {
             constructedLayers = existingStepLayers.map((l) => ({
@@ -1052,21 +1051,14 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             annotationPluginData = existingGroup.plugin_data;
             annotationGroupName = existingGroup.name;
             if (existingGroup.children_ids) {
-              rawAnnotations = existingGroup.children_ids
-                .map((cid) => get().annotationObjects[cid])
-                .filter(Boolean);
+              rawAnnotations = existingGroup.children_ids.map((cid) => get().annotationObjects[cid]).filter(Boolean);
             }
           }
         } else {
           dirtySteps.add(stepId);
 
           // 7. Run plugin backend API
-          rawResult = await BackendAPI.runPlugin(
-            targetPlugin,
-            finalContextData,
-            pythonPathToUse,
-            layersToPass
-          );
+          rawResult = await BackendAPI.runPlugin(targetPlugin, finalContextData, pythonPathToUse, layersToPass);
 
           // 8. Process outputs
           // Custom Layers output
@@ -1161,7 +1153,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
                   (l) =>
                     l.type === 'plugin' &&
                     l.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                    l.pipeline_metadata?.step_id === stepId
+                    l.pipeline_metadata?.step_id === stepId,
                 )
               : [];
 
@@ -1187,7 +1179,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
                 (n) =>
                   n.type === 'generator' &&
                   n.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                  n.pipeline_metadata?.step_id === stepId
+                  n.pipeline_metadata?.step_id === stepId,
               );
               if (found) targetParentId = found.id;
             }
@@ -1304,7 +1296,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               const found = Object.values(store.annotationGroups).find(
                 (g) =>
                   g.pipeline_metadata?.pipeline_execution_id === existingExecutionId &&
-                  g.pipeline_metadata?.step_id === stepId
+                  g.pipeline_metadata?.step_id === stepId,
               );
               if (found) targetGroupId = found.id;
             }
@@ -1547,10 +1539,10 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     });
 
     try {
-      let pythonPathToUse = globalPythonPath?.trim() || "python3";
-      if (plugin.manifest.type === "python") {
+      let pythonPathToUse = globalPythonPath?.trim() || 'python3';
+      if (plugin.manifest.type === 'python') {
         const setting = pluginSettings.find((s) => s.id === plugin.id);
-        if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== "") {
+        if (setting && setting.pythonOverridePath && setting.pythonOverridePath.trim() !== '') {
           pythonPathToUse = setting.pythonOverridePath.trim();
         }
       }
@@ -1565,19 +1557,14 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       }
 
       const needsOccupancyGrid = plugin.manifest.needs?.some(
-        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region'
+        (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
       );
 
       const layersToPass = needsOccupancyGrid
         ? await prepareLayersForExport(mapLayers || [], customLayers || [])
         : undefined;
 
-      const result = await BackendAPI.runPlugin(
-        plugin,
-        contextData,
-        pythonPathToUse,
-        layersToPass
-      );
+      const result = await BackendAPI.runPlugin(plugin, contextData, pythonPathToUse, layersToPass);
 
       // Check if this request is still the latest one
       if (requestId !== currentCalculationRequestId) {
@@ -1590,12 +1577,12 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         // Flat list of segments or points
         set({ calculatedPathSegments: [result], isCalculatingPath: false });
       } else {
-        console.warn("[recalculatePath] Unexpected result format from path calculator:", result);
+        console.warn('[recalculatePath] Unexpected result format from path calculator:', result);
         set({ calculatedPathSegments: null, isCalculatingPath: false });
       }
     } catch (err) {
       if (requestId === currentCalculationRequestId) {
-        console.error("[recalculatePath] Failed to calculate path:", err);
+        console.error('[recalculatePath] Failed to calculate path:', err);
         set({ calculatedPathSegments: null, isCalculatingPath: false });
       }
     } finally {
@@ -1609,7 +1596,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     try {
       const installedPlugins = await BackendAPI.fetchInstalledPlugins();
       const newMap: Record<string, PluginInstance> = {};
-      
+
       installedPlugins.forEach((p: PluginInstance) => {
         newMap[p.id] = p;
       });
@@ -1625,7 +1612,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           }
         }
       }
-      
+
       // Alias resolution for legacy_ids
       Object.values(newMap).forEach((p) => {
         if (p.manifest?.legacy_ids) {
@@ -1638,9 +1625,9 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       });
 
       set({ plugins: newMap });
-      console.log("[AppStore] Plugins reloaded successfully (with custom merging).");
+      console.log('[AppStore] Plugins reloaded successfully (with custom merging).');
     } catch (err) {
-      console.error("Failed to reload plugins:", err);
+      console.error('Failed to reload plugins:', err);
       throw err;
     }
   },

@@ -1,16 +1,16 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useAppStore } from "../../stores/appStore";
-import { PluginPropertyEditor } from "./PluginPropertyEditor";
-import { Button } from "./common/Button";
-import { Select } from "./common/Select";
-import { Input } from "./common/Input";
-import { Slider } from "./common/Slider";
-import { Label } from "./common/Label";
-import { Checkbox } from "./common/Checkbox";
-import { NumericInput } from "./NumericInput";
-import { Route, RefreshCcw, ChevronDown } from "lucide-react";
-import { cn } from "../../utils/cn";
-import { PATH_COLOR_PRESETS, DEFAULT_PATH_COLOR } from "../../utils/colorPresets";
+import React, { useState, useRef, useEffect } from 'react';
+import { useAppStore } from '../../stores/appStore';
+import { PluginPropertyEditor } from './PluginPropertyEditor';
+import { Button } from './common/Button';
+import { Select } from './common/Select';
+import { Input } from './common/Input';
+import { Slider } from './common/Slider';
+import { Label } from './common/Label';
+import { Checkbox } from './common/Checkbox';
+import { NumericInput } from './NumericInput';
+import { Route, RefreshCcw, ChevronDown } from 'lucide-react';
+import { cn } from '../../utils/cn';
+import { PATH_COLOR_PRESETS, DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 
 export function PathRouterMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -49,7 +49,7 @@ export function PathRouterMenu() {
   }
 
   const pathPlugins = Object.values(plugins).filter(
-    (p) => p && p.manifest && p.manifest.category === "path_calculator"
+    (p) => p && p.manifest && p.manifest.category === 'path_calculator',
   );
 
   const activePlugin = activePathCalculatorPluginId ? plugins[activePathCalculatorPluginId] : null;
@@ -61,9 +61,9 @@ export function PathRouterMenu() {
       }
     };
     if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
   const handlePluginSelect = (pluginId: string) => {
@@ -74,7 +74,7 @@ export function PathRouterMenu() {
       if (p) {
         const initialParams: Record<string, any> = {};
         p.manifest.properties?.forEach((prop) => {
-          if (prop.name) initialParams[prop.name] = prop.default ?? "";
+          if (prop.name) initialParams[prop.name] = prop.default ?? '';
         });
         setPathCalculatorParams(initialParams);
       }
@@ -87,18 +87,16 @@ export function PathRouterMenu() {
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
-          "px-2.5 py-1 text-[12px] font-medium transition-all rounded-md flex items-center gap-1.5 border",
+          'px-2.5 py-1 text-[12px] font-medium transition-all rounded-md flex items-center gap-1.5 border',
           activePlugin
-            ? "bg-accent-generator/10 text-accent-generator border-accent-generator/30 hover:bg-accent-generator/20"
-            : "text-text-muted border-border-base/50 hover:bg-surface-hover hover:text-text-base",
-          isOpen && "ring-1 ring-primary-base"
+            ? 'bg-accent-generator/10 text-accent-generator border-accent-generator/30 hover:bg-accent-generator/20'
+            : 'text-text-muted border-border-base/50 hover:bg-surface-hover hover:text-text-base',
+          isOpen && 'ring-1 ring-primary-base',
         )}
         title="Path Routing Settings"
       >
-        <Route size={14} className={activePlugin ? "text-accent-generator" : "text-text-muted"} />
-        <span className="truncate max-w-[140px]">
-          {activePlugin ? activePlugin.manifest.name : "Route: Straight"}
-        </span>
+        <Route size={14} className={activePlugin ? 'text-accent-generator' : 'text-text-muted'} />
+        <span className="truncate max-w-[140px]">{activePlugin ? activePlugin.manifest.name : 'Route: Straight'}</span>
         <ChevronDown size={12} className="opacity-60" />
       </button>
 
@@ -120,7 +118,7 @@ export function PathRouterMenu() {
           <div className="space-y-1.5">
             <Label className="text-[11px] font-semibold text-text-muted">Algorithm</Label>
             <Select
-              value={activePathCalculatorPluginId || ""}
+              value={activePathCalculatorPluginId || ''}
               onChange={(e) => handlePluginSelect(e.target.value)}
               className="w-full text-xs h-8"
             >
@@ -136,9 +134,7 @@ export function PathRouterMenu() {
           {/* Path Appearance (Common Settings) */}
           <div className="space-y-3 pt-2 border-t border-border-base/40">
             <div className="flex items-center justify-between">
-              <Label className="text-[11px] font-bold text-text-base uppercase tracking-wider">
-                Path Appearance
-              </Label>
+              <Label className="text-[11px] font-bold text-text-base uppercase tracking-wider">Path Appearance</Label>
             </div>
 
             {/* Color */}
@@ -146,14 +142,16 @@ export function PathRouterMenu() {
               <div className="flex items-center justify-between">
                 <Label className="text-[11px] text-text-muted">Color</Label>
                 <div className="flex items-center gap-1">
-                  {PATH_COLOR_PRESETS.map(c => (
+                  {PATH_COLOR_PRESETS.map((c) => (
                     <button
                       key={c}
                       type="button"
                       onClick={() => setPathColor(c)}
                       className={cn(
-                        "w-3.5 h-3.5 rounded-full border transition-transform hover:scale-110",
-                        pathColor.toLowerCase() === c.toLowerCase() ? "ring-2 ring-primary-base ring-offset-1 border-text-inverse" : "border-border-base/60"
+                        'w-3.5 h-3.5 rounded-full border transition-transform hover:scale-110',
+                        pathColor.toLowerCase() === c.toLowerCase()
+                          ? 'ring-2 ring-primary-base ring-offset-1 border-text-inverse'
+                          : 'border-border-base/60',
                       )}
                       style={{ backgroundColor: c }}
                       title={c}
@@ -181,9 +179,7 @@ export function PathRouterMenu() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-[11px] text-text-muted">Opacity</Label>
-                <span className="text-[11px] font-mono text-text-base">
-                  {Math.round((pathOpacity ?? 0.7) * 100)}%
-                </span>
+                <span className="text-[11px] font-mono text-text-base">{Math.round((pathOpacity ?? 0.7) * 100)}%</span>
               </div>
               <Slider
                 min={0.1}
@@ -209,7 +205,7 @@ export function PathRouterMenu() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-[11px] text-text-muted">
-                  {syncPathWidthWithFootprint ? "Footprint Width" : "Path Width"}
+                  {syncPathWidthWithFootprint ? 'Footprint Width' : 'Path Width'}
                 </Label>
                 {syncPathWidthWithFootprint && (
                   <span className="text-[10px] text-accent-generator font-mono">
@@ -243,9 +239,7 @@ export function PathRouterMenu() {
 
               {activePlugin.manifest.properties && activePlugin.manifest.properties.length > 0 && (
                 <div className="space-y-2">
-                  <Label className="text-[11px] font-bold text-text-base uppercase tracking-wider">
-                    Parameters
-                  </Label>
+                  <Label className="text-[11px] font-bold text-text-base uppercase tracking-wider">Parameters</Label>
                   {activePlugin.manifest.properties.map((prop, idx) => {
                     const key = prop.name;
                     return (
@@ -253,9 +247,7 @@ export function PathRouterMenu() {
                         key={`prop-${idx}`}
                         property={prop}
                         value={pathCalculatorParams[key]}
-                        onChange={(val) =>
-                          setPathCalculatorParams({ ...pathCalculatorParams, [key]: val })
-                        }
+                        onChange={(val) => setPathCalculatorParams({ ...pathCalculatorParams, [key]: val })}
                       />
                     );
                   })}
@@ -280,8 +272,8 @@ export function PathRouterMenu() {
                 disabled={isCalculatingPath}
                 className="w-full h-8 text-xs gap-1.5"
               >
-                <RefreshCcw size={13} className={isCalculatingPath ? "animate-spin" : ""} />
-                {isCalculatingPath ? "Calculating..." : "Recalculate Path"}
+                <RefreshCcw size={13} className={isCalculatingPath ? 'animate-spin' : ''} />
+                {isCalculatingPath ? 'Calculating...' : 'Recalculate Path'}
               </Button>
             </div>
           )}

@@ -182,15 +182,16 @@ function SortableTreeNodeItem({
   const isGroup = node.type === 'manual_group' || node.type === 'group';
   const isContainer = isGenerator || isGroup;
 
-  const pluginName = isGenerator && node.plugin_id && plugins[node.plugin_id]
-    ? plugins[node.plugin_id].manifest.name
-    : 'Generator';
+  const pluginName =
+    isGenerator && node.plugin_id && plugins[node.plugin_id] ? plugins[node.plugin_id].manifest.name : 'Generator';
 
   const defaultDisplayName = isGenerator
     ? pluginName
     : isGroup
-    ? (node.name || 'Group')
-    : (node.name ? `Waypoint (${node.name})` : 'Waypoint');
+      ? node.name || 'Group'
+      : node.name
+        ? `Waypoint (${node.name})`
+        : 'Waypoint';
 
   const handleNameSubmit = () => {
     if (nameValue.trim() && nameValue !== node.name) {
@@ -215,13 +216,13 @@ function SortableTreeNodeItem({
               ? 'bg-accent-generator/15 border-accent-generator/50 text-text-base'
               : 'bg-primary-base/15 border-primary-base/50 text-text-base'
             : hasSelectedChild
-            ? isGenerator
-              ? 'bg-accent-generator/10 border-accent-generator/40 ring-1 ring-accent-generator/25 text-text-base'
-              : 'bg-primary-base/10 border-primary-base/40 ring-1 ring-primary-base/25 text-text-base'
-            : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+              ? isGenerator
+                ? 'bg-accent-generator/10 border-accent-generator/40 ring-1 ring-accent-generator/25 text-text-base'
+                : 'bg-primary-base/10 border-primary-base/40 ring-1 ring-primary-base/25 text-text-base'
+              : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
           isFlashing && 'ring-2 ring-primary-base ring-offset-1 shadow-lg bg-primary-base/25 animate-pulse',
           isAnchor && 'border-accent-anchor/60 bg-accent-anchor/20',
-          isAfterInsertion && 'opacity-40 grayscale-[35%] hover:opacity-75'
+          isAfterInsertion && 'opacity-40 grayscale-[35%] hover:opacity-75',
         )}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
@@ -284,12 +285,10 @@ function SortableTreeNodeItem({
           ) : (
             <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
               {!isContainer && globalIndex !== undefined && (
-                <span className="opacity-60 font-mono text-[11px] shrink-0">
-                  [{globalIndex + indexStartIndex}]
-                </span>
+                <span className="opacity-60 font-mono text-[11px] shrink-0">[{globalIndex + indexStartIndex}]</span>
               )}
               <span className="truncate font-medium text-text-base" title={defaultDisplayName}>
-                {isContainer ? (node.name || defaultDisplayName) : defaultDisplayName}
+                {isContainer ? node.name || defaultDisplayName : defaultDisplayName}
               </span>
               {isAnchor && (
                 <span title="Anchor Point" className="shrink-0 flex items-center">
@@ -304,7 +303,7 @@ function SortableTreeNodeItem({
             <span
               className={cn(
                 'w-2 h-2 rounded-full shrink-0 animate-pulse ring-2 ring-surface-panel shadow-xs',
-                isGenerator ? 'bg-accent-generator' : 'bg-primary-base'
+                isGenerator ? 'bg-accent-generator' : 'bg-primary-base',
               )}
               title="選択中の子要素を含んでいます"
             />
@@ -369,12 +368,7 @@ export function WaypointTree() {
     if (isCurrentlyExpanded) {
       next.delete(id);
       if (insertionTarget) {
-        const escaped = escapeCollapsedInsertionTarget(
-          insertionTarget,
-          next,
-          rootNodeIds,
-          nodes
-        );
+        const escaped = escapeCollapsedInsertionTarget(insertionTarget, next, rootNodeIds, nodes);
         if (escaped && (escaped.parentId !== insertionTarget.parentId || escaped.index !== insertionTarget.index)) {
           setInsertionTarget(escaped);
         }
@@ -405,20 +399,17 @@ export function WaypointTree() {
 
   const getWaypointParentId = React.useCallback(
     (id: string) => findNodeParentId(id, rootNodeIds, nodes),
-    [rootNodeIds, nodes]
+    [rootNodeIds, nodes],
   );
 
   const highlightedContainerIds = useMemo(
     () => getHighlightedContainerIds(selectedNodeIds, getWaypointParentId),
-    [selectedNodeIds, getWaypointParentId]
+    [selectedNodeIds, getWaypointParentId],
   );
 
   const { flashingId } = useTreeReveal({
     treeType: 'node',
-    getAncestorIds: React.useCallback(
-      (id: string) => getAncestorIds(id, getWaypointParentId),
-      [getWaypointParentId]
-    ),
+    getAncestorIds: React.useCallback((id: string) => getAncestorIds(id, getWaypointParentId), [getWaypointParentId]),
     setExpanded: setExpandedNodes,
   });
 
@@ -478,9 +469,10 @@ export function WaypointTree() {
       const parentNode = nodes[insertionTarget.parentId];
       const children = parentNode?.children_ids || [];
       const parentVisibleIdx = visibleNodes.findIndex((v) => v.id === insertionTarget.parentId);
-      const parentDepth = parentVisibleIdx !== -1
-        ? visibleNodes[parentVisibleIdx].depth
-        : getNodeDepth(insertionTarget.parentId, rootNodeIds, nodes);
+      const parentDepth =
+        parentVisibleIdx !== -1
+          ? visibleNodes[parentVisibleIdx].depth
+          : getNodeDepth(insertionTarget.parentId, rootNodeIds, nodes);
       insertBarDepth = parentDepth + 1;
 
       let found = false;
@@ -572,9 +564,7 @@ export function WaypointTree() {
   };
 
   const handleCreateGroup = () => {
-    const targetIds = selectedNodeIds.length > 0
-      ? selectedNodeIds
-      : contextMenu?.nodeId ? [contextMenu.nodeId] : [];
+    const targetIds = selectedNodeIds.length > 0 ? selectedNodeIds : contextMenu?.nodeId ? [contextMenu.nodeId] : [];
     if (targetIds.length === 0) return;
 
     const newGroupId = groupNodes(targetIds);
@@ -587,7 +577,7 @@ export function WaypointTree() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -629,12 +619,10 @@ export function WaypointTree() {
 
     // 通常のノードがドラッグされ、挿入バーの上にドロップされた場合
     if (overId === INSERTION_BAR_ID) {
-      const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1
-        ? selectedNodeIds
-        : [activeId];
+      const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1 ? selectedNodeIds : [activeId];
       if (insertionTarget) {
         const { parentId, index } = insertionTarget;
-        const siblings = parentId ? (nodes[parentId]?.children_ids || []) : rootNodeIds;
+        const siblings = parentId ? nodes[parentId]?.children_ids || [] : rootNodeIds;
         if (siblings.length === 0 && parentId) {
           moveNodesInTree(movingIds, parentId, 'inside');
         } else {
@@ -654,9 +642,7 @@ export function WaypointTree() {
     }
 
     // 通常のノード同士のドラッグ移動
-    const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1
-      ? selectedNodeIds
-      : [activeId];
+    const movingIds = selectedNodeIds.includes(activeId) && selectedNodeIds.length > 1 ? selectedNodeIds : [activeId];
 
     if (movingIds.includes(overId)) return;
 
@@ -806,217 +792,219 @@ export function WaypointTree() {
                 <span>グループで貼り付け</span>
               </button>
             </>
-          ) : (() => {
-            const contextNodeId = contextMenu.nodeId;
-            if (!contextNodeId) return null;
+          ) : (
+            (() => {
+              const contextNodeId = contextMenu.nodeId;
+              if (!contextNodeId) return null;
 
-            const targetNode = nodes[contextNodeId];
-            const isContainer = targetNode?.type === 'generator' || targetNode?.type === 'manual_group' || targetNode?.type === 'group';
-            const isInsertable = isInsertableContainer(targetNode);
-            const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextNodeId);
-            const targetIds = isMultiSelected ? selectedNodeIds : [contextNodeId];
+              const targetNode = nodes[contextNodeId];
+              const isContainer =
+                targetNode?.type === 'generator' || targetNode?.type === 'manual_group' || targetNode?.type === 'group';
+              const isInsertable = isInsertableContainer(targetNode);
+              const isMultiSelected = selectedNodeIds.length > 1 && selectedNodeIds.includes(contextNodeId);
+              const targetIds = isMultiSelected ? selectedNodeIds : [contextNodeId];
 
-            return (
-              <>
-                {/* グループ化 (Group) */}
-                <button
-                  onClick={handleCreateGroup}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
-                >
-                  <FolderPlus size={13} className="text-accent-anchor" />
-                  <span>
-                    {targetIds.length > 1
-                      ? `選択項目をグループ化 (${targetIds.length})`
-                      : 'グループ化 (Group)'}
-                  </span>
-                </button>
+              return (
+                <>
+                  {/* グループ化 (Group) */}
+                  <button
+                    onClick={handleCreateGroup}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
+                  >
+                    <FolderPlus size={13} className="text-accent-anchor" />
+                    <span>
+                      {targetIds.length > 1 ? `選択項目をグループ化 (${targetIds.length})` : 'グループ化 (Group)'}
+                    </span>
+                  </button>
 
-                {/* 名前を変更 (Rename) */}
-                <button
-                  onClick={() => {
-                    setEditingNodeId(contextNodeId);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Edit2 size={13} className="text-primary-base" />
-                  <span>名前を変更 (Rename)</span>
-                </button>
-
-                {/* グループ解除 (Ungroup) */}
-                {isContainer && (
+                  {/* 名前を変更 (Rename) */}
                   <button
                     onClick={() => {
-                      ungroupNode(contextNodeId);
+                      setEditingNodeId(contextNodeId);
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Unlink size={13} className="text-accent-anchor" />
-                    <span>グループ解除 (Ungroup)</span>
+                    <Edit2 size={13} className="text-primary-base" />
+                    <span>名前を変更 (Rename)</span>
                   </button>
-                )}
 
-                {/* 挿入位置に設定 */}
-                <button
-                  onClick={() => {
-                    let targetParentId = findNodeParentId(contextNodeId, rootNodeIds, nodes);
-                    let refNodeId = contextNodeId;
-                    while (targetParentId && !isInsertableContainer(nodes[targetParentId])) {
-                      refNodeId = targetParentId;
-                      targetParentId = findNodeParentId(targetParentId, rootNodeIds, nodes);
-                    }
-                    const siblings = targetParentId ? (nodes[targetParentId]?.children_ids || []) : rootNodeIds;
-                    const idx = siblings.indexOf(refNodeId);
-                    setInsertionTarget({ parentId: targetParentId, index: idx + 1 });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <ArrowDownToLine size={13} className="text-primary-base" />
-                  <span>この直後に挿入を設定</span>
-                </button>
-                {isInsertable && (
+                  {/* グループ解除 (Ungroup) */}
+                  {isContainer && (
+                    <button
+                      onClick={() => {
+                        ungroupNode(contextNodeId);
+                        setContextMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    >
+                      <Unlink size={13} className="text-accent-anchor" />
+                      <span>グループ解除 (Ungroup)</span>
+                    </button>
+                  )}
+
+                  {/* 挿入位置に設定 */}
                   <button
                     onClick={() => {
-                      setInsertionTarget({ parentId: contextNodeId, index: 0 });
-                      setExpandedNodes((prev) => new Set([...prev, contextNodeId]));
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                  >
-                    <ArrowDownToLine size={13} className="text-accent-anchor" />
-                    <span>グループ内の先頭に挿入を設定</span>
-                  </button>
-                )}
-
-                <div className="h-px bg-border-base/30 my-0.5" />
-
-                {/* 切り取り (Cut) */}
-                <button
-                  onClick={() => {
-                    cutSelectedMapElements();
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Scissors size={13} className="text-accent-automation" />
-                  <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
-                </button>
-
-                {/* コピー (Copy) */}
-                <button
-                  onClick={() => {
-                    copySelectedMapElements();
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Copy size={13} className="text-accent-automation" />
-                  <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
-                </button>
-
-                {/* 貼り付け (Paste) */}
-                <button
-                  onClick={() => {
-                    pasteMapElements({ asGroup: false });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <ClipboardPaste size={13} className="text-primary-base" />
-                  <span>貼り付け (Paste)</span>
-                </button>
-
-                {/* グループで貼り付け (Paste as Group) */}
-                <button
-                  onClick={() => {
-                    pasteMapElements({ asGroup: true });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <FolderPlus size={13} className="text-primary-base" />
-                  <span>グループで貼り付け</span>
-                </button>
-
-                {/* 複製 (Duplicate) */}
-                <button
-                  onClick={() => {
-                    duplicateNodes(targetIds);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Copy size={13} className="text-accent-automation" />
-                  <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
-                </button>
-
-                {/* 内部プロパティ表示 (モーダル) */}
-                <button
-                  onClick={() => {
-                    const titleName = targetNode?.name || (targetNode?.type === 'generator' ? 'Generator' : 'Waypoint');
-                    openPluginDataModal(
-                      `内部プロパティ: ${titleName}`,
-                      targetNode?.plugin_data,
-                      `ノードID: ${targetNode?.id} • 内部メタデータ (Read-only)`
-                    );
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Code2 size={13} className="text-accent-automation" />
-                  <span>内部プロパティを表示</span>
-                </button>
-
-                {/* インスペクターを開く */}
-                <button
-                  onClick={() => {
-                    selectNodes([contextNodeId]);
-                    setRightPanelActiveTab('inspector');
-                    setRightPanelOpen(true);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Layers size={13} className="text-text-muted" />
-                  <span>インスペクターを開く</span>
-                </button>
-
-                {/* アンカー設定 (ウェイポイントの場合) */}
-                {!isContainer && !isMultiSelected && (
-                  <button
-                    onClick={() => {
-                      if (anchorNodeId === contextNodeId) {
-                        setAnchorNode(null);
-                      } else {
-                        setAnchorNode(contextNodeId);
+                      let targetParentId = findNodeParentId(contextNodeId, rootNodeIds, nodes);
+                      let refNodeId = contextNodeId;
+                      while (targetParentId && !isInsertableContainer(nodes[targetParentId])) {
+                        refNodeId = targetParentId;
+                        targetParentId = findNodeParentId(targetParentId, rootNodeIds, nodes);
                       }
+                      const siblings = targetParentId ? nodes[targetParentId]?.children_ids || [] : rootNodeIds;
+                      const idx = siblings.indexOf(refNodeId);
+                      setInsertionTarget({ parentId: targetParentId, index: idx + 1 });
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Anchor size={13} className="text-accent-anchor" />
-                    <span>{anchorNodeId === contextNodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
+                    <ArrowDownToLine size={13} className="text-primary-base" />
+                    <span>この直後に挿入を設定</span>
                   </button>
-                )}
+                  {isInsertable && (
+                    <button
+                      onClick={() => {
+                        setInsertionTarget({ parentId: contextNodeId, index: 0 });
+                        setExpandedNodes((prev) => new Set([...prev, contextNodeId]));
+                        setContextMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    >
+                      <ArrowDownToLine size={13} className="text-accent-anchor" />
+                      <span>グループ内の先頭に挿入を設定</span>
+                    </button>
+                  )}
 
-                <div className="h-px bg-border-base/30 my-0.5" />
+                  <div className="h-px bg-border-base/30 my-0.5" />
 
-                {/* 削除 */}
-                <button
-                  onClick={() => {
-                    removeNodes(targetIds);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
-                >
-                  <Trash2 size={13} />
-                  <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
-                </button>
-              </>
-            );
-          })()}
+                  {/* 切り取り (Cut) */}
+                  <button
+                    onClick={() => {
+                      cutSelectedMapElements();
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Scissors size={13} className="text-accent-automation" />
+                    <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
+                  </button>
+
+                  {/* コピー (Copy) */}
+                  <button
+                    onClick={() => {
+                      copySelectedMapElements();
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Copy size={13} className="text-accent-automation" />
+                    <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
+                  </button>
+
+                  {/* 貼り付け (Paste) */}
+                  <button
+                    onClick={() => {
+                      pasteMapElements({ asGroup: false });
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <ClipboardPaste size={13} className="text-primary-base" />
+                    <span>貼り付け (Paste)</span>
+                  </button>
+
+                  {/* グループで貼り付け (Paste as Group) */}
+                  <button
+                    onClick={() => {
+                      pasteMapElements({ asGroup: true });
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <FolderPlus size={13} className="text-primary-base" />
+                    <span>グループで貼り付け</span>
+                  </button>
+
+                  {/* 複製 (Duplicate) */}
+                  <button
+                    onClick={() => {
+                      duplicateNodes(targetIds);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Copy size={13} className="text-accent-automation" />
+                    <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
+                  </button>
+
+                  {/* 内部プロパティ表示 (モーダル) */}
+                  <button
+                    onClick={() => {
+                      const titleName =
+                        targetNode?.name || (targetNode?.type === 'generator' ? 'Generator' : 'Waypoint');
+                      openPluginDataModal(
+                        `内部プロパティ: ${titleName}`,
+                        targetNode?.plugin_data,
+                        `ノードID: ${targetNode?.id} • 内部メタデータ (Read-only)`,
+                      );
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Code2 size={13} className="text-accent-automation" />
+                    <span>内部プロパティを表示</span>
+                  </button>
+
+                  {/* インスペクターを開く */}
+                  <button
+                    onClick={() => {
+                      selectNodes([contextNodeId]);
+                      setRightPanelActiveTab('inspector');
+                      setRightPanelOpen(true);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Layers size={13} className="text-text-muted" />
+                    <span>インスペクターを開く</span>
+                  </button>
+
+                  {/* アンカー設定 (ウェイポイントの場合) */}
+                  {!isContainer && !isMultiSelected && (
+                    <button
+                      onClick={() => {
+                        if (anchorNodeId === contextNodeId) {
+                          setAnchorNode(null);
+                        } else {
+                          setAnchorNode(contextNodeId);
+                        }
+                        setContextMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    >
+                      <Anchor size={13} className="text-accent-anchor" />
+                      <span>{anchorNodeId === contextNodeId ? 'アンカー設定を解除' : 'アンカーに設定'}</span>
+                    </button>
+                  )}
+
+                  <div className="h-px bg-border-base/30 my-0.5" />
+
+                  {/* 削除 */}
+                  <button
+                    onClick={() => {
+                      removeNodes(targetIds);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
+                  </button>
+                </>
+              );
+            })()
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
-import { NumericInput } from "../NumericInput";
-import { FieldLabel } from "./FieldLabel";
-import { cn } from "../../../utils/cn";
+import { NumericInput } from '../NumericInput';
+import { FieldLabel } from './FieldLabel';
+import { cn } from '../../../utils/cn';
 
 export interface LabeledNumericInputProps {
   label: string;
@@ -32,7 +32,7 @@ export function LabeledNumericInput({
   onEditEnd,
 }: LabeledNumericInputProps) {
   return (
-    <div className={cn("space-y-0.5", className)}>
+    <div className={cn('space-y-0.5', className)}>
       <FieldLabel className="mb-0.5">{label}</FieldLabel>
       <NumericInput
         value={value}
@@ -42,7 +42,7 @@ export function LabeledNumericInput({
         min={min}
         max={max}
         disabled={disabled}
-        className={cn("h-7 text-[11px]", inputClassName)}
+        className={cn('h-7 text-[11px]', inputClassName)}
         onEditStart={onEditStart}
         onEditEnd={onEditEnd}
       />

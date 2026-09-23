@@ -20,11 +20,10 @@ pub struct OptionsSchema {
 
 pub fn load_options_schema(yaml_path: &str) -> Result<OptionsSchema, String> {
     let path = Path::new(yaml_path);
-    let yaml_content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read schema YAML: {}", e))?;
-    
-    let schema: OptionsSchema = serde_yaml::from_str(&yaml_content)
-        .map_err(|e| format!("Failed to parse schema YAML: {}", e))?;
+    let yaml_content = fs::read_to_string(path).map_err(|e| format!("Failed to read schema YAML: {}", e))?;
+
+    let schema: OptionsSchema =
+        serde_yaml::from_str(&yaml_content).map_err(|e| format!("Failed to parse schema YAML: {}", e))?;
 
     Ok(schema)
 }
@@ -49,7 +48,7 @@ options:
 "#;
         let schema: OptionsSchema = serde_yaml::from_str(yaml_str).expect("Failed to parse valid schema");
         assert_eq!(schema.options.len(), 2);
-        
+
         let opt1 = &schema.options[0];
         assert_eq!(opt1.name, "velocity");
         assert_eq!(opt1.option_type, "float");

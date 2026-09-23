@@ -1,4 +1,4 @@
-use crate::plugins::models::{PluginManifest, PluginInstance};
+use crate::plugins::models::{PluginInstance, PluginManifest};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,7 +22,7 @@ pub fn detect_sdk_version(plugin_dir: &Path) -> Option<String> {
             }
         }
     }
-    
+
     // Fallback/Legacy structure: wpt_plugin.py (still used during transition or for simple cases)
     let sdk_path = plugin_dir.join("wpt_plugin.py");
     if sdk_path.exists() {
@@ -54,10 +54,7 @@ pub fn get_bundled_sdk_version(resource_dir: Option<&Path>) -> Option<String> {
     }
     // Fallback for development environment
     if let Ok(current_dir) = std::env::current_dir() {
-        for path in &[
-            current_dir.join("../python_sdk"),
-            current_dir.join("python_sdk"),
-        ] {
+        for path in &[current_dir.join("../python_sdk"), current_dir.join("python_sdk")] {
             let resolved = path.canonicalize().unwrap_or(path.clone());
             if let Some(v) = detect_sdk_version(&resolved) {
                 return Some(v);
@@ -112,7 +109,10 @@ impl PluginManager {
         if !plugins_dir.exists() {
             let _ = fs::create_dir_all(&plugins_dir);
         }
-        Self { plugins_dir, resource_dir }
+        Self {
+            plugins_dir,
+            resource_dir,
+        }
     }
 
     pub fn scan_plugins(&self) -> Result<Vec<PluginInstance>, String> {
@@ -165,14 +165,14 @@ impl PluginManager {
         #[cfg(all(debug_assertions, not(test)))]
         {
             if let Ok(current_dir) = std::env::current_dir() {
-                let dev_paths = vec![
-                    current_dir.join("../python_sdk"),
-                    current_dir.join("python_sdk"),
-                ];
+                let dev_paths = vec![current_dir.join("../python_sdk"), current_dir.join("python_sdk")];
                 for dev_dir in dev_paths {
                     let dev_dir = dev_dir.canonicalize().unwrap_or(dev_dir);
                     if dev_dir.exists() && dev_dir.is_dir() {
-                        println!("[DEBUG/RUST] (DEBUG-MODE) Prioritizing development python_sdk at: {:?}", dev_dir);
+                        println!(
+                            "[DEBUG/RUST] (DEBUG-MODE) Prioritizing development python_sdk at: {:?}",
+                            dev_dir
+                        );
                         plugins.extend(Self::scan_plugins_in_dir(&dev_dir, true));
                         scanned_builtin = true;
                         break;
@@ -211,7 +211,12 @@ impl PluginManager {
                 let appdir_path = Path::new(&appdir);
                 // In AppImage, resources are usually in usr/lib/<product>/resources
                 let candidates = vec![
-                    appdir_path.join("usr").join("lib").join("waypoint-tool").join("resources").join("python_sdk"),
+                    appdir_path
+                        .join("usr")
+                        .join("lib")
+                        .join("waypoint-tool")
+                        .join("resources")
+                        .join("python_sdk"),
                     appdir_path.join("usr").join("bin").join("resources").join("python_sdk"),
                 ];
                 for python_sdk_dir in candidates {
@@ -340,8 +345,12 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let plugin_dir = tmp.path().join("my_plugin");
         fs::create_dir_all(&plugin_dir).unwrap();
-        fs::write(plugin_dir.join("manifest.json"), r#"{"name":"P","type":"python","executable":"main.py"}"#).unwrap();
-        
+        fs::write(
+            plugin_dir.join("manifest.json"),
+            r#"{"name":"P","type":"python","executable":"main.py"}"#,
+        )
+        .unwrap();
+
         let sdk_dir = plugin_dir.join("wpt_plugin");
         fs::create_dir_all(&sdk_dir).unwrap();
         fs::write(sdk_dir.join("__init__.py"), "__version__ = '2.0.0'\n").unwrap();
@@ -355,17 +364,25 @@ mod tests {
     fn test_plugin_manager_scan_plugins_combined() {
         let user_tmp = TempDir::new().unwrap();
         let builtin_tmp = TempDir::new().unwrap();
-        
+
         // Create a user plugin
-        create_test_plugin(user_tmp.path().join("plugins").as_path(), "user_p", r#"{"name":"User","type":"python","executable":"m.py"}"#);
-        
+        create_test_plugin(
+            user_tmp.path().join("plugins").as_path(),
+            "user_p",
+            r#"{"name":"User","type":"python","executable":"m.py"}"#,
+        );
+
         // Create a builtin plugin (nested in python_sdk as per manager logic)
         let sdk_dir = builtin_tmp.path().join("python_sdk");
-        create_test_plugin(&sdk_dir, "builtin_p", r#"{"name":"Builtin","type":"python","executable":"m.py"}"#);
-        
+        create_test_plugin(
+            &sdk_dir,
+            "builtin_p",
+            r#"{"name":"Builtin","type":"python","executable":"m.py"}"#,
+        );
+
         let manager = PluginManager::new(user_tmp.path(), Some(builtin_tmp.path().to_path_buf()));
         let plugins = manager.scan_plugins().unwrap();
-        
+
         assert_eq!(plugins.len(), 2);
         assert!(plugins.iter().any(|p| p.manifest.name == "User" && !p.is_builtin));
         assert!(plugins.iter().any(|p| p.manifest.name == "Builtin" && p.is_builtin));

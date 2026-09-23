@@ -32,10 +32,10 @@ vi.mock('../../stores/appStore', () => ({
 
 // Mock Child Components
 vi.mock('./ExportModal', () => ({
-  ExportModal: ({ isOpen }: any) => isOpen ? <div data-testid="export-modal" /> : null,
+  ExportModal: ({ isOpen }: any) => (isOpen ? <div data-testid="export-modal" /> : null),
 }));
 vi.mock('./ImportModal', () => ({
-  ImportModal: ({ isOpen }: any) => isOpen ? <div data-testid="import-modal" /> : null,
+  ImportModal: ({ isOpen }: any) => (isOpen ? <div data-testid="import-modal" /> : null),
 }));
 
 describe('ToolPanel', () => {
@@ -47,27 +47,29 @@ describe('ToolPanel', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      activeTool: 'select',
-      activePluginId: null,
-      plugins: {},
-      pluginSettings: [],
-      isExportModalOpen: false,
-      isImportModalOpen: false,
-      isMapEditMode: false,
-      mapEditSubTool: 'rect',
-      mapEditFillValue: 0,
-      mapEditBrushSize: 10,
-      setMapEditMode: vi.fn(),
-      setMapEditSubTool: vi.fn(),
-      setMapEditFillValue: vi.fn(),
-      setMapEditBrushSize: vi.fn(),
-      setActiveTool: mockSetActiveTool,
-      setActivePlugin: mockSetActivePlugin,
-      setExportModalOpen: mockSetExportModalOpen,
-      setImportModalOpen: mockSetImportModalOpen,
-      setSettingsModalOpen: mockSetSettingsModalOpen,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        activeTool: 'select',
+        activePluginId: null,
+        plugins: {},
+        pluginSettings: [],
+        isExportModalOpen: false,
+        isImportModalOpen: false,
+        isMapEditMode: false,
+        mapEditSubTool: 'rect',
+        mapEditFillValue: 0,
+        mapEditBrushSize: 10,
+        setMapEditMode: vi.fn(),
+        setMapEditSubTool: vi.fn(),
+        setMapEditFillValue: vi.fn(),
+        setMapEditBrushSize: vi.fn(),
+        setActiveTool: mockSetActiveTool,
+        setActivePlugin: mockSetActivePlugin,
+        setExportModalOpen: mockSetExportModalOpen,
+        setImportModalOpen: mockSetImportModalOpen,
+        setSettingsModalOpen: mockSetSettingsModalOpen,
+      }),
+    );
   });
 
   it('renders basic tools and handles switching', () => {
@@ -86,7 +88,7 @@ describe('ToolPanel', () => {
 
   it('opens export modal and settings modal', () => {
     render(<ToolPanel />);
-    
+
     const exportBtn = screen.getByTitle(/export waypoints/i);
     fireEvent.click(exportBtn);
     expect(mockSetExportModalOpen).toHaveBeenCalledWith(true);

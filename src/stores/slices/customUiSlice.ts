@@ -25,10 +25,11 @@ export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> 
   customUiPresetType: null,
   customUiPresetPath: null,
 
-  setCustomUiConfig: (config) => set({
-    customUiConfig: config,
-    isCustomUiMode: config !== null,
-  }),
+  setCustomUiConfig: (config) =>
+    set({
+      customUiConfig: config,
+      isCustomUiMode: config !== null,
+    }),
 
   setIsCustomUiMode: (enabled) => set({ isCustomUiMode: enabled }),
 

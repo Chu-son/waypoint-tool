@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  matchesSemVer,
-  parseSemVer,
-  compareSemVer,
-  resolvePluginDependencies,
-} from './dependencyResolver';
+import { matchesSemVer, parseSemVer, compareSemVer, resolvePluginDependencies } from './dependencyResolver';
 import { PluginInstance } from '../types/store';
 
 describe('SemVer Matching', () => {
@@ -75,7 +70,7 @@ describe('resolvePluginDependencies', () => {
     id: string,
     version: string,
     deps: { id: string; version: string }[] = [],
-    steps?: { step_id: string; plugin_id: string }[]
+    steps?: { step_id: string; plugin_id: string }[],
   ): PluginInstance => ({
     id,
     folder_path: `/plugins/${id}`,
@@ -94,9 +89,7 @@ describe('resolvePluginDependencies', () => {
 
   it('returns valid report when all dependencies are satisfied', () => {
     const geomLib = createMockPlugin('geom_lib', '1.5.0');
-    const mainPlugin = createMockPlugin('main_plugin', '1.0.0', [
-      { id: 'geom_lib', version: '^1.2.0' },
-    ]);
+    const mainPlugin = createMockPlugin('main_plugin', '1.0.0', [{ id: 'geom_lib', version: '^1.2.0' }]);
 
     const allPlugins = {
       geom_lib: geomLib,
@@ -113,9 +106,7 @@ describe('resolvePluginDependencies', () => {
   });
 
   it('detects missing dependencies', () => {
-    const mainPlugin = createMockPlugin('main_plugin', '1.0.0', [
-      { id: 'non_existent_lib', version: '>=1.0.0' },
-    ]);
+    const mainPlugin = createMockPlugin('main_plugin', '1.0.0', [{ id: 'non_existent_lib', version: '>=1.0.0' }]);
 
     const report = resolvePluginDependencies(mainPlugin, { main_plugin: mainPlugin });
     expect(report.isValid).toBe(false);
@@ -127,9 +118,7 @@ describe('resolvePluginDependencies', () => {
 
   it('detects version mismatches', () => {
     const oldLib = createMockPlugin('geom_lib', '0.9.0');
-    const mainPlugin = createMockPlugin('main_plugin', '1.0.0', [
-      { id: 'geom_lib', version: '>=1.0.0' },
-    ]);
+    const mainPlugin = createMockPlugin('main_plugin', '1.0.0', [{ id: 'geom_lib', version: '>=1.0.0' }]);
 
     const report = resolvePluginDependencies(mainPlugin, {
       geom_lib: oldLib,
@@ -159,9 +148,7 @@ describe('resolvePluginDependencies', () => {
   it('detects circular dependencies in pipelines (A -> B -> C -> A)', () => {
     const pluginA = createMockPlugin('pluginA', '1.0.0', [{ id: 'pluginB', version: '*' }]);
     const pluginB = createMockPlugin('pluginB', '1.0.0', [{ id: 'pluginC', version: '*' }]);
-    const pluginC = createMockPlugin('pluginC', '1.0.0', [], [
-      { step_id: 's1', plugin_id: 'pluginA' },
-    ]);
+    const pluginC = createMockPlugin('pluginC', '1.0.0', [], [{ step_id: 's1', plugin_id: 'pluginA' }]);
 
     const allPlugins = { pluginA, pluginB, pluginC };
 
@@ -173,9 +160,7 @@ describe('resolvePluginDependencies', () => {
 
   it('automatically treats pipeline step plugins as dependencies', () => {
     const stepPlugin = createMockPlugin('step_plugin', '1.0.0');
-    const pipeline = createMockPlugin('my_pipeline', '1.0.0', [], [
-      { step_id: 'step1', plugin_id: 'step_plugin' },
-    ]);
+    const pipeline = createMockPlugin('my_pipeline', '1.0.0', [], [{ step_id: 'step1', plugin_id: 'step_plugin' }]);
 
     const report = resolvePluginDependencies(pipeline, {
       step_plugin: stepPlugin,

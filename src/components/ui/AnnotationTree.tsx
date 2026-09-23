@@ -154,7 +154,7 @@ function SortableAnnotationTreeNode({
     }
   };
 
-  const isVisible = isGroup ? group?.visible ?? true : obj?.visible ?? true;
+  const isVisible = isGroup ? (group?.visible ?? true) : (obj?.visible ?? true);
   const isGenerator = isGroup && group?.type === 'generator';
   const childCount = group?.children_ids?.length || 0;
 
@@ -169,10 +169,10 @@ function SortableAnnotationTreeNode({
           isSelected
             ? 'bg-primary-base/15 border-primary-base/50 text-text-base font-medium'
             : hasSelectedChild
-            ? 'bg-primary-base/10 border-primary-base/40 ring-1 ring-primary-base/25 text-text-base font-medium'
-            : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
+              ? 'bg-primary-base/10 border-primary-base/40 ring-1 ring-primary-base/25 text-text-base font-medium'
+              : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
           isFlashing && 'ring-2 ring-primary-base ring-offset-1 shadow-lg bg-primary-base/25 animate-pulse',
-          !isVisible && 'opacity-60 grayscale-[0.3]'
+          !isVisible && 'opacity-60 grayscale-[0.3]',
         )}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
@@ -206,7 +206,11 @@ function SortableAnnotationTreeNode({
           {/* Group / Annotation Icon */}
           <div className="shrink-0 flex items-center gap-1">
             {isGroup ? (
-              isGenerator ? <Wand2 size={13} className="text-primary-base" /> : <Folder size={13} className="text-accent-anchor" />
+              isGenerator ? (
+                <Wand2 size={13} className="text-primary-base" />
+              ) : (
+                <Folder size={13} className="text-accent-anchor" />
+              )
             ) : obj ? (
               <>
                 <span
@@ -238,10 +242,7 @@ function SortableAnnotationTreeNode({
               className="flex-1 min-w-0 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
             />
           ) : (
-            <span
-              className="truncate font-medium flex-1 min-w-0 text-text-base"
-              title={group?.name || obj?.name || ''}
-            >
+            <span className="truncate font-medium flex-1 min-w-0 text-text-base" title={group?.name || obj?.name || ''}>
               {group?.name || obj?.name || ''}
             </span>
           )}
@@ -278,7 +279,7 @@ function SortableAnnotationTreeNode({
               }}
               className={cn(
                 'w-5 h-5 p-0 hover:bg-surface-hover',
-                obj.labelVisible ? 'text-primary-base' : 'text-text-muted/40 hover:text-text-muted'
+                obj.labelVisible ? 'text-primary-base' : 'text-text-muted/40 hover:text-text-muted',
               )}
               title={obj.labelVisible ? 'ラベル: 表示中' : 'ラベル: 非表示中'}
             >
@@ -295,7 +296,7 @@ function SortableAnnotationTreeNode({
             }}
             className={cn(
               'w-5 h-5 p-0 hover:bg-surface-hover',
-              isVisible ? 'text-text-base' : 'text-text-muted/40 hover:text-text-muted'
+              isVisible ? 'text-text-base' : 'text-text-muted/40 hover:text-text-muted',
             )}
             title={isVisible ? '表示中' : '非表示中'}
           >
@@ -366,7 +367,7 @@ export function AnnotationTree() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const toggleGroupExpand = (groupId: string) => {
@@ -389,20 +390,17 @@ export function AnnotationTree() {
 
   const getAnnotParentId = React.useCallback(
     (id: string) => getAnnotationParentId(id, rootAnnotationIds, annotationGroups, annotationObjects),
-    [rootAnnotationIds, annotationGroups, annotationObjects]
+    [rootAnnotationIds, annotationGroups, annotationObjects],
   );
 
   const highlightedContainerIds = useMemo(
     () => getHighlightedContainerIds(selectedAnnotationIds, getAnnotParentId),
-    [selectedAnnotationIds, getAnnotParentId]
+    [selectedAnnotationIds, getAnnotParentId],
   );
 
   const { flashingId } = useTreeReveal({
     treeType: 'annotation',
-    getAncestorIds: React.useCallback(
-      (id: string) => getAncestorIds(id, getAnnotParentId),
-      [getAnnotParentId]
-    ),
+    getAncestorIds: React.useCallback((id: string) => getAncestorIds(id, getAnnotParentId), [getAnnotParentId]),
     setExpanded: setExpandedGroups,
   });
 
@@ -425,9 +423,8 @@ export function AnnotationTree() {
   };
 
   const handleCreateGroup = () => {
-    const targetIds = selectedAnnotationIds.length > 0
-      ? selectedAnnotationIds
-      : contextMenu?.id ? [contextMenu.id] : [];
+    const targetIds =
+      selectedAnnotationIds.length > 0 ? selectedAnnotationIds : contextMenu?.id ? [contextMenu.id] : [];
     if (targetIds.length === 0) return;
 
     const newGroupId = groupAnnotations(targetIds);
@@ -450,9 +447,8 @@ export function AnnotationTree() {
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    const movingIds = selectedAnnotationIds.includes(activeId) && selectedAnnotationIds.length > 1
-      ? selectedAnnotationIds
-      : [activeId];
+    const movingIds =
+      selectedAnnotationIds.includes(activeId) && selectedAnnotationIds.length > 1 ? selectedAnnotationIds : [activeId];
 
     if (movingIds.includes(overId)) return;
 
@@ -460,9 +456,7 @@ export function AnnotationTree() {
     moveAnnotationsInTree(movingIds, overId, position);
   };
 
-  const activeDragItem = activeDragId
-    ? annotationObjects[activeDragId] || annotationGroups[activeDragId]
-    : null;
+  const activeDragItem = activeDragId ? annotationObjects[activeDragId] || annotationGroups[activeDragId] : null;
 
   return (
     <div
@@ -487,7 +481,10 @@ export function AnnotationTree() {
             variant="ghost"
             size="sm"
             onClick={() => setShowAnnotationLabels(!showAnnotationLabels)}
-            className={cn('h-6 px-1.5 text-[11px] gap-1', showAnnotationLabels ? 'text-primary-base' : 'text-text-muted')}
+            className={cn(
+              'h-6 px-1.5 text-[11px] gap-1',
+              showAnnotationLabels ? 'text-primary-base' : 'text-text-muted',
+            )}
             title={showAnnotationLabels ? '全ラベル非表示' : '全ラベル表示'}
           >
             <Tag size={12} />
@@ -630,173 +627,173 @@ export function AnnotationTree() {
                 <span>グループで貼り付け</span>
               </button>
             </>
-          ) : (() => {
-            const contextId = contextMenu.id;
-            if (!contextId) return null;
+          ) : (
+            (() => {
+              const contextId = contextMenu.id;
+              if (!contextId) return null;
 
-            const isGroup = !!annotationGroups[contextId];
-            const groupObj = isGroup ? annotationGroups[contextId] : undefined;
-            const itemObj = !isGroup ? annotationObjects[contextId] : undefined;
-            const isMultiSelected = selectedAnnotationIds.length > 1 && selectedAnnotationIds.includes(contextId);
-            const targetIds = isMultiSelected ? selectedAnnotationIds : [contextId];
+              const isGroup = !!annotationGroups[contextId];
+              const groupObj = isGroup ? annotationGroups[contextId] : undefined;
+              const itemObj = !isGroup ? annotationObjects[contextId] : undefined;
+              const isMultiSelected = selectedAnnotationIds.length > 1 && selectedAnnotationIds.includes(contextId);
+              const targetIds = isMultiSelected ? selectedAnnotationIds : [contextId];
 
-            return (
-              <>
-                {/* グループ化 (Group) */}
-                <button
-                  onClick={handleCreateGroup}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
-                >
-                  <FolderPlus size={13} className="text-accent-anchor" />
-                  <span>
-                    {targetIds.length > 1
-                      ? `選択項目をグループ化 (${targetIds.length})`
-                      : 'グループ化 (Group)'}
-                  </span>
-                </button>
+              return (
+                <>
+                  {/* グループ化 (Group) */}
+                  <button
+                    onClick={handleCreateGroup}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
+                  >
+                    <FolderPlus size={13} className="text-accent-anchor" />
+                    <span>
+                      {targetIds.length > 1 ? `選択項目をグループ化 (${targetIds.length})` : 'グループ化 (Group)'}
+                    </span>
+                  </button>
 
-                {/* 名前を変更 (Rename) */}
-                <button
-                  onClick={() => {
-                    setEditingId(contextId);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Edit2 size={13} className="text-primary-base" />
-                  <span>名前を変更 (Rename)</span>
-                </button>
-
-                {/* グループ解除 (Ungroup) */}
-                {isGroup && (
+                  {/* 名前を変更 (Rename) */}
                   <button
                     onClick={() => {
-                      ungroupAnnotation(contextId);
+                      setEditingId(contextId);
                       setContextMenu(null);
                     }}
                     className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Unlink size={13} className="text-accent-anchor" />
-                    <span>グループ解除 (Ungroup)</span>
+                    <Edit2 size={13} className="text-primary-base" />
+                    <span>名前を変更 (Rename)</span>
                   </button>
-                )}
 
-                <div className="h-px bg-border-base/30 my-0.5" />
+                  {/* グループ解除 (Ungroup) */}
+                  {isGroup && (
+                    <button
+                      onClick={() => {
+                        ungroupAnnotation(contextId);
+                        setContextMenu(null);
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    >
+                      <Unlink size={13} className="text-accent-anchor" />
+                      <span>グループ解除 (Ungroup)</span>
+                    </button>
+                  )}
 
-                {/* 切り取り (Cut) */}
-                <button
-                  onClick={() => {
-                    cutSelectedMapElements();
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Scissors size={13} className="text-accent-automation" />
-                  <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
-                </button>
+                  <div className="h-px bg-border-base/30 my-0.5" />
 
-                {/* コピー (Copy) */}
-                <button
-                  onClick={() => {
-                    copySelectedMapElements();
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Copy size={13} className="text-accent-automation" />
-                  <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
-                </button>
+                  {/* 切り取り (Cut) */}
+                  <button
+                    onClick={() => {
+                      cutSelectedMapElements();
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Scissors size={13} className="text-accent-automation" />
+                    <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
+                  </button>
 
-                {/* 貼り付け (Paste) */}
-                <button
-                  onClick={() => {
-                    pasteMapElements({ asGroup: false });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <ClipboardPaste size={13} className="text-primary-base" />
-                  <span>貼り付け (Paste)</span>
-                </button>
+                  {/* コピー (Copy) */}
+                  <button
+                    onClick={() => {
+                      copySelectedMapElements();
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Copy size={13} className="text-accent-automation" />
+                    <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
+                  </button>
 
-                {/* グループで貼り付け (Paste as Group) */}
-                <button
-                  onClick={() => {
-                    pasteMapElements({ asGroup: true });
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <FolderPlus size={13} className="text-primary-base" />
-                  <span>グループで貼り付け</span>
-                </button>
+                  {/* 貼り付け (Paste) */}
+                  <button
+                    onClick={() => {
+                      pasteMapElements({ asGroup: false });
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <ClipboardPaste size={13} className="text-primary-base" />
+                    <span>貼り付け (Paste)</span>
+                  </button>
 
-                {/* 複製 (Duplicate) */}
-                <button
-                  onClick={() => {
-                    duplicateAnnotations(targetIds);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Copy size={13} className="text-accent-automation" />
-                  <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
-                </button>
+                  {/* グループで貼り付け (Paste as Group) */}
+                  <button
+                    onClick={() => {
+                      pasteMapElements({ asGroup: true });
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <FolderPlus size={13} className="text-primary-base" />
+                    <span>グループで貼り付け</span>
+                  </button>
 
-                {/* 内部プロパティ表示 (モーダル) */}
-                <button
-                  onClick={() => {
-                    if (isGroup) {
-                      openPluginDataModal(
-                        `グループ: ${groupObj?.name || 'Group'}`,
-                        groupObj?.plugin_data,
-                        `プラグイン: ${groupObj?.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`
-                      );
-                    } else {
-                      openPluginDataModal(
-                        `アノテーション: ${itemObj?.name || 'Annotation'}`,
-                        itemObj?.plugin_data,
-                        `タイプ: ${itemObj?.type} • 内部メタデータ (Read-only)`
-                      );
-                    }
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Code2 size={13} className="text-accent-automation" />
-                  <span>内部プロパティを表示</span>
-                </button>
+                  {/* 複製 (Duplicate) */}
+                  <button
+                    onClick={() => {
+                      duplicateAnnotations(targetIds);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Copy size={13} className="text-accent-automation" />
+                    <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
+                  </button>
 
-                {/* インスペクターを開く */}
-                <button
-                  onClick={() => {
-                    selectAnnotationObjects([contextId]);
-                    setRightPanelActiveTab('inspector');
-                    setRightPanelOpen(true);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
-                >
-                  <Folder size={13} className="text-text-muted" />
-                  <span>インスペクターを開く</span>
-                </button>
+                  {/* 内部プロパティ表示 (モーダル) */}
+                  <button
+                    onClick={() => {
+                      if (isGroup) {
+                        openPluginDataModal(
+                          `グループ: ${groupObj?.name || 'Group'}`,
+                          groupObj?.plugin_data,
+                          `プラグイン: ${groupObj?.plugin_id || 'Manual'} • 内部メタデータ (Read-only)`,
+                        );
+                      } else {
+                        openPluginDataModal(
+                          `アノテーション: ${itemObj?.name || 'Annotation'}`,
+                          itemObj?.plugin_data,
+                          `タイプ: ${itemObj?.type} • 内部メタデータ (Read-only)`,
+                        );
+                      }
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Code2 size={13} className="text-accent-automation" />
+                    <span>内部プロパティを表示</span>
+                  </button>
 
-                <div className="h-px bg-border-base/30 my-0.5" />
+                  {/* インスペクターを開く */}
+                  <button
+                    onClick={() => {
+                      selectAnnotationObjects([contextId]);
+                      setRightPanelActiveTab('inspector');
+                      setRightPanelOpen(true);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  >
+                    <Folder size={13} className="text-text-muted" />
+                    <span>インスペクターを開く</span>
+                  </button>
 
-                {/* 削除 */}
-                <button
-                  onClick={() => {
-                    removeAnnotationObjects(targetIds);
-                    setContextMenu(null);
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
-                >
-                  <Trash2 size={13} />
-                  <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
-                </button>
-              </>
-            );
-          })()}
+                  <div className="h-px bg-border-base/30 my-0.5" />
+
+                  {/* 削除 */}
+                  <button
+                    onClick={() => {
+                      removeAnnotationObjects(targetIds);
+                      setContextMenu(null);
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
+                  </button>
+                </>
+              );
+            })()
+          )}
         </div>
       )}
     </div>

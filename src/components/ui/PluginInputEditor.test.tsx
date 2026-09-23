@@ -41,7 +41,7 @@ describe('PluginInputEditor', () => {
           mode="creation"
           isActive={true}
           hasData={false}
-        />
+        />,
       );
 
       expect(screen.getByText('Start Point')).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('PluginInputEditor', () => {
           mode="creation"
           isActive={true}
           hasData={true}
-        />
+        />,
       );
 
       const xInput = screen.getByDisplayValue('1.23');
@@ -72,13 +72,7 @@ describe('PluginInputEditor', () => {
 
     it('renders rectangle input empty state correctly', () => {
       render(
-        <PluginInputEditor
-          {...baseProps}
-          input={rectInput}
-          interactionData={null}
-          mode="creation"
-          isActive={true}
-        />
+        <PluginInputEditor {...baseProps} input={rectInput} interactionData={null} mode="creation" isActive={true} />,
       );
 
       expect(screen.getByText('Click and drag on map to draw')).toBeInTheDocument();
@@ -99,12 +93,12 @@ describe('PluginInputEditor', () => {
           interactionData={rectData}
           mode="creation"
           isActive={true}
-        />
+        />,
       );
 
       expect(screen.getByDisplayValue('10')).toBeInTheDocument(); // Width
-      expect(screen.getByDisplayValue('5')).toBeInTheDocument();  // Height
-      expect(screen.getByDisplayValue('45')).toBeInTheDocument();   // Yaw in degrees
+      expect(screen.getByDisplayValue('5')).toBeInTheDocument(); // Height
+      expect(screen.getByDisplayValue('45')).toBeInTheDocument(); // Yaw in degrees
 
       const widthInput = screen.getByDisplayValue('10');
       fireEvent.change(widthInput, { target: { value: '15' } });
@@ -114,14 +108,7 @@ describe('PluginInputEditor', () => {
 
   describe('Edit Mode', () => {
     it('renders edit mode for point correctly', () => {
-      render(
-        <PluginInputEditor
-          {...baseProps}
-          input={pointInput}
-          interactionData={{ x: 10, y: 20 }}
-          mode="edit"
-        />
-      );
+      render(<PluginInputEditor {...baseProps} input={pointInput} interactionData={{ x: 10, y: 20 }} mode="edit" />);
 
       expect(screen.getByText('(Point)')).toBeInTheDocument();
       expect(screen.getByDisplayValue('10')).toBeInTheDocument();
@@ -135,7 +122,7 @@ describe('PluginInputEditor', () => {
           input={rectInput}
           interactionData={{ center: { x: 5, y: 5 }, width: 8, height: 4, yaw: 0 }}
           mode="edit"
-        />
+        />,
       );
 
       expect(screen.getByText('(Rectangle Area)')).toBeInTheDocument();
@@ -163,7 +150,7 @@ describe('PluginInputEditor', () => {
           mode="creation"
           isActive={true}
           hasData={false}
-        />
+        />,
       );
 
       expect(screen.getByText('Seed Points')).toBeInTheDocument();
@@ -187,7 +174,7 @@ describe('PluginInputEditor', () => {
           mode="creation"
           isActive={true}
           hasData={true}
-        />
+        />,
       );
 
       expect(screen.getByText('2 points')).toBeInTheDocument();
@@ -211,14 +198,7 @@ describe('PluginInputEditor', () => {
         { id: 'pt-2', x: 3.5, y: 4.5 },
       ];
 
-      render(
-        <PluginInputEditor
-          {...baseProps}
-          input={pointsInput}
-          interactionData={initialPoints}
-          mode="edit"
-        />
-      );
+      render(<PluginInputEditor {...baseProps} input={pointsInput} interactionData={initialPoints} mode="edit" />);
 
       expect(screen.getByText('(Points List)')).toBeInTheDocument();
 
@@ -230,20 +210,12 @@ describe('PluginInputEditor', () => {
       // Remove single
       const removeButtons = screen.getAllByTitle('Remove this point');
       fireEvent.click(removeButtons[0]);
-      expect(mockOnUpdate).toHaveBeenCalledWith([
-        { id: 'pt-2', x: 3.5, y: 4.5 },
-      ]);
+      expect(mockOnUpdate).toHaveBeenCalledWith([{ id: 'pt-2', x: 3.5, y: 4.5 }]);
     });
 
     it('allows adding point manually via Add button', () => {
       render(
-        <PluginInputEditor
-          {...baseProps}
-          input={pointsInput}
-          interactionData={[]}
-          mode="creation"
-          isActive={true}
-        />
+        <PluginInputEditor {...baseProps} input={pointsInput} interactionData={[]} mode="creation" isActive={true} />,
       );
 
       const addBtn = screen.getByText('Add');
@@ -279,7 +251,7 @@ describe('PluginInputEditor', () => {
           interactionData={mockLayers[0]}
           mode="creation"
           isActive={true}
-        />
+        />,
       );
 
       expect(screen.getByText('Target Custom Layer')).toBeInTheDocument();
@@ -310,7 +282,7 @@ describe('PluginInputEditor', () => {
           interactionData={[mockLayers[0]]}
           mode="creation"
           isActive={true}
-        />
+        />,
       );
 
       expect(screen.getByText('Obstacle Layer')).toBeInTheDocument();

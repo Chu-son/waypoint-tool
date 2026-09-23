@@ -39,7 +39,7 @@ describe('TransformGroup - Quick Rotate', () => {
         decimalPrecision: 2,
         selectedNodeIds: ['wp-1'],
         nodes: { 'wp-1': sampleNode },
-      })
+      }),
     );
 
     (useAppStore.getState as any) = vi.fn().mockReturnValue({
@@ -52,13 +52,7 @@ describe('TransformGroup - Quick Rotate', () => {
   });
 
   it('renders quick rotate buttons with appropriate aria labels and titles', () => {
-    render(
-      <TransformGroup
-        isMultiSelection={false}
-        node={sampleNode}
-        handleUpdate={mockHandleUpdate}
-      />
-    );
+    render(<TransformGroup isMultiSelection={false} node={sampleNode} handleUpdate={mockHandleUpdate} />);
 
     const leftBtn = screen.getByRole('button', { name: 'Rotate 90° Left' });
     const flipBtn = screen.getByRole('button', { name: 'Rotate 180°' });
@@ -73,13 +67,7 @@ describe('TransformGroup - Quick Rotate', () => {
   });
 
   it('rotates 90 degrees left (CCW) on left button click', () => {
-    render(
-      <TransformGroup
-        isMultiSelection={false}
-        node={sampleNode}
-        handleUpdate={mockHandleUpdate}
-      />
-    );
+    render(<TransformGroup isMultiSelection={false} node={sampleNode} handleUpdate={mockHandleUpdate} />);
 
     const leftBtn = screen.getByRole('button', { name: 'Rotate 90° Left' });
     fireEvent.click(leftBtn);
@@ -96,13 +84,7 @@ describe('TransformGroup - Quick Rotate', () => {
   });
 
   it('rotates 180 degrees (mirror reverse) on 180 button click', () => {
-    render(
-      <TransformGroup
-        isMultiSelection={false}
-        node={sampleNode}
-        handleUpdate={mockHandleUpdate}
-      />
-    );
+    render(<TransformGroup isMultiSelection={false} node={sampleNode} handleUpdate={mockHandleUpdate} />);
 
     const flipBtn = screen.getByRole('button', { name: 'Rotate 180°' });
     fireEvent.click(flipBtn);
@@ -119,13 +101,7 @@ describe('TransformGroup - Quick Rotate', () => {
   });
 
   it('rotates 90 degrees right (CW) on right button click', () => {
-    render(
-      <TransformGroup
-        isMultiSelection={false}
-        node={sampleNode}
-        handleUpdate={mockHandleUpdate}
-      />
-    );
+    render(<TransformGroup isMultiSelection={false} node={sampleNode} handleUpdate={mockHandleUpdate} />);
 
     const rightBtn = screen.getByRole('button', { name: 'Rotate 90° Right' });
     fireEvent.click(rightBtn);
@@ -164,7 +140,7 @@ describe('TransformGroup - Quick Rotate', () => {
         decimalPrecision: 2,
         selectedNodeIds: ['wp-1', 'wp-2'],
         nodes: { 'wp-1': sampleNode, 'wp-2': node2 },
-      })
+      }),
     );
 
     (useAppStore.getState as any) = vi.fn().mockReturnValue({
@@ -175,13 +151,7 @@ describe('TransformGroup - Quick Rotate', () => {
       selectedNodeIds: ['wp-1', 'wp-2'],
     });
 
-    render(
-      <TransformGroup
-        isMultiSelection={true}
-        node={null}
-        handleUpdate={mockHandleUpdate}
-      />
-    );
+    render(<TransformGroup isMultiSelection={true} node={null} handleUpdate={mockHandleUpdate} />);
 
     const leftBtn = screen.getByRole('button', { name: 'Rotate 90° Left' });
     fireEvent.click(leftBtn);

@@ -99,13 +99,7 @@ describe('MapLayerSprite Texture Lifecycle & Regression Test', () => {
       blend_mode: 'overwrite',
     };
 
-    const { rerender, unmount } = render(
-      <MapLayerSprite
-        layer={initialLayer}
-        scale={1.0}
-        textStyle={mockTextStyle}
-      />
-    );
+    const { rerender, unmount } = render(<MapLayerSprite layer={initialLayer} scale={1.0} textStyle={mockTextStyle} />);
 
     // 1. Initial render triggered Image 1 instantiation
     expect(createdImages).toHaveLength(1);
@@ -128,13 +122,7 @@ describe('MapLayerSprite Texture Lifecycle & Regression Test', () => {
       image_base64: 'REGENERATED_RAW_BASE64_WITHOUT_PREFIX',
     };
 
-    rerender(
-      <MapLayerSprite
-        layer={updatedLayer}
-        scale={1.0}
-        textStyle={mockTextStyle}
-      />
-    );
+    rerender(<MapLayerSprite layer={updatedLayer} scale={1.0} textStyle={mockTextStyle} />);
 
     // New Image 2 is instantiated with normalized data: prefix, but onload has NOT fired yet
     expect(createdImages).toHaveLength(2);

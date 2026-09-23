@@ -24,7 +24,10 @@ export function hexStringToNumber(hex?: string | null, fallback = 0x000000): num
  * Converts a hex string or RGB color to an RGB normalized tuple ([r, g, b] with values 0.0 to 1.0)
  * useful for WebGL / GLSL shader uniforms.
  */
-export function hexStringToVec3(hex?: string | null, fallback: [number, number, number] = [0, 0, 0]): [number, number, number] {
+export function hexStringToVec3(
+  hex?: string | null,
+  fallback: [number, number, number] = [0, 0, 0],
+): [number, number, number] {
   if (!hex || typeof hex !== 'string') return fallback;
   const num = hexStringToNumber(hex, -1);
   if (num === -1) return fallback;

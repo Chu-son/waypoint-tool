@@ -30,12 +30,8 @@ describe('CustomLayerInspector', () => {
       type: 'python',
       executable: 'main.py',
       description: 'Inflates obstacles in the map',
-      properties: [
-        { name: 'radius', type: 'number', default: 0.5, label: 'Inflation Radius' },
-      ],
-      inputs: [
-        { id: 'seed_point', name: 'seed_point', type: 'point', label: 'Seed Point', required: true },
-      ],
+      properties: [{ name: 'radius', type: 'number', default: 0.5, label: 'Inflation Radius' }],
+      inputs: [{ id: 'seed_point', name: 'seed_point', type: 'point', label: 'Seed Point', required: true }],
     },
   };
 
@@ -77,9 +73,7 @@ describe('CustomLayerInspector', () => {
       opacity: 1.0,
       z_index: 0,
       blend_mode: 'overwrite',
-      editObjects: [
-        { id: 'obj-1', type: 'rect', fillValue: 0, cx: 1, cy: 1, width: 2, height: 2, angle: 0 },
-      ],
+      editObjects: [{ id: 'obj-1', type: 'rect', fillValue: 0, cx: 1, cy: 1, width: 2, height: 2, angle: 0 }],
     };
 
     useAppStore.setState({

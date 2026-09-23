@@ -51,7 +51,7 @@ describe('PropertiesPanel', () => {
     id: 'node-1',
     type: 'manual',
     transform: { x: 1.0, y: 2.0, z: 0.0, qx: 0, qy: 0, qz: 0, qw: 1 },
-    options: { 'custom-attr': 'val' }
+    options: { 'custom-attr': 'val' },
   };
 
   const mockGeneratorNode = {
@@ -60,9 +60,9 @@ describe('PropertiesPanel', () => {
     plugin_id: 'plugin-1',
     generator_params: {
       properties: { count: 5 },
-      interaction_data: { start: { x: 0, y: 0 } }
+      interaction_data: { start: { x: 0, y: 0 } },
     },
-    children_ids: ['child-1']
+    children_ids: ['child-1'],
   };
 
   const mockPlugin = {
@@ -70,45 +70,51 @@ describe('PropertiesPanel', () => {
     manifest: {
       name: 'Test Generator',
       properties: [{ name: 'count', type: 'float', label: 'Count' }],
-      inputs: [{ name: 'start', type: 'point', label: 'Start Point' }]
-    }
+      inputs: [{ name: 'start', type: 'point', label: 'Start Point' }],
+    },
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: [],
-      nodes: {},
-      rootNodeIds: [],
-      optionsSchema: null,
-      visibleAttributes: ['index', 'transform'],
-      indexStartIndex: 0,
-      decimalPrecision: 2,
-      plugins: {},
-      pluginSettings: [],
-      updateNode: mockUpdateNode,
-      removeNodes: mockRemoveNodes,
-      toggleAttributeVisibility: mockToggleAttributeVisibility,
-      updatePluginInteractionData: vi.fn(),
-      pluginInteractionData: {},
-    }));
-    
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: [],
+        nodes: {},
+        rootNodeIds: [],
+        optionsSchema: null,
+        visibleAttributes: ['index', 'transform'],
+        indexStartIndex: 0,
+        decimalPrecision: 2,
+        plugins: {},
+        pluginSettings: [],
+        updateNode: mockUpdateNode,
+        removeNodes: mockRemoveNodes,
+        toggleAttributeVisibility: mockToggleAttributeVisibility,
+        updatePluginInteractionData: vi.fn(),
+        pluginInteractionData: {},
+      }),
+    );
+
     // Mock getState for non-hook access (used inside handleRegenerate and status sync)
     (useAppStore.getState as any) = vi.fn().mockReturnValue({
-        clearPluginInteractionData: vi.fn(),
-        setPluginActiveProperties: vi.fn(),
-        addNode: mockAddNode,
-        nodes: { 'gen-1': mockGeneratorNode },
-        runInHistoryTransaction: (fn: () => void) => fn(),
-        beginHistoryTransaction: vi.fn(),
-        endHistoryTransaction: vi.fn(),
-        executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
-          await BackendAPI.runPlugin(params.plugin, { properties: params.properties, interaction_data: params.interactionData }, 'python3');
-          mockRemoveNodes(['child-1']);
-          mockAddNode();
-          mockUpdateNode('gen-1', { generator_params: { properties: { count: 5 } } });
-          return { success: true, executionId: 'exec-1', parentWaypointId: 'gen-1', customLayerIds: [] };
-        }),
+      clearPluginInteractionData: vi.fn(),
+      setPluginActiveProperties: vi.fn(),
+      addNode: mockAddNode,
+      nodes: { 'gen-1': mockGeneratorNode },
+      runInHistoryTransaction: (fn: () => void) => fn(),
+      beginHistoryTransaction: vi.fn(),
+      endHistoryTransaction: vi.fn(),
+      executeGeneratorPlugin: vi.fn().mockImplementation(async (params) => {
+        await BackendAPI.runPlugin(
+          params.plugin,
+          { properties: params.properties, interaction_data: params.interactionData },
+          'python3',
+        );
+        mockRemoveNodes(['child-1']);
+        mockAddNode();
+        mockUpdateNode('gen-1', { generator_params: { properties: { count: 5 } } });
+        return { success: true, executionId: 'exec-1', parentWaypointId: 'gen-1', customLayerIds: [] };
+      }),
     });
   });
 
@@ -118,44 +124,51 @@ describe('PropertiesPanel', () => {
   });
 
   it('renders properties for a single manual node and updates X', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: ['node-1'],
-      nodes: { 'node-1': mockManualNode },
-      rootNodeIds: ['node-1'],
-      visibleAttributes: ['index', 'transform'],
-      indexStartIndex: 0,
-      decimalPrecision: 2,
-      updateNode: mockUpdateNode,
-      toggleAttributeVisibility: mockToggleAttributeVisibility,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: ['node-1'],
+        nodes: { 'node-1': mockManualNode },
+        rootNodeIds: ['node-1'],
+        visibleAttributes: ['index', 'transform'],
+        indexStartIndex: 0,
+        decimalPrecision: 2,
+        updateNode: mockUpdateNode,
+        toggleAttributeVisibility: mockToggleAttributeVisibility,
+      }),
+    );
 
     render(<PropertiesPanel />);
     expect(screen.getByText(/Waypoint \[0\]/i)).toBeInTheDocument();
-    
+
     const xInput = screen.getByDisplayValue('1');
     fireEvent.change(xInput, { target: { value: '15' } });
     fireEvent.blur(xInput);
 
-    expect(mockUpdateNode).toHaveBeenCalledWith('node-1', expect.objectContaining({
-      transform: expect.objectContaining({ x: 15 })
-    }));
+    expect(mockUpdateNode).toHaveBeenCalledWith(
+      'node-1',
+      expect.objectContaining({
+        transform: expect.objectContaining({ x: 15 }),
+      }),
+    );
   });
 
   it('renders generator node and handles re-generation flow', async () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: ['gen-1'],
-      nodes: { 'gen-1': mockGeneratorNode },
-      rootNodeIds: ['gen-1'],
-      plugins: { 'plugin-1': mockPlugin },
-      pluginSettings: [],
-      visibleAttributes: [],
-      decimalPrecision: 2,
-      updateNode: mockUpdateNode,
-      removeNodes: mockRemoveNodes,
-      updatePluginInteractionData: vi.fn(),
-      pluginInteractionData: { start: { x: 0, y: 0 } },
-      runWithLoading: async (_: any, fn: any) => await fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: ['gen-1'],
+        nodes: { 'gen-1': mockGeneratorNode },
+        rootNodeIds: ['gen-1'],
+        plugins: { 'plugin-1': mockPlugin },
+        pluginSettings: [],
+        visibleAttributes: [],
+        decimalPrecision: 2,
+        updateNode: mockUpdateNode,
+        removeNodes: mockRemoveNodes,
+        updatePluginInteractionData: vi.fn(),
+        pluginInteractionData: { start: { x: 0, y: 0 } },
+        runWithLoading: async (_: any, fn: any) => await fn(),
+      }),
+    );
 
     (BackendAPI.runPlugin as any).mockResolvedValue([{ x: 10, y: 10, yaw: 0 }]);
 
@@ -172,18 +185,22 @@ describe('PropertiesPanel', () => {
 
     expect(mockRemoveNodes).toHaveBeenCalledWith(['child-1']);
     expect(mockAddNode).toHaveBeenCalled();
-    expect(mockUpdateNode).toHaveBeenCalledWith('gen-1', expect.objectContaining({
+    expect(mockUpdateNode).toHaveBeenCalledWith(
+      'gen-1',
+      expect.objectContaining({
         generator_params: expect.objectContaining({
-            properties: { count: 5 }
-        })
-    }));
+          properties: { count: 5 },
+        }),
+      }),
+    );
   });
 
   it('renders options from schema for manual node', () => {
-      const schema = {
-          options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }]
-      };
-      (useAppStore as any).mockImplementation((selector: any) => selector({
+    const schema = {
+      options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }],
+    };
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
         selectedNodeIds: ['node-1'],
         nodes: { 'node-1': mockManualNode },
         rootNodeIds: ['node-1'],
@@ -193,41 +210,47 @@ describe('PropertiesPanel', () => {
         decimalPrecision: 2,
         updateNode: mockUpdateNode,
         toggleAttributeVisibility: vi.fn(),
-      }));
+      }),
+    );
 
-      (useAppStore.getState as any).mockReturnValue({
-        nodes: { 'node-1': mockManualNode },
-        toggleAttributeVisibility: vi.fn(),
-        clearPluginInteractionData: vi.fn(),
-        setPluginActiveProperties: vi.fn(),
-        runInHistoryTransaction: (fn: () => void) => fn(),
-        beginHistoryTransaction: vi.fn(),
-        endHistoryTransaction: vi.fn(),
-      });
+    (useAppStore.getState as any).mockReturnValue({
+      nodes: { 'node-1': mockManualNode },
+      toggleAttributeVisibility: vi.fn(),
+      clearPluginInteractionData: vi.fn(),
+      setPluginActiveProperties: vi.fn(),
+      runInHistoryTransaction: (fn: () => void) => fn(),
+      beginHistoryTransaction: vi.fn(),
+      endHistoryTransaction: vi.fn(),
+    });
 
-      render(<PropertiesPanel />);
-      expect(screen.getByText('Target Speed')).toBeInTheDocument();
-      
-      const speedInput = screen.getByDisplayValue('0.5');
-      fireEvent.change(speedInput, { target: { value: '1.2' } });
-      // updateNode is called on change for custom options
-      expect(mockUpdateNode).toHaveBeenCalledWith('node-1', expect.objectContaining({
-          options: expect.objectContaining({ speed: 1.2 })
-      }));
+    render(<PropertiesPanel />);
+    expect(screen.getByText('Target Speed')).toBeInTheDocument();
+
+    const speedInput = screen.getByDisplayValue('0.5');
+    fireEvent.change(speedInput, { target: { value: '1.2' } });
+    // updateNode is called on change for custom options
+    expect(mockUpdateNode).toHaveBeenCalledWith(
+      'node-1',
+      expect.objectContaining({
+        options: expect.objectContaining({ speed: 1.2 }),
+      }),
+    );
   });
 
   it('renders multiple selection view', () => {
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: ['node-1', 'node-2'],
-      nodes: { 
-        'node-1': mockManualNode,
-        'node-2': { ...mockManualNode, id: 'node-2' }
-      },
-      rootNodeIds: ['node-1', 'node-2'],
-      visibleAttributes: [],
-      indexStartIndex: 0,
-      decimalPrecision: 2,
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: ['node-1', 'node-2'],
+        nodes: {
+          'node-1': mockManualNode,
+          'node-2': { ...mockManualNode, id: 'node-2' },
+        },
+        rootNodeIds: ['node-1', 'node-2'],
+        visibleAttributes: [],
+        indexStartIndex: 0,
+        decimalPrecision: 2,
+      }),
+    );
 
     render(<PropertiesPanel />);
     expect(screen.getByText(/multiple selected \(2\)/i)).toBeInTheDocument();
@@ -250,20 +273,22 @@ describe('PropertiesPanel', () => {
       children_ids: ['wp-2'],
     };
 
-    (useAppStore as any).mockImplementation((selector: any) => selector({
-      selectedNodeIds: ['wp-2'],
-      nodes: {
-        'wp-1': wp1,
-        'grp-1': groupNode,
-        'wp-2': wp2,
-      },
-      rootNodeIds: ['wp-1', 'grp-1'],
-      visibleAttributes: ['transform'],
-      indexStartIndex: 0,
-      decimalPrecision: 2,
-      updateNode: mockUpdateNode,
-      toggleAttributeVisibility: vi.fn(),
-    }));
+    (useAppStore as any).mockImplementation((selector: any) =>
+      selector({
+        selectedNodeIds: ['wp-2'],
+        nodes: {
+          'wp-1': wp1,
+          'grp-1': groupNode,
+          'wp-2': wp2,
+        },
+        rootNodeIds: ['wp-1', 'grp-1'],
+        visibleAttributes: ['transform'],
+        indexStartIndex: 0,
+        decimalPrecision: 2,
+        updateNode: mockUpdateNode,
+        toggleAttributeVisibility: vi.fn(),
+      }),
+    );
 
     (useAppStore.getState as any).mockReturnValue({
       nodes: {

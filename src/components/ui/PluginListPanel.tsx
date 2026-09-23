@@ -1,27 +1,56 @@
-import { useState } from "react";
-import { useAppStore } from "../../stores/appStore";
-import { Settings, Puzzle, Sparkles, Map, PenTool, Wand2, Image as ImageIcon, ExternalLink, Route, Tag, Workflow, AlertTriangle } from "lucide-react";
-import { EmptyState } from "./common/EmptyState";
-import { cn } from "../../utils/cn";
-import { resolvePluginDependencies } from "../../utils/dependencyResolver";
+import { useState } from 'react';
+import { useAppStore } from '../../stores/appStore';
+import {
+  Settings,
+  Puzzle,
+  Sparkles,
+  Map,
+  PenTool,
+  Wand2,
+  Image as ImageIcon,
+  ExternalLink,
+  Route,
+  Tag,
+  Workflow,
+  AlertTriangle,
+} from 'lucide-react';
+import { EmptyState } from './common/EmptyState';
+import { cn } from '../../utils/cn';
+import { resolvePluginDependencies } from '../../utils/dependencyResolver';
 
-type FilterCategory = "all" | "waypoints" | "custom_layer" | "annotations" | "path_calculator" | "pipelines";
+type FilterCategory = 'all' | 'waypoints' | 'custom_layer' | 'annotations' | 'path_calculator' | 'pipelines';
 
 function PluginIcon({ iconStr, size, className }: { iconStr: string; size: number; className?: string }) {
-  if (iconStr.startsWith("data:image/")) {
-    return <img src={iconStr} alt="plugin-icon" style={{ width: size, height: size, objectFit: 'contain' }} className={className} />;
+  if (iconStr.startsWith('data:image/')) {
+    return (
+      <img
+        src={iconStr}
+        alt="plugin-icon"
+        style={{ width: size, height: size, objectFit: 'contain' }}
+        className={className}
+      />
+    );
   }
 
   switch (iconStr) {
-    case "Sparkles": return <Sparkles size={size} className={className} />;
-    case "Map": return <Map size={size} className={className} />;
-    case "PenTool": return <PenTool size={size} className={className} />;
-    case "Wand2": return <Wand2 size={size} className={className} />;
-    case "ImageIcon": return <ImageIcon size={size} className={className} />;
-    case "Route": return <Route size={size} className={className} />;
-    case "Tag": return <Tag size={size} className={className} />;
-    case "Workflow": return <Workflow size={size} className={className} />;
-    default: return <Puzzle size={size} className={className} />;
+    case 'Sparkles':
+      return <Sparkles size={size} className={className} />;
+    case 'Map':
+      return <Map size={size} className={className} />;
+    case 'PenTool':
+      return <PenTool size={size} className={className} />;
+    case 'Wand2':
+      return <Wand2 size={size} className={className} />;
+    case 'ImageIcon':
+      return <ImageIcon size={size} className={className} />;
+    case 'Route':
+      return <Route size={size} className={className} />;
+    case 'Tag':
+      return <Tag size={size} className={className} />;
+    case 'Workflow':
+      return <Workflow size={size} className={className} />;
+    default:
+      return <Puzzle size={size} className={className} />;
   }
 }
 
@@ -43,17 +72,16 @@ function PluginCard({
   const isPipeline = plugin.manifest.type === 'pipeline';
   const primaryOutput = isPipeline
     ? 'pipeline'
-    : plugin.manifest.primary_output || (
-        plugin.manifest.category === 'map_layer_generator'
-          ? 'custom_layer'
-          : plugin.manifest.category === 'path_calculator'
+    : plugin.manifest.primary_output ||
+      (plugin.manifest.category === 'map_layer_generator'
+        ? 'custom_layer'
+        : plugin.manifest.category === 'path_calculator'
           ? 'path_calculator'
-          : 'waypoints'
-      );
+          : 'waypoints');
 
   const hasDependencies = Boolean(
     (plugin.manifest?.plugin_dependencies && plugin.manifest.plugin_dependencies.length > 0) ||
-    (isPipeline && plugin.manifest?.pipeline?.steps && plugin.manifest.pipeline.steps.length > 0)
+    (isPipeline && plugin.manifest?.pipeline?.steps && plugin.manifest.pipeline.steps.length > 0),
   );
   const depReport = hasDependencies ? resolvePluginDependencies(plugin, allPlugins) : null;
   const hasDepIssues = depReport ? !depReport.isValid : false;
@@ -61,17 +89,17 @@ function PluginCard({
   return (
     <div
       className={cn(
-        "group flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer",
+        'group flex items-center gap-3 p-2 rounded-lg border transition-all cursor-pointer',
         isActive
-          ? "bg-primary-base/20 border-primary-base shadow-lg shadow-primary-base/10"
-          : "bg-surface-base/40 border-border-base hover:border-border-base/60 hover:bg-surface-hover"
+          ? 'bg-primary-base/20 border-primary-base shadow-lg shadow-primary-base/10'
+          : 'bg-surface-base/40 border-border-base hover:border-border-base/60 hover:bg-surface-hover',
       )}
       onClick={onSelect}
     >
       <div
         className={cn(
-          "p-2 rounded-lg shrink-0",
-          isActive ? "bg-primary-base text-text-inverse" : "bg-surface-hover text-text-muted"
+          'p-2 rounded-lg shrink-0',
+          isActive ? 'bg-primary-base text-text-inverse' : 'bg-surface-hover text-text-muted',
         )}
       >
         <PluginIcon iconStr={iconStr} size={18} />
@@ -79,19 +107,14 @@ function PluginCard({
 
       <div className="flex-1 overflow-hidden">
         <div className="flex items-center justify-between gap-2">
-          <span
-            className={cn(
-              "text-xs font-bold truncate",
-              isActive ? "text-primary-base" : "text-text-base"
-            )}
-          >
+          <span className={cn('text-xs font-bold truncate', isActive ? 'text-primary-base' : 'text-text-base')}>
             {plugin.manifest.name}
           </span>
           <div className="flex items-center gap-1">
             {hasDepIssues && (
               <span
                 className="flex items-center gap-0.5 text-[9px] px-1 py-0.2 rounded bg-status-warning/15 text-status-warning border border-status-warning/30 font-medium"
-                title={depReport?.issues.map((i) => i.message).join("\n")}
+                title={depReport?.issues.map((i) => i.message).join('\n')}
               >
                 <AlertTriangle size={10} />
                 <span>Issue</span>
@@ -99,10 +122,10 @@ function PluginCard({
             )}
             <span
               className={cn(
-                "text-[9px] px-1.5 py-0.2 rounded font-mono border",
+                'text-[9px] px-1.5 py-0.2 rounded font-mono border',
                 isPipeline
-                  ? "bg-primary-base/15 text-primary-base border-primary-base/30 font-semibold"
-                  : "bg-surface-hover text-text-muted border-border-base/30"
+                  ? 'bg-primary-base/15 text-primary-base border-primary-base/30 font-semibold'
+                  : 'bg-surface-hover text-text-muted border-border-base/30',
               )}
             >
               {primaryOutput}
@@ -120,9 +143,7 @@ function PluginCard({
           </div>
         </div>
         {plugin.manifest.description && (
-          <p className="text-[10px] text-text-muted/70 truncate mt-0.5">
-            {plugin.manifest.description}
-          </p>
+          <p className="text-[10px] text-text-muted/70 truncate mt-0.5">{plugin.manifest.description}</p>
         )}
       </div>
     </div>
@@ -143,7 +164,7 @@ export function PluginListPanel() {
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
   const setActivePathCalculatorPluginId = useAppStore((state) => state.setActivePathCalculatorPluginId);
 
-  const [filterCategory, setFilterCategory] = useState<FilterCategory>("all");
+  const [filterCategory, setFilterCategory] = useState<FilterCategory>('all');
 
   const allEnabledPlugins = (pluginSettings || [])
     .filter((s) => s.enabled)
@@ -153,45 +174,45 @@ export function PluginListPanel() {
 
   const filteredPlugins = allEnabledPlugins.filter((p) => {
     const isPipeline = p.manifest.type === 'pipeline';
-    if (filterCategory === "all") return true;
-    if (filterCategory === "pipelines") return isPipeline;
+    if (filterCategory === 'all') return true;
+    if (filterCategory === 'pipelines') return isPipeline;
     if (isPipeline) return false;
-    const po = p.manifest.primary_output || (
-      p.manifest.category === 'map_layer_generator'
+    const po =
+      p.manifest.primary_output ||
+      (p.manifest.category === 'map_layer_generator'
         ? 'custom_layer'
         : p.manifest.category === 'path_calculator'
-        ? 'path_calculator'
-        : 'waypoints'
-    );
+          ? 'path_calculator'
+          : 'waypoints');
     return po === filterCategory;
   });
 
   const getPluginIconStr = (pluginId: string) => {
-    const setting = pluginSettings.find(s => s.id === pluginId);
+    const setting = pluginSettings.find((s) => s.id === pluginId);
     const p = plugins[pluginId];
     const manifestIcon = p?.manifest?.icon;
     if (setting?.icon) return setting.icon;
     if (manifestIcon) return manifestIcon;
-    if (p?.manifest?.type === 'pipeline') return "Workflow";
-    return "Puzzle";
+    if (p?.manifest?.type === 'pipeline') return 'Workflow';
+    return 'Puzzle';
   };
 
   const handleSelectPlugin = (plugin: any) => {
-    const po = plugin.manifest.primary_output || (
-      plugin.manifest.category === 'map_layer_generator'
+    const po =
+      plugin.manifest.primary_output ||
+      (plugin.manifest.category === 'map_layer_generator'
         ? 'custom_layer'
         : plugin.manifest.category === 'path_calculator'
-        ? 'path_calculator'
-        : 'waypoints'
-    );
+          ? 'path_calculator'
+          : 'waypoints');
 
-    if (po === "path_calculator") {
+    if (po === 'path_calculator') {
       setActivePathCalculatorPluginId(plugin.id);
     } else {
       selectNodes([]);
       setActivePlugin(plugin.id);
-      setActiveTool("add_generator");
-      setRightPanelActiveTab("inspector");
+      setActiveTool('add_generator');
+      setRightPanelActiveTab('inspector');
       setRightPanelOpen(true);
     }
   };
@@ -213,12 +234,12 @@ export function PluginListPanel() {
       <div className="p-2 border-b border-border-base/20 flex items-center gap-1 overflow-x-auto">
         {(
           [
-            { id: "all", label: "All" },
-            { id: "waypoints", label: "Waypoints" },
-            { id: "custom_layer", label: "Layers" },
-            { id: "annotations", label: "Annotations" },
-            { id: "path_calculator", label: "Path" },
-            { id: "pipelines", label: "Pipelines", icon: Workflow },
+            { id: 'all', label: 'All' },
+            { id: 'waypoints', label: 'Waypoints' },
+            { id: 'custom_layer', label: 'Layers' },
+            { id: 'annotations', label: 'Annotations' },
+            { id: 'path_calculator', label: 'Path' },
+            { id: 'pipelines', label: 'Pipelines', icon: Workflow },
           ] as const
         ).map((tab) => {
           const Icon = 'icon' in tab ? tab.icon : undefined;
@@ -227,10 +248,10 @@ export function PluginListPanel() {
               key={tab.id}
               onClick={() => setFilterCategory(tab.id)}
               className={cn(
-                "px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap transition-colors flex items-center gap-1",
+                'px-2 py-1 rounded-md text-[10px] font-semibold whitespace-nowrap transition-colors flex items-center gap-1',
                 filterCategory === tab.id
-                  ? "bg-primary-base text-text-inverse shadow-xs"
-                  : "bg-surface-panel/60 text-text-muted hover:text-text-base hover:bg-surface-hover"
+                  ? 'bg-primary-base text-text-inverse shadow-xs'
+                  : 'bg-surface-panel/60 text-text-muted hover:text-text-base hover:bg-surface-hover',
               )}
             >
               {Icon && <Icon size={11} className="shrink-0" />}
@@ -245,7 +266,7 @@ export function PluginListPanel() {
           <EmptyState message="該当するプラグインがありません。" />
         ) : (
           filteredPlugins.map((plugin) => {
-            const isActive = activePluginId === plugin.id && activeTool === "add_generator";
+            const isActive = activePluginId === plugin.id && activeTool === 'add_generator';
             return (
               <PluginCard
                 key={plugin.id}

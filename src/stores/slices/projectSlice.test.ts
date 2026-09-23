@@ -107,7 +107,7 @@ describe('projectSlice - currentProjectPath & save behaviors', () => {
         expect.stringContaining(existingPath),
         expect.objectContaining({
           title: '上書き保存の確認',
-        })
+        }),
       );
       // Should NOT show file save dialog
       expect(saveDialogSpy).not.toHaveBeenCalled();

@@ -31,7 +31,8 @@ export function MapEditOverlay() {
 
   if (!isMapEditMode || !activeCustomLayerId) return null;
 
-  const activeLayer = customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') as import('../../types/store').ManualCustomLayer | undefined;
+  const activeLayer = customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') as
+    import('../../types/store').ManualCustomLayer | undefined;
   const selectedObject = activeLayer?.editObjects.find((o) => o.id === selectedEditObjectId);
 
   const currentFillValue = selectedObject !== undefined ? selectedObject.fillValue : mapEditFillValue;
@@ -63,8 +64,8 @@ export function MapEditOverlay() {
     <FloatingActionBanner
       ref={containerRef}
       icon={<Pencil size={16} className="animate-pulse" />}
-      title={isCompact ? (activeLayer?.name || 'Layer') : `編集中: ${activeLayer?.name || 'Edit Layer'}`}
-      subtitle={selectedObject ? `選択中: ${selectedObject.type}` : (isCompact ? undefined : "マップ編集モード")}
+      title={isCompact ? activeLayer?.name || 'Layer' : `編集中: ${activeLayer?.name || 'Edit Layer'}`}
+      subtitle={selectedObject ? `選択中: ${selectedObject.type}` : isCompact ? undefined : 'マップ編集モード'}
       statusText={
         <div className="flex items-center gap-1.5 sm:gap-3 px-1 flex-nowrap shrink-0">
           {/* Subtool Selector */}
@@ -86,9 +87,7 @@ export function MapEditOverlay() {
 
           {/* Fill Value Controls */}
           <div className="flex items-center gap-1 sm:gap-1.5 border-l border-border-base/30 pl-1.5 sm:pl-2 flex-shrink-0">
-            {!isCompact && (
-              <span className="text-[11px] font-semibold text-text-muted">塗りつぶし:</span>
-            )}
+            {!isCompact && <span className="text-[11px] font-semibold text-text-muted">塗りつぶし:</span>}
             <div className="flex items-center gap-0.5">
               <Button
                 variant={currentFillValue === 0 ? 'secondary' : 'ghost'}
@@ -127,9 +126,7 @@ export function MapEditOverlay() {
           {/* Brush Size (Freehand mode only) */}
           {mapEditSubTool === 'freehand' && (
             <div className="flex items-center gap-1 border-l border-border-base/30 pl-1.5 flex-shrink-0">
-              {!isCompact && (
-                <span className="text-[11px] font-semibold text-text-muted">ブラシ:</span>
-              )}
+              {!isCompact && <span className="text-[11px] font-semibold text-text-muted">ブラシ:</span>}
               <div className="w-14 sm:w-18">
                 <Slider
                   min="1"
@@ -139,9 +136,7 @@ export function MapEditOverlay() {
                   onChange={(e) => setMapEditBrushSize(parseInt(e.target.value, 10))}
                 />
               </div>
-              <span className="text-[11px] font-mono text-text-base w-4 text-right">
-                {mapEditBrushSize}
-              </span>
+              <span className="text-[11px] font-mono text-text-base w-4 text-right">{mapEditBrushSize}</span>
             </div>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Save,
   FolderOpen,
@@ -10,31 +10,27 @@ import {
   AlertTriangle,
   Folder,
   Image as ImageIcon,
-} from "lucide-react";
-import { useAppStore } from "../../stores/appStore";
-import { BackendAPI } from "../../api";
-import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
-import { Button } from "./common/Button";
-import { Checkbox } from "./common/Checkbox";
-import { Input } from "./common/Input";
-import { Label } from "./common/Label";
-import { BrowseInput } from "./common/BrowseInput";
-import { cn } from "../../utils/cn";
-import { v4 as uuidv4 } from "uuid";
-import {
-  ExportProfile,
-  ExportTargetItem,
-  ExportTargetType,
-} from "../../types/store";
+} from 'lucide-react';
+import { useAppStore } from '../../stores/appStore';
+import { BackendAPI } from '../../api';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from './common/Modal';
+import { Button } from './common/Button';
+import { Checkbox } from './common/Checkbox';
+import { Input } from './common/Input';
+import { Label } from './common/Label';
+import { BrowseInput } from './common/BrowseInput';
+import { cn } from '../../utils/cn';
+import { v4 as uuidv4 } from 'uuid';
+import { ExportProfile, ExportTargetItem, ExportTargetType } from '../../types/store';
 import {
   resolveExportFiles,
   buildExportTreePreview,
   TreeDirectoryNode,
   TreeFileNode,
-} from "../../utils/exportTemplateEngine";
-import { extractWaypointsForExport } from "../../utils/exportWaypointUtils";
-import { prepareLayersForExport } from "../../utils/mapRasterize";
-import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from "../../stores/migrations/projectMigration";
+} from '../../utils/exportTemplateEngine';
+import { extractWaypointsForExport } from '../../utils/exportWaypointUtils';
+import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../stores/migrations/projectMigration';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -43,9 +39,8 @@ interface ExportModalProps {
 
 export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   const rawExportProfiles = useAppStore((state) => state.exportProfiles);
-  const exportProfiles = Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0
-    ? rawExportProfiles
-    : DEFAULT_EXPORT_PROFILES;
+  const exportProfiles =
+    Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0 ? rawExportProfiles : DEFAULT_EXPORT_PROFILES;
   const activeExportProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
   const addExportProfile = useAppStore((state) => state.addExportProfile);
   const updateExportProfile = useAppStore((state) => state.updateExportProfile);
@@ -87,22 +82,19 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
   // Derive project name from project path
   const projectName = useMemo(() => {
-    if (!currentProjectPath) return "untitled";
-    const filename = currentProjectPath.split(/[/\\]/).pop() || "untitled";
-    return filename.replace(/\.wptroj$/i, "");
+    if (!currentProjectPath) return 'untitled';
+    const filename = currentProjectPath.split(/[/\\]/).pop() || 'untitled';
+    return filename.replace(/\.wptroj$/i, '');
   }, [currentProjectPath]);
 
   // Root directory: profile-specific or fallback to lastDirectory or project parent directory
   const rootDir = useMemo(() => {
     if (activeProfile.outputRootDir) return activeProfile.outputRootDir;
     if (currentProjectPath) {
-      const lastSlash = Math.max(
-        currentProjectPath.lastIndexOf("/"),
-        currentProjectPath.lastIndexOf("\\")
-      );
+      const lastSlash = Math.max(currentProjectPath.lastIndexOf('/'), currentProjectPath.lastIndexOf('\\'));
       if (lastSlash > -1) return currentProjectPath.substring(0, lastSlash);
     }
-    return lastDirectory || "";
+    return lastDirectory || '';
   }, [activeProfile.outputRootDir, currentProjectPath, lastDirectory]);
 
   const handleRootDirChange = (newDir: string) => {
@@ -128,15 +120,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
         extension: f.extension,
       })),
     });
-  }, [
-    activeProfile.items,
-    sessionDate,
-    projectName,
-    rootDir,
-    exportRegions,
-    exportTemplates,
-    defaultExportFormats,
-  ]);
+  }, [activeProfile.items, sessionDate, projectName, rootDir, exportRegions, exportTemplates, defaultExportFormats]);
 
   // Build tree from resolved files
   const treeNodes = useMemo(() => {
@@ -156,7 +140,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
         const existing = await BackendAPI.checkExportConflicts(fullPaths);
         setConflictFiles(new Set(existing));
       } catch (err) {
-        console.error("Failed to check export conflicts:", err);
+        console.error('Failed to check export conflicts:', err);
       }
     }, 300);
 
@@ -177,13 +161,13 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     const newProfile: ExportProfile = {
       id: uuidv4(),
       name: `新規プロファイル ${exportProfiles.length + 1}`,
-      conflictResolution: "backup_file",
+      conflictResolution: 'backup_file',
       items: [
         {
           id: uuidv4(),
-          type: "waypoint_default",
-          sourceId: "__default_yaml__",
-          relativePathPattern: "waypoints/{{yyyymmdd}}_waypoints.yaml",
+          type: 'waypoint_default',
+          sourceId: '__default_yaml__',
+          relativePathPattern: 'waypoints/{{yyyymmdd}}_waypoints.yaml',
           enabled: true,
         },
       ],
@@ -198,7 +182,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
   const handleDeleteProfile = () => {
     if (exportProfiles.length <= 1) {
-      alert("最後のプロファイルは削除できません。");
+      alert('最後のプロファイルは削除できません。');
       return;
     }
     if (confirm(`プロファイル「${activeProfile.name}」を削除しますか？`)) {
@@ -208,15 +192,15 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
   // Item actions
   const handleAddItem = (type: ExportTargetType) => {
-    let sourceId = "__default_yaml__";
-    let pattern = "waypoints/{{yyyymmdd}}_waypoints.yaml";
+    let sourceId = '__default_yaml__';
+    let pattern = 'waypoints/{{yyyymmdd}}_waypoints.yaml';
 
-    if (type === "map_all_regions") {
-      sourceId = "all";
-      pattern = "Map/{{name}}.pgm";
-    } else if (type === "map_region") {
-      sourceId = exportRegions[0]?.id || "default";
-      pattern = "Map/{{name}}.pgm";
+    if (type === 'map_all_regions') {
+      sourceId = 'all';
+      pattern = 'Map/{{name}}.pgm';
+    } else if (type === 'map_region') {
+      sourceId = exportRegions[0]?.id || 'default';
+      pattern = 'Map/{{name}}.pgm';
     }
 
     const newItem: ExportTargetItem = {
@@ -224,7 +208,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
       type,
       sourceId,
       relativePathPattern: pattern,
-      mapFormat: "ros_standard",
+      mapFormat: 'ros_standard',
       includeMapImage: false,
       enabled: true,
     };
@@ -244,16 +228,12 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   };
 
   const handleToggleItemEnabled = (itemId: string, enabled: boolean) => {
-    const updated = activeProfile.items.map((i) =>
-      i.id === itemId ? { ...i, enabled } : i
-    );
+    const updated = activeProfile.items.map((i) => (i.id === itemId ? { ...i, enabled } : i));
     updateExportProfile(activeProfile.id, { items: updated });
   };
 
   const handleUpdateItem = (itemId: string, updates: Partial<ExportTargetItem>) => {
-    const updated = activeProfile.items.map((i) =>
-      i.id === itemId ? { ...i, ...updates } : i
-    );
+    const updated = activeProfile.items.map((i) => (i.id === itemId ? { ...i, ...updates } : i));
     updateExportProfile(activeProfile.id, { items: updated });
   };
 
@@ -268,10 +248,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     if (input) {
       const start = input.selectionStart || currentPattern.length;
       const end = input.selectionEnd || currentPattern.length;
-      const newPattern =
-        currentPattern.substring(0, start) +
-        varName +
-        currentPattern.substring(end);
+      const newPattern = currentPattern.substring(0, start) + varName + currentPattern.substring(end);
       handleUpdateItem(selectedItem.id, { relativePathPattern: newPattern });
       setTimeout(() => {
         input.focus();
@@ -288,24 +265,22 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   const handleExecuteExport = async () => {
     const enabledItems = activeProfile.items.filter((i) => i.enabled);
     if (enabledItems.length === 0) {
-      alert("エクスポート対象の項目が選択されていません。");
+      alert('エクスポート対象の項目が選択されていません。');
       return;
     }
 
     if (!rootDir) {
-      alert("出力先ルートフォルダを指定してください。");
+      alert('出力先ルートフォルダを指定してください。');
       return;
     }
 
     try {
-      const hasMapItems = enabledItems.some(
-        (i) => i.type === "map_region" || i.type === "map_all_regions"
-      );
+      const hasMapItems = enabledItems.some((i) => i.type === 'map_region' || i.type === 'map_all_regions');
       const hasMapShot = enabledItems.some((i) => i.includeMapImage);
 
       await runWithLoading(
         {
-          message: "エクスポートを実行中...",
+          message: 'エクスポートを実行中...',
           detail: `${enabledItems.length} 件の構成を出力中`,
           blocking: true,
         },
@@ -321,32 +296,29 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           if (hasMapShot) {
             useAppStore.setState({ shouldFitToMaps: Date.now() });
             await new Promise((r) => setTimeout(r, 800));
-            const canvas = document.querySelector("canvas");
+            const canvas = document.querySelector('canvas');
             if (canvas) {
-              imageDataB64 = canvas.toDataURL("image/png").split(",")[1];
+              imageDataB64 = canvas.toDataURL('image/png').split(',')[1];
             }
           }
 
           // 3. Extract waypoints
-          const extractedWaypoints = extractWaypointsForExport(
-            rootNodeIds,
-            nodes,
-            optionsSchema,
-            indexStartIndex
-          );
+          const extractedWaypoints = extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex);
 
           // 4. Resolve package items
           const waypointItems: any[] = [];
           const mapItems: any[] = [];
 
-          const timestampStr = `${sessionDate.getFullYear()}${String(
-            sessionDate.getMonth() + 1
-          ).padStart(2, "0")}${String(sessionDate.getDate()).padStart(
+          const timestampStr = `${sessionDate.getFullYear()}${String(sessionDate.getMonth() + 1).padStart(
             2,
-            "0"
-          )}_${String(sessionDate.getHours()).padStart(2, "0")}${String(
-            sessionDate.getMinutes()
-          ).padStart(2, "0")}${String(sessionDate.getSeconds()).padStart(2, "0")}`;
+            '0',
+          )}${String(sessionDate.getDate()).padStart(
+            2,
+            '0',
+          )}_${String(sessionDate.getHours()).padStart(2, '0')}${String(sessionDate.getMinutes()).padStart(
+            2,
+            '0',
+          )}${String(sessionDate.getSeconds()).padStart(2, '0')}`;
 
           const resolvedTargetFiles = resolveExportFiles(enabledItems, {
             now: sessionDate,
@@ -367,14 +339,12 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
           // Group by item
           for (const item of enabledItems) {
-            if (item.type === "waypoint_template" || item.type === "waypoint_default") {
-              const file = resolvedTargetFiles.find(
-                (f) => f.item.id === item.id && !f.isPairSecondary
-              );
+            if (item.type === 'waypoint_template' || item.type === 'waypoint_default') {
+              const file = resolvedTargetFiles.find((f) => f.item.id === item.id && !f.isPairSecondary);
               if (!file) continue;
 
               let templateContent: string | undefined = undefined;
-              if (item.type === "waypoint_template") {
+              if (item.type === 'waypoint_template') {
                 const t = exportTemplates.find((x) => x.id === item.sourceId);
                 templateContent = t?.content;
               }
@@ -385,21 +355,18 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                 template: templateContent,
                 image_data_b64: item.includeMapImage ? imageDataB64 : undefined,
               });
-            } else if (item.type === "map_all_regions") {
+            } else if (item.type === 'map_all_regions') {
               const regions = exportRegions.length > 0 ? exportRegions : [];
               for (const reg of regions) {
                 const primaryFile = resolvedTargetFiles.find(
-                  (f) =>
-                    f.item.id === item.id &&
-                    !f.isPairSecondary &&
-                    f.fileName.startsWith(reg.name)
+                  (f) => f.item.id === item.id && !f.isPairSecondary && f.fileName.startsWith(reg.name),
                 );
                 if (!primaryFile) continue;
 
-                const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, "");
+                const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, '');
                 mapItems.push({
                   save_path: basePath,
-                  format: item.mapFormat || "ros_standard",
+                  format: item.mapFormat || 'ros_standard',
                   region: {
                     name: reg.name,
                     rect: reg.rect,
@@ -408,19 +375,17 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                   layers: preparedLayers,
                 });
               }
-            } else if (item.type === "map_region") {
+            } else if (item.type === 'map_region') {
               const reg = exportRegions.find((r) => r.id === item.sourceId);
               if (!reg) continue;
 
-              const primaryFile = resolvedTargetFiles.find(
-                (f) => f.item.id === item.id && !f.isPairSecondary
-              );
+              const primaryFile = resolvedTargetFiles.find((f) => f.item.id === item.id && !f.isPairSecondary);
               if (!primaryFile) continue;
 
-              const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, "");
+              const basePath = primaryFile.fullPath.replace(/\.(pgm|png)$/i, '');
               mapItems.push({
                 save_path: basePath,
-                format: item.mapFormat || "ros_standard",
+                format: item.mapFormat || 'ros_standard',
                 region: {
                   name: reg.name,
                   rect: reg.rect,
@@ -446,10 +411,10 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           }
           alert(alertMsg);
           onClose();
-        }
+        },
       );
     } catch (err) {
-      console.error("Failed to execute export:", err);
+      console.error('Failed to execute export:', err);
       alert(`エクスポートに失敗しました:\n${String(err)}`);
     }
   };
@@ -483,9 +448,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
               </select>
               <Input
                 value={activeProfile.name}
-                onChange={(e) =>
-                  updateExportProfile(activeProfile.id, { name: e.target.value })
-                }
+                onChange={(e) => updateExportProfile(activeProfile.id, { name: e.target.value })}
                 placeholder="プロファイル名"
                 className="h-8 text-xs w-48 font-medium"
               />
@@ -564,9 +527,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                     updateExportProfile(activeProfile.id, { items: updated });
                   }}
                 >
-                  {activeProfile.items.every((i) => i.enabled)
-                    ? "全解除"
-                    : "全選択"}
+                  {activeProfile.items.every((i) => i.enabled) ? '全解除' : '全選択'}
                 </Button>
               </div>
             </div>
@@ -586,20 +547,18 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleAddItem("waypoint_default")}
+                onClick={() => handleAddItem('waypoint_default')}
                 className="flex-1 text-xs h-7 flex items-center justify-center gap-1"
               >
-                <FileText size={12} className="text-primary-base" />
-                ＋ Waypoint出力
+                <FileText size={12} className="text-primary-base" />＋ Waypoint出力
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleAddItem("map_all_regions")}
+                onClick={() => handleAddItem('map_all_regions')}
                 className="flex-1 text-xs h-7 flex items-center justify-center gap-1"
               >
-                <MapIcon size={12} className="text-accent-generator" />
-                ＋ マップ領域出力
+                <MapIcon size={12} className="text-accent-generator" />＋ マップ領域出力
               </Button>
             </div>
           </div>
@@ -610,15 +569,13 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
               <div className="space-y-5">
                 <div className="flex items-center justify-between pb-3 border-b border-border-base/30">
                   <div className="flex items-center gap-2">
-                    {selectedItem.type.startsWith("map") ? (
+                    {selectedItem.type.startsWith('map') ? (
                       <MapIcon size={16} className="text-accent-generator" />
                     ) : (
                       <FileText size={16} className="text-primary-base" />
                     )}
                     <span className="font-bold text-sm text-text-base">
-                      {selectedItem.type.startsWith("map")
-                        ? "マップ出力設定"
-                        : "ウェイポイント出力設定"}
+                      {selectedItem.type.startsWith('map') ? 'マップ出力設定' : 'ウェイポイント出力設定'}
                     </span>
                   </div>
                   <Button
@@ -634,33 +591,27 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
 
                 {/* Source Selection */}
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-bold text-text-muted">
-                    出力ソース (データ元)
-                  </Label>
-                  {selectedItem.type.startsWith("map") ? (
+                  <Label className="text-xs font-bold text-text-muted">出力ソース (データ元)</Label>
+                  {selectedItem.type.startsWith('map') ? (
                     <div className="flex flex-col gap-2">
                       <select
-                        value={
-                          selectedItem.type === "map_all_regions"
-                            ? "__all__"
-                            : selectedItem.sourceId
-                        }
+                        value={selectedItem.type === 'map_all_regions' ? '__all__' : selectedItem.sourceId}
                         onChange={(e) => {
-                          if (e.target.value === "__all__") {
+                          if (e.target.value === '__all__') {
                             handleUpdateItem(selectedItem.id, {
-                              type: "map_all_regions",
-                              sourceId: "all",
+                              type: 'map_all_regions',
+                              sourceId: 'all',
                             });
                           } else {
                             handleUpdateItem(selectedItem.id, {
-                              type: "map_region",
+                              type: 'map_region',
                               sourceId: e.target.value,
                             });
                           }
                         }}
                         className="h-8 text-xs rounded-md bg-surface-base border border-border-base/40 text-text-base px-2"
                       >
-                        <option value="__all__">{"全マップ領域を一括出力 ({{name}}置換)"}</option>
+                        <option value="__all__">{'全マップ領域を一括出力 ({{name}}置換)'}</option>
                         {exportRegions.map((r) => (
                           <option key={r.id} value={r.id}>
                             マップ領域: {r.name}
@@ -676,22 +627,22 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                   ) : (
                     <select
                       value={
-                        selectedItem.type === "waypoint_template"
+                        selectedItem.type === 'waypoint_template'
                           ? `tmpl:${selectedItem.sourceId}`
                           : `def:${selectedItem.sourceId}`
                       }
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (val.startsWith("tmpl:")) {
-                          const id = val.replace("tmpl:", "");
+                        if (val.startsWith('tmpl:')) {
+                          const id = val.replace('tmpl:', '');
                           handleUpdateItem(selectedItem.id, {
-                            type: "waypoint_template",
+                            type: 'waypoint_template',
                             sourceId: id,
                           });
                         } else {
-                          const id = val.replace("def:", "");
+                          const id = val.replace('def:', '');
                           handleUpdateItem(selectedItem.id, {
-                            type: "waypoint_default",
+                            type: 'waypoint_default',
                             sourceId: id,
                           });
                         }
@@ -744,17 +695,17 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        { var: "{{YYYYMMDD}}", label: "年月日" },
-                        { var: "{{HHmmss}}", label: "時分秒" },
-                        { var: "{{YYYYMMDD_HHmmss}}", label: "日時一括" },
-                        { var: "{{YYYY}}", label: "年" },
-                        { var: "{{MM}}", label: "月" },
-                        { var: "{{dd}}", label: "日" },
-                        { var: "{{HH}}", label: "時" },
-                        { var: "{{mm}}", label: "分" },
-                        { var: "{{ss}}", label: "秒" },
-                        { var: "{{project_name}}", label: "プロジェクト" },
-                        { var: "{{name}}", label: "名称" },
+                        { var: '{{YYYYMMDD}}', label: '年月日' },
+                        { var: '{{HHmmss}}', label: '時分秒' },
+                        { var: '{{YYYYMMDD_HHmmss}}', label: '日時一括' },
+                        { var: '{{YYYY}}', label: '年' },
+                        { var: '{{MM}}', label: '月' },
+                        { var: '{{dd}}', label: '日' },
+                        { var: '{{HH}}', label: '時' },
+                        { var: '{{mm}}', label: '分' },
+                        { var: '{{ss}}', label: '秒' },
+                        { var: '{{project_name}}', label: 'プロジェクト' },
+                        { var: '{{name}}', label: '名称' },
                       ].map((chip) => (
                         <button
                           key={chip.var}
@@ -772,23 +723,18 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                 </div>
 
                 {/* Map Format Options */}
-                {selectedItem.type.startsWith("map") && (
+                {selectedItem.type.startsWith('map') && (
                   <div className="space-y-1.5 pt-2 border-t border-border-base/30">
-                    <Label className="text-xs font-bold text-text-muted">
-                      マップ出力フォーマット
-                    </Label>
+                    <Label className="text-xs font-bold text-text-muted">マップ出力フォーマット</Label>
                     <div className="flex gap-4 text-xs">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
                           type="radio"
                           name={`mapFormat-${selectedItem.id}`}
-                          checked={
-                            (selectedItem.mapFormat || "ros_standard") ===
-                            "ros_standard"
-                          }
+                          checked={(selectedItem.mapFormat || 'ros_standard') === 'ros_standard'}
                           onChange={() =>
                             handleUpdateItem(selectedItem.id, {
-                              mapFormat: "ros_standard",
+                              mapFormat: 'ros_standard',
                             })
                           }
                           className="accent-primary-base"
@@ -799,10 +745,10 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                         <input
                           type="radio"
                           name={`mapFormat-${selectedItem.id}`}
-                          checked={selectedItem.mapFormat === "png_only"}
+                          checked={selectedItem.mapFormat === 'png_only'}
                           onChange={() =>
                             handleUpdateItem(selectedItem.id, {
-                              mapFormat: "png_only",
+                              mapFormat: 'png_only',
                             })
                           }
                           className="accent-primary-base"
@@ -814,7 +760,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                 )}
 
                 {/* Waypoint High-Res Image Option */}
-                {!selectedItem.type.startsWith("map") && (
+                {!selectedItem.type.startsWith('map') && (
                   <div className="pt-2 border-t border-border-base/30">
                     <label className="flex items-center gap-2 cursor-pointer text-xs">
                       <Checkbox
@@ -825,9 +771,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                           })
                         }
                       />
-                      <span className="font-semibold text-text-base">
-                        High-Res Map Shot (.png) を同梱出力
-                      </span>
+                      <span className="font-semibold text-text-base">High-Res Map Shot (.png) を同梱出力</span>
                     </label>
                     <p className="text-[11px] text-text-muted mt-1 ml-6">
                       ウェイポイントが配置されたキャンバス画像（.png）を同名で出力します。
@@ -852,10 +796,10 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
             <input
               type="radio"
               name="conflictResolution"
-              checked={activeProfile.conflictResolution === "backup_file"}
+              checked={activeProfile.conflictResolution === 'backup_file'}
               onChange={() =>
                 updateExportProfile(activeProfile.id, {
-                  conflictResolution: "backup_file",
+                  conflictResolution: 'backup_file',
                 })
               }
               className="accent-primary-base"
@@ -866,10 +810,10 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
             <input
               type="radio"
               name="conflictResolution"
-              checked={activeProfile.conflictResolution === "overwrite"}
+              checked={activeProfile.conflictResolution === 'overwrite'}
               onChange={() =>
                 updateExportProfile(activeProfile.id, {
-                  conflictResolution: "overwrite",
+                  conflictResolution: 'overwrite',
                 })
               }
               className="accent-primary-base"
@@ -912,10 +856,10 @@ function renderTreeNodes(
   onSelectItem: (id: string) => void,
   onToggleEnabled: (id: string, enabled: boolean) => void,
   conflictFiles: Set<string>,
-  depth = 0
+  depth = 0,
 ) {
   return nodes.map((node) => {
-    if (node.type === "directory") {
+    if (node.type === 'directory') {
       return (
         <div key={node.relativePath} className="space-y-0.5">
           <div
@@ -926,14 +870,7 @@ function renderTreeNodes(
             <span className="font-semibold text-text-base">{node.name}/</span>
           </div>
           <div>
-            {renderTreeNodes(
-              node.children,
-              selectedItemId,
-              onSelectItem,
-              onToggleEnabled,
-              conflictFiles,
-              depth + 1
-            )}
+            {renderTreeNodes(node.children, selectedItemId, onSelectItem, onToggleEnabled, conflictFiles, depth + 1)}
           </div>
         </div>
       );
@@ -947,10 +884,10 @@ function renderTreeNodes(
         key={node.relativePath}
         onClick={() => onSelectItem(node.item.id)}
         className={cn(
-          "flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors select-none group",
+          'flex items-center justify-between py-1 px-2 rounded cursor-pointer transition-colors select-none group',
           isSelected
-            ? "bg-primary-base/15 text-primary-base font-semibold border border-primary-base/30"
-            : "hover:bg-surface-panel/40 text-text-base border border-transparent"
+            ? 'bg-primary-base/15 text-primary-base font-semibold border border-primary-base/30'
+            : 'hover:bg-surface-panel/40 text-text-base border border-transparent',
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
@@ -967,9 +904,9 @@ function renderTreeNodes(
             <div className="w-4" />
           )}
 
-          {node.name.endsWith(".png") ? (
+          {node.name.endsWith('.png') ? (
             <ImageIcon size={13} className="text-text-muted shrink-0" />
-          ) : node.name.endsWith(".pgm") ? (
+          ) : node.name.endsWith('.pgm') ? (
             <MapIcon size={13} className="text-accent-generator shrink-0" />
           ) : (
             <FileText size={13} className="text-primary-base shrink-0" />
@@ -986,9 +923,7 @@ function renderTreeNodes(
               既存
             </span>
           )}
-          <span className="text-[10px] text-text-muted font-normal">
-            {node.sourceLabel}
-          </span>
+          <span className="text-[10px] text-text-muted font-normal">{node.sourceLabel}</span>
         </div>
       </div>
     );

@@ -1,4 +1,4 @@
-use image::{RgbaImage, Rgba, DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellValue {
@@ -11,16 +11,16 @@ impl CellValue {
     pub fn to_rgba(self) -> Rgba<u8> {
         match self {
             CellValue::Obstacle => Rgba([0, 0, 0, 255]),
-            CellValue::Free     => Rgba([254, 254, 254, 255]),
-            CellValue::Unknown  => Rgba([205, 205, 205, 255]),
+            CellValue::Free => Rgba([254, 254, 254, 255]),
+            CellValue::Unknown => Rgba([205, 205, 205, 255]),
         }
     }
 
     pub fn to_occupancy_grid_val(self) -> i8 {
         match self {
             CellValue::Obstacle => 100,
-            CellValue::Free     => 0,
-            CellValue::Unknown  => -1,
+            CellValue::Free => 0,
+            CellValue::Unknown => -1,
         }
     }
 }
@@ -62,7 +62,8 @@ pub fn apply_blend_cell(current: CellValue, incoming: CellValue, blend_mode: &st
                 CellValue::Unknown
             }
         }
-        _ => { // "overwrite"
+        _ => {
+            // "overwrite"
             if incoming != CellValue::Unknown {
                 incoming
             } else {
@@ -89,11 +90,7 @@ pub struct RectRegion {
 }
 
 /// レイヤー群を指定されたワールド矩形領域に共通アルゴリズムで合成描画
-pub fn blend_layers_to_image(
-    layers: &[LayerInput],
-    region: &RectRegion,
-    output_resolution: f64,
-) -> RgbaImage {
+pub fn blend_layers_to_image(layers: &[LayerInput], region: &RectRegion, output_resolution: f64) -> RgbaImage {
     let out_w = (region.width / output_resolution).round() as u32;
     let out_h = (region.height / output_resolution).round() as u32;
 
@@ -112,11 +109,7 @@ pub fn blend_layers_to_image(
         let l_h = layer.image.height() as f64;
         let yaw = layer.origin[2];
         let has_yaw = yaw.abs() >= 1e-9;
-        let (cos_yaw, sin_yaw) = if has_yaw {
-            (yaw.cos(), yaw.sin())
-        } else {
-            (1.0, 0.0)
-        };
+        let (cos_yaw, sin_yaw) = if has_yaw { (yaw.cos(), yaw.sin()) } else { (1.0, 0.0) };
 
         for r in 0..out_h {
             for c in 0..out_w {
@@ -168,19 +161,46 @@ mod tests {
     #[test]
     fn test_apply_blend_cell() {
         // overwrite
-        assert_eq!(apply_blend_cell(CellValue::Unknown, CellValue::Obstacle, "overwrite"), CellValue::Obstacle);
-        assert_eq!(apply_blend_cell(CellValue::Obstacle, CellValue::Unknown, "overwrite"), CellValue::Obstacle);
-        assert_eq!(apply_blend_cell(CellValue::Obstacle, CellValue::Free, "overwrite"), CellValue::Free);
+        assert_eq!(
+            apply_blend_cell(CellValue::Unknown, CellValue::Obstacle, "overwrite"),
+            CellValue::Obstacle
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Obstacle, CellValue::Unknown, "overwrite"),
+            CellValue::Obstacle
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Obstacle, CellValue::Free, "overwrite"),
+            CellValue::Free
+        );
 
         // merge_obstacles
-        assert_eq!(apply_blend_cell(CellValue::Free, CellValue::Obstacle, "merge_obstacles"), CellValue::Obstacle);
-        assert_eq!(apply_blend_cell(CellValue::Obstacle, CellValue::Free, "merge_obstacles"), CellValue::Obstacle);
-        assert_eq!(apply_blend_cell(CellValue::Unknown, CellValue::Free, "merge_obstacles"), CellValue::Free);
+        assert_eq!(
+            apply_blend_cell(CellValue::Free, CellValue::Obstacle, "merge_obstacles"),
+            CellValue::Obstacle
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Obstacle, CellValue::Free, "merge_obstacles"),
+            CellValue::Obstacle
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Unknown, CellValue::Free, "merge_obstacles"),
+            CellValue::Free
+        );
 
         // merge_free
-        assert_eq!(apply_blend_cell(CellValue::Obstacle, CellValue::Free, "merge_free"), CellValue::Free);
-        assert_eq!(apply_blend_cell(CellValue::Free, CellValue::Obstacle, "merge_free"), CellValue::Free);
-        assert_eq!(apply_blend_cell(CellValue::Unknown, CellValue::Obstacle, "merge_free"), CellValue::Obstacle);
+        assert_eq!(
+            apply_blend_cell(CellValue::Obstacle, CellValue::Free, "merge_free"),
+            CellValue::Free
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Free, CellValue::Obstacle, "merge_free"),
+            CellValue::Free
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Unknown, CellValue::Obstacle, "merge_free"),
+            CellValue::Obstacle
+        );
     }
 
     #[test]

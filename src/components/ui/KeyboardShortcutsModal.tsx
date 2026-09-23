@@ -1,8 +1,8 @@
-import React, { useEffect } from "react";
-import { Keyboard } from "lucide-react";
-import { Modal, ModalHeader, ModalContent, ModalFooter } from "./common/Modal";
-import { Button } from "./common/Button";
-import { Kbd } from "./common/Kbd";
+import React, { useEffect } from 'react';
+import { Keyboard } from 'lucide-react';
+import { Modal, ModalHeader, ModalContent, ModalFooter } from './common/Modal';
+import { Button } from './common/Button';
+import { Kbd } from './common/Kbd';
 
 type KeyboardShortcutsModalProps = {
   isOpen: boolean;
@@ -10,38 +10,38 @@ type KeyboardShortcutsModalProps = {
 };
 
 const shortcuts = [
-  { action: "New Project", keys: ["Ctrl", "N"] },
-  { action: "Open Project", keys: ["Ctrl", "O"] },
-  { action: "Save Project", keys: ["Ctrl", "S"] },
-  { action: "Save Project As", keys: ["Ctrl", "Shift", "S"] },
-  { action: "Export Waypoints", keys: ["Ctrl", "E"] },
-  { action: "Toggle Occupancy Highlight", keys: ["Ctrl", "H"] },
-  { action: "Select All Nodes", keys: ["Ctrl", "A"] },
-  { action: "Undo", keys: ["Ctrl", "Z"] },
-  { action: "Redo", keys: ["Ctrl", "Y"] },
-  { action: "Cut Map Element", keys: ["Ctrl", "X"] },
-  { action: "Copy Map Element", keys: ["Ctrl", "C"] },
-  { action: "Paste Map Element", keys: ["Ctrl", "V"] },
-  { action: "Paste as Group", keys: ["Ctrl", "Shift", "V"] },
-  { action: "Duplicate Map Element", keys: ["Ctrl", "D"] },
-  { action: "Delete Selected", keys: ["Delete", "or", "Backspace"] },
-  { action: "Deselect / Cancel", keys: ["Esc"] },
-  { action: "Select Tool", keys: ["V"] },
-  { action: "Add Waypoint Tool", keys: ["P"] },
-  { action: "Measure Distance Tool", keys: ["M"] },
-  { action: "Snap to Object (Measure Tool)", keys: ["Alt", "+", "Left Click"] },
-  { action: "Cycle Snap Base Node (Add Mode)", keys: ["Tab"] },
-  { action: "Distance Input (Add Mode)", keys: ["0", "-", "9", ".", "-"] },
-  { action: "Confirm Snapped Waypoint (Add Mode)", keys: ["Enter"] },
-  { action: "Force Axis Snap X/Y (Add Mode)", keys: ["↑", "↓", "←", "→"] },
-  { action: "Pan Map", keys: ["Left Mouse Drag"] },
-  { action: "Zoom Map", keys: ["Scroll Wheel"] },
-  { action: "Fit Map to Screen", keys: ["Middle Double Click"] },
-  { action: "Select Node", keys: ["Left Click"] },
-  { action: "Select Multiple", keys: ["Shift", "+", "Left Click"] },
-  { action: "Box / Marquee Selection", keys: ["Shift", "+", "Left Mouse Drag"] },
-  { action: "Set / Clear Anchor", keys: ["Right Click Node"] },
-  { action: "Copy Transform Element", keys: ["Right Click Label"] },
+  { action: 'New Project', keys: ['Ctrl', 'N'] },
+  { action: 'Open Project', keys: ['Ctrl', 'O'] },
+  { action: 'Save Project', keys: ['Ctrl', 'S'] },
+  { action: 'Save Project As', keys: ['Ctrl', 'Shift', 'S'] },
+  { action: 'Export Waypoints', keys: ['Ctrl', 'E'] },
+  { action: 'Toggle Occupancy Highlight', keys: ['Ctrl', 'H'] },
+  { action: 'Select All Nodes', keys: ['Ctrl', 'A'] },
+  { action: 'Undo', keys: ['Ctrl', 'Z'] },
+  { action: 'Redo', keys: ['Ctrl', 'Y'] },
+  { action: 'Cut Map Element', keys: ['Ctrl', 'X'] },
+  { action: 'Copy Map Element', keys: ['Ctrl', 'C'] },
+  { action: 'Paste Map Element', keys: ['Ctrl', 'V'] },
+  { action: 'Paste as Group', keys: ['Ctrl', 'Shift', 'V'] },
+  { action: 'Duplicate Map Element', keys: ['Ctrl', 'D'] },
+  { action: 'Delete Selected', keys: ['Delete', 'or', 'Backspace'] },
+  { action: 'Deselect / Cancel', keys: ['Esc'] },
+  { action: 'Select Tool', keys: ['V'] },
+  { action: 'Add Waypoint Tool', keys: ['P'] },
+  { action: 'Measure Distance Tool', keys: ['M'] },
+  { action: 'Snap to Object (Measure Tool)', keys: ['Alt', '+', 'Left Click'] },
+  { action: 'Cycle Snap Base Node (Add Mode)', keys: ['Tab'] },
+  { action: 'Distance Input (Add Mode)', keys: ['0', '-', '9', '.', '-'] },
+  { action: 'Confirm Snapped Waypoint (Add Mode)', keys: ['Enter'] },
+  { action: 'Force Axis Snap X/Y (Add Mode)', keys: ['↑', '↓', '←', '→'] },
+  { action: 'Pan Map', keys: ['Left Mouse Drag'] },
+  { action: 'Zoom Map', keys: ['Scroll Wheel'] },
+  { action: 'Fit Map to Screen', keys: ['Middle Double Click'] },
+  { action: 'Select Node', keys: ['Left Click'] },
+  { action: 'Select Multiple', keys: ['Shift', '+', 'Left Click'] },
+  { action: 'Box / Marquee Selection', keys: ['Shift', '+', 'Left Mouse Drag'] },
+  { action: 'Set / Clear Anchor', keys: ['Right Click Node'] },
+  { action: 'Copy Transform Element', keys: ['Right Click Label'] },
 ];
 
 function ShortcutRow({ action, keys }: { action: string; keys: string[] }) {
@@ -51,7 +51,7 @@ function ShortcutRow({ action, keys }: { action: string; keys: string[] }) {
       <div className="flex items-center gap-1.5">
         {keys.map((key, keyIdx) => (
           <React.Fragment key={keyIdx}>
-            {key === "or" || key === "+" ? (
+            {key === 'or' || key === '+' ? (
               <span className="text-text-muted text-[12px] font-medium">{key}</span>
             ) : (
               <Kbd>{key}</Kbd>
@@ -66,12 +66,12 @@ function ShortcutRow({ action, keys }: { action: string; keys: string[] }) {
 export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsModalProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === 'Escape' && isOpen) {
         onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -83,7 +83,7 @@ export function KeyboardShortcutsModal({ isOpen, onClose }: KeyboardShortcutsMod
         icon={<Keyboard size={20} className="text-primary-base" />}
         title="Keyboard Shortcuts"
       />
-      
+
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

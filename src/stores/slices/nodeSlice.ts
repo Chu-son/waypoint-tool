@@ -13,11 +13,7 @@ import {
   expandSelectionWithDescendants,
   mapInsertionTarget,
 } from '../../utils/treeUtils';
-import {
-  filterTopLevelIds,
-  remapHierarchicalIds,
-  resolveMapElementName,
-} from '../../utils/mapElementTreeUtils';
+import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { WaypointClipboardPayload } from '../../utils/mapElementClipboard';
 
 export type NodeSlice = {
@@ -25,7 +21,7 @@ export type NodeSlice = {
   rootNodeIds: string[];
   selectedNodeIds: string[];
   insertionTarget: InsertionTarget | null;
-  
+
   anchorNodeId: string | null;
   setAnchorNode: (id: string | null) => void;
   addNode: (node: WaypointNode, parentId?: string | null, options?: { skipRecalculate?: boolean }) => void;
@@ -33,7 +29,7 @@ export type NodeSlice = {
     nodes: WaypointNode[],
     parentId?: string | null,
     targetIndex?: number,
-    options?: { skipRecalculate?: boolean }
+    options?: { skipRecalculate?: boolean },
   ) => void;
   updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => void;
   updateNodes: (updates: Record<string, Partial<WaypointNode>>, options?: { skipRecalculate?: boolean }) => void;
@@ -62,15 +58,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
   setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
 
-  setInsertionTarget: (target: InsertionTarget | null) => set((state) => ({
-    insertionTarget: validateAndCorrectInsertionTarget(target, state.rootNodeIds, state.nodes),
-  })),
+  setInsertionTarget: (target: InsertionTarget | null) =>
+    set((state) => ({
+      insertionTarget: validateAndCorrectInsertionTarget(target, state.rootNodeIds, state.nodes),
+    })),
 
   addNodes: (
     nodesToAdd: WaypointNode[],
     parentId?: string | null,
     targetIndex?: number,
-    options?: { skipRecalculate?: boolean }
+    options?: { skipRecalculate?: boolean },
   ) => {
     if (!nodesToAdd || nodesToAdd.length === 0) return;
     get().pushHistorySnapshot();
@@ -83,20 +80,21 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       let newRootIds = [...state.rootNodeIds];
 
       const isExplicitPlacement = parentId !== undefined || targetIndex !== undefined;
-      const effectiveParentId = parentId !== undefined
-        ? (parentId ?? undefined)
-        : (state.insertionTarget?.parentId ?? undefined);
+      const effectiveParentId =
+        parentId !== undefined ? (parentId ?? undefined) : (state.insertionTarget?.parentId ?? undefined);
 
       let nextInsertionTarget = state.insertionTarget;
 
       if (effectiveParentId && newNodes[effectiveParentId]) {
         const parent = newNodes[effectiveParentId];
         const children = [...(parent.children_ids || [])];
-        let insIdx = targetIndex !== undefined
-          ? Math.min(targetIndex, children.length)
-          : children.length;
+        let insIdx = targetIndex !== undefined ? Math.min(targetIndex, children.length) : children.length;
 
-        if (!isExplicitPlacement && state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+        if (
+          !isExplicitPlacement &&
+          state.insertionTarget?.parentId === effectiveParentId &&
+          state.insertionTarget.index >= 0
+        ) {
           insIdx = Math.min(state.insertionTarget.index, children.length);
         }
 
@@ -106,15 +104,22 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
           children_ids: children,
         };
 
-        if (!isExplicitPlacement && state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+        if (
+          !isExplicitPlacement &&
+          state.insertionTarget?.parentId === effectiveParentId &&
+          state.insertionTarget.index >= 0
+        ) {
           nextInsertionTarget = { parentId: effectiveParentId, index: insIdx + nodeIds.length };
         }
       } else {
-        let insIdx = targetIndex !== undefined
-          ? Math.min(targetIndex, newRootIds.length)
-          : newRootIds.length;
+        let insIdx = targetIndex !== undefined ? Math.min(targetIndex, newRootIds.length) : newRootIds.length;
 
-        if (!isExplicitPlacement && state.insertionTarget?.parentId === null && state.insertionTarget !== null && state.insertionTarget.index >= 0) {
+        if (
+          !isExplicitPlacement &&
+          state.insertionTarget?.parentId === null &&
+          state.insertionTarget !== null &&
+          state.insertionTarget.index >= 0
+        ) {
           insIdx = Math.min(state.insertionTarget.index, newRootIds.length);
         }
 
@@ -151,9 +156,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       return {
         nodes: {
           ...state.nodes,
-          [id]: { ...existing, ...updates }
+          [id]: { ...existing, ...updates },
         },
-        isDirty: true
+        isDirty: true,
       };
     });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
@@ -178,7 +183,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       });
       return {
         nodes: nextNodes,
-        isDirty: true
+        isDirty: true,
       };
     });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
@@ -197,7 +202,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       const { parentId: targetParentId, insertIndex } = findHighestLevelParent(
         selectedIds,
         state.rootNodeIds,
-        state.nodes
+        state.nodes,
       );
 
       // 2. 連番でグループ名を生成 ("Group 1", "Group 2", ...)
@@ -272,7 +277,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
       const nextSelected = expandSelectionWithDescendants([newGroupId], newNodes);
@@ -300,7 +305,10 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     get().pushHistorySnapshot();
     set((state) => {
       const groupNode = state.nodes[groupId];
-      if (!groupNode || (groupNode.type !== 'manual_group' && groupNode.type !== 'group' && groupNode.type !== 'generator')) {
+      if (
+        !groupNode ||
+        (groupNode.type !== 'manual_group' && groupNode.type !== 'group' && groupNode.type !== 'generator')
+      ) {
         return state;
       }
 
@@ -333,7 +341,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
       const nextSelected = expandSelectionWithDescendants(childIds, newNodes);
@@ -460,7 +468,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
       return {
@@ -526,7 +534,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
       const nextSelected = state.selectedNodeIds.filter((id) => !idsToRemove.has(id));
@@ -550,16 +558,18 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     // グループが含まれる場合、その全子孫ノードIDを自動収集して展開（generatorは除外）
     const targetIds = expandSelectionWithDescendants(ids, state.nodes);
 
-    const nextIds = multi ? (() => {
-      const current = new Set(state.selectedNodeIds);
-      const allSelected = targetIds.every((id) => current.has(id));
-      if (allSelected) {
-        targetIds.forEach((id) => current.delete(id));
-      } else {
-        targetIds.forEach((id) => current.add(id));
-      }
-      return Array.from(current);
-    })() : targetIds;
+    const nextIds = multi
+      ? (() => {
+          const current = new Set(state.selectedNodeIds);
+          const allSelected = targetIds.every((id) => current.has(id));
+          if (allSelected) {
+            targetIds.forEach((id) => current.delete(id));
+          } else {
+            targetIds.forEach((id) => current.add(id));
+          }
+          return Array.from(current);
+        })()
+      : targetIds;
 
     state.setSelection(nextIds.length > 0 ? { type: 'nodes', ids: nextIds } : { type: 'none' });
     if (nextIds.length > 0 && state.isAnnotationEditMode) {
@@ -570,7 +580,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
   selectAllNodes: () => {
     get().setSelection({ type: 'nodes', ids: Object.keys(get().nodes) });
   },
-  
+
   deselectAllNodes: () => {
     get().setSelection({ type: 'none' });
   },
@@ -589,7 +599,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       const existingNames = new Set(
         Object.values(state.nodes)
           .map((n) => n.name)
-          .filter(Boolean) as string[]
+          .filter(Boolean) as string[],
       );
 
       const remapResult = remapHierarchicalIds(topLevelIds, state.nodes, {
@@ -664,7 +674,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       const existingNames = new Set(
         Object.values(state.nodes)
           .map((n) => n.name)
-          .filter(Boolean) as string[]
+          .filter(Boolean) as string[],
       );
 
       // 1. クリップボード内のノード群のIDを新規UUIDへ再採番
@@ -713,7 +723,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         } else {
           // ノード選択中ならその直後
           const parentId = findNodeParentId(selId, state.rootNodeIds, state.nodes);
-          const siblings = parentId ? (state.nodes[parentId]?.children_ids || []) : state.rootNodeIds;
+          const siblings = parentId ? state.nodes[parentId]?.children_ids || [] : state.rootNodeIds;
           const idx = siblings.indexOf(selId);
           if (idx !== -1) {
             targetToUse = { parentId, index: idx + 1 };

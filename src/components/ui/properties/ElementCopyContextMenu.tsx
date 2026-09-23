@@ -33,15 +33,15 @@ function CopyMenuItem({
       variant="ghost"
       onClick={onClick}
       className={cn(
-        "w-full text-left justify-between px-2.5 py-1.5 h-8 text-[13px] hover:bg-surface-hover transition-colors rounded-md",
-        isAnchor ? "text-accent-anchor" : "text-text-base"
+        'w-full text-left justify-between px-2.5 py-1.5 h-8 text-[13px] hover:bg-surface-hover transition-colors rounded-md',
+        isAnchor ? 'text-accent-anchor' : 'text-text-base',
       )}
     >
       <span className="flex items-center gap-1.5">
         {icon}
         {label}
       </span>
-      <span className={cn("font-mono ml-2", isAnchor ? "text-accent-anchor/80" : "text-text-muted")}>
+      <span className={cn('font-mono ml-2', isAnchor ? 'text-accent-anchor/80' : 'text-text-muted')}>
         {value.toFixed(4)}
       </span>
     </Button>

@@ -9,10 +9,7 @@ import { BackendAPI } from '../../../api';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance } from '../../../types/store';
 import { PythonDependencyDef } from '../../../types/pipeline';
-import {
-  Terminal,
-  Loader2,
-} from 'lucide-react';
+import { Terminal, Loader2 } from 'lucide-react';
 
 export interface VenvSetupModalProps {
   isOpen: boolean;
@@ -61,9 +58,7 @@ export const VenvSetupModal: React.FC<VenvSetupModalProps> = ({
     });
   }, [plugin.manifest?.python_dependencies]);
 
-  const defaultVenvDir = plugin.folder_path
-    ? `${plugin.folder_path}/.venv`
-    : '.venv';
+  const defaultVenvDir = plugin.folder_path ? `${plugin.folder_path}/.venv` : '.venv';
 
   const [basePython, setBasePython] = useState(globalPythonPath || 'python3');
   const [targetDir, setTargetDir] = useState(defaultVenvDir);
@@ -78,9 +73,7 @@ export const VenvSetupModal: React.FC<VenvSetupModalProps> = ({
     return initial;
   });
 
-  const [status, setStatus] = useState<'idle' | 'creating' | 'installing' | 'success' | 'error'>(
-    'idle'
-  );
+  const [status, setStatus] = useState<'idle' | 'creating' | 'installing' | 'success' | 'error'>('idle');
   const [logs, setLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -141,16 +134,11 @@ export const VenvSetupModal: React.FC<VenvSetupModalProps> = ({
       addLog(`仮想環境の作成を開始します: ${targetDir}`);
       addLog(`ベース Python: ${basePython.trim() || 'default'}`);
 
-      const venvPythonPath = await BackendAPI.createVirtualenv(
-        targetDir,
-        basePython.trim() || undefined
-      );
+      const venvPythonPath = await BackendAPI.createVirtualenv(targetDir, basePython.trim() || undefined);
 
       addLog(`仮想環境の作成に成功しました: ${venvPythonPath}`);
 
-      const packagesToInstall = dependencies
-        .filter((dep) => selectedPackages[dep.name] ?? true)
-        .map((dep) => dep.spec);
+      const packagesToInstall = dependencies.filter((dep) => selectedPackages[dep.name] ?? true).map((dep) => dep.spec);
 
       if (packagesToInstall.length > 0) {
         setStatus('installing');
@@ -247,13 +235,9 @@ export const VenvSetupModal: React.FC<VenvSetupModalProps> = ({
         {/* Packages to Install */}
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <FieldLabel className="mb-0">
-              Packages to Install ({dependencies.length})
-            </FieldLabel>
+            <FieldLabel className="mb-0">Packages to Install ({dependencies.length})</FieldLabel>
             {hasDependencies && (
-              <span className="text-[10px] text-text-muted font-mono">
-                plugin.manifest.python_dependencies
-              </span>
+              <span className="text-[10px] text-text-muted font-mono">plugin.manifest.python_dependencies</span>
             )}
           </div>
 
@@ -275,14 +259,8 @@ export const VenvSetupModal: React.FC<VenvSetupModalProps> = ({
                       disabled={isRunning}
                     />
                     <div className="truncate">
-                      <span className="text-xs font-mono font-medium text-text-base">
-                        {dep.spec}
-                      </span>
-                      {dep.description && (
-                        <span className="text-[11px] text-text-muted ml-2">
-                          - {dep.description}
-                        </span>
-                      )}
+                      <span className="text-xs font-mono font-medium text-text-base">{dep.spec}</span>
+                      {dep.description && <span className="text-[11px] text-text-muted ml-2">- {dep.description}</span>}
                     </div>
                   </div>
                   {dep.optional && (
@@ -339,12 +317,7 @@ export const VenvSetupModal: React.FC<VenvSetupModalProps> = ({
           </Button>
         ) : (
           <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              disabled={isRunning}
-            >
+            <Button variant="ghost" size="sm" onClick={onClose} disabled={isRunning}>
               Cancel
             </Button>
             <Button

@@ -54,9 +54,7 @@ function JsonNode({
             {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
           {keyName && <span className="text-primary-base font-semibold">{keyName}: </span>}
-          <span className="text-text-muted/80 text-[11px]">
-            {isArray ? `Array(${count})` : `Object{${count}}`}
-          </span>
+          <span className="text-text-muted/80 text-[11px]">{isArray ? `Array(${count})` : `Object{${count}}`}</span>
         </div>
 
         {isExpanded && (
@@ -114,7 +112,12 @@ export function PluginDataViewer({
 
   if (data === undefined || data === null) {
     return (
-      <div className={cn('bg-surface-panel/30 border border-border-base/30 rounded-xl p-3 text-xs text-text-muted/70 italic text-center', className)}>
+      <div
+        className={cn(
+          'bg-surface-panel/30 border border-border-base/30 rounded-xl p-3 text-xs text-text-muted/70 italic text-center',
+          className,
+        )}
+      >
         プラグイン内部データ (plugin_data) はありません。
       </div>
     );

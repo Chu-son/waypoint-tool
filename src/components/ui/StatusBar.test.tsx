@@ -91,12 +91,12 @@ describe('StatusBar', () => {
           forcedAxis: null,
           forcedSign: null,
         },
-      })
+      }),
     );
 
     render(<StatusBar />);
     expect(screen.getByText('ウェイポイント追加')).toBeInTheDocument();
-    
+
     const escBtn = screen.getByTitle(/Escキーまたはクリックで 選択モードへ復帰/i);
     expect(escBtn).toBeInTheDocument();
 
@@ -109,12 +109,12 @@ describe('StatusBar', () => {
       selector({
         ...defaultStoreState,
         selection: { type: 'nodes', ids: ['wp-1'] },
-      })
+      }),
     );
 
     render(<StatusBar />);
     expect(screen.getByText(/ノード選択中 "wp_01"/)).toBeInTheDocument();
-    
+
     const escBtn = screen.getByTitle(/Escキーまたはクリックで 選択を解除/i);
     fireEvent.click(escBtn);
     expect(mockHandleGlobalEscape).toHaveBeenCalledTimes(1);
@@ -139,7 +139,7 @@ describe('StatusBar', () => {
       selector({
         ...defaultStoreState,
         isDirty: true,
-      })
+      }),
     );
 
     render(<StatusBar />);

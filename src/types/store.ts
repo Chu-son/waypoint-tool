@@ -1,16 +1,6 @@
-import {
-  PipelineRecipeDef,
-  PipelineMetadata,
-  PluginDependencyDef,
-  PythonDependencyDef,
-} from './pipeline';
+import { PipelineRecipeDef, PipelineMetadata, PluginDependencyDef, PythonDependencyDef } from './pipeline';
 
-export type {
-  PipelineRecipeDef,
-  PipelineMetadata,
-  PluginDependencyDef,
-  PythonDependencyDef,
-};
+export type { PipelineRecipeDef, PipelineMetadata, PluginDependencyDef, PythonDependencyDef };
 
 export type Transform = {
   x: number;
@@ -63,15 +53,9 @@ export type ExportTemplate = {
   importMapping?: ImportFieldMapping;
 };
 
-export type ExportTargetType =
-  | 'waypoint_template'
-  | 'waypoint_default'
-  | 'map_region'
-  | 'map_all_regions';
+export type ExportTargetType = 'waypoint_template' | 'waypoint_default' | 'map_region' | 'map_all_regions';
 
-export type ConflictResolution =
-  | 'overwrite'
-  | 'backup_file';
+export type ConflictResolution = 'overwrite' | 'backup_file';
 
 export interface ExportTargetItem {
   id: string;
@@ -176,8 +160,8 @@ export type CircularFootprint = {
 
 export type RectangularFootprint = {
   type: 'rectangular';
-  length: number;    // X direction (front-to-back, in meters)
-  width: number;     // Y direction (left-to-right, in meters)
+  length: number; // X direction (front-to-back, in meters)
+  width: number; // Y direction (left-to-right, in meters)
   offset_x?: number; // Offset of robot center from footprint origin (in meters)
   offset_y?: number; // Offset of robot center from footprint origin (in meters)
 };
@@ -193,7 +177,8 @@ export type RobotFootprint = CircularFootprint | RectangularFootprint | PolygonF
 // --- Plugin Architecture Types ---
 export type PluginPrimaryOutput = 'waypoints' | 'custom_layer' | 'annotations' | 'path_calculator';
 export type PluginCategory = 'waypoint_generator' | 'map_layer_generator' | 'path_calculator' | PluginPrimaryOutput;
-export type PluginInputType = 'point' | 'points' | 'point_list' | 'rectangle' | 'waypoint' | 'annotation' | 'custom_layer';
+export type PluginInputType =
+  'point' | 'points' | 'point_list' | 'rectangle' | 'waypoint' | 'annotation' | 'custom_layer';
 
 export interface PluginInteractionPointItem {
   id: string;
@@ -289,17 +274,17 @@ export interface LineEditObject extends EditObjectBase {
 
 export interface RectEditObject extends EditObjectBase {
   type: 'rect';
-  cx: number;     // Center world coordinate X (meters)
-  cy: number;     // Center world coordinate Y (meters)
-  width: number;  // Width in world units (meters)
+  cx: number; // Center world coordinate X (meters)
+  cy: number; // Center world coordinate Y (meters)
+  width: number; // Width in world units (meters)
   height: number; // Height in world units (meters)
-  angle: number;  // Radians (relative to center point)
+  angle: number; // Radians (relative to center point)
 }
 
 export interface CircleEditObject extends EditObjectBase {
   type: 'circle';
-  cx: number;     // Center world coordinate X (meters)
-  cy: number;     // Center world coordinate Y (meters)
+  cx: number; // Center world coordinate X (meters)
+  cy: number; // Center world coordinate Y (meters)
   radius: number; // Radius in world units (meters)
 }
 
@@ -489,11 +474,7 @@ export interface CircleAnnotation extends AnnotationBase {
 }
 
 export type AnnotationObject =
-  | PointAnnotation
-  | OrientedPointAnnotation
-  | LineAnnotation
-  | RectAnnotation
-  | CircleAnnotation;
+  PointAnnotation | OrientedPointAnnotation | LineAnnotation | RectAnnotation | CircleAnnotation;
 
 export interface AnnotationGroup {
   id: string;
@@ -565,17 +546,21 @@ export interface PluginAnnotationOutputItem {
 }
 
 export interface PluginUnifiedResult {
-  waypoints?: {
-    name?: string;
-    items: PluginWaypointOutputItem[];
-    plugin_data?: Record<string, any>;
-  } | PluginWaypointOutputItem[];
+  waypoints?:
+    | {
+        name?: string;
+        items: PluginWaypointOutputItem[];
+        plugin_data?: Record<string, any>;
+      }
+    | PluginWaypointOutputItem[];
   custom_layers?: PluginCustomLayerOutputItem[];
-  annotations?: {
-    name?: string;
-    items: PluginAnnotationOutputItem[];
-    plugin_data?: Record<string, any>;
-  } | PluginAnnotationOutputItem[];
+  annotations?:
+    | {
+        name?: string;
+        items: PluginAnnotationOutputItem[];
+        plugin_data?: Record<string, any>;
+      }
+    | PluginAnnotationOutputItem[];
   plugin_data?: Record<string, any>;
   segments?: Array<Array<{ x: number; y: number }>>; // For path calculators
 }
@@ -634,8 +619,8 @@ export interface ProjectMapLayer {
 // --- Occupancy Settings Types ---
 export interface OccupancySettings {
   defaultOccupiedThresh: number; // 0.0 ~ 1.0 (default 0.65)
-  defaultFreeThresh: number;     // 0.0 ~ 1.0 (default 0.25)
-  defaultNegate: 0 | 1;          // 0: normal, 1: inverted
+  defaultFreeThresh: number; // 0.0 ~ 1.0 (default 0.25)
+  defaultNegate: 0 | 1; // 0: normal, 1: inverted
 }
 // --------------------------------
 
@@ -731,7 +716,7 @@ export interface AppState {
   rootNodeIds: string[];
   selectedNodeIds: string[];
   activeTool: 'select' | 'add_point' | 'add_rect_sweep' | 'add_export_region' | 'measure';
-  
+
   // Maps & Layers
   mapLayers: MapLayer[];
   defaultMapOpacity: number;
@@ -745,10 +730,10 @@ export interface AppState {
   exportProfiles: ExportProfile[];
   activeExportProfileId: string | null;
   globalPythonPath: string;
-  
+
   // Unsaved changes tracker
   isDirty: boolean;
-  
+
   // Actions
   setDirty: (dirty: boolean) => void;
   addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => void;

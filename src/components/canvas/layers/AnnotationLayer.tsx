@@ -75,7 +75,7 @@ export function AnnotationLayer({
         fontWeight: 'bold',
         stroke: { color: '#000000', width: 2.5 },
       }),
-    []
+    [],
   );
 
   const renderSingleAnnotation = (obj: AnnotationObject, isPreview = false) => {
@@ -103,7 +103,8 @@ export function AnnotationLayer({
 
     const strokeColorHex = condStyle?.strokeColor ? parseColorSafe(condStyle.strokeColor, baseColorHex) : baseColorHex;
     const fillColorHex = condStyle?.fillColor ? parseColorSafe(condStyle.fillColor, baseColorHex) : strokeColorHex;
-    const strokeWidth = (condStyle?.strokeWidth !== undefined ? condStyle.strokeWidth : (isSelected ? 3.0 : 2.0)) / safeScale;
+    const strokeWidth =
+      (condStyle?.strokeWidth !== undefined ? condStyle.strokeWidth : isSelected ? 3.0 : 2.0) / safeScale;
     const opacity = condStyle?.opacity !== undefined ? condStyle.opacity : 1.0;
 
     const isInteractive = !isPreview;
@@ -298,35 +299,36 @@ export function AnnotationLayer({
                 />
               </>
             )}
-            {line.showLength && (() => {
-              const dx = line.x2 - line.x1;
-              const dy = line.y2 - line.y1;
-              const len = Math.hypot(dx, dy);
-              const lenText = `${len.toFixed(2)} m`;
-              const textWidth = Math.max(50, lenText.length * 8 + 12);
-              const bw = textWidth / safeScale;
-              const bh = 18 / safeScale;
-              return (
-                <pixiContainer x={midX} y={midY}>
-                  <pixiGraphics
-                    draw={(g) => {
-                      g.clear();
-                      g.fillStyle = { color: 0x0f172a, alpha: 0.85 };
-                      g.strokeStyle = { width: 1.5 / safeScale, color: strokeColorHex, alpha: 0.9 * opacity };
-                      g.roundRect(-bw / 2, -bh / 2, bw, bh, 4 / safeScale);
-                      g.fill();
-                      g.stroke();
-                    }}
-                  />
-                  <pixiText
-                    text={lenText}
-                    anchor={{ x: 0.5, y: 0.5 }}
-                    style={labelStyle}
-                    scale={{ x: 1 / safeScale, y: -1 / safeScale }}
-                  />
-                </pixiContainer>
-              );
-            })()}
+            {line.showLength &&
+              (() => {
+                const dx = line.x2 - line.x1;
+                const dy = line.y2 - line.y1;
+                const len = Math.hypot(dx, dy);
+                const lenText = `${len.toFixed(2)} m`;
+                const textWidth = Math.max(50, lenText.length * 8 + 12);
+                const bw = textWidth / safeScale;
+                const bh = 18 / safeScale;
+                return (
+                  <pixiContainer x={midX} y={midY}>
+                    <pixiGraphics
+                      draw={(g) => {
+                        g.clear();
+                        g.fillStyle = { color: 0x0f172a, alpha: 0.85 };
+                        g.strokeStyle = { width: 1.5 / safeScale, color: strokeColorHex, alpha: 0.9 * opacity };
+                        g.roundRect(-bw / 2, -bh / 2, bw, bh, 4 / safeScale);
+                        g.fill();
+                        g.stroke();
+                      }}
+                    />
+                    <pixiText
+                      text={lenText}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                      style={labelStyle}
+                      scale={{ x: 1 / safeScale, y: -1 / safeScale }}
+                    />
+                  </pixiContainer>
+                );
+              })()}
             {showAnnotationLabels && line.labelVisible && line.name && (
               <pixiText
                 text={line.name}
@@ -367,7 +369,12 @@ export function AnnotationLayer({
                   // Selection outer ring
                   if (isSelected) {
                     g.strokeStyle = { width: 1.5 / safeScale, color: 0x60a5fa, alpha: 0.8 };
-                    g.rect(-halfW - 3 / safeScale, -halfH - 3 / safeScale, rect.width + 6 / safeScale, rect.height + 6 / safeScale);
+                    g.rect(
+                      -halfW - 3 / safeScale,
+                      -halfH - 3 / safeScale,
+                      rect.width + 6 / safeScale,
+                      rect.height + 6 / safeScale,
+                    );
                     g.stroke();
                   }
 

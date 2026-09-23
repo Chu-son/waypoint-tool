@@ -15,18 +15,7 @@ import { ToggleSwitch } from '../common/ToggleSwitch';
 import { FieldLabel } from '../common/FieldLabel';
 import { Label } from '../common/Label';
 import { TabSectionHeader } from './TabSectionHeader';
-import {
-  Plus,
-  Trash2,
-  Copy,
-  ChevronUp,
-  ChevronDown,
-  Upload,
-  Layers,
-  Sparkles,
-  Info,
-  Check,
-} from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronUp, ChevronDown, Upload, Layers, Sparkles, Info, Check } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 
 // ============================================================================
@@ -41,13 +30,7 @@ interface ConditionItemEditorProps {
   depth?: number;
 }
 
-function ConditionItemEditor({
-  item,
-  onChange,
-  onDelete,
-  optionsList,
-  depth = 0,
-}: ConditionItemEditorProps) {
+function ConditionItemEditor({ item, onChange, onDelete, optionsList, depth = 0 }: ConditionItemEditorProps) {
   if (item.type === 'group') {
     return (
       <ConditionGroupEditor
@@ -150,13 +133,7 @@ interface ConditionGroupEditorProps {
   depth?: number;
 }
 
-function ConditionGroupEditor({
-  group,
-  onChange,
-  onDelete,
-  optionsList,
-  depth = 0,
-}: ConditionGroupEditorProps) {
+function ConditionGroupEditor({ group, onChange, onDelete, optionsList, depth = 0 }: ConditionGroupEditorProps) {
   const handleLogicalChange = (logical: 'and' | 'or') => {
     onChange({ ...group, logicalOperator: logical });
   };
@@ -198,9 +175,7 @@ function ConditionGroupEditor({
     <div
       className={cn(
         'rounded-xl border p-3 space-y-2.5 transition-colors',
-        depth === 0
-          ? 'bg-surface-panel/30 border-border-base/40'
-          : 'bg-surface-panel/60 border-primary-base/20'
+        depth === 0 ? 'bg-surface-panel/30 border-border-base/40' : 'bg-surface-panel/60 border-primary-base/20',
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -214,7 +189,7 @@ function ConditionGroupEditor({
                 'px-2 py-0.5 rounded text-[11px] font-bold transition-colors whitespace-nowrap',
                 group.logicalOperator === 'and'
                   ? 'bg-primary-base text-white shadow-xs'
-                  : 'text-text-muted hover:text-text-base'
+                  : 'text-text-muted hover:text-text-base',
               )}
             >
               すべて一致 (AND)
@@ -226,7 +201,7 @@ function ConditionGroupEditor({
                 'px-2 py-0.5 rounded text-[11px] font-bold transition-colors whitespace-nowrap',
                 group.logicalOperator === 'or'
                   ? 'bg-primary-base text-white shadow-xs'
-                  : 'text-text-muted hover:text-text-base'
+                  : 'text-text-muted hover:text-text-base',
               )}
             >
               いずれか一致 (OR)
@@ -848,7 +823,7 @@ export function ConditionalStylesTab() {
   const optionsSchema = useAppStore((state) => state.optionsSchema);
 
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(
-    conditionalStyles.length > 0 ? conditionalStyles[0].id : null
+    conditionalStyles.length > 0 ? conditionalStyles[0].id : null,
   );
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -1070,7 +1045,7 @@ export function ConditionalStylesTab() {
                       'flex items-center justify-between gap-2 p-2.5 rounded-xl border transition-all cursor-pointer text-xs select-none',
                       isSelected
                         ? 'bg-surface-panel border-primary-base/50 shadow-xs'
-                        : 'bg-surface-panel/40 border-border-base/40 hover:bg-surface-panel/70'
+                        : 'bg-surface-panel/40 border-border-base/40 hover:bg-surface-panel/70',
                     )}
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1088,7 +1063,7 @@ export function ConditionalStylesTab() {
                         <span
                           className={cn(
                             'text-[9px] uppercase px-1.5 py-0.5 rounded font-mono font-bold border shrink-0',
-                            targetBadgeColor[rule.targetElement]
+                            targetBadgeColor[rule.targetElement],
                           )}
                         >
                           {rule.targetElement}
@@ -1096,7 +1071,7 @@ export function ConditionalStylesTab() {
                         <span
                           className={cn(
                             'font-medium truncate',
-                            rule.enabled ? 'text-text-base' : 'text-text-muted line-through'
+                            rule.enabled ? 'text-text-base' : 'text-text-muted line-through',
                           )}
                           title={rule.name}
                         >
@@ -1189,9 +1164,7 @@ export function ConditionalStylesTab() {
                     <span className="text-xs text-text-muted">一致時に以降の評価を停止:</span>
                     <ToggleSwitch
                       checked={selectedRule.stopIfMatched || false}
-                      onChange={(checked) =>
-                        updateConditionalStyleRule(selectedRule.id, { stopIfMatched: checked })
-                      }
+                      onChange={(checked) => updateConditionalStyleRule(selectedRule.id, { stopIfMatched: checked })}
                     />
                   </div>
                 </div>
@@ -1202,9 +1175,7 @@ export function ConditionalStylesTab() {
                     <Input
                       type="text"
                       value={selectedRule.name}
-                      onChange={(e) =>
-                        updateConditionalStyleRule(selectedRule.id, { name: e.target.value })
-                      }
+                      onChange={(e) => updateConditionalStyleRule(selectedRule.id, { name: e.target.value })}
                       className="h-8 text-xs font-medium"
                     />
                   </div>
@@ -1220,7 +1191,10 @@ export function ConditionalStylesTab() {
                           style: {
                             waypoint: newTarget === 'waypoint' ? { color: '#ef4444', shape: 'diamond' } : undefined,
                             path: newTarget === 'path' ? { color: '#f59e0b', dashPattern: 'dashed' } : undefined,
-                            footprint: newTarget === 'footprint' ? { visibleMode: 'force_show', strokeColor: '#10b981' } : undefined,
+                            footprint:
+                              newTarget === 'footprint'
+                                ? { visibleMode: 'force_show', strokeColor: '#10b981' }
+                                : undefined,
                             annotation: newTarget === 'annotation' ? { strokeColor: '#8b5cf6' } : undefined,
                           },
                         });
@@ -1241,9 +1215,7 @@ export function ConditionalStylesTab() {
                 <FieldLabel>判定条件 (Conditions)</FieldLabel>
                 <ConditionGroupEditor
                   group={selectedRule.condition}
-                  onChange={(updatedGroup) =>
-                    updateConditionalStyleRule(selectedRule.id, { condition: updatedGroup })
-                  }
+                  onChange={(updatedGroup) => updateConditionalStyleRule(selectedRule.id, { condition: updatedGroup })}
                   optionsList={optionsList}
                 />
               </div>

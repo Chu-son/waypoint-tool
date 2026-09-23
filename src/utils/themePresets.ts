@@ -228,11 +228,25 @@ export interface ThemePresetOption {
 
 export const DARK_THEME_PRESETS: ThemePresetOption[] = [
   { id: 'default', name: 'Indigo', title: 'Indigo', label: 'Indigo', primaryBase: '#5e6ad2', primaryColor: '#5e6ad2' },
-  { id: 'emerald', name: 'Emerald', title: 'Emerald', label: 'Emerald', primaryBase: '#10b981', primaryColor: '#10b981' },
+  {
+    id: 'emerald',
+    name: 'Emerald',
+    title: 'Emerald',
+    label: 'Emerald',
+    primaryBase: '#10b981',
+    primaryColor: '#10b981',
+  },
   { id: 'ocean', name: 'Ocean', title: 'Ocean', label: 'Ocean', primaryBase: '#0ea5e9', primaryColor: '#0ea5e9' },
   { id: 'amber', name: 'Amber', title: 'Amber', label: 'Amber', primaryBase: '#f59e0b', primaryColor: '#f59e0b' },
   { id: 'purple', name: 'Purple', title: 'Purple', label: 'Purple', primaryBase: '#8b5cf6', primaryColor: '#8b5cf6' },
-  { id: 'midnight', name: 'Midnight', title: 'Midnight', label: 'Midnight', primaryBase: '#06b6d4', primaryColor: '#06b6d4' },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    title: 'Midnight',
+    label: 'Midnight',
+    primaryBase: '#06b6d4',
+    primaryColor: '#06b6d4',
+  },
 ];
 
 export const THEME_PRESET_OPTIONS = DARK_THEME_PRESETS;
@@ -297,10 +311,10 @@ export function resolveThemeVariables(theme?: CustomUiTheme): {
     presetKey === 'light'
       ? 'default'
       : presetKey === 'roomba'
-      ? 'emerald'
-      : presetKey === 'dark'
-      ? 'default'
-      : presetKey;
+        ? 'emerald'
+        : presetKey === 'dark'
+          ? 'default'
+          : presetKey;
 
   const accentPreset = THEME_PRESETS[effectiveAccentKey] || THEME_PRESETS.default;
 
@@ -309,8 +323,7 @@ export function resolveThemeVariables(theme?: CustomUiTheme): {
 
   let base: ThemeColorSet;
   if (targetColorScheme === 'light') {
-    const lightHover =
-      LIGHT_ACCENT_HOVERS[effectiveAccentKey] || darkenHex(accentPreset.primaryBase);
+    const lightHover = LIGHT_ACCENT_HOVERS[effectiveAccentKey] || darkenHex(accentPreset.primaryBase);
 
     base = {
       ...THEME_PRESETS.light,
@@ -365,7 +378,8 @@ export function resolveThemeVariables(theme?: CustomUiTheme): {
     '--color-surface-base': merged.surfaceBase,
     '--color-surface-panel': merged.surfacePanel,
     '--color-surface-hover': merged.surfaceHover,
-    '--color-surface-active': merged.surfaceActive || (merged.colorScheme === 'light' ? 'rgba(0, 0, 0, 0.07)' : 'rgba(255, 255, 255, 0.08)'),
+    '--color-surface-active':
+      merged.surfaceActive || (merged.colorScheme === 'light' ? 'rgba(0, 0, 0, 0.07)' : 'rgba(255, 255, 255, 0.08)'),
     '--color-border-base': merged.borderBase,
     '--color-border-focus': merged.borderFocus,
     '--color-border-error': merged.borderError,

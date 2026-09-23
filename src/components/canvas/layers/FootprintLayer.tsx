@@ -27,18 +27,26 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   const renderableNodes = useMemo(
     () =>
       getFlattenedWaypointIds(rootNodeIds, nodes)
-        .map(id => nodes[id])
-        .filter(node => node && node.transform)
-        .map(node => ({ node })),
+        .map((id) => nodes[id])
+        .filter((node) => node && node.transform)
+        .map((node) => ({ node })),
     [rootNodeIds, nodes],
   );
 
   // 条件付き書式のメモ化キャッシュ
   const resolvedFpMap = useMemo(() => {
     const map = new Map<string, ResolvedFootprintStyle>();
-    if (!robotFootprint || !conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0) return map;
+    if (!robotFootprint || !conditionalStylesEnabled || !conditionalStyles || conditionalStyles.length === 0)
+      return map;
     renderableNodes.forEach(({ node }, idx) => {
-      const style = resolveFootprintConditionalStyle(node, robotFootprint, conditionalStyles, conditionalStylesEnabled, optionsSchema, { index: idx });
+      const style = resolveFootprintConditionalStyle(
+        node,
+        robotFootprint,
+        conditionalStyles,
+        conditionalStylesEnabled,
+        optionsSchema,
+        { index: idx },
+      );
       if (style) map.set(node.id, style);
     });
     return map;
@@ -70,18 +78,12 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
         const baseFill = condStyle?.fillColor ? parseColorSafe(condStyle.fillColor, 0x94a3b8) : 0x94a3b8;
 
         const strokeColor = isSelected ? 0x38bdf8 : baseStroke;
-        const strokeWidth = isSelected ? 1.5 / safeScale : ((condStyle?.strokeWidth ?? 1.0) / safeScale);
+        const strokeWidth = isSelected ? 1.5 / safeScale : (condStyle?.strokeWidth ?? 1.0) / safeScale;
         const fillColor = isSelected ? 0x38bdf8 : baseFill;
         const fillAlpha = isSelected ? 0.18 : (condStyle?.fillAlpha ?? 0.05);
 
         return (
-          <pixiContainer
-            key={`footprint-${node.id}`}
-            x={px}
-            y={py}
-            rotation={yaw}
-            eventMode="none"
-          >
+          <pixiContainer key={`footprint-${node.id}`} x={px} y={py} rotation={yaw} eventMode="none">
             <pixiGraphics
               eventMode="none"
               draw={(g) => {
@@ -99,12 +101,7 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   );
 }
 
-function drawFootprintShape(
-  g: any,
-  footprint: RobotFootprint,
-  safeScale: number,
-  isSelected: boolean
-) {
+function drawFootprintShape(g: any, footprint: RobotFootprint, safeScale: number, isSelected: boolean) {
   if (footprint.type === 'circular') {
     const r = footprint.radius;
     g.circle(0, 0, r);

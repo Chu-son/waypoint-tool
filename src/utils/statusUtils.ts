@@ -3,7 +3,8 @@ import { getFlattenedWaypointIds } from './treeUtils';
 import { WaypointNode } from '../types/store';
 
 export type StatusModeVariant = 'default' | 'primary' | 'reference' | 'obstacle' | 'anchor' | 'generator';
-export type StatusIconType = 'select' | 'waypoint' | 'annotation' | 'layer' | 'generator' | 'plugin' | 'copy' | 'region' | 'modal';
+export type StatusIconType =
+  'select' | 'waypoint' | 'annotation' | 'layer' | 'generator' | 'plugin' | 'copy' | 'region' | 'modal';
 
 export interface StatusInteractionInfo {
   modeBadgeText: string;
@@ -17,46 +18,65 @@ export interface StatusInteractionInfo {
 /**
  * 状態機械の階層（Tier 1〜Tier 7）を評価し、現在のステータス情報およびEscキーによる遷移先を導出する。
  */
-export function computeStatusInteraction(state: Pick<
-  AppState,
-  | 'modalStack'
-  | 'isSettingsModalOpen'
-  | 'isExportModalOpen'
-  | 'isImportModalOpen'
-  | 'isExportMapsModalOpen'
-  | 'isShortcutsModalOpen'
-  | 'isWelcomeModalOpen'
-  | 'isInitialLaunch'
-  | 'pluginDataModalState'
-  | 'appMode'
-  | 'selection'
-  | 'nodes'
-  | 'customLayers'
->): StatusInteractionInfo {
+export function computeStatusInteraction(
+  state: Pick<
+    AppState,
+    | 'modalStack'
+    | 'isSettingsModalOpen'
+    | 'isExportModalOpen'
+    | 'isImportModalOpen'
+    | 'isExportMapsModalOpen'
+    | 'isShortcutsModalOpen'
+    | 'isWelcomeModalOpen'
+    | 'isInitialLaunch'
+    | 'pluginDataModalState'
+    | 'appMode'
+    | 'selection'
+    | 'nodes'
+    | 'customLayers'
+  >,
+): StatusInteractionInfo {
   // Tier 1: Modal Stack
   const isModalActuallyOpen = (modal: string): boolean => {
     switch (modal) {
-      case 'settings': return !!state.isSettingsModalOpen;
-      case 'export': return !!state.isExportModalOpen;
-      case 'import': return !!state.isImportModalOpen;
-      case 'export_maps': return !!state.isExportMapsModalOpen;
-      case 'shortcuts': return !!state.isShortcutsModalOpen;
-      case 'welcome': return !!state.isWelcomeModalOpen;
-      case 'plugin_data': return !!state.pluginDataModalState?.isOpen;
-      default: return false;
+      case 'settings':
+        return !!state.isSettingsModalOpen;
+      case 'export':
+        return !!state.isExportModalOpen;
+      case 'import':
+        return !!state.isImportModalOpen;
+      case 'export_maps':
+        return !!state.isExportMapsModalOpen;
+      case 'shortcuts':
+        return !!state.isShortcutsModalOpen;
+      case 'welcome':
+        return !!state.isWelcomeModalOpen;
+      case 'plugin_data':
+        return !!state.pluginDataModalState?.isOpen;
+      default:
+        return false;
     }
   };
 
   const activeStack = (state.modalStack || []).filter(isModalActuallyOpen);
-  const topModal = activeStack.length > 0 ? activeStack[activeStack.length - 1] : (
-    state.isSettingsModalOpen ? 'settings' :
-    state.isExportModalOpen ? 'export' :
-    state.isImportModalOpen ? 'import' :
-    state.isExportMapsModalOpen ? 'export_maps' :
-    state.isShortcutsModalOpen ? 'shortcuts' :
-    state.isWelcomeModalOpen ? 'welcome' :
-    state.pluginDataModalState?.isOpen ? 'plugin_data' : null
-  );
+  const topModal =
+    activeStack.length > 0
+      ? activeStack[activeStack.length - 1]
+      : state.isSettingsModalOpen
+        ? 'settings'
+        : state.isExportModalOpen
+          ? 'export'
+          : state.isImportModalOpen
+            ? 'import'
+            : state.isExportMapsModalOpen
+              ? 'export_maps'
+              : state.isShortcutsModalOpen
+                ? 'shortcuts'
+                : state.isWelcomeModalOpen
+                  ? 'welcome'
+                  : state.pluginDataModalState?.isOpen
+                    ? 'plugin_data'
+                    : null;
 
   if (topModal) {
     const modalNames: Record<string, string> = {
@@ -92,11 +112,7 @@ export function computeStatusInteraction(state: Pick<
         hintText: 'Enterで確定 / Escでクリア',
       };
     }
-    if (
-      modeState.forcedAxis !== null ||
-      modeState.forcedSign !== null ||
-      modeState.lockedWaypointId !== null
-    ) {
+    if (modeState.forcedAxis !== null || modeState.forcedSign !== null || modeState.lockedWaypointId !== null) {
       const axisText = modeState.forcedAxis ? `${modeState.forcedAxis}軸固定` : 'スナップロック';
       return {
         modeBadgeText: `ウェイポイント追加 (${axisText})`,
@@ -149,7 +165,7 @@ export function computeStatusInteraction(state: Pick<
   }
 
   if (currentSelection?.type === 'custom_layer') {
-    const layer = state.customLayers?.find(l => l.id === currentSelection.layerId);
+    const layer = state.customLayers?.find((l) => l.id === currentSelection.layerId);
     return {
       modeBadgeText: `レイヤー選択: ${layer?.name || 'Custom Layer'}`,
       modeIcon: 'layer',

@@ -5,7 +5,7 @@ import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 describe('KeyboardShortcutsModal', () => {
   it('renders correctly when open', () => {
     render(<KeyboardShortcutsModal isOpen={true} onClose={vi.fn()} />);
-    
+
     expect(screen.getByText('Keyboard Shortcuts')).toBeInTheDocument();
     expect(screen.getByText('Open Project')).toBeInTheDocument();
     expect(screen.getByText('Save Project')).toBeInTheDocument();
@@ -20,7 +20,7 @@ describe('KeyboardShortcutsModal', () => {
   it('calls onClose when the X button is clicked', () => {
     const mockOnClose = vi.fn();
     render(<KeyboardShortcutsModal isOpen={true} onClose={mockOnClose} />);
-    
+
     fireEvent.click(screen.getByLabelText('Close'));
     expect(mockOnClose).toHaveBeenCalled();
   });
@@ -28,7 +28,7 @@ describe('KeyboardShortcutsModal', () => {
   it('calls onClose when Esc key is pressed', () => {
     const mockOnClose = vi.fn();
     render(<KeyboardShortcutsModal isOpen={true} onClose={mockOnClose} />);
-    
+
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(mockOnClose).toHaveBeenCalled();
   });

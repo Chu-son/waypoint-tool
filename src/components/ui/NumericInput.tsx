@@ -76,7 +76,7 @@ export function NumericInput({
         commit();
         onEditEnd?.();
       }}
-      onChange={e => {
+      onChange={(e) => {
         const raw = e.target.value;
         // Allow empty, minus, decimal point, and any valid number fragment
         if (raw === '' || raw === '-' || raw === '.' || raw === '-.' || /^-?\d*\.?\d*$/.test(raw)) {
@@ -92,7 +92,7 @@ export function NumericInput({
           }
         }
       }}
-      onKeyDown={e => {
+      onKeyDown={(e) => {
         if (e.key === 'Enter') {
           commit();
           (e.target as HTMLInputElement).blur();
