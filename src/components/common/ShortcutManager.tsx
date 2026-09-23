@@ -103,31 +103,7 @@ export function ShortcutManager() {
       }
 
       if (e.key === 'Escape') {
-        if (typeof handleGlobalEscape === 'function') {
-          handleGlobalEscape();
-        } else if (typeof (useAppStore as any).getState?.()?.handleGlobalEscape === 'function') {
-          (useAppStore as any).getState().handleGlobalEscape();
-        } else {
-          // Fallback if handleGlobalEscape is not in store (e.g. mocked store in legacy unit tests)
-          if (selectedEditObjectId && setSelectedEditObjectId) {
-            setSelectedEditObjectId(null);
-          }
-          if (selectedNodeIds.length > 0) {
-            selectNodes?.([]);
-          }
-          if (activeCustomLayerId) {
-            setActiveCustomLayerId?.(null);
-          }
-          if (selectedAnnotationIds.length > 0) {
-            clearAnnotationSelection?.();
-          }
-          setAnnotationEditMode?.(false);
-          setMapEditMode?.(false);
-          setActiveTool?.('select');
-          setActivePlugin?.(null);
-          clearPluginInteractionData?.();
-          setRightPanelActiveTab?.('layers');
-        }
+        handleGlobalEscape();
         return;
       }
 
