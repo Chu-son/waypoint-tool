@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
+import { useClickOutside } from '../../../hooks/useClickOutside';
 import {
   Eye,
   EyeOff,
@@ -263,16 +264,7 @@ export function LayerPanel() {
     y: number;
   } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setContextMenu(null);
-      }
-    };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(menuRef, () => setContextMenu(null));
 
   const handleLoadMap = async () => {
     try {

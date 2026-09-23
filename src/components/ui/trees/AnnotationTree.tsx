@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useClickOutside } from '../../../hooks/useClickOutside';
 import { useAppStore } from '../../../stores/appStore';
 import {
   Eye,
@@ -354,16 +355,7 @@ export function AnnotationTree() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ id: string | null; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setContextMenu(null);
-      }
-    };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(menuRef, () => setContextMenu(null));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

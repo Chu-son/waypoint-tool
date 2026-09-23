@@ -1,4 +1,5 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useMemo } from 'react';
+import { useClickOutside } from '../../../hooks/useClickOutside';
 import { useAppStore } from '../../../stores/appStore';
 import { AppAPI, DialogAPI, BackendAPI } from '../../../api';
 import { notify, notifyError } from '../../../services/notify';
@@ -37,18 +38,7 @@ function DropdownMenu({
   onMouseEnter: () => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose]);
+  useClickOutside(menuRef, onClose, isOpen);
 
   return (
     <div className="relative" ref={menuRef}>

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useClickOutside } from '../../../hooks/useClickOutside';
 import { useAppStore } from '../../../stores/appStore';
 import {
   ChevronRight,
@@ -353,16 +354,7 @@ export function WaypointTree() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ nodeId: string | null; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setContextMenu(null);
-      }
-    };
-    window.addEventListener('mousedown', handleClickOutside);
-    return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  useClickOutside(menuRef, () => setContextMenu(null));
 
   const toggleExpand = (id: string) => {
     const isCurrentlyExpanded = expandedNodes.has(id);
