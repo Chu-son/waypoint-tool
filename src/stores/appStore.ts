@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 import { NodeSlice, createNodeSlice } from './slices/nodeSlice';
 import { UISlice, createUISlice } from './slices/uiSlice';
 import { PluginSlice, createPluginSlice } from './slices/pluginSlice';
+import { PathCalculatorSlice, createPathCalculatorSlice } from './slices/pathCalculatorSlice';
 import { MapSlice, createMapSlice } from './slices/mapSlice';
 import { ProjectSlice, createProjectSlice } from './slices/projectSlice';
 import { HistorySlice, createHistorySlice } from './slices/historySlice';
@@ -17,6 +18,7 @@ import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 export type AppState = NodeSlice &
   UISlice &
   PluginSlice &
+  PathCalculatorSlice &
   MapSlice &
   ProjectSlice &
   HistorySlice &
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>()(
       ...createNodeSlice(set, get, api),
       ...createUISlice(set, get, api),
       ...createPluginSlice(set, get, api),
+      ...createPathCalculatorSlice(set, get, api),
       ...createMapSlice(set, get, api),
       ...createProjectSlice(set, get, api),
       ...createHistorySlice(set, get, api),
