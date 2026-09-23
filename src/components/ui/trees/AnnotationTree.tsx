@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useClickOutside } from '../../../hooks/useClickOutside';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '../common/ContextMenu';
 import { useAppStore } from '../../../stores/appStore';
 import {
   Eye,
@@ -354,8 +354,6 @@ export function AnnotationTree() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ id: string | null; x: number; y: number } | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  useClickOutside(menuRef, () => setContextMenu(null));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -588,36 +586,21 @@ export function AnnotationTree() {
 
       {/* Context Menu */}
       {contextMenu && (
-        <div
-          ref={menuRef}
-          style={{ top: contextMenu.y, left: contextMenu.x }}
-          className="fixed z-50 bg-surface-panel border border-border-base/60 rounded-xl shadow-xl p-1 min-w-[190px] text-xs text-text-base flex flex-col gap-0.5 backdrop-blur-md"
-        >
+        <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={() => setContextMenu(null)}>
           {contextMenu.id === null ? (
             <>
-              {/* 貼り付け (Paste) */}
-              <button
-                onClick={() => {
-                  pasteMapElements({ asGroup: false });
-                  setContextMenu(null);
-                }}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+              <ContextMenuItem
+                icon={<ClipboardPaste size={13} className="text-primary-base" />}
+                onSelect={() => pasteMapElements({ asGroup: false })}
               >
-                <ClipboardPaste size={13} className="text-primary-base" />
-                <span>貼り付け (Paste)</span>
-              </button>
-
-              {/* グループで貼り付け (Paste as Group) */}
-              <button
-                onClick={() => {
-                  pasteMapElements({ asGroup: true });
-                  setContextMenu(null);
-                }}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                貼り付け (Paste)
+              </ContextMenuItem>
+              <ContextMenuItem
+                icon={<FolderPlus size={13} className="text-primary-base" />}
+                onSelect={() => pasteMapElements({ asGroup: true })}
               >
-                <FolderPlus size={13} className="text-primary-base" />
-                <span>グループで貼り付け</span>
-              </button>
+                グループで貼り付け
+              </ContextMenuItem>
             </>
           ) : (
             (() => {
@@ -632,108 +615,63 @@ export function AnnotationTree() {
 
               return (
                 <>
-                  {/* グループ化 (Group) */}
-                  <button
-                    onClick={handleCreateGroup}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base font-medium"
+                  <ContextMenuItem
+                    emphasis="strong"
+                    icon={<FolderPlus size={13} className="text-accent-anchor" />}
+                    onSelect={handleCreateGroup}
                   >
-                    <FolderPlus size={13} className="text-accent-anchor" />
-                    <span>
-                      {targetIds.length > 1 ? `選択項目をグループ化 (${targetIds.length})` : 'グループ化 (Group)'}
-                    </span>
-                  </button>
-
-                  {/* 名前を変更 (Rename) */}
-                  <button
-                    onClick={() => {
-                      setEditingId(contextId);
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    {targetIds.length > 1 ? `選択項目をグループ化 (${targetIds.length})` : 'グループ化 (Group)'}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Edit2 size={13} className="text-primary-base" />}
+                    onSelect={() => setEditingId(contextId)}
                   >
-                    <Edit2 size={13} className="text-primary-base" />
-                    <span>名前を変更 (Rename)</span>
-                  </button>
-
-                  {/* グループ解除 (Ungroup) */}
+                    名前を変更 (Rename)
+                  </ContextMenuItem>
                   {isGroup && (
-                    <button
-                      onClick={() => {
-                        ungroupAnnotation(contextId);
-                        setContextMenu(null);
-                      }}
-                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    <ContextMenuItem
+                      icon={<Unlink size={13} className="text-accent-anchor" />}
+                      onSelect={() => ungroupAnnotation(contextId)}
                     >
-                      <Unlink size={13} className="text-accent-anchor" />
-                      <span>グループ解除 (Ungroup)</span>
-                    </button>
+                      グループ解除 (Ungroup)
+                    </ContextMenuItem>
                   )}
 
-                  <div className="h-px bg-border-base/30 my-0.5" />
+                  <ContextMenuSeparator />
 
-                  {/* 切り取り (Cut) */}
-                  <button
-                    onClick={() => {
-                      cutSelectedMapElements();
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                  <ContextMenuItem
+                    icon={<Scissors size={13} className="text-accent-automation" />}
+                    onSelect={() => cutSelectedMapElements()}
                   >
-                    <Scissors size={13} className="text-accent-automation" />
-                    <span>{isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}</span>
-                  </button>
-
-                  {/* コピー (Copy) */}
-                  <button
-                    onClick={() => {
-                      copySelectedMapElements();
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    {isMultiSelected ? `選択項目を切り取り (${targetIds.length})` : '切り取り (Cut)'}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Copy size={13} className="text-accent-automation" />}
+                    onSelect={() => copySelectedMapElements()}
                   >
-                    <Copy size={13} className="text-accent-automation" />
-                    <span>{isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}</span>
-                  </button>
-
-                  {/* 貼り付け (Paste) */}
-                  <button
-                    onClick={() => {
-                      pasteMapElements({ asGroup: false });
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    {isMultiSelected ? `選択項目をコピー (${targetIds.length})` : 'コピー (Copy)'}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<ClipboardPaste size={13} className="text-primary-base" />}
+                    onSelect={() => pasteMapElements({ asGroup: false })}
                   >
-                    <ClipboardPaste size={13} className="text-primary-base" />
-                    <span>貼り付け (Paste)</span>
-                  </button>
-
-                  {/* グループで貼り付け (Paste as Group) */}
-                  <button
-                    onClick={() => {
-                      pasteMapElements({ asGroup: true });
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    貼り付け (Paste)
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<FolderPlus size={13} className="text-primary-base" />}
+                    onSelect={() => pasteMapElements({ asGroup: true })}
                   >
-                    <FolderPlus size={13} className="text-primary-base" />
-                    <span>グループで貼り付け</span>
-                  </button>
-
-                  {/* 複製 (Duplicate) */}
-                  <button
-                    onClick={() => {
-                      duplicateAnnotations(targetIds);
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
+                    グループで貼り付け
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Copy size={13} className="text-accent-automation" />}
+                    onSelect={() => duplicateAnnotations(targetIds)}
                   >
-                    <Copy size={13} className="text-accent-automation" />
-                    <span>{isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}</span>
-                  </button>
-
-                  {/* 内部プロパティ表示 (モーダル) */}
-                  <button
-                    onClick={() => {
+                    {isMultiSelected ? `選択項目を複製 (${targetIds.length})` : '複製 (Duplicate)'}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Code2 size={13} className="text-accent-automation" />}
+                    onSelect={() => {
                       if (isGroup) {
                         openPluginDataModal(
                           `グループ: ${groupObj?.name || 'Group'}`,
@@ -747,46 +685,35 @@ export function AnnotationTree() {
                           `タイプ: ${itemObj?.type} • 内部メタデータ (Read-only)`,
                         );
                       }
-                      setContextMenu(null);
                     }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Code2 size={13} className="text-accent-automation" />
-                    <span>内部プロパティを表示</span>
-                  </button>
-
-                  {/* インスペクターを開く */}
-                  <button
-                    onClick={() => {
+                    内部プロパティを表示
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Folder size={13} className="text-text-muted" />}
+                    onSelect={() => {
                       selectAnnotationObjects([contextId]);
                       setRightPanelActiveTab('inspector');
                       setRightPanelOpen(true);
-                      setContextMenu(null);
                     }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-surface-hover text-left w-full transition-colors text-text-base"
                   >
-                    <Folder size={13} className="text-text-muted" />
-                    <span>インスペクターを開く</span>
-                  </button>
+                    インスペクターを開く
+                  </ContextMenuItem>
 
-                  <div className="h-px bg-border-base/30 my-0.5" />
+                  <ContextMenuSeparator />
 
-                  {/* 削除 */}
-                  <button
-                    onClick={() => {
-                      removeAnnotationObjects(targetIds);
-                      setContextMenu(null);
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-danger-base/10 text-danger-base text-left w-full transition-colors"
+                  <ContextMenuItem
+                    tone="danger"
+                    icon={<Trash2 size={13} />}
+                    onSelect={() => removeAnnotationObjects(targetIds)}
                   >
-                    <Trash2 size={13} />
-                    <span>{isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}</span>
-                  </button>
+                    {isMultiSelected ? `選択項目を削除 (${targetIds.length})` : '削除 (Delete)'}
+                  </ContextMenuItem>
                 </>
               );
             })()
           )}
-        </div>
+        </ContextMenu>
       )}
     </div>
   );
