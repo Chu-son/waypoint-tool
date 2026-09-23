@@ -81,6 +81,9 @@
 
 ### 共通 Hooks (`src/hooks/`)
 - **`useClickOutside(ref, onOutside, enabled?)`**: 要素の外側でマウスが押されたときにコールバック（ドロップダウン・メニューのクローズ）。
+- **`useTreeInteractionState()`**: WaypointTree / AnnotationTree 共通の DnD センサー、展開集合、インライン編集 ID、ドラッグ中 ID、コンテキストメニュー状態。
+- **`useExportPlan({ isOpen, onClose })`** (`ui/modals/useExportPlan.ts`): ExportModal のプロファイル/項目編集、ファイルプレビュー、衝突チェック、エクスポート実行。
+- **`PluginCard`** (`ui/settings/PluginCard.tsx`): PluginsTab の 1 プラグイン分（有効化・並び替え・アイコン・インタプリタ上書き・SDK/依存状態）。**`ManualLayerTools`** (`ui/properties/ManualLayerTools.tsx`): 手動ベクターレイヤーの描画ツール・塗り種別・描画オブジェクト一覧。
 - **`useTreeItemSelection`** / **`useTreeReveal`**: ツリーのクリック・Shift 範囲選択、および選択要素までの自動展開・スクロール。
 - **`useResponsiveContainer`**: コンテナ幅に応じたレスポンシブ表示切り替え。
 
