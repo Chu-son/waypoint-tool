@@ -121,6 +121,9 @@
 - **`PropertySectionHeader`** ([`src/components/ui/properties/PropertySectionHeader.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/PropertySectionHeader.tsx))
   - **概要**: 属性パネル内の可視性トグル付きセクションヘッダー部品。
   - **主要Props**: `title`, `isVisible`, `onToggleVisible`, `toggleTitle`
+- **`InlineNameInput`** ([`src/components/ui/common/InlineNameInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/InlineNameInput.tsx))
+  - **概要**: ツリー行などのインライン名前変更入力。編集中のみマウントし、Enter/blur で確定、Escape で取消。空・未変更は取消扱い。
+  - **主要Props**: `name`, `onRename`, `onCancel`, `className`
 - **`InternalPropertiesSection`** ([`src/components/ui/properties/InternalPropertiesSection.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/InternalPropertiesSection.tsx))
   - **概要**: プラグイン生成要素の `plugin_data` を読み取り専用で表示し、全画面ダイアログ (`openPluginDataModal`) を開く「内部プロパティ」セクション。GeneratorNodePanel / CustomLayerInspector / AnnotationInspector / AnnotationGroupPanel で共用。
   - **主要Props**: `data`, `viewerTitle`, `modalTitle`, `modalSubtitle`, `hideWhenEmpty`

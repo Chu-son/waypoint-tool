@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { ChevronRight, Layers, GripVertical, Anchor, Folder, Target } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { WaypointNode } from '../../../types/store';
+import { InlineNameInput } from '../common/InlineNameInput';
 
 interface TreeItemRowProps {
   id: string;
@@ -46,12 +47,7 @@ export function SortableTreeNodeItem({
   onCancelRename,
 }: TreeItemRowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const [nameValue, setNameValue] = useState(node.name || '');
   const plugins = useAppStore((state) => state.plugins);
-
-  useEffect(() => {
-    setNameValue(node.name || '');
-  }, [node.name, isEditing]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -75,14 +71,6 @@ export function SortableTreeNodeItem({
       : node.name
         ? `Waypoint (${node.name})`
         : 'Waypoint';
-
-  const handleNameSubmit = () => {
-    if (nameValue.trim() && nameValue !== node.name) {
-      onRename(nameValue.trim());
-    } else {
-      onCancelRename();
-    }
-  };
 
   const childCount = node.children_ids?.length || 0;
 
@@ -151,22 +139,7 @@ export function SortableTreeNodeItem({
 
           {/* Node Name / Inline Editing */}
           {isEditing ? (
-            <input
-              type="text"
-              value={nameValue}
-              autoFocus
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={handleNameSubmit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleNameSubmit();
-                if (e.key === 'Escape') {
-                  setNameValue(node.name || '');
-                  onCancelRename();
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex-1 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
-            />
+            <InlineNameInput name={node.name || ''} onRename={onRename} onCancel={onCancelRename} />
           ) : (
             <div className="flex items-center gap-1 min-w-0 flex-1 truncate">
               {!isContainer && globalIndex !== undefined && (

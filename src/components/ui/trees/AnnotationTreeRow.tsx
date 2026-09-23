@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Eye,
   EyeOff,
@@ -20,6 +20,7 @@ import { DEFAULT_ANNOTATION_COLOR } from '../../../utils/colorPresets';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { AnnotationObject, AnnotationGroup, AnnotationType } from '../../../types/store';
+import { InlineNameInput } from '../common/InlineNameInput';
 
 function getAnnotationIcon(type: AnnotationType) {
   switch (type) {
@@ -97,11 +98,6 @@ export function SortableAnnotationTreeNode({
   onDelete,
 }: TreeNodeItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const [nameValue, setNameValue] = useState(group?.name || obj?.name || '');
-
-  useEffect(() => {
-    setNameValue(group?.name || obj?.name || '');
-  }, [group?.name, obj?.name, isEditing]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -109,15 +105,6 @@ export function SortableAnnotationTreeNode({
     opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 50 : 'auto',
     position: 'relative' as const,
-  };
-
-  const handleNameSubmit = () => {
-    const currentName = group?.name || obj?.name || '';
-    if (nameValue.trim() && nameValue !== currentName) {
-      onRename(nameValue.trim());
-    } else {
-      onCancelRename();
-    }
   };
 
   const isVisible = isGroup ? (group?.visible ?? true) : (obj?.visible ?? true);
@@ -191,22 +178,7 @@ export function SortableAnnotationTreeNode({
 
           {/* Name / Inline Editing */}
           {isEditing ? (
-            <input
-              type="text"
-              value={nameValue}
-              autoFocus
-              onChange={(e) => setNameValue(e.target.value)}
-              onBlur={handleNameSubmit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleNameSubmit();
-                if (e.key === 'Escape') {
-                  setNameValue(group?.name || obj?.name || '');
-                  onCancelRename();
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="flex-1 min-w-0 bg-surface-base border border-primary-base rounded px-1.5 py-0.5 text-xs text-text-base focus:outline-none"
-            />
+            <InlineNameInput name={group?.name || obj?.name || ''} onRename={onRename} onCancel={onCancelRename} />
           ) : (
             <span className="truncate font-medium flex-1 min-w-0 text-text-base" title={group?.name || obj?.name || ''}>
               {group?.name || obj?.name || ''}
