@@ -35,6 +35,7 @@ import { BackendAPI } from '../../../api';
 import { PluginInstance } from '../../../types/store';
 import { notify } from '../../../services/notify';
 import { resolvePythonPath } from '../../../utils/pythonPath';
+import { importPluginFolders, scaffoldNewPlugin } from '../../../services/pluginImport';
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -101,155 +102,10 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
             >
               <RefreshCw size={14} className="mr-1" /> Reload All
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={async () => {
-                const { DialogAPI, BackendAPI } = await import('../../../api');
-                const confirmed = await DialogAPI.ask(
-                  'プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？',
-                  { title: 'セキュリティ警告', kind: 'warning' },
-                );
-                if (!confirmed) {
-                  return;
-                }
-                try {
-                  const selectedPath = await DialogAPI.open({
-                    multiple: true,
-                    directory: true,
-                    defaultPath: lastDirectory || undefined,
-                  });
-                  if (!selectedPath) return;
-
-                  const targetPaths: string[] = [];
-                  if (Array.isArray(selectedPath)) {
-                    for (const item of selectedPath) {
-                      const p = typeof item === 'string' ? item : (item as any)?.path;
-                      if (p) targetPaths.push(p);
-                    }
-                  } else {
-                    const p = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any)?.path;
-                    if (p) targetPaths.push(p);
-                  }
-
-                  if (targetPaths.length === 0) return;
-
-                  const allScanned: PluginInstance[] = [];
-                  for (const p of targetPaths) {
-                    try {
-                      const results = await BackendAPI.scanCustomPlugins(p);
-                      allScanned.push(...results);
-                    } catch (scanErr) {
-                      console.warn(`Failed to scan plugins at ${p}:`, scanErr);
-                      if (targetPaths.length === 1) {
-                        throw scanErr;
-                      }
-                    }
-                  }
-
-                  // Deduplicate by plugin id
-                  const uniquePlugins: PluginInstance[] = [];
-                  const seenIds = new Set<string>();
-                  for (const p of allScanned) {
-                    if (!seenIds.has(p.id)) {
-                      seenIds.add(p.id);
-                      uniquePlugins.push(p);
-                    }
-                  }
-
-                  if (uniquePlugins.length === 0) {
-                    void notify('指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。');
-                    return;
-                  }
-
-                  const newMap = { ...plugins };
-                  const nextSettings = [...pluginSettings];
-
-                  for (const customPlugin of uniquePlugins) {
-                    newMap[customPlugin.id] = customPlugin;
-                    const existingIndex = nextSettings.findIndex((s) => s.id === customPlugin.id);
-                    if (existingIndex >= 0) {
-                      nextSettings[existingIndex] = {
-                        ...nextSettings[existingIndex],
-                        path: customPlugin.folder_path,
-                      };
-                    } else {
-                      nextSettings.push({
-                        id: customPlugin.id,
-                        path: customPlugin.folder_path,
-                        enabled: true,
-                        order: nextSettings.length,
-                        isBuiltin: false,
-                      });
-                    }
-                  }
-
-                  setPlugins(newMap);
-                  setPluginSettings(nextSettings);
-
-                  if (uniquePlugins.length === 1) {
-                    const p = uniquePlugins[0];
-                    void notify(`Plugin '${p.manifest?.name || p.id}' をインポートしました。`);
-                  } else {
-                    const names = uniquePlugins.map((p) => p.manifest?.name || p.id).join(', ');
-                    void notify(`${uniquePlugins.length} 個のプラグインを一括インポートしました:\n${names}`);
-                  }
-                } catch (err) {
-                  console.error('Failed to load custom plugin:', err);
-                  void notify(`Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
-                }
-              }}
-            >
+            <Button variant="secondary" size="sm" onClick={() => importPluginFolders(lastDirectory)}>
               <Plus size={14} className="mr-1" /> Add Folder
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={async () => {
-                const { DialogAPI, BackendAPI } = await import('../../../api');
-                const confirmed = await DialogAPI.ask(
-                  'プラグインはPythonコードを直接実行します。有害なコードが含まれる場合、システムに悪影響を及ぼす可能性があります。自己責任で追加してください。追加を続行しますか？',
-                  { title: 'セキュリティ警告', kind: 'warning' },
-                );
-                if (!confirmed) {
-                  return;
-                }
-                try {
-                  const selectedPath = await DialogAPI.open({
-                    multiple: false,
-                    directory: true,
-                    defaultPath: lastDirectory || undefined,
-                  });
-                  if (!selectedPath) return;
-                  const targetDir = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
-                  if (!targetDir) return;
-
-                  const pluginName = prompt(`プラグイン名を入力してください:\n(作成先: ${targetDir})`);
-                  if (!pluginName || !pluginName.trim()) return;
-
-                  const newPlugin = await BackendAPI.scaffoldPlugin(pluginName.trim(), targetDir);
-                  const newMap = { ...plugins, [newPlugin.id]: newPlugin };
-                  setPlugins(newMap);
-
-                  if (!pluginSettings.find((s) => s.id === newPlugin.id)) {
-                    setPluginSettings([
-                      ...pluginSettings,
-                      {
-                        id: newPlugin.id,
-                        path: newPlugin.folder_path,
-                        enabled: true,
-                        order: pluginSettings.length,
-                        isBuiltin: false,
-                      },
-                    ]);
-                  }
-                  void notify(`Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`);
-                } catch (err) {
-                  console.error('Failed to scaffold plugin:', err);
-                  void notify(`プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`);
-                }
-              }}
-            >
+            <Button variant="primary" size="sm" onClick={() => scaffoldNewPlugin(lastDirectory)}>
               <Plus size={14} className="mr-1" /> Create New
             </Button>
           </>
