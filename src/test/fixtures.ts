@@ -7,11 +7,11 @@ import type {
   CircleAnnotation,
   LineAnnotation,
   ManualCustomLayer,
-  MapLayer,
   OrientedPointAnnotation,
   PluginInstance,
   PluginManifest,
   PointAnnotation,
+  ProjectMapLayer,
   RectAnnotation,
   Transform,
   WaypointNode,
@@ -82,7 +82,7 @@ export function makeManualCustomLayer(id: string, overrides: Partial<ManualCusto
   return { id, name: id, type: 'manual', visible: true, opacity: 1, z_index: 0, editObjects: [], ...overrides };
 }
 
-export function makeMapLayer(id: string, overrides: Partial<MapLayer> = {}): MapLayer {
+export function makeMapLayer(id: string, overrides: Partial<ProjectMapLayer> = {}): ProjectMapLayer {
   return {
     id,
     name: id,
@@ -90,16 +90,18 @@ export function makeMapLayer(id: string, overrides: Partial<MapLayer> = {}): Map
       image: `${id}.pgm`,
       resolution: 0.05,
       origin: [0, 0, 0],
+      initial_origin: [0, 0, 0],
       negate: 0,
       occupied_thresh: 0.65,
       free_thresh: 0.196,
     },
-    imageBase64: '',
+    image_base64: '',
     width: 100,
     height: 100,
     visible: true,
     opacity: 1,
-    zIndex: 0,
+    z_index: 0,
+    blend_mode: 'overwrite',
     ...overrides,
   };
 }
