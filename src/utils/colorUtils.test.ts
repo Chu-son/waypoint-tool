@@ -22,6 +22,19 @@ describe('colorUtils', () => {
       expect(hexStringToNumber('invalid', 0x123456)).toBe(0x123456);
       expect(hexStringToNumber('', 0x123456)).toBe(0x123456);
     });
+
+    it('rejects strings that are only partly hexadecimal', () => {
+      expect(hexStringToNumber('abcxyz', 0x123456)).toBe(0x123456);
+      expect(hexStringToNumber('#12', 0x123456)).toBe(0x123456);
+    });
+
+    it('ignores the alpha channel of #RRGGBBAA colors', () => {
+      expect(hexStringToNumber('#3b82f6ff')).toBe(0x3b82f6);
+    });
+
+    it('keeps black instead of falling back', () => {
+      expect(hexStringToNumber('#000', 0x123456)).toBe(0x000000);
+    });
   });
 
   describe('hexStringToVec3', () => {

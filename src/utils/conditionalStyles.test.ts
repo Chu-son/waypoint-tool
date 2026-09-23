@@ -23,6 +23,10 @@ describe('conditionalStyles utility', () => {
       expect(parseColorSafe(undefined, 0x123456)).toBe(0x123456);
     });
 
+    it('parseColorSafe keeps black shorthand instead of falling back to the default', () => {
+      expect(parseColorSafe('#000', 0x123456)).toBe(0x000000);
+    });
+
     it('clampNumber clamps value to range', () => {
       expect(clampNumber(5, 0, 10, 0)).toBe(5);
       expect(clampNumber(-5, 0, 10, 0)).toBe(0);

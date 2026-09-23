@@ -9,6 +9,7 @@ import {
   WaypointShape,
 } from '../types/store';
 import { quaternionToYaw } from './transformUtils';
+import { hexStringToNumber } from './colorUtils';
 
 // ============================================================================
 // Types
@@ -57,17 +58,7 @@ export interface ResolvedAnnotationStyle {
  * 不正な値の場合は defaultColor を返す。
  */
 export function parseColorSafe(hex?: string, defaultColor: number = 0xffa500): number {
-  if (!hex || typeof hex !== 'string') return defaultColor;
-  const cleanHex = hex.replace('#', '').trim();
-  if (!/^[0-9a-fA-F]{3,8}$/.test(cleanHex)) return defaultColor;
-  if (cleanHex.length === 3) {
-    const r = cleanHex[0] + cleanHex[0];
-    const g = cleanHex[1] + cleanHex[1];
-    const b = cleanHex[2] + cleanHex[2];
-    return parseInt(r + g + b, 16) || defaultColor;
-  }
-  const parsed = parseInt(cleanHex.slice(0, 6), 16);
-  return isNaN(parsed) ? defaultColor : parsed;
+  return hexStringToNumber(hex, defaultColor);
 }
 
 /**
