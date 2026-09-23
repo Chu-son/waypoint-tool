@@ -64,6 +64,29 @@ pub fn get_bundled_sdk_version(resource_dir: Option<&Path>) -> Option<String> {
     None
 }
 
+/// Load the plugin in `dir` from its `manifest.json`. The plugin id is the folder name.
+pub fn load_plugin_dir(dir: &Path, is_builtin: bool) -> Result<PluginInstance, String> {
+    if !dir.is_dir() {
+        return Err("Provided path is not a directory.".to_string());
+    }
+    let manifest_path = dir.join("manifest.json");
+    if !manifest_path.exists() {
+        return Err("manifest.json not found in the provided directory.".to_string());
+    }
+    let content = fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read manifest.json at {}: {}", manifest_path.display(), e))?;
+    let manifest: PluginManifest =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse manifest.json: {}", e))?;
+
+    Ok(PluginInstance {
+        id: dir.file_name().unwrap_or_default().to_string_lossy().to_string(),
+        manifest,
+        folder_path: dir.to_string_lossy().to_string(),
+        is_builtin,
+        sdk_version: detect_sdk_version(dir),
+    })
+}
+
 pub struct PluginManager {
     plugins_dir: PathBuf,
     resource_dir: Option<PathBuf>,
@@ -71,37 +94,15 @@ pub struct PluginManager {
 
 impl PluginManager {
     /// Scan a single directory for plugins (public for testing).
+    /// Sub-folders without a readable, valid manifest are skipped.
     pub fn scan_plugins_in_dir(dir: &Path, is_builtin: bool) -> Vec<PluginInstance> {
-        let mut plugins = Vec::new();
-        if !dir.exists() {
-            return plugins;
-        }
-        let entries = match fs::read_dir(dir) {
-            Ok(entries) => entries,
-            Err(_) => return plugins,
+        let Ok(entries) = fs::read_dir(dir) else {
+            return Vec::new();
         };
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                let manifest_path = path.join("manifest.json");
-                if manifest_path.exists() {
-                    if let Ok(content) = fs::read_to_string(&manifest_path) {
-                        if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&content) {
-                            let id = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                            let sdk_version = detect_sdk_version(&path);
-                            plugins.push(PluginInstance {
-                                id,
-                                manifest,
-                                folder_path: path.to_string_lossy().to_string(),
-                                is_builtin,
-                                sdk_version,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-        plugins
+        entries
+            .flatten()
+            .filter_map(|entry| load_plugin_dir(&entry.path(), is_builtin).ok())
+            .collect()
     }
 
     pub fn new(app_data_dir: &Path, resource_dir: Option<PathBuf>) -> Self {
