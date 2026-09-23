@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
-import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
 import { ManualCustomLayer, EditObject, WaypointNode } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
@@ -22,17 +21,16 @@ import { useMapEditCircle } from './hooks/useMapEditCircle';
 import { useMapEditFreehand } from './hooks/useMapEditFreehand';
 import { useMapEditLine } from './hooks/useMapEditLine';
 import { useAnnotationEdit } from './hooks/useAnnotationEdit';
-import { prepareLayersForExport } from '../../services/mapRasterize';
+import { useBlendedPreview } from './hooks/useBlendedPreview';
+import { useCanvasTheme } from './hooks/useCanvasTheme';
 import { computePointsBoundingBox } from '../../utils/geometry';
-import { resolveThemeVariables } from '../../utils/themePresets';
-import { hexStringToNumber } from '../../utils/colorUtils';
 import { getPrecedingManualWaypoint, findNodeParentId } from '../../utils/treeUtils';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { MapLayerSprite } from './MapLayerSprite';
 import { getFallbackGridColors } from './utils/canvasTheme';
 import { findNearestObjectCenter } from './utils/hitTest';
-import { CANVAS_ACCENT_COLOR, CANVAS_SURFACE_BASE, CANVAS_SURFACE_BASE_HEX } from './canvasConstants';
+import { CANVAS_ACCENT_COLOR } from './canvasConstants';
 
 extend({
   Container,
@@ -93,10 +91,6 @@ export function MapCanvas() {
   const resetMeasure = useAppStore((state) => state.resetMeasure);
   const syncMeasureFromSelection = useAppStore((state) => state.syncMeasureFromSelection);
 
-  const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
-  const [previewInfo, setPreviewInfo] = useState<any>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
   const scaleRef = useRef(scale);
@@ -118,160 +112,8 @@ export function MapCanvas() {
   );
 
   const occupancySettings = useAppStore((state) => state.occupancySettings);
-  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
-  const shouldShowBlendedPreview = isExportPreview || showOccupancyHighlight;
-
-  const customUiConfig = useAppStore((state) => state.customUiConfig);
-  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
-  const themeMode = useAppStore((state) => state.themeMode);
-  const themePreset = useAppStore((state) => state.themePreset);
-
-  const resolvedTheme = useMemo(() => {
-    if (isCustomUiMode && customUiConfig?.theme) {
-      return resolveThemeVariables(customUiConfig.theme);
-    }
-    return resolveThemeVariables({
-      preset: themePreset || 'default',
-      colorScheme: themeMode,
-    });
-  }, [isCustomUiMode, customUiConfig, themeMode, themePreset]);
-
-  const hasExplicitCustomSurface = useMemo(() => {
-    return Boolean(
-      isCustomUiMode &&
-      (customUiConfig?.theme?.colors?.surfaceBase ||
-        customUiConfig?.theme?.colors?.surfacePanel ||
-        customUiConfig?.theme?.cssVariables?.['--color-surface-base'] ||
-        customUiConfig?.theme?.cssVariables?.['--color-surface-panel']),
-    );
-  }, [isCustomUiMode, customUiConfig]);
-
-  const canvasBackgroundColor = useMemo(() => {
-    // If customUiConfig explicitly defines surface colors, honor it
-    if (hasExplicitCustomSurface) {
-      const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || CANVAS_SURFACE_BASE_HEX;
-      return hexStringToNumber(surfaceBaseHex, CANVAS_SURFACE_BASE);
-    }
-
-    // In light mode (Option A - CAD / RViz approach), keep high contrast dark viewport background
-    // so ROS maps (free space = #ffffff) and paths remain clearly visible.
-    if (resolvedTheme.colorScheme === 'light') {
-      return CANVAS_SURFACE_BASE;
-    }
-
-    const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || CANVAS_SURFACE_BASE_HEX;
-    return hexStringToNumber(surfaceBaseHex, CANVAS_SURFACE_BASE);
-  }, [resolvedTheme, hasExplicitCustomSurface]);
-
-  // blend_mode, z_index, visible, image_base64, customLayers, occupancySettings の変更キーを生成
-  const previewSyncKey = useMemo(() => {
-    const mapKey = JSON.stringify(
-      mapLayers.map((l) => ({
-        id: l.id,
-        blend_mode: l.blend_mode || 'overwrite',
-        z_index: l.z_index,
-        visible: l.visible,
-        hasImage: !!l.image_base64,
-        info: l.info,
-      })),
-    );
-    const customKey = JSON.stringify(
-      customLayers.map((l) => ({
-        id: l.id,
-        type: l.type,
-        visible: l.visible,
-        is_reference: l.is_reference || false,
-        z_index: l.z_index,
-        blend_mode: l.blend_mode || 'overwrite',
-        objCount: l.type === 'manual' ? l.editObjects.length : 0,
-        editObjects: l.type === 'manual' ? l.editObjects : undefined,
-        hasImage: l.type === 'plugin' ? !!l.image_base64 : false,
-      })),
-    );
-    const occKey = JSON.stringify(occupancySettings);
-    return `${shouldShowBlendedPreview}::${mapKey}::${customKey}::${occKey}`;
-  }, [shouldShowBlendedPreview, mapLayers, customLayers, occupancySettings]);
-
-  const startLoading = useAppStore((state) => state.startLoading);
-  const stopLoading = useAppStore((state) => state.stopLoading);
-
-  useEffect(() => {
-    if (!shouldShowBlendedPreview) {
-      setPreviewTexture(null);
-      stopLoading('blended-preview');
-      setPreviewError(null);
-      return;
-    }
-
-    let cancelled = false;
-    startLoading({
-      id: 'blended-preview',
-      message: isExportPreview ? 'エクスポートプレビューを生成中...' : '占有状態プレビューを生成中...',
-      blocking: true,
-    });
-    setPreviewError(null);
-
-    prepareLayersForExport(mapLayers, customLayers)
-      .then((layerInputs) => {
-        if (cancelled) return null;
-        if (!layerInputs || layerInputs.length === 0) return null;
-        return BackendAPI.blendMapPreview(layerInputs);
-      })
-      .then((result) => {
-        if (cancelled || !result) {
-          stopLoading('blended-preview');
-          return;
-        }
-        const img = new Image();
-        img.onload = () => {
-          if (cancelled) return;
-          const texture = Texture.from(img);
-          setPreviewTexture(texture);
-          setPreviewInfo({
-            resolution: result.resolution,
-            origin: result.origin,
-            occupied_thresh: occupancySettings.defaultOccupiedThresh,
-            free_thresh: occupancySettings.defaultFreeThresh,
-            negate: occupancySettings.defaultNegate,
-          });
-          stopLoading('blended-preview');
-        };
-        img.onerror = () => {
-          if (cancelled) return;
-          setPreviewError('Failed to load image texture from base64.');
-          stopLoading('blended-preview');
-        };
-        img.src = result.image_data_b64;
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        console.error('[Blend Preview] Blend Preview failed:', err);
-        setPreviewError(String(err));
-        stopLoading('blended-preview');
-      });
-
-    return () => {
-      cancelled = true;
-      stopLoading('blended-preview');
-    };
-  }, [
-    shouldShowBlendedPreview,
-    previewSyncKey,
-    mapLayers,
-    customLayers,
-    occupancySettings,
-    isExportPreview,
-    startLoading,
-    stopLoading,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      if (previewTexture && !previewTexture.destroyed) {
-        previewTexture.destroy(false);
-      }
-    };
-  }, [previewTexture]);
+  const { shouldShowBlendedPreview, previewTexture, previewInfo, previewError } = useBlendedPreview();
+  const { resolvedTheme, hasExplicitCustomSurface, canvasBackgroundColor } = useCanvasTheme();
 
   const interactionMode = useRef<
     | 'none'
