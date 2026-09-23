@@ -12,6 +12,7 @@ waypoint-tool/
 │   ├── ARCHITECTURE.md        # [本ファイル] アーキテクチャガイド
 │   ├── COMPONENT_CATALOG.md   # UI・Canvasコンポーネントカタログ
 │   ├── DEVELOPMENT_GUIDE.md   # 開発者ガイド・セットアップ手順
+│   ├── TESTING.md             # テスト方針（振る舞い検証・実ストア・境界モック）
 │   ├── RULES.md               # 開発ルール・ショートカット管理
 │   ├── STATE_MACHINE.md       # 状態機械・モード遷移・選択権限仕様書
 │   ├── REQUIREMENTS.md        # システム要件定義
@@ -23,9 +24,12 @@ waypoint-tool/
 │   │   ├── canvas/            # PixiJS 描画キャンバスとレイヤー群
 │   │   ├── common/            # アプリ共通機能 (ShortcutManager 等)
 │   │   └── ui/                # UI コンポーネント (共通要素・各機能パネル)
+│   ├── hooks/                 # 再利用可能な React Hooks
+│   ├── services/              # ストア・API を組み合わせるユースケース
 │   ├── stores/                # Zustand 状態管理 (Slices 構成)
+│   ├── test/                  # テスト共通基盤 (ストアリセット・fixtures・PixiJS モック)
 │   ├── types/                 # TypeScript 型定義
-│   └── utils/                 # 座標変換・幾何計算などのユーティリティ
+│   └── utils/                 # 座標変換・幾何計算などの純粋関数
 ├── src-tauri/                 # バックエンド (Rust / Tauri Core)
 │   └── src/
 │       ├── commands/          # Tauri IPC コマンド群
@@ -36,6 +40,27 @@ waypoint-tool/
 └── python_sdk/                # プラグイン用 Python SDK & 標準ジェネレータープラグイン
     └── wpt_plugin/            # 幾何計算・通信用 SDK パッケージ
 ```
+
+### 1.1 フロントエンドの依存方向（層規約）
+
+`src/` 配下のモジュールは、以下の **一方向** にのみ依存できます（左が下位層）。上位層から下位層への import のみ許可し、逆方向・循環参照は禁止です。
+
+```
+types  ←  utils  ←  api  ←  services  ←  stores  ←  hooks  ←  components
+```
+
+| 層 | 役割 | 依存してはならないもの |
+|---|---|---|
+| `types/` | ドメイン型・永続化型 | 他のすべての層（型の再エクスポートも含む） |
+| `utils/` | **純粋関数**（幾何計算・ツリー操作・変換） | `stores/`, `components/`, React。DOM / PixiJS に依存する処理は `components/canvas/` 側へ置く |
+| `api/` | Tauri IPC・ダイアログのアダプタ（本番実装 / Mock 実装） | `stores/`, `components/` |
+| `services/` | ストアや API を組み合わせるユースケース（例：破棄確認ガード、ワークフローアクション） | `components/` |
+| `stores/` | Zustand スライス・マイグレーション | `components/` |
+| `hooks/` | 再利用可能な React Hooks | — |
+| `components/` | UI・Canvas | `@tauri-apps/*` の直接 import（必ず `src/api` を経由） |
+
+- slice から `AppState` を参照する際は `import type` を使い、実行時の循環を作らない。
+- これらの規約は ESLint（`no-restricted-imports`, `import-x/no-cycle`）で検出します。既存違反は warning として残っており、リファクタリングで順次解消します。
 
 ---
 
