@@ -22,10 +22,10 @@ export default defineConfig(async () => ({
       reporter: ['text-summary', 'html', 'json-summary'],
       // Ratchet: raise these as coverage improves; never lower them (docs/TESTING.md).
       thresholds: {
-        lines: 59.5,
-        functions: 61.5,
-        branches: 53,
-        statements: 60,
+        lines: 62,
+        functions: 63,
+        branches: 54.5,
+        statements: 62.5,
       },
     },
   },

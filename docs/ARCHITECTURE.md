@@ -124,6 +124,8 @@ graph TD
    - プロジェクトファイル（`.wptroj`）読み込み時の `projectMigration.ts`、およびブラウザローカルストレージ設定（`waypoint-tool-storage`）復元時の `storageMigration.ts` を統括します。
    - 外部入力（旧バージョン形式、未定義プロパティ、キー名揺れ等）をエントリポイント境界で即座に検知し、最新の厳格なスキーマへと完全正規化・デフォルト値補完を実施します。
    - これにより、内部スライスやコンポーネント内に互換フォールバック（`||` や `??`）を散乱させないクリーンアーキテクチャを実現します。
+   - 保存時のデータ構築（ストア → `StrictProjectData`）は `src/stores/serialization/projectSerializer.ts`（`buildProjectData`）が担います。
+   - ノード／アノテーション共通の子リスト操作（削除・挿入）は純粋関数 `src/utils/treeOps.ts`（`detachFromTree` / `insertIntoTree`）に集約されています。
 
 5. **バックエンド (Tauri / Rust Core)**:
    - ファイルシステムの直接アクセス、Handlebars テンプレートによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
