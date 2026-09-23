@@ -82,7 +82,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       'no-restricted-syntax': [
-        'warn',
+        'error',
         {
           selector:
             "CallExpression[callee.object.name='vi'][callee.property.name='mock'][arguments.0.value=/stores\\/appStore$/]",
