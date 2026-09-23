@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import { Label } from './common/Label';
 import { AlertBox } from './common/AlertBox';
 import { PipelineSetupView } from './pipeline/PipelineSetupView';
+import { notify } from '../../services/notify';
 
 export function PluginParamsPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
@@ -199,7 +200,7 @@ export function PluginParamsPanel() {
                 const reloadPlugins = useAppStore.getState().reloadPlugins;
                 await reloadPlugins();
               } catch (err) {
-                alert(`プラグインのリロードに失敗しました: ${String(err)}`);
+                void notify(`プラグインのリロードに失敗しました: ${String(err)}`);
               }
             }}
             className="h-7 w-7 text-text-muted hover:text-primary-base"

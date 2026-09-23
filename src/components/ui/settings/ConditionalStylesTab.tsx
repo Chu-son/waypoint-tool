@@ -17,6 +17,7 @@ import { Label } from '../common/Label';
 import { TabSectionHeader } from './TabSectionHeader';
 import { Plus, Trash2, Copy, ChevronUp, ChevronDown, Upload, Layers, Sparkles, Info, Check } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { notify } from '../../../services/notify';
 
 // ============================================================================
 // Helper Components: Condition Group & Rule Editor
@@ -898,12 +899,12 @@ export function ConditionalStylesTab() {
       if (Array.isArray(parsed)) {
         setConditionalStyles(parsed);
         if (parsed.length > 0) setSelectedRuleId(parsed[0].id);
-        alert(`${parsed.length} 個のルールをインポートしました。`);
+        void notify(`${parsed.length} 個のルールをインポートしました。`);
       } else {
-        alert('無効なJSONフォーマットです。配列である必要があります。');
+        void notify('無効なJSONフォーマットです。配列である必要があります。');
       }
     } catch (e: any) {
-      alert(`インポート失敗: ${e.message}`);
+      void notify(`インポート失敗: ${e.message}`);
     }
   };
 

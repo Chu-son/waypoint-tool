@@ -10,6 +10,7 @@ import { TabSectionHeader } from './TabSectionHeader';
 import { Save, Plus, Trash2, RotateCcw, Copy, Check, Bot } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { DEFAULT_ROBOT_FOOTPRINT } from '../../../stores/slices/projectSlice';
+import { notify } from '../../../services/notify';
 
 export function RobotFootprintTab() {
   const globalFootprint = useAppStore((state) => state.robotFootprint);
@@ -31,7 +32,7 @@ export function RobotFootprintTab() {
 
   const handleApply = () => {
     setGlobalFootprint(footprint);
-    alert('ロボットフットプリント設定を適用しました。');
+    void notify('ロボットフットプリント設定を適用しました。');
   };
 
   const handleReset = () => {
@@ -78,7 +79,7 @@ export function RobotFootprintTab() {
   const handleRemovePoint = (index: number) => {
     if (footprint.type !== 'polygon') return;
     if (footprint.points.length <= 3) {
-      alert('多角形フットプリントには最低3つの頂点が必要です。');
+      void notify('多角形フットプリントには最低3つの頂点が必要です。');
       return;
     }
     setFootprint({
@@ -112,10 +113,10 @@ export function RobotFootprintTab() {
           points,
         });
       } else {
-        alert('無効な頂点リストです。形式: [[x1, y1], [x2, y2], ...]');
+        void notify('無効な頂点リストです。形式: [[x1, y1], [x2, y2], ...]');
       }
     } catch {
-      alert('JSONパースに失敗しました。形式: [[x1, y1], [x2, y2], ...]');
+      void notify('JSONパースに失敗しました。形式: [[x1, y1], [x2, y2], ...]');
     }
   };
 

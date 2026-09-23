@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { PipelineInspector } from './PipelineInspector';
-import { BackendAPI } from '../../../api';
+import { BackendAPI, DialogAPI } from '../../../api';
 import { renderWithStore } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { makePlugin, makeWaypoint, waypointTree } from '../../../test/fixtures';
@@ -121,13 +121,23 @@ describe('PipelineInspector', () => {
     });
   });
 
-  it('detaches the layer from the pipeline after confirmation', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('detaches the layer from the pipeline after confirmation', async () => {
+    vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
     renderInspector();
 
     fireEvent.click(screen.getByRole('button', { name: /Detach/i }));
 
-    expect(layer().pipeline_metadata).toBeUndefined();
+    await waitFor(() => expect(layer().pipeline_metadata).toBeUndefined());
+  });
+
+  it('keeps the layer attached when the user cancels detaching', async () => {
+    const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+    renderInspector();
+
+    fireEvent.click(screen.getByRole('button', { name: /Detach/i }));
+
+    await waitFor(() => expect(ask).toHaveBeenCalled());
+    expect(layer().pipeline_metadata).toBeDefined();
   });
 
   it('edits the target layer name and reference flag', () => {

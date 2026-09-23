@@ -26,6 +26,7 @@ import {
   Bookmark,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { confirmAction } from '../../../services/notify';
 
 export interface PipelineInspectorProps {
   pipelineMetadata: PipelineMetadata;
@@ -267,9 +268,9 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
     }
   };
 
-  const handleDetach = () => {
+  const handleDetach = async () => {
     if (
-      window.confirm(
+      await confirmAction(
         'この成果物をパイプラインの連動管理から切り離しますか？\n切り離すと、単独のノードやレイヤーとして独立して編集できるようになります。',
       )
     ) {

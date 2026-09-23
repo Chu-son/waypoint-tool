@@ -33,6 +33,7 @@ import { resolvePluginDependencies } from '../../../utils/dependencyResolver';
 import { VenvSetupModal } from './VenvSetupModal';
 import { BackendAPI } from '../../../api';
 import { PluginInstance } from '../../../types/store';
+import { notify } from '../../../services/notify';
 
 interface PluginsTabProps {
   bundledSdkVersion: string | null;
@@ -93,7 +94,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   const reloadPlugins = useAppStore.getState().reloadPlugins;
                   await reloadPlugins();
                 } catch (err) {
-                  alert(`リロードに失敗しました: ${String(err)}`);
+                  void notify(`リロードに失敗しました: ${String(err)}`);
                 }
               }}
               className="text-text-muted hover:text-text-base border-border-base/30"
@@ -157,7 +158,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                   }
 
                   if (uniquePlugins.length === 0) {
-                    alert('指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。');
+                    void notify('指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。');
                     return;
                   }
 
@@ -188,14 +189,14 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
 
                   if (uniquePlugins.length === 1) {
                     const p = uniquePlugins[0];
-                    alert(`Plugin '${p.manifest?.name || p.id}' をインポートしました。`);
+                    void notify(`Plugin '${p.manifest?.name || p.id}' をインポートしました。`);
                   } else {
                     const names = uniquePlugins.map((p) => p.manifest?.name || p.id).join(', ');
-                    alert(`${uniquePlugins.length} 個のプラグインを一括インポートしました:\n${names}`);
+                    void notify(`${uniquePlugins.length} 個のプラグインを一括インポートしました:\n${names}`);
                   }
                 } catch (err) {
                   console.error('Failed to load custom plugin:', err);
-                  alert(`Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+                  void notify(`Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
                 }
               }}
             >
@@ -242,10 +243,10 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                       },
                     ]);
                   }
-                  alert(`Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`);
+                  void notify(`Plugin '${pluginName}' を作成しました:\n${newPlugin.folder_path}`);
                 } catch (err) {
                   console.error('Failed to scaffold plugin:', err);
-                  alert(`プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`);
+                  void notify(`プラグイン雛形の生成に失敗しました。\nエラー詳細: ${String(err)}`);
                 }
               }}
             >
@@ -486,7 +487,7 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                                       setPluginSettings(newSettings);
                                     } catch (err) {
                                       console.error('Failed to read image', err);
-                                      alert('画像の読み込みに失敗しました。');
+                                      void notify('画像の読み込みに失敗しました。');
                                     }
                                   }
                                 }}
@@ -576,9 +577,9 @@ export function PluginsTab({ bundledSdkVersion, globalPythonPath }: PluginsTabPr
                                           if (!newMap[s.id] && plugins[s.id]) newMap[s.id] = plugins[s.id];
                                         });
                                       setPlugins(newMap);
-                                      alert(`SDK を v${newVersion} に更新しました。`);
+                                      void notify(`SDK を v${newVersion} に更新しました。`);
                                     } catch (err) {
-                                      alert(`SDK 更新に失敗しました: ${String(err)}`);
+                                      void notify(`SDK 更新に失敗しました: ${String(err)}`);
                                     }
                                   }}
                                   className="text-[10px] font-bold text-status-warning hover:text-status-warning/80 flex items-center gap-1 bg-status-warning/5 hover:bg-status-warning/10 px-2 py-0.5 rounded-md transition-colors"

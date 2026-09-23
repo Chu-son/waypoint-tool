@@ -9,6 +9,7 @@ import { cn } from '../../../utils/cn';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { FieldLabel } from '../common/FieldLabel';
+import { notify } from '../../../services/notify';
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -39,21 +40,21 @@ export function OptionSchemaTab() {
     const hasInvalidDefaults = localOptions.some((opt) => !isDefaultValid(opt));
 
     if (hasEmptyName) {
-      alert('Key Name cannot be empty.');
+      void notify('Key Name cannot be empty.');
       return;
     }
     if (hasDuplicates) {
-      alert('Key Names must be unique. Duplicate keys found.');
+      void notify('Key Names must be unique. Duplicate keys found.');
       return;
     }
     if (hasInvalidDefaults) {
-      alert('Some options have default values that do not match their type.');
+      void notify('Some options have default values that do not match their type.');
       return;
     }
 
     setGlobalOptionsSchema({ options: localOptions });
     useAppStore.setState({ isDirty: true });
-    alert('オプションスキーマを保存しました。');
+    void notify('オプションスキーマを保存しました。');
   };
 
   const handleAddOption = () => {
@@ -89,10 +90,10 @@ export function OptionSchemaTab() {
       };
 
       await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
-      alert('オプションスキーマをエクスポートしました。');
+      void notify('オプションスキーマをエクスポートしました。');
     } catch (err) {
       console.error('Failed to export options schema:', err);
-      alert(`エクスポートに失敗しました。\n詳細: ${String(err)}`);
+      void notify(`エクスポートに失敗しました。\n詳細: ${String(err)}`);
     }
   };
 
@@ -128,21 +129,21 @@ export function OptionSchemaTab() {
         try {
           parsed = JSON.parse(fileContent);
         } catch {
-          alert('ファイルの形式が不正です（JSONではありません）。');
+          void notify('ファイルの形式が不正です（JSONではありません）。');
           return;
         }
         if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.options)) {
-          alert('有効な Options Schema ファイルではありません。');
+          void notify('有効な Options Schema ファイルではありません。');
           return;
         }
         schema = parsed as OptionsSchema;
       }
 
       setLocalOptions(schema.options || []);
-      alert('オプションスキーマをインポートしました。');
+      void notify('オプションスキーマをインポートしました。');
     } catch (err) {
       console.error('Failed to import options schema:', err);
-      alert(`インポートに失敗しました。\n詳細: ${String(err)}`);
+      void notify(`インポートに失敗しました。\n詳細: ${String(err)}`);
     }
   };
 

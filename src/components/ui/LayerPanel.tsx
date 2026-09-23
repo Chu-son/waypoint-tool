@@ -34,6 +34,7 @@ import { EmptyState } from './common/EmptyState';
 import { ProjectMapLayer, CustomLayer, ExportRegion } from '../../types/store';
 import { NewCustomLayerModal } from './NewCustomLayerModal';
 import { cn } from '../../utils/cn';
+import { notifyError } from '../../services/notify';
 
 function CardFrame({
   visible = true,
@@ -302,7 +303,7 @@ export function LayerPanel() {
       }
     } catch (err) {
       console.error('Failed to load map:', err);
-      alert(`マップの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+      void notifyError(`マップの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
     }
   };
 

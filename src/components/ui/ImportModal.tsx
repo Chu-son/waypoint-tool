@@ -13,6 +13,7 @@ import { BrowseInput } from './common/BrowseInput';
 import { AlertBox } from './common/AlertBox';
 import { ExportTemplate, ImportFieldMapping } from '../../types/store';
 import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from '../../utils/importUtils';
+import { notify } from '../../services/notify';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -109,7 +110,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
 
   const runParse = async () => {
     if (!filePath) {
-      alert('Please select a file to import.');
+      void notify('Please select a file to import.');
       return null;
     }
     try {
@@ -127,7 +128,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
         },
       );
     } catch (err) {
-      alert(`ファイルの解析に失敗しました。\nエラー詳細: ${String(err)}`);
+      void notify(`ファイルの解析に失敗しました。\nエラー詳細: ${String(err)}`);
       return null;
     } finally {
       setIsBusy(false);
@@ -149,7 +150,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     });
 
     const errorSummary = result.errors.length > 0 ? `\n(${result.errors.length}件をスキップしました)` : '';
-    alert(`${result.nodes.length}件のウェイポイントをインポートしました。${errorSummary}`);
+    void notify(`${result.nodes.length}件のウェイポイントをインポートしました。${errorSummary}`);
     onClose();
   };
 

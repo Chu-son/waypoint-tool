@@ -1,26 +1,18 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExportModal } from './ExportModal';
-import { useAppStore } from '../../stores/appStore';
-
-// Mock Tauri modules
-vi.mock('../../api', () => ({
-  BackendAPI: {
-    checkExportConflicts: vi.fn().mockResolvedValue([]),
-    executeExportPackage: vi.fn().mockResolvedValue({
-      exported_files_count: 2,
-      backed_up_files: [],
-    }),
-  },
-  DialogAPI: {
-    open: vi.fn().mockResolvedValue('/mock/export/dir'),
-    save: vi.fn().mockResolvedValue('/mock/export/file'),
-  },
-}));
+import { BackendAPI, DialogAPI } from '../../api';
+import { resetAppStore } from '../../test/store';
 
 describe('ExportModal UI', () => {
   beforeEach(() => {
-    useAppStore.setState({
+    vi.spyOn(BackendAPI, 'checkExportConflicts').mockResolvedValue([]);
+    vi.spyOn(BackendAPI, 'executeExportPackage').mockResolvedValue({
+      exported_files_count: 2,
+      backed_up_files: [],
+    } as any);
+    vi.spyOn(DialogAPI, 'message').mockResolvedValue();
+    resetAppStore({
       nodes: {
         wp1: { id: 'wp1', type: 'manual', transform: { x: 1, y: 2, qx: 0, qy: 0, qz: 0, qw: 1 } },
       },
@@ -97,7 +89,6 @@ describe('ExportModal UI', () => {
 
   it('triggers executeExportPackage when clicking the export button', async () => {
     const mockOnClose = vi.fn();
-    window.alert = vi.fn();
 
     render(<ExportModal isOpen={true} onClose={mockOnClose} />);
 
@@ -106,7 +97,6 @@ describe('ExportModal UI', () => {
 
     fireEvent.click(exportBtn);
 
-    const { BackendAPI } = await import('../../api');
     await waitFor(() => {
       expect(BackendAPI.executeExportPackage).toHaveBeenCalled();
       expect(mockOnClose).toHaveBeenCalled();

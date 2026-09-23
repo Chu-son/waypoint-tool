@@ -10,6 +10,7 @@ import { OptionCard } from './common/OptionCard';
 import { FieldLabel } from './common/FieldLabel';
 import { EmptyState } from './common/EmptyState';
 import { prepareLayersForExport } from '../../services/mapRasterize';
+import { notify } from '../../services/notify';
 
 export function ExportMapsModal() {
   const isOpen = useAppStore((state) => state.isExportMapsModalOpen);
@@ -35,7 +36,7 @@ export function ExportMapsModal() {
   const handleExport = async () => {
     const selectedRegionIds = Object.keys(selectedRegions).filter((id) => selectedRegions[id]);
     if (selectedRegionIds.length === 0) {
-      alert('At least one export region must be selected.');
+      void notify('At least one export region must be selected.');
       return;
     }
 
@@ -78,12 +79,12 @@ export function ExportMapsModal() {
           },
         );
 
-        alert('マップのエクスポートが完了しました。');
+        void notify('マップのエクスポートが完了しました。');
         onClose();
       }
     } catch (err) {
       console.error('Failed to export maps:', err);
-      alert(`マップのエクスポートに失敗しました。\nエラー詳細: ${String(err)}`);
+      void notify(`マップのエクスポートに失敗しました。\nエラー詳細: ${String(err)}`);
     }
   };
 

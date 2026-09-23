@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { AppAPI, DialogAPI, BackendAPI } from '../../api';
+import { notify, notifyError } from '../../services/notify';
 import { MousePointer2, Minus, Square, X, Check, FolderOpen } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { confirmDiscardChanges } from '../../services/projectGuard';
@@ -289,7 +290,7 @@ export function TopMenu() {
       }
     } catch (err) {
       console.error('Failed to load custom UI config file:', err);
-      alert('Custom UI 設定ファイルの読み込みに失敗しました。');
+      void notifyError('Custom UI 設定ファイルの読み込みに失敗しました。');
     }
   };
 
@@ -519,11 +520,11 @@ export function TopMenu() {
               const version = await AppAPI.getVersion();
               if (isCustomUiMode && customUiConfig?.brand?.about) {
                 const about = customUiConfig.brand.about;
-                alert(
+                void notify(
                   `${about.title || 'Custom UI Tool'} ${about.version || `v${version}`}\n\n${about.description || ''}\n${about.company || ''}`,
                 );
               } else {
-                alert(`Waypoint Tool v${version}`);
+                void notify(`Waypoint Tool v${version}`);
               }
             },
           },

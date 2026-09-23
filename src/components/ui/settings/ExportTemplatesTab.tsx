@@ -14,6 +14,7 @@ import { SectionDivider } from '../common/SectionDivider';
 import { InlineFieldRow } from '../common/InlineFieldRow';
 import { FieldLabel } from '../common/FieldLabel';
 import { AlertBox } from '../common/AlertBox';
+import { notify } from '../../../services/notify';
 
 function TemplateCreateModal({
   isOpen,
@@ -258,10 +259,10 @@ export function ExportTemplatesTab() {
       };
 
       await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
-      alert('テンプレートをエクスポートしました。');
+      void notify('テンプレートをエクスポートしました。');
     } catch (err) {
       console.error('Failed to export template:', err);
-      alert(`エクスポートに失敗しました。\n詳細: ${String(err)}`);
+      void notify(`エクスポートに失敗しました。\n詳細: ${String(err)}`);
     }
   };
 
@@ -282,7 +283,7 @@ export function ExportTemplatesTab() {
       try {
         parsed = JSON.parse(fileContent);
       } catch {
-        alert('ファイルの形式が不正です（JSONではありません）。');
+        void notify('ファイルの形式が不正です（JSONではありません）。');
         return;
       }
 
@@ -293,7 +294,7 @@ export function ExportTemplatesTab() {
         !parsed.extension ||
         typeof parsed.content !== 'string'
       ) {
-        alert('有効な Waypoint テンプレートファイルではありません。');
+        void notify('有効な Waypoint テンプレートファイルではありません。');
         return;
       }
 
@@ -303,7 +304,7 @@ export function ExportTemplatesTab() {
       setIsImportModalOpen(true);
     } catch (err) {
       console.error('Failed to import template:', err);
-      alert(`インポートに失敗しました。\n詳細: ${String(err)}`);
+      void notify(`インポートに失敗しました。\n詳細: ${String(err)}`);
     }
   };
 
@@ -336,7 +337,7 @@ export function ExportTemplatesTab() {
     }
 
     setIsImportModalOpen(false);
-    alert('テンプレートのインポートが完了しました。');
+    void notify('テンプレートのインポートが完了しました。');
   };
 
   const insertTemplateVar = (templateId: string, text: string) => {

@@ -26,6 +26,7 @@ import {
   DEFAULT_CONDITIONAL_STYLES_ENABLED,
   migrateAndNormalizeProjectData,
 } from '../migrations/projectMigration';
+import { notify, notifyError } from '../../services/notify';
 
 export {
   DEFAULT_ROBOT_FOOTPRINT,
@@ -184,7 +185,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     setIsDirty(false);
     addRecentProject(finalPath);
     set({ currentProjectPath: finalPath });
-    alert('プロジェクトを保存しました。');
+    void notify('プロジェクトを保存しました。');
   };
 
   return {
@@ -497,7 +498,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         );
       } catch (err) {
         console.error('Failed to load project:', err);
-        alert(`プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+        void notifyError(`プロジェクトの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
         return false;
       }
     },
@@ -519,7 +520,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         return false;
       } catch (err) {
         console.error('Failed to open project dialog:', err);
-        alert(`プロジェクト選択ダイアログの起動に失敗しました。\nエラー詳細: ${String(err)}`);
+        void notifyError(`プロジェクト選択ダイアログの起動に失敗しました。\nエラー詳細: ${String(err)}`);
         return false;
       }
     },
@@ -541,7 +542,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         }
       } catch (err) {
         console.error('Failed to save project as:', err);
-        alert(`プロジェクトの保存に失敗しました。\nエラー詳細: ${String(err)}`);
+        void notifyError(`プロジェクトの保存に失敗しました。\nエラー詳細: ${String(err)}`);
       }
     },
 
@@ -568,7 +569,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         await executeSaveProject(currentProjectPath);
       } catch (err) {
         console.error('Failed to overwrite save project:', err);
-        alert(`プロジェクトの上書き保存に失敗しました。\nエラー詳細: ${String(err)}`);
+        void notifyError(`プロジェクトの上書き保存に失敗しました。\nエラー詳細: ${String(err)}`);
       }
     },
   };

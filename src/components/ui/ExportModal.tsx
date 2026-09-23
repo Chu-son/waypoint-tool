@@ -31,6 +31,7 @@ import {
 import { extractWaypointsForExport } from '../../utils/exportWaypointUtils';
 import { prepareLayersForExport } from '../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../stores/migrations/projectMigration';
+import { confirmAction, notify } from '../../services/notify';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -180,12 +181,12 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     duplicateExportProfile(activeProfile.id);
   };
 
-  const handleDeleteProfile = () => {
+  const handleDeleteProfile = async () => {
     if (exportProfiles.length <= 1) {
-      alert('最後のプロファイルは削除できません。');
+      void notify('最後のプロファイルは削除できません。');
       return;
     }
-    if (confirm(`プロファイル「${activeProfile.name}」を削除しますか？`)) {
+    if (await confirmAction(`プロファイル「${activeProfile.name}」を削除しますか？`)) {
       removeExportProfile(activeProfile.id);
     }
   };
@@ -265,12 +266,12 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   const handleExecuteExport = async () => {
     const enabledItems = activeProfile.items.filter((i) => i.enabled);
     if (enabledItems.length === 0) {
-      alert('エクスポート対象の項目が選択されていません。');
+      void notify('エクスポート対象の項目が選択されていません。');
       return;
     }
 
     if (!rootDir) {
-      alert('出力先ルートフォルダを指定してください。');
+      void notify('出力先ルートフォルダを指定してください。');
       return;
     }
 
@@ -409,13 +410,13 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           if (result.backed_up_files && result.backed_up_files.length > 0) {
             alertMsg += `\nバックアップ作成: ${result.backed_up_files.length} 件 (.bak)`;
           }
-          alert(alertMsg);
+          void notify(alertMsg);
           onClose();
         },
       );
     } catch (err) {
       console.error('Failed to execute export:', err);
-      alert(`エクスポートに失敗しました:\n${String(err)}`);
+      void notify(`エクスポートに失敗しました:\n${String(err)}`);
     }
   };
 

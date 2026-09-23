@@ -2,6 +2,7 @@ import { AppState, useAppStore } from '../stores/appStore';
 import { DialogAPI, BackendAPI } from '../api';
 import type { AnnotationToolType } from '../types/ui';
 import { v4 as uuidv4 } from 'uuid';
+import { notify } from './notify';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;
 
@@ -298,7 +299,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
           ? `\n\n利用可能なプラグイン一覧:\n- ${availableIds.join('\n- ')}`
           : '\n\n(利用可能なプラグインがロードされていません)';
       console.warn(`[WorkflowAction] Plugin not found: ${pluginId}`, availableIds);
-      alert(`プラグインが見つかりません: ${pluginId || '(未指定)'}${availableMsg}`);
+      void notify(`プラグインが見つかりません: ${pluginId || '(未指定)'}${availableMsg}`);
       return;
     }
 
@@ -356,7 +357,7 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
       );
     } catch (err) {
       console.error('Failed to run plugin in workflow action:', err);
-      alert(`プラグイン実行に失敗しました:\n${String(err)}`);
+      void notify(`プラグイン実行に失敗しました:\n${String(err)}`);
     }
   },
 
