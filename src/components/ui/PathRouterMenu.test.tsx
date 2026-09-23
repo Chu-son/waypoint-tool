@@ -1,71 +1,42 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { PathRouterMenu } from './PathRouterMenu';
-import { useAppStore } from '../../stores/appStore';
+import { renderWithStore } from '../../test/render';
+import { getAppState } from '../../test/store';
+import { makePlugin } from '../../test/fixtures';
 
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: vi.fn(),
-}));
+const dijkstra = makePlugin('path-plugin-1', {
+  name: 'Dijkstra Avoidance',
+  category: 'path_calculator',
+  primary_output: 'path_calculator',
+  description: 'Calculates path with obstacle avoidance',
+  properties: [{ name: 'safety_margin', label: 'Safety Margin', type: 'float', default: 0.15 }],
+});
+
+const renderMenu = () =>
+  renderWithStore(<PathRouterMenu />, { plugins: { [dijkstra.id]: dijkstra }, autoRecalculatePath: false });
 
 describe('PathRouterMenu', () => {
-  const mockPlugins = {
-    'path-plugin-1': {
-      id: 'path-plugin-1',
-      manifest: {
-        name: 'Dijkstra Avoidance',
-        category: 'path_calculator',
-        type: 'python',
-        description: 'Calculates path with obstacle avoidance',
-        properties: [{ name: 'safety_margin', label: 'Safety Margin', type: 'float', default: 0.15 }],
-      },
-    },
-  };
-
-  const mockSetActivePluginId = vi.fn();
-  const mockSetPathCalculatorParams = vi.fn();
-  const mockSetAutoRecalculatePath = vi.fn();
-  const mockRecalculatePath = vi.fn();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) =>
-      selector({
-        plugins: mockPlugins,
-        activePathCalculatorPluginId: null,
-        setActivePathCalculatorPluginId: mockSetActivePluginId,
-        pathCalculatorParams: {},
-        setPathCalculatorParams: mockSetPathCalculatorParams,
-        autoRecalculatePath: true,
-        setAutoRecalculatePath: mockSetAutoRecalculatePath,
-        isCalculatingPath: false,
-        recalculatePath: mockRecalculatePath,
-      }),
-    );
-  });
-
-  it('renders default button text when no active plugin', () => {
-    render(<PathRouterMenu />);
+  it('shows straight-line routing by default', () => {
+    renderMenu();
     expect(screen.getByText('Route: Straight')).toBeInTheDocument();
   });
 
-  it('opens menu on click and lists path calculators', () => {
-    render(<PathRouterMenu />);
-    const button = screen.getByTitle('Path Routing Settings');
-    fireEvent.click(button);
+  it('lists the available path calculators', () => {
+    renderMenu();
+    fireEvent.click(screen.getByTitle('Path Routing Settings'));
 
     expect(screen.getByText('Path Routing')).toBeInTheDocument();
     expect(screen.getByText('Straight Line (Default)')).toBeInTheDocument();
     expect(screen.getByText('Dijkstra Avoidance')).toBeInTheDocument();
   });
 
-  it('selects a path calculator plugin', () => {
-    render(<PathRouterMenu />);
-    const button = screen.getByTitle('Path Routing Settings');
-    fireEvent.click(button);
+  it('activates the chosen path calculator', () => {
+    renderMenu();
+    fireEvent.click(screen.getByTitle('Path Routing Settings'));
 
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'path-plugin-1' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'path-plugin-1' } });
 
-    expect(mockSetActivePluginId).toHaveBeenCalledWith('path-plugin-1');
+    expect(getAppState().activePathCalculatorPluginId).toBe('path-plugin-1');
   });
 });

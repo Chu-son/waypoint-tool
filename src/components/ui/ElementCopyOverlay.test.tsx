@@ -1,44 +1,21 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import { ElementCopyOverlay } from './ElementCopyOverlay';
-import { useAppStore } from '../../stores/appStore';
+import { renderWithStore } from '../../test/render';
+import { getAppState } from '../../test/store';
+import { makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
+import { quaternionToYaw } from '../../utils/transformUtils';
 
-// Mock useAppStore
-vi.mock('../../stores/appStore', () => ({
-  useAppStore: vi.fn(),
-}));
-
-describe('ElementCopyOverlay', () => {
-  const mockSetElementCopyState = vi.fn();
-  const mockClearElementCopyState = vi.fn();
-  const mockUpdateNode = vi.fn();
-
-  const targetNode = {
-    id: 'node-2',
-    type: 'manual' as const,
-    transform: { x: 10, y: 20, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (useAppStore as any).mockImplementation((selector: any) => {
-      const state = {
-        elementCopyState: { field: 'yaw', value: 1.57, coordSystem: 'world', previewNodeId: 'node-2' },
-        setElementCopyState: mockSetElementCopyState,
-        clearElementCopyState: mockClearElementCopyState,
-        selectedNodeIds: ['node-2'],
-        nodes: { 'node-2': targetNode },
-        rootNodeIds: ['node-1', 'node-2'],
-        anchorNodeId: null,
-        updateNode: mockUpdateNode,
-        indexStartIndex: 0,
-      };
-      return selector(state);
-    });
+const renderOverlay = () =>
+  renderWithStore(<ElementCopyOverlay />, {
+    ...waypointTree([makeWaypoint('node-1'), makeWaypoint('node-2', { transform: makeTransform(10, 20, 0) })]),
+    selectedNodeIds: ['node-2'],
+    elementCopyState: { field: 'yaw', value: 1.57, coordSystem: 'world', previewNodeId: 'node-2' },
   });
 
-  it('renders copy overlay info and active target', () => {
-    render(<ElementCopyOverlay />);
+describe('ElementCopyOverlay', () => {
+  it('shows which field is being copied and the waypoint it applies to', () => {
+    renderOverlay();
 
     expect(screen.getByText(/YAW コピー中/)).toBeInTheDocument();
     expect(screen.getByText(/Waypoint \[1\] に適用中/)).toBeInTheDocument();
@@ -46,22 +23,23 @@ describe('ElementCopyOverlay', () => {
     expect(screen.getByRole('button', { name: /完了/ })).toBeInTheDocument();
   });
 
-  it('triggers paste confirmation when confirm button is clicked', () => {
-    render(<ElementCopyOverlay />);
+  it('applies the copied value to the previewed waypoint on confirm', () => {
+    renderOverlay();
 
-    const confirmBtn = screen.getByRole('button', { name: /ペースト確定/ });
-    fireEvent.click(confirmBtn);
+    fireEvent.click(screen.getByRole('button', { name: /ペースト確定/ }));
 
-    expect(mockUpdateNode).toHaveBeenCalledWith('node-2', expect.anything());
-    expect(mockSetElementCopyState).toHaveBeenCalledWith(expect.objectContaining({ previewNodeId: null }));
+    const pasted = getAppState().nodes['node-2'].transform!;
+    expect(quaternionToYaw(pasted)).toBeCloseTo(1.57, 5);
+    expect(pasted).toMatchObject({ x: 10, y: 20 });
+    expect(getAppState().elementCopyState?.previewNodeId).toBeNull();
   });
 
-  it('triggers clearElementCopyState when cancel button is clicked', () => {
-    render(<ElementCopyOverlay />);
+  it('ends copy mode without changing the waypoint', () => {
+    renderOverlay();
 
-    const cancelBtn = screen.getByRole('button', { name: /完了/ });
-    fireEvent.click(cancelBtn);
+    fireEvent.click(screen.getByRole('button', { name: /完了/ }));
 
-    expect(mockClearElementCopyState).toHaveBeenCalled();
+    expect(getAppState().elementCopyState).toBeNull();
+    expect(quaternionToYaw(getAppState().nodes['node-2'].transform!)).toBe(0);
   });
 });
