@@ -19,6 +19,7 @@ import {
 import { Slider } from './common/Slider';
 import { Kbd } from './common/Kbd';
 import { getPrecedingManualWaypoint, getFlattenedWaypointIds } from '../../utils/treeUtils';
+import { quaternionToYaw } from '../../utils/transformUtils';
 import {
   computeStatusInteraction,
   computeTotalPathDistance,
@@ -129,13 +130,7 @@ export const StatusBar: React.FC = () => {
     const transform = latestNode.transform;
     const Wx = transform.x ?? 0;
     const Wy = transform.y ?? 0;
-    const qx = transform.qx ?? 0;
-    const qy = transform.qy ?? 0;
-    const qz = transform.qz ?? 0;
-    const qw = transform.qw ?? 1;
-
-    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-    if (!isFinite(yaw)) yaw = 0;
+    const yaw = quaternionToYaw(transform);
 
     const dx = cursorPosition.x - Wx;
     const dy = cursorPosition.y - Wy;

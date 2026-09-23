@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { v4 as uuidv4 } from 'uuid';
 import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { quaternionToYaw } from '../../../utils/transformUtils';
 
 export interface SnapState {
   isSnapped: boolean;
@@ -196,9 +197,8 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
         return { x: worldX, y: worldY };
       }
 
-      const { x: ox, y: oy, qx, qy, qz, qw } = prevTransform;
-      let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-      if (!isFinite(yaw)) yaw = 0;
+      const { x: ox, y: oy } = prevTransform;
+      const yaw = quaternionToYaw(prevTransform);
 
       const dx = worldX - ox;
       const dy = worldY - oy;
@@ -335,9 +335,8 @@ export function useSnapping({ scale, enableSnapping }: UseSnappingProps) {
               const prev = list[curIdx].node.transform || null;
 
               if (prev) {
-                const { x: ox, y: oy, qx, qy, qz, qw } = prev;
-                let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-                if (!isFinite(yaw)) yaw = 0;
+                const { x: ox, y: oy } = prev;
+                const yaw = quaternionToYaw(prev);
                 setSnapStateSynced((s) => ({
                   ...s,
                   lockedWaypointId: newLockedId,

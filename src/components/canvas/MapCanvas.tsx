@@ -34,6 +34,7 @@ import { computePointsBoundingBox } from '../../utils/geometry';
 import { resolveThemeVariables } from '../../utils/themePresets';
 import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
 import { getPrecedingManualWaypoint, findNodeParentId } from '../../utils/treeUtils';
+import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 
 import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
@@ -2397,9 +2398,8 @@ export function MapCanvas() {
       if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
         const node = useAppStore.getState().nodes[activeNodeId.current];
         if (node && node.transform) {
-          const { x, y, qx, qy, qz, qw } = node.transform;
-          let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-          if (!isFinite(yaw)) yaw = 0;
+          const { x, y } = node.transform;
+          const yaw = quaternionToYaw(node.transform);
           setSnapState((prev) => ({
             ...prev,
             isSnapped: false,

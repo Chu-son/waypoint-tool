@@ -1,6 +1,7 @@
 import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent } from 'pixi.js';
 import { CanvasHandle } from '../common/CanvasHandle';
+import { quaternionToYaw } from '../../../utils/transformUtils';
 
 interface PluginLayerProps {
   scale: number;
@@ -243,11 +244,8 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
                 if (!pt || typeof pt.x !== 'number' || !isFinite(pt.x) || !isFinite(pt.y)) return null;
                 const ptKey = pt.id || `pt-${key}-${idx}`;
                 const pqw = pt.qw ?? 1,
-                  pqz = pt.qz ?? 0,
-                  pqx = pt.qx ?? 0,
-                  pqy = pt.qy ?? 0;
-                let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
-                if (!isFinite(yaw)) yaw = 0;
+                  pqz = pt.qz ?? 0;
+                const yaw = quaternionToYaw(pt);
 
                 const hasYaw = Math.abs(pqz) > 0.0001 || Math.abs(pqw - 1) > 0.0001;
 
@@ -325,12 +323,7 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
 
         // Single Point data
         if (typeof data.x !== 'number' || !isFinite(data.x) || !isFinite(data.y)) return null;
-        const pqw = data.qw ?? 1,
-          pqz = data.qz ?? 0,
-          pqx = data.qx ?? 0,
-          pqy = data.qy ?? 0;
-        let yaw = Math.atan2(2.0 * (pqw * pqz + pqx * pqy), 1.0 - 2.0 * (pqy * pqy + pqz * pqz));
-        if (!isFinite(yaw)) yaw = 0;
+        const yaw = quaternionToYaw(data);
 
         return (
           <pixiGraphics

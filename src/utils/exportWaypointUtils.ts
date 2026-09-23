@@ -1,5 +1,6 @@
 import type { WaypointNode, OptionsSchema } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
+import { quaternionToYaw } from './transformUtils';
 
 export interface ExportedWaypointItem {
   index: number;
@@ -48,7 +49,7 @@ export function extractWaypointsForExport(
       const qy = node.transform?.qy || 0;
       const qz = node.transform?.qz || 0;
       const qw = node.transform?.qw ?? 1;
-      const yawVal = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
+      const yawVal = quaternionToYaw(node.transform);
 
       return {
         index: index + indexStartIndex,

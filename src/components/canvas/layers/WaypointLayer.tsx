@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
+import { quaternionToYaw } from '../../../utils/transformUtils';
 import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_HOVER_COLOR } from '../canvasConstants';
 import {
   parseColorSafe,
@@ -158,12 +159,8 @@ export function WaypointLayer({
     }
 
     const transform = node.transform!;
-    const qx = transform.qx ?? 0;
-    const qy = transform.qy ?? 0;
-    const qz = transform.qz ?? 0;
-    const qw = transform.qw ?? 1;
-    let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-    if (!isFinite(yaw)) yaw = 0;
+    const { qx, qy, qz, qw } = transform;
+    const yaw = quaternionToYaw(transform);
     const px = isFinite(transform.x) ? transform.x : 0;
     const py = isFinite(transform.y) ? transform.y : 0;
 
