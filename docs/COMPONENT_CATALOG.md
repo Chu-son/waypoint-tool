@@ -10,10 +10,10 @@
 - **`FloatingActionBanner`** ([`src/components/ui/common/FloatingActionBanner.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/FloatingActionBanner.tsx))
   - **概要**: モード操作時（コピー、領域選択等）にキャンバス上部に浮遊表示されるバナー通知・アクションUI。
   - **主要Props**: `icon`, `title`, `subtitle`, `valueDisplay`, `statusText`, `actions`
-- **`PanelContainer`** ([`src/components/ui/PanelContainer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PanelContainer.tsx))
+- **`PanelContainer`** ([`src/components/ui/shell/PanelContainer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/PanelContainer.tsx))
   - **概要**: 左右サイドパネルを格納し、タブ切り替え、上下分割、タブ右クリックによる反対パネルへの移動（左右ドッキング）・順序並び替え、レイアウト初期化を制御するコンテナ。
   - **主要Props**: `panels`, `activeTabId`, `onTabChange`, `viewMode`, `onViewModeChange`, `side`, `onMoveTabToPanel`, `onReorderTab`, `onResetLayout`, `onClose`, `closeIcon`
-- **`NumericInput`** ([`src/components/ui/NumericInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/NumericInput.tsx))
+- **`NumericInput`** ([`src/components/ui/common/NumericInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/NumericInput.tsx))
   - **概要**: 数値編集用インプット。ドラッグによる値変更やステップ増減、フォーカス外確定をサポート。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`
 - **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
@@ -22,13 +22,13 @@
 - **`BackgroundLoadingBadge`** ([`src/components/ui/common/BackgroundLoadingBadge.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/BackgroundLoadingBadge.tsx))
   - **概要**: 自動経路計算等の非ブロッキングバックグラウンド処理時にキャンバス右上に浮遊表示されるコンパクトなピル型インジケーター。
   - **主要Props**: `className`
-- **`ElementCopyOverlay`** ([`src/components/ui/ElementCopyOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ElementCopyOverlay.tsx))
+- **`ElementCopyOverlay`** ([`src/components/ui/overlays/ElementCopyOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/ElementCopyOverlay.tsx))
   - **概要**: 複数要素や特定の座標・プロパティを別のノードへ連続コピーする際のキャンバスオーバーレイ。
   - **主要Props**: なし（コピー状態を `appStore` より読み出し表示）
-- **`AnnotationEditOverlay`** ([`src/components/ui/AnnotationEditOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationEditOverlay.tsx))
+- **`AnnotationEditOverlay`** ([`src/components/ui/overlays/AnnotationEditOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/AnnotationEditOverlay.tsx))
   - **概要**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）の配置・編集モード時にキャンバス上部に表示されるフローティングアクションバナー（サブツール・カラー選択・削除・完了）。
   - **主要Props**: なし
-- **`MapEditOverlay`** ([`src/components/ui/MapEditOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/MapEditOverlay.tsx))
+- **`MapEditOverlay`** ([`src/components/ui/overlays/MapEditOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/MapEditOverlay.tsx))
   - **概要**: マップ編集モード時にキャンバス上部に表示されるフローティングアクションバナー（直線・矩形・円形・ブラシのサブツール切り替え、塗りつぶし値設定、ブラシサイズ、削除、完了）。
   - **主要Props**: なし
 - **`Modal`** ([`src/components/ui/common/Modal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Modal.tsx))
@@ -102,7 +102,7 @@
 - **`AnnotationInspector`** ([`src/components/ui/properties/AnnotationInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/AnnotationInspector.tsx))
   - **概要**: 選択中のアノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）の名前・カラー・表示トグル・各幾何座標（位置、サイズ、角度、半径等）を編集するインスペクターUI。
   - **主要Props**: なし（`appStore` の `selectedAnnotationIds` と連動）
-- **`NewCustomLayerModal`** ([`src/components/ui/NewCustomLayerModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/NewCustomLayerModal.tsx))
+- **`NewCustomLayerModal`** ([`src/components/ui/modals/NewCustomLayerModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/NewCustomLayerModal.tsx))
   - **概要**: 新規カスタムレイヤー作成モーダル。手動ベクターレイヤーの追加、または `map_layer_generator` プラグインの一覧から選択してレイヤーを作成する。
   - **主要Props**: `isOpen`, `onClose`
 - **`IndexGroup`** / **`ElementCopyContextMenu`** ([`src/components/ui/properties/`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/))
@@ -119,49 +119,49 @@
 
 ## 3. アプリケーション機能パネル & モーダル (`src/components/ui/`)
 
-- **`TopMenu`** ([`src/components/ui/TopMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/TopMenu.tsx))
+- **`TopMenu`** ([`src/components/ui/shell/TopMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/TopMenu.tsx))
   - **概要**: アプリケーション最上部のメニューバー (File, Edit, View, Help)、中央のプロジェクト名表示・未保存状態（`isDirty`）インジケータバッジ、およびウィンドウ操作コントロール。
   - **主要Props**: なし
-- **`PathRouterMenu`** ([`src/components/ui/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PathRouterMenu.tsx))
+- **`PathRouterMenu`** ([`src/components/ui/shell/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/PathRouterMenu.tsx))
   - **概要**: トップバーに配置されるパス計算アルゴリズム選択、パラメータ設定、自動再計算トグル用ドロップダウンメニュー。
   - **主要Props**: なし
-- **`ToolPanel`** ([`src/components/ui/ToolPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ToolPanel.tsx))
+- **`ToolPanel`** ([`src/components/ui/shell/ToolPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/ToolPanel.tsx))
   - **概要**: 画面左端に配置されるメインツール切り替えバー (Select, Add Waypoint, Export Region, Import/Export/Settings等)。
   - **主要Props**: なし
-- **`LayerPanel`** ([`src/components/ui/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/LayerPanel.tsx))
+- **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
   - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
   - **主要Props**: なし
-- **`WaypointTreePanel`** ([`src/components/ui/WaypointTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WaypointTreePanel.tsx))
+- **`WaypointTreePanel`** ([`src/components/ui/trees/WaypointTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/WaypointTreePanel.tsx))
   - **概要**: ウェイポイントツリー (`WaypointTree`) を単独でフルハイト表示する専用パネルコンポーネント。
   - **主要Props**: なし
-- **`AnnotationTreePanel`** ([`src/components/ui/AnnotationTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationTreePanel.tsx))
+- **`AnnotationTreePanel`** ([`src/components/ui/trees/AnnotationTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/AnnotationTreePanel.tsx))
   - **概要**: アノテーション一覧 (`AnnotationTree`) を単独でフルハイト表示する専用パネルコンポーネント。
   - **主要Props**: なし
-- **`ObjectsPanel`** ([`src/components/ui/ObjectsPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ObjectsPanel.tsx))
+- **`ObjectsPanel`** ([`src/components/ui/trees/ObjectsPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/ObjectsPanel.tsx))
   - **概要**: ウェイポイントツリー (`WaypointTree`) とアノテーション一覧 (`AnnotationTree`) を統合してホストするレガシー/互換用オブジェクトパネル。
   - **主要Props**: なし
-- **`WaypointTree`** ([`src/components/ui/WaypointTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WaypointTree.tsx))
+- **`WaypointTree`** ([`src/components/ui/trees/WaypointTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/WaypointTree.tsx))
   - **概要**: 全 Waypoint / ジェネレーター要素を階層表示・ドラッグ＆ドロップで並び替えるツリーペイン。Shiftキーによる範囲選択、不連続選択を含む複数ノードの一括ドラッグ並び替え（連続化配置 & DragOverlayによるスタックカード視覚表示）、右クリックコンテキストメニュー（単一/複数選択項目の一括複製・一括削除・アンカー設定・内部プロパティ表示・Explode）に対応。
   - **主要Props**: なし
-- **`AnnotationTree`** ([`src/components/ui/AnnotationTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/AnnotationTree.tsx))
+- **`AnnotationTree`** ([`src/components/ui/trees/AnnotationTree.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/AnnotationTree.tsx))
   - **概要**: アノテーションオブジェクトの一覧表示、ドラッグ＆ドロップ並び替え、可視性/ラベル表示トグル、削除、名前編集、複製、配置モード開始トリガーを提供するコンポーネント。
   - **主要Props**: なし
-- **`PropertiesPanel`** ([`src/components/ui/PropertiesPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PropertiesPanel.tsx))
+- **`PropertiesPanel`** ([`src/components/ui/properties/PropertiesPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/PropertiesPanel.tsx))
   - **概要**: 現在選択されている Waypoint またはジェネレーターの属性を編集するインスペクター右ペイン。
   - **主要Props**: なし
-- **`PluginListPanel`** ([`src/components/ui/PluginListPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PluginListPanel.tsx))
+- **`PluginListPanel`** ([`src/components/ui/plugins/PluginListPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/plugins/PluginListPanel.tsx))
   - **概要**: 利用可能なプラグイン（経路自動生成アルゴリズム）を一覧表示し、クリックで起動するサイドパネル。
   - **主要Props**: `onSelectPlugin`
-- **`PluginParamsPanel`** ([`src/components/ui/PluginParamsPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PluginParamsPanel.tsx))
+- **`PluginParamsPanel`** ([`src/components/ui/plugins/PluginParamsPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/plugins/PluginParamsPanel.tsx))
   - **概要**: 選択中プラグインの実行パラメータ設定・インタラクション入力トリガーフォーム。
   - **主要Props**: `pluginId`
-- **`PluginInputEditor`** ([`src/components/ui/PluginInputEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PluginInputEditor.tsx))
+- **`PluginInputEditor`** ([`src/components/ui/plugins/PluginInputEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/plugins/PluginInputEditor.tsx))
   - **概要**: プラグインが必要とする入力（座標 `point`、点群 `points`、領域 `rectangle`、参照 `waypoint`、アノテーション `annotation`、カスタムレイヤー `custom_layer`）の定義・編集エディタ。
   - **主要Props**: `inputDef`, `value`, `onChange`
-- **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ExportModal.tsx))
+- **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/modals/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/ExportModal.tsx))
   - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。
   - **主要Props**: `isOpen`, `onClose`
-- **`SettingsModal`** ([`src/components/ui/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/SettingsModal.tsx))
+- **`SettingsModal`** ([`src/components/ui/modals/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/SettingsModal.tsx))
   - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` の7タブを保持。
   - **主要Props**: `isOpen`, `onClose`
 - **`AppearanceTab`** ([`src/components/ui/settings/AppearanceTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/AppearanceTab.tsx))
@@ -182,28 +182,28 @@
 - **`SettingsRow`** ([`src/components/ui/settings/SettingsRow.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/SettingsRow.tsx))
   - **概要**: 左側ラベル・説明と右側コントロールを均一に配置する設定行部品。水平・垂直レイアウトをサポート。
   - **主要Props**: `label`, `labelRight`, `description`, `children`, `vertical`
-- **`PathRouterMenu`** ([`src/components/ui/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PathRouterMenu.tsx))
+- **`PathRouterMenu`** ([`src/components/ui/shell/PathRouterMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/PathRouterMenu.tsx))
   - **概要**: トップバーに常駐するパス計算・ルーター設定ポップアップメニュー。経路補間アルゴリズム（直線 / Dijkstra等）の選択、パラメータ設定、自動再計算トグル、パス色・透過度・線幅・Footprint幅同期などの表示設定を提供。
   - **主要Props**: なし
-- **`KeyboardShortcutsModal`** ([`src/components/ui/KeyboardShortcutsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/KeyboardShortcutsModal.tsx))
+- **`KeyboardShortcutsModal`** ([`src/components/ui/modals/KeyboardShortcutsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/KeyboardShortcutsModal.tsx))
   - **概要**: 定義されているショートカットキー一覧を表示するヘルプダイアログ。
   - **主要Props**: `isOpen`, `onClose`
-- **`WelcomeModal`** ([`src/components/ui/WelcomeModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WelcomeModal.tsx))
+- **`WelcomeModal`** ([`src/components/ui/modals/WelcomeModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/WelcomeModal.tsx))
   - **概要**: ツール起動時およびファイルメニューから呼び出せるプロジェクト選択・ウェルカム画面。新規作成、既存プロジェクトを開く、直近開いたプロジェクト一覧のロードを提供。
   - **主要Props**: `isOpen`, `onClose`
-- **`ThemeInjector`** ([`src/components/ui/ThemeInjector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/ThemeInjector.tsx))
+- **`ThemeInjector`** ([`src/components/ui/shell/ThemeInjector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/ThemeInjector.tsx))
   - **概要**: `themeMode`（Linear Dark / Light）、アクセントテーマ用プリセット（`themePreset`: Indigo / Emerald / Ocean / Amber / Purple / Midnight）、および Custom UI（`customUiConfig.theme`）のカラープリセット・カスタムCSS変数・`color-scheme` を DOM の `:root` に注入し、アンマウント時にクリーンアップするインジェクターコンポーネント。
   - **主要Props**: なし
-- **`WorkflowPanel`** ([`src/components/ui/WorkflowPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/WorkflowPanel.tsx))
+- **`WorkflowPanel`** ([`src/components/ui/workflow/WorkflowPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/workflow/WorkflowPanel.tsx))
   - **概要**: Custom UI モード時にステップバイステップの作業手順をガイドするワークフローパネル。各ステップのアクションボタン、簡易パラメータ、プラグイン入力フォームを表示。
   - **主要Props**: なし
-- **`CustomHtmlPanel`** ([`src/components/ui/CustomHtmlPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/CustomHtmlPanel.tsx))
+- **`CustomHtmlPanel`** ([`src/components/ui/shell/CustomHtmlPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/CustomHtmlPanel.tsx))
   - **概要**: 外部 HTML ファイルまたはインライン HTML を iframe 経由でパネル内に安全に描画し、PostMessage 経由でアプリ側アクションを呼び出すカスタムパネル。
   - **主要Props**: `tabDef`
-- **`PanelRegistry`** ([`src/components/ui/PanelRegistry.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/PanelRegistry.tsx))
+- **`PanelRegistry`** ([`src/components/ui/shell/PanelRegistry.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/PanelRegistry.tsx))
   - **概要**: パネルタブID（`project`, `inspector`, `layers`, `plugins`, `workflow`, `custom_html` 等）から対応するパネルコンポーネントを動的に解決・レンダリングするレジストリモジュール。
   - **主要Props**: なし
-- **`StatusBar`** ([`src/components/ui/StatusBar.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/StatusBar.tsx))
+- **`StatusBar`** ([`src/components/ui/shell/StatusBar.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/StatusBar.tsx))
   - **概要**: 画面最下部に常駐する高機能ステータスバー。状態機械と連動した「現在のモードバッジ」および「Escキー遷移先（Next on Esc）ボタン」、バックグラウンドタスク進捗、カーソル世界座標 (X, Y)・相対極座標・ローカル座標、挿入位置インジケータ、選択ノード数/総数カウンター、全経路長 (m)、未保存 (Dirty) インジケータ＆保存ボタン、スナップON/OFFトグル、マップ解像度 (m/px)、ズーム倍率および Fit ボタンを表示。
   - **主要Props**: なし
 

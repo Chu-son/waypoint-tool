@@ -11,10 +11,19 @@ UI関連のコンポーネントは `src/components/ui/` に配置し、役割�
 ```
 src/components/ui/
 ├── common/         # アプリ横断で使う汎用UI部品（2ファイル以上で共通利用）
+├── shell/          # TopMenu・ToolPanel・StatusBar・パネル枠などアプリの外枠
+├── modals/         # モーダルダイアログ
+├── trees/          # Waypoint / Annotation ツリー
+├── layers/         # レイヤー一覧パネル
+├── plugins/        # プラグイン一覧・パラメータ・入力エディタ
+├── overlays/       # キャンバス上のフローティング UI
+├── properties/     # Inspector（PropertiesPanel と専用部品）
 ├── settings/       # SettingsModal タブ専用コンポーネント群
-├── properties/     # PropertiesPanel 専用コンポーネント群
-└── *.tsx           # パネル、トップメニュー、モーダルなど大きな単一画面部品
+├── pipeline/       # パイプライン実行 UI
+└── workflow/       # カスタム UI ワークフロー
 ```
+
+`ui/` 直下にはファイルを置きません（配置ルールの詳細は [RULES.md §2.1](./RULES.md)）。
 
 ### 配置の判断基準
 
