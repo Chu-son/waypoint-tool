@@ -3,6 +3,7 @@ pub mod io;
 pub mod map;
 pub mod models;
 pub mod plugins;
+pub mod tiles;
 
 use tauri_plugin_window_state::StateFlags;
 
@@ -48,6 +49,7 @@ pub fn run() {
             commands::open_devtools,
             commands::load_custom_ui_config,
             commands::load_custom_ui_preset,
+            commands::fetch_map_tile,
             commands::check_python_packages,
             commands::create_virtualenv,
             commands::install_pip_packages,
