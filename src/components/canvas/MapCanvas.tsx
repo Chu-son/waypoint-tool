@@ -15,6 +15,8 @@ import { ExportRegionLayer } from './layers/ExportRegionLayer';
 import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
 import { AnnotationLayer } from './layers/AnnotationLayer';
 import { MeasureLayer } from './layers/MeasureLayer';
+import { GeoTileLayer } from './layers/GeoTileLayer';
+import { GeoAttribution } from '../ui/overlays/GeoAttribution';
 import { getAnnotationCenter } from '../../stores/slices/measureSlice';
 import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
@@ -1814,6 +1816,9 @@ export function MapCanvas() {
       <Application preserveDrawingBuffer={true} background={canvasBackgroundColor} resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
+          {/* 0. Geographic base map (OSM / satellite tiles) at the very back */}
+          <GeoTileLayer scale={scale} position={position} />
+
           {/* 1. Base Map Layers Group */}
           <pixiContainer label="map-layers-group">
             {shouldShowBlendedPreview ? (
@@ -2130,6 +2135,8 @@ export function MapCanvas() {
           {marqueeBox && <pixiGraphics draw={drawMarquee} zIndex={10000} />}
         </pixiContainer>
       </Application>
+
+      <GeoAttribution />
 
       {canvasContextMenu && (
         <CanvasContextMenu
