@@ -31,7 +31,7 @@ export function GeoMapCard() {
   const endGeoAlignDrag = useAppStore((state) => state.endGeoAlignDrag);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
 
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const basemapId = useId();
   const urlId = useId();
   const attributionId = useId();

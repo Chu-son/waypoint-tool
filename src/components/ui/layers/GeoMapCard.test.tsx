@@ -1,10 +1,19 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { renderWithStore } from '../../../test/render';
+import { renderWithStore as renderCard } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { DEFAULT_GEO_MAP } from '../../../stores/migrations/geoMapNormalization';
 import type { GeoMapSettings } from '../../../types/geo';
+import type { AppState } from '../../../stores/appStore';
+import type { ReactElement } from 'react';
 import { GeoMapCard } from './GeoMapCard';
+
+/** The settings start collapsed; most tests want them open, so expand them when the base map is on. */
+function renderWithStore(ui: ReactElement, state: Partial<AppState> = {}) {
+  const utils = renderCard(ui, state);
+  if (state.geoMap?.enabled) fireEvent.click(screen.getByRole('button', { name: 'Expand settings' }));
+  return utils;
+}
 
 const enabled = (overrides: Partial<GeoMapSettings> = {}) => ({
   geoMap: { ...DEFAULT_GEO_MAP, enabled: true, ...overrides },
@@ -18,16 +27,17 @@ describe('GeoMapCard', () => {
     expect(screen.queryByLabelText('Base map')).not.toBeInTheDocument();
   });
 
-  it('turns the base map on and reveals its settings', async () => {
+  it('turns the base map on with its settings still collapsed', async () => {
     const { user } = renderWithStore(<GeoMapCard />);
 
     await user.click(screen.getByRole('switch', { name: /show geo base map/i }));
 
     expect(getAppState().geoMap.enabled).toBe(true);
-    expect(screen.getByLabelText('Base map')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Base map')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Expand settings' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('collapses and expands the settings while the base map stays on', async () => {
+  it('expands and collapses the settings while the base map stays on', async () => {
     const { user } = renderWithStore(<GeoMapCard />, enabled());
     expect(screen.getByLabelText('Base map')).toBeInTheDocument();
 
