@@ -25,6 +25,7 @@ import {
   DEFAULT_CONDITIONAL_STYLES_ENABLED,
   migrateAndNormalizeProjectData,
 } from '../migrations/projectMigration';
+import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 import { notify, notifyError } from '../../services/notify';
 import { buildProjectData } from '../serialization/projectSerializer';
 
@@ -328,6 +329,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           conditionalStylesEnabled: data.conditional_styles_enabled,
           exportProfiles: data.export_profiles,
           activeExportProfileId: data.active_export_profile_id,
+          geoMap: data.geo_map,
           isDirty: false,
         };
       });
@@ -372,6 +374,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           conditionalStylesEnabled: DEFAULT_CONDITIONAL_STYLES_ENABLED,
           exportProfiles: DEFAULT_EXPORT_PROFILES,
           activeExportProfileId: DEFAULT_ACTIVE_EXPORT_PROFILE_ID,
+          geoMap: DEFAULT_GEO_MAP,
           exportRegions: [],
           optionsSchema: null,
           robotFootprint: DEFAULT_ROBOT_FOOTPRINT,

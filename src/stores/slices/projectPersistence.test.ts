@@ -8,6 +8,7 @@ import {
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
 } from '../migrations/projectMigration';
+import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 
 describe('projectPersistence roundtrip & strict validation', () => {
   beforeEach(() => {
@@ -121,6 +122,14 @@ describe('projectPersistence roundtrip & strict validation', () => {
         defaultNegate: 1,
       },
       default_map_opacity: 0.65,
+      geo_map: {
+        enabled: true,
+        basemapId: 'esri_imagery',
+        customBasemap: { urlTemplate: 'https://t.example/{z}/{x}/{y}.png', maxZoom: 16, attribution: 'Example' },
+        opacity: 0.4,
+        origin: { kind: 'utm', zone: 54, hemisphere: 'N', easting: 388500.5, northing: 3949000.25 },
+        alignment: { dx: 3.5, dy: -2, yawDeg: 12.5 },
+      },
       left_panel_view_mode: 'split',
       right_panel_view_mode: 'split',
       active_path_calculator_plugin_id: 'dijkstra-plugin',
@@ -200,6 +209,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'conditional_styles_enabled',
       'export_profiles',
       'active_export_profile_id',
+      'geo_map',
       'custom_ui_data',
     ];
 
@@ -221,6 +231,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.robot_footprint).toEqual(fullProjectData.robot_footprint);
     expect(saved.occupancy_settings).toEqual(fullProjectData.occupancy_settings);
     expect(saved.default_map_opacity).toBe(0.65);
+    expect(saved.geo_map).toEqual(fullProjectData.geo_map);
     expect(saved.left_panel_view_mode).toBe('split');
     expect(saved.right_panel_view_mode).toBe('split');
     expect(saved.active_path_calculator_plugin_id).toBe('dijkstra-plugin');
@@ -273,6 +284,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       index_start_index: 1,
       decimal_precision: 2,
       default_map_opacity: 0.9,
+      geo_map: { enabled: true, alignment: { dx: 5, dy: 6, yawDeg: 7 } },
       path_color: '#123456',
       auto_recalculate_path: false,
       custom_ui_data: {
@@ -286,6 +298,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(useAppStore.getState().indexStartIndex).toBe(1);
     expect(useAppStore.getState().decimalPrecision).toBe(2);
     expect(useAppStore.getState().defaultMapOpacity).toBe(0.9);
+    expect(useAppStore.getState().geoMap.enabled).toBe(true);
     expect(useAppStore.getState().autoRecalculatePath).toBe(false);
     expect(useAppStore.getState().currentStepIndex).toBe(5);
 
@@ -296,6 +309,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(state.indexStartIndex).toBe(0);
     expect(state.decimalPrecision).toBe(6);
     expect(state.defaultMapOpacity).toBe(DEFAULT_MAP_OPACITY);
+    expect(state.geoMap).toEqual(DEFAULT_GEO_MAP);
     expect(state.defaultExportFormats).toEqual(DEFAULT_EXPORT_FORMATS);
     expect(state.robotFootprint).toEqual(DEFAULT_ROBOT_FOOTPRINT);
     expect(state.occupancySettings).toEqual(DEFAULT_OCCUPANCY_SETTINGS);
@@ -395,6 +409,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       robot_footprint: DEFAULT_ROBOT_FOOTPRINT,
       occupancy_settings: DEFAULT_OCCUPANCY_SETTINGS,
       default_map_opacity: DEFAULT_MAP_OPACITY,
+      geo_map: DEFAULT_GEO_MAP,
       left_panel_view_mode: 'tabs',
       right_panel_view_mode: 'tabs',
       active_path_calculator_plugin_id: null,

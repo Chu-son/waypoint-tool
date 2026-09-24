@@ -10,6 +10,7 @@ import {
   ExportProfile,
 } from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
+import { normalizeGeoMap } from './geoMapNormalization';
 import { v4 as uuidv4 } from 'uuid';
 
 export const DEFAULT_ROBOT_FOOTPRINT: CircularFootprint = {
@@ -517,6 +518,7 @@ export function normalizeV1(raw: any): StrictProjectData {
     conditional_styles_enabled: conditionalStylesEnabled,
     export_profiles: exportProfiles,
     active_export_profile_id: activeExportProfileId,
+    geo_map: normalizeGeoMap(data.geo_map),
     custom_ui_data: customUiData,
   };
 }

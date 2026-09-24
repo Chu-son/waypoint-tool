@@ -67,6 +67,7 @@ export function buildProjectData(state: AppState): StrictProjectData {
     conditional_styles_enabled: state.conditionalStylesEnabled,
     export_profiles: state.exportProfiles,
     active_export_profile_id: state.activeExportProfileId,
+    geo_map: state.geoMap,
     custom_ui_data: {
       workflow_state: {
         current_step_index: state.currentStepIndex,
