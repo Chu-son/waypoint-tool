@@ -1,7 +1,7 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -13,6 +13,21 @@ export default defineConfig(async () => ({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
+    restoreMocks: true,
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/*.d.ts', 'src/main.tsx', 'src/types/**'],
+      reporter: ['text-summary', 'html', 'json-summary'],
+      // Ratchet: raise these as coverage improves; never lower them (docs/TESTING.md).
+      thresholds: {
+        lines: 63,
+        functions: 64,
+        branches: 55,
+        statements: 63.5,
+      },
+    },
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
@@ -29,14 +44,14 @@ export default defineConfig(async () => ({
     host: host || false,
     hmr: host
       ? {
-          protocol: "ws",
+          protocol: 'ws',
           host,
           port: 1421,
         }
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      ignored: ['**/src-tauri/**'],
     },
   },
 }));

@@ -1,9 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import type { ElementCopyField } from '../../../types/ui';
 import { Button } from '../common/Button';
 import { FieldLabel } from '../common/FieldLabel';
 import { cn } from '../../../utils/cn';
+import { Anchor } from 'lucide-react';
 
 interface ElementCopyContextMenuProps {
   field: ElementCopyField;
@@ -15,11 +16,13 @@ interface ElementCopyContextMenuProps {
 }
 
 function CopyMenuItem({
+  icon,
   label,
   value,
   isAnchor,
   onClick,
 }: {
+  icon?: React.ReactNode;
   label: string;
   value: number;
   isAnchor?: boolean;
@@ -30,12 +33,15 @@ function CopyMenuItem({
       variant="ghost"
       onClick={onClick}
       className={cn(
-        "w-full text-left justify-between px-3 py-2 hover:bg-surface-hover transition-colors",
-        isAnchor ? "text-accent-anchor" : "text-text-base"
+        'w-full text-left justify-between px-2.5 py-1.5 h-8 text-[13px] hover:bg-surface-hover transition-colors rounded-md',
+        isAnchor ? 'text-accent-anchor' : 'text-text-base',
       )}
     >
-      <span>{label}</span>
-      <span className={cn("font-mono ml-2", isAnchor ? "text-accent-anchor/80" : "text-text-muted")}>
+      <span className="flex items-center gap-1.5">
+        {icon}
+        {label}
+      </span>
+      <span className={cn('font-mono ml-2', isAnchor ? 'text-accent-anchor/80' : 'text-text-muted')}>
         {value.toFixed(4)}
       </span>
     </Button>
@@ -101,7 +107,8 @@ export function ElementCopyContextMenu({
       />
       {anchorAvailable && anchorRelValue !== undefined && (
         <CopyMenuItem
-          label="⚓ アンカー相対値でコピー"
+          icon={<Anchor size={12} className="shrink-0" />}
+          label="アンカー相対値でコピー"
           value={anchorRelValue}
           isAnchor
           onClick={() => {

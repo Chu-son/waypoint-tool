@@ -15,7 +15,7 @@ describe('API Router (index.ts)', () => {
   it('should export Tauri implementations when in Tauri environment', async () => {
     // @ts-ignore
     window.__TAURI_INTERNALS__ = {};
-    
+
     const { BackendAPI: B } = await import('./index');
     expect(B.constructor.name).toBe('TauriBackendAPI');
   });

@@ -12,7 +12,9 @@ waypoint-tool/
 │   ├── ARCHITECTURE.md        # [本ファイル] アーキテクチャガイド
 │   ├── COMPONENT_CATALOG.md   # UI・Canvasコンポーネントカタログ
 │   ├── DEVELOPMENT_GUIDE.md   # 開発者ガイド・セットアップ手順
+│   ├── TESTING.md             # テスト方針（振る舞い検証・実ストア・境界モック）
 │   ├── RULES.md               # 開発ルール・ショートカット管理
+│   ├── STATE_MACHINE.md       # 状態機械・モード遷移・選択権限仕様書
 │   ├── REQUIREMENTS.md        # システム要件定義
 │   ├── USER_GUIDE.md          # ユーザーガイド
 │   └── PLUGIN_GUIDE.md        # プラグイン開発仕様書
@@ -22,19 +24,44 @@ waypoint-tool/
 │   │   ├── canvas/            # PixiJS 描画キャンバスとレイヤー群
 │   │   ├── common/            # アプリ共通機能 (ShortcutManager 等)
 │   │   └── ui/                # UI コンポーネント (共通要素・各機能パネル)
+│   ├── hooks/                 # 再利用可能な React Hooks
+│   ├── services/              # ストア・API を組み合わせるユースケース
 │   ├── stores/                # Zustand 状態管理 (Slices 構成)
+│   ├── test/                  # テスト共通基盤 (ストアリセット・fixtures・PixiJS モック)
 │   ├── types/                 # TypeScript 型定義
-│   └── utils/                 # 座標変換・幾何計算などのユーティリティ
+│   └── utils/                 # 座標変換・幾何計算などの純粋関数
 ├── src-tauri/                 # バックエンド (Rust / Tauri Core)
 │   └── src/
 │       ├── commands/          # Tauri IPC コマンド群
 │       ├── io/                # ファイル読み書き (YAML/JSON エクスポート等)
 │       ├── map/               # Map / PGM データ処理
 │       ├── models/            # データ構造定義
-│       └── plugins/           # 外部プラグイン (Python/WASM) プロセス実行・通信
+│       ├── plugins/           # 外部プラグイン (Python/WASM) プロセス実行・通信
+│       └── tiles.rs           # 背景地図タイルの取得とディスクキャッシュ
 └── python_sdk/                # プラグイン用 Python SDK & 標準ジェネレータープラグイン
     └── wpt_plugin/            # 幾何計算・通信用 SDK パッケージ
 ```
+
+### 1.1 フロントエンドの依存方向（層規約）
+
+`src/` 配下のモジュールは、以下の **一方向** にのみ依存できます（左が下位層）。上位層から下位層への import のみ許可し、逆方向・循環参照は禁止です。
+
+```
+types  ←  utils  ←  api  ←  services  ←  stores  ←  hooks  ←  components
+```
+
+| 層 | 役割 | 依存してはならないもの |
+|---|---|---|
+| `types/` | ドメイン型・永続化型 | 他のすべての層（型の再エクスポートも含む） |
+| `utils/` | **純粋関数**（幾何計算・ツリー操作・変換） | `stores/`, `components/`, React。DOM / PixiJS に依存する処理は `components/canvas/` 側へ置く |
+| `api/` | Tauri IPC・ダイアログのアダプタ（本番実装 / Mock 実装） | `stores/`, `components/` |
+| `services/` | ストアや API を組み合わせるユースケース（例：破棄確認ガード、ワークフローアクション） | `components/` |
+| `stores/` | Zustand スライス・マイグレーション | `components/` |
+| `hooks/` | 再利用可能な React Hooks | — |
+| `components/` | UI・Canvas | `@tauri-apps/*` の直接 import（必ず `src/api` を経由） |
+
+- slice から `AppState` を参照する際は `import type` を使い、実行時の循環を作らない。
+- これらの規約は ESLint（`no-restricted-imports`, `import-x/no-cycle`）で検出します。既存違反は warning として残っており、リファクタリングで順次解消します。
 
 ---
 
@@ -98,6 +125,8 @@ graph TD
    - プロジェクトファイル（`.wptroj`）読み込み時の `projectMigration.ts`、およびブラウザローカルストレージ設定（`waypoint-tool-storage`）復元時の `storageMigration.ts` を統括します。
    - 外部入力（旧バージョン形式、未定義プロパティ、キー名揺れ等）をエントリポイント境界で即座に検知し、最新の厳格なスキーマへと完全正規化・デフォルト値補完を実施します。
    - これにより、内部スライスやコンポーネント内に互換フォールバック（`||` や `??`）を散乱させないクリーンアーキテクチャを実現します。
+   - 保存時のデータ構築（ストア → `StrictProjectData`）は `src/stores/serialization/projectSerializer.ts`（`buildProjectData`）が担います。
+   - ノード／アノテーション共通の子リスト操作（削除・挿入）は純粋関数 `src/utils/treeOps.ts`（`detachFromTree` / `insertIntoTree`）に集約されています。
 
 5. **バックエンド (Tauri / Rust Core)**:
    - ファイルシステムの直接アクセス、Handlebars テンプレートによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
@@ -113,9 +142,12 @@ graph TD
 - **`mapSlice.ts`**: ロード済みマップレイヤー情報、解像度、原点座標、不透明度、アクティブマップ設定、フットプリント全体表示トグル (`showFootprints`)。
 - **`nodeSlice.ts`**: Waypoint ノードおよびジェネレーターノードの追加・削除・編集・一括操作・Undo/Redo。
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
-- **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。
-- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
-- **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、アクティブパネル、モーダル表示状態、ズーム/パン位置。
+- **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
+- **`pathCalculatorSlice.ts`**: 経路計算プラグイン（障害物回避ルーティング等）の選択・パラメータ・計算結果、デバウンス付き再計算 (`recalculatePath`)。
+- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
+- **`interactionSlice.ts`**: 状態機械および対話管理（10種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
+- **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、サイドバーパネルの自由ドッキング配置構造（`panelLayout`：左/右パネル所属タブ一覧・並び替え・相互移動・永続化）、アクティブタブ（`activateTab`）、モーダル表示状態、ズーム/パン位置。
+- **`geoMapSlice.ts`**: 背景地図（OSM / 衛星画像）の設定 `geoMap`（有効/無効、ベースマップ ID とカスタム URL、不透明度、ワールド原点の地理座標、位置合わせ `alignment`）と、ドラッグ／数値入力による位置合わせの編集セッション（`beginGeoAlignDrag` → `updateGeoAlignDrag` → `endGeoAlignDrag` / `cancelGeoAlignDrag`）。位置合わせは Undo 履歴に含まれ、1 セッションが Undo 1 回になる。プロジェクトファイルの `geo_map` に保存し、読込時は `migrations/geoMapNormalization.ts` で検証・補完する。
 - **`historySlice.ts`**: 履歴スタック管理（Undo / Redo、トランザクション、`pushHistorySnapshot` による原子的履歴記録）。
 - **`workflowSlice.ts`**: ワークフローステップ管理（動的UIでのステップ進行、ステップ実行状態・変数の追跡）。
 - **`customUiSlice.ts`**: 動的UI定義（プリセット検出、カスタムUI設定ロード、レイアウトオーバーライド）。
@@ -152,8 +184,101 @@ graph TD
 - ROS のマップ原点 `origin: [x, y, yaw]` に対し、世界座標 $(x_w, y_w)$ とピクセル座標 $(c, r)$ の相互変換は、必ず $Yaw$ 回転行列 $R(\theta)$ を含む 2D 剛体変換式を一貫適用する。
 - フロントエンドの描画・ラスタライズと、Rust バックエンド（`blending.rs` 等）の双方でこの数学的変換式を統一する。
 
+### 5.3.1 背景地図の座標変換規約 (Geo Base Map Transform)
+- 緯度経度 ⇔ ワールド座標の変換は `src/utils/geo/geoTransform.ts` に集約する。ワールド座標 = R(yaw)·(UTM − 原点のUTM) + (dx, dy)（X 右 / Y 上、m）。回転行列は 5.3 のマップ原点と同じ向き（反時計回りが正）。
+- UTM は必ず原点と同じゾーン・半球に固定して計算する（ゾーン境界をまたいでも連続に扱うため）。UTM の縮尺係数 (0.9996) は無視して m をそのままワールドの m とみなす。
+- タイルの配置は、タイル左上・右上・左下の 3 隅をワールド座標へ写して Sprite の位置・回転・スケールを求める（Web Mercator と UTM はどちらも等角なので、タイル 1 枚の範囲では相似変換として扱える）。
+- 背景地図は `MapCanvas` のワールドコンテナ内で最背面（`map-layers-group` より前）に描画する。タイルの取得は `BackendAPI.fetchMapTile` → Rust `tiles.rs` が担い、フロント側は `canvas/utils/tileCache.ts`（同時取得数の制限・LRU・失敗時の再試行間隔）で保持する。
+
 ### 5.4 ツリー変形時の挿入境界射影規約 (Adjacent Boundary Projection Standard)
 - ツリー変形（ノード削除、Group作成・解除、ノード移動、複製等）を行うすべての Store アクションは、直前ノードに基づく共通写像関数 `mapInsertionTarget`（`src/utils/treeUtils.ts`）を介して `insertionTarget` を安全に追従・更新しなければならない。
 - 複数ノードの追加はループによる個別 `addNode` 呼び出しを禁止し、単一トランザクション・単一履歴スナップショットで完結する `addNodes` 一括登録 API を使用すること。
 
+---
 
+## 6. 状態遷移および対話アーキテクチャ (State Machine & Interaction Architecture)
+
+複雑なツールモードや過渡操作の競合を防ぐため、本アプリケーションは状態機械（State Machine）を中心に設計されています。
+ユーザー操作（Action）、状態機械コア（State）、および画面UI表示（View）が3層で協調し、Single Source of Truth に基づく決定論的な振る舞いを保証します。
+
+詳細な設計仕様、直交5軸の定義、ウェイポイント操作モデル、UI表示マトリクス、完全な状態遷移マトリクス、Mermaid状態遷移図、および不変条件カタログについては、公式仕様書 📖 **[docs/STATE_MACHINE.md](./STATE_MACHINE.md)** を参照してください。
+
+### 6.1 「状態（State）× 操作（Action）× UI表示（View）」の3層協調アーキテクチャ
+
+```mermaid
+graph TD
+    subgraph UserInput ["1. ユーザー操作 (User Input)"]
+        UI_Key["キーボード (P, V, Esc, Del, Tab, 0-9)"]
+        UI_Mouse["マウス / ポインタ (Click, Drag, Shift+Drag)"]
+        UI_TreeBtn["ツリーボタン (+, 削除, 目アイコン)"]
+    end
+
+    subgraph StateCore ["2. 状態機械コア (State Machine Core)"]
+        Axis_Mode["プライマリモード (AppModeState: 10種)<br>【入力解釈の前提ルール】"]
+        Axis_Sel["選択権限 (ActiveSelection: 単一真実源)<br>【操作対象の排他的特定】"]
+        Axis_Gest["キャンバス過渡ジェスチャー (Transient Gesture)<br>【PointerDown〜Upの短命状態】"]
+        Axis_Hist["履歴トランザクション (HistorySnapshot)<br>【Undo/Redo & ロールバック】"]
+    end
+
+    subgraph ViewPresentation ["3. 画面UI表示 (View Presentation)"]
+        V_Canvas["中央キャンバス (MapCanvas)<br>・カーソル形状 / ノード選択枠<br>・スナップ補助線 / 矩形選択オーバーレイ"]
+        V_Left["左ペイン (Objects / Layers)<br>・ツリー選択ハイライト<br>・点滅する挿入バー (InsertionTarget)"]
+        V_Right["右ペイン (Inspector)<br>・単一/複数ノード設定<br>・アノテーション / レイヤー設定"]
+        V_Status["下部ステータスバー (StatusBar)<br>・モード名 / カーソル世界座標 / 選択数"]
+    end
+
+    UI_Key -->|Shortcut / Key Event| Axis_Mode
+    UI_Mouse -->|Pointer Event| Axis_Gest
+    UI_TreeBtn -->|Command Action| Axis_Sel
+
+    Axis_Mode -->|解釈規則の決定| Axis_Gest
+    Axis_Gest -->|確定 / ロールバック| Axis_Hist
+    Axis_Gest -->|選択ノード特定| Axis_Sel
+
+    Axis_Mode -. モード通知 .-> V_Canvas
+    Axis_Mode -. ツール名表示 .-> V_Status
+    Axis_Sel -->|属性バインド| V_Right
+    Axis_Sel -->|ハイライト更新| V_Left
+    Axis_Sel -->|選択枠描画| V_Canvas
+    Axis_Gest -->|ラバーバンド / スナップ描画| V_Canvas
+```
+
+### 6.2 画面レイアウトと各UI領域の表示責務マップ (UI Presentation Layout)
+
+```mermaid
+graph TB
+    subgraph AppWindow ["ROS Waypoint Tool メイン画面"]
+        TopBar["上部バー: TopMenu & ToolPanel<br>【モード切替アイコン (Select/Add/Annot/Layer)、Undo/Redo、Save】"]
+        
+        subgraph MiddleArea ["中央ワークスペース (Split Pane)"]
+            LeftPane["左ペイン: ObjectsPanel / LayerPanel<br>・Objects タブ: 階層ツリー、選択ハイライト、挿入バー (青いライン)<br>・Layers タブ: マップ/レイヤー一覧、アノテーション一覧、可視性"]
+            CenterCanvas["中央キャンバス: MapCanvas (PixiJS)<br>・背景マップ / ウェイポイントノード / パスライン<br>・カーソル形状 (矢印 / 十字 / ハンドル)<br>・スナップ補助線 / 矩形選択オーバーレイ枠"]
+            RightPane["右ペイン: Inspector (PanelRegistry)<br>・未選択: ProjectPropertiesPanel (ロボット寸法・設定)<br>・ノード選択: PropertiesPanel (座標X/Y/Z/Yaw, Anchor)<br>・アノテーション: AnnotationInspector (色・寸法・頂点)<br>・レイヤー: CustomLayerInspector (ブラシサイズ・黒白値)<br>・プラグイン: PluginParamsPanel (引数UI)"]
+        end
+        
+        BottomBar["下部バー: StatusBar<br>【現在のモード名 (Select/Add/Edit)、マウス世界座標、選択ノード数、直前基準ノード】"]
+    end
+
+    TopBar -->|ツール選択| CenterCanvas
+    LeftPane -->|ツリー選択| RightPane
+    CenterCanvas -->|クリック / ドラッグ選択| RightPane
+    CenterCanvas -->|クリック / ドラッグ選択| LeftPane
+    CenterCanvas -->|マウス移動| BottomBar
+```
+
+### 6.3 コアコンセプトの要約
+1. **5つの直交状態軸**:
+   - `Modal Stack`（最上位モーダル）
+   - `DOM Text Focus`（文字入力専有）
+   - `Primary Tool Mode`（10種の完全排他モード `AppModeState`）
+   - `Canvas Transient Gestures`（短命ドラッグ・描画操作）
+   - `Selection Authority`（単一真実源 `ActiveSelection`）
+2. **4フェーズ同期ライフサイクルパイプライン**:
+   - `transitionToMode` 単一チョークポイントにおいて、`Phase 1: Guard` → `Phase 2: OnExit（過渡アボート強制ロールバック・同期リスナー通知）` → `Phase 3: State Mutation（状態更新・非互換選択クリア）` → `Phase 4: OnEnter（新モード初期化・同期リスナー通知）` を決定論的に実行。
+3. **委譲型過渡アボートとポインタ喪失保護 (Inversion of Control)**:
+   - ストアはキャンバスの具体実装を知らず、`registerCanvasAbortHandler` 経由で登録された破棄関数を呼ぶのみの疎結合構造。
+   - キャンバスは `pointercancel`, `lostpointercapture`, `window.blur` を監視し、OS/ブラウザレベルでのポインタ喪失時にも即座に安全なロールバックを実行。
+4. **階層型エスケープ・パイプライン**:
+   - `Tier 1（最前面モーダル）` → `Tier 2（入力フォーカス）` → `Tier 3（過渡ジェスチャーロールバック）` → `Tier 4（スナップ精密入力クリア）` → `Tier 5（選択解除）` → `Tier 6（モード復帰）` → `Tier 7（アイドル）` の順序律で段階的にキャンセルを実行。
+5. **決定論的 Inspector 解決**:
+   - モードと `ActiveSelection` に基づき、右ペインに表示すべき Inspector を一意かつ決定論的にルーティング（純粋関数解決）。

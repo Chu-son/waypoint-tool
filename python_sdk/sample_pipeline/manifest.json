@@ -1,0 +1,44 @@
+{
+  "name": "Noise Filtered Sweep Pipeline",
+  "version": "1.0.0",
+  "type": "pipeline",
+  "description": "走査矩形領域に対してモルフォロジーノイズ除去（Opening/Closing）を実行した後に、ジグザグ走査カバレッジ経路を生成する公式サンプルパイプラインです。",
+  "pipeline": {
+    "steps": [
+      {
+        "step_id": "filter_step",
+        "plugin_id": "noise_filter_layer_generator",
+        "name": "Noise Filter Preprocessing",
+        "bindings": {},
+        "property_overrides": {
+          "mode": "remove_obstacles",
+          "noise_size": 0.15,
+          "layer_name": "Pipeline Filter Mask"
+        },
+        "exports": {
+          "custom_layers": true,
+          "waypoints": false,
+          "annotations": false
+        }
+      },
+      {
+        "step_id": "sweep_step",
+        "plugin_id": "rect_search_generator",
+        "name": "Generate Sweep Route",
+        "bindings": {
+          "sweep_rect": "$steps.filter_step.inputs.roi_region"
+        },
+        "property_overrides": {
+          "num_lines": 6,
+          "start_corner": "Bottom-Left",
+          "sweep_direction": "Horizontal"
+        },
+        "exports": {
+          "custom_layers": false,
+          "waypoints": true,
+          "annotations": false
+        }
+      }
+    ]
+  }
+}

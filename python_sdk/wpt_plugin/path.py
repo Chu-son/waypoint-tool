@@ -9,7 +9,7 @@ import heapq
 import traceback
 from typing import Dict, Any, List, Optional, Tuple
 
-from .core import PluginBase
+from .core import PluginBase, load_context_from_stdin, emit_output_to_stdout
 from .geometry import Point
 from .occupancy_grid import OccupancyGrid
 from .footprint import RobotFootprint
@@ -333,12 +333,11 @@ class PathCalculator(PluginBase):
     def run_from_stdin(self):
         """標準入出力 (stdin / stdout) 通信ループ。"""
         try:
-            input_data = sys.stdin.read()
-            if not input_data.strip():
-                print(json.dumps({"segments": []}))
+            context = load_context_from_stdin()
+            if context is None:
+                emit_output_to_stdout({"segments": []})
                 return
 
-            context = json.loads(input_data)
             segments = self.calculate_path(context)
 
             # JSON シリアライズ: segments: [ [ { x, y }, ... ], ... ]
@@ -355,7 +354,7 @@ class PathCalculator(PluginBase):
             output = {
                 "segments": serialized_segments
             }
-            print(json.dumps(output))
+            emit_output_to_stdout(output)
 
         except Exception:
             print(traceback.format_exc(), file=sys.stderr)

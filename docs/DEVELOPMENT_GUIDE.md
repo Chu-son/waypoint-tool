@@ -45,15 +45,28 @@ npm run tauri dev
 ## 4. テスト指針 (Testing)
 
 ### フロントエンド (Vitest)
-ロジックやコンポーネントの振る舞いをテストします。
+ロジックやコンポーネントの **振る舞い** をテストします。書き方・モック方針・共通ヘルパーは 📖 [TESTING.md](./TESTING.md) を必ず参照してください。
 ```bash
-npm run test
+npm run test           # 型チェック + 全テスト
+npm run test:coverage  # カバレッジ付き（閾値あり）
 ```
 - `*.test.ts` / `*.test.tsx` を同じディレクトリに作成。
+- ストアはモックせず実物を使う（`src/test/` のヘルパーを利用）。
+
+### 静的解析・フォーマット
+```bash
+npm run lint           # ESLint（層ルール・循環参照・Hooks 規約）
+npm run format         # Prettier で整形
+npm run check          # typecheck + lint + format:check + test:coverage（CI と同じ内容）
+```
+- CI（`.github/workflows/ci.yml`）で PR ごとに上記と Rust の `cargo fmt --check` / `cargo clippy -D warnings` / `cargo test` を実行します。リリースビルドは `.github/workflows/release.yml`（タグ push）が担当します（[バージョン管理とリリース](#バージョン管理とリリース) 参照）。
+- 一括整形コミットは `.git-blame-ignore-revs` に登録済みです（`git config blame.ignoreRevsFile .git-blame-ignore-revs`）。
 
 ### バックエンド (Rust)
 ```bash
 cd src-tauri
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 - 各モジュールの末尾にある `#[cfg(test)]` ブロックに記述。
@@ -69,6 +82,45 @@ python3 -m unittest discover tests
 2. `feature/` または `fix/` ブロックでブランチを作成。
 3. 命名規則とテスト指針に従って実装。
 4. プルリクエストを作成し、レビューを受ける。
+
+### バージョン管理とリリース
+
+#### アプリ本体のバージョン
+
+アプリのバージョンの正（Single Source of Truth）は **`package.json` の `version`** です。以下は `npm run version:bump` で同期されます。
+
+| ファイル | 備考 |
+|---|---|
+| `package.json` | 正。`src-tauri/tauri.conf.json` の `version` は `"../package.json"` でこれを参照（インストーラ名・About 表示に反映） |
+| `package-lock.json` | 2 箇所（ルートと `packages[""]`） |
+| `src-tauri/Cargo.toml` / `Cargo.lock` | `CARGO_PKG_VERSION`（タイル取得の User-Agent）に使用 |
+
+```bash
+npm run version:bump -- 0.1.0   # 上記をまとめて更新
+npm run version:check           # ファイル間の一致を検証（不一致なら exit 1）
+npm run version:check v0.1.0    # タグ名との一致も検証
+```
+
+- SemVer（`X.Y.Z`）。1.0 未満は機能追加で MINOR、修正で PATCH を上げる。プレリリースは `0.2.0-rc.1` のようにハイフン付き。
+- 手で個別のファイルのバージョンを書き換えず、必ずスクリプトを使うこと。
+
+#### 独立してバージョニングするもの（アプリ版とは連動させない）
+
+| 対象 | 場所 | 上げるタイミング |
+|---|---|---|
+| Python SDK | `python_sdk/wpt_plugin/__init__.py` の `__version__` | SDK の公開 API を変更したとき（同梱 SDK との差分表示に使用） |
+| 各プラグイン | 各 `manifest.json`（Rust プラグインは `Cargo.toml` も） | そのプラグインを変更したとき（依存解決 `dependencyResolver.ts` が参照） |
+| プロジェクトファイル形式 | `projectSerializer.ts` の `version`（整数） | 保存形式に後方互換のない変更をしたとき。※現状、読込時の検査・マイグレーションは未実装 |
+| クリップボード形式 | `mapElementClipboard.ts` の `MAP_ELEMENT_CLIPBOARD_VERSION` | 内部形式を非互換に変更したとき |
+
+#### リリース手順
+
+1. `develop` で `npm run version:bump -- X.Y.Z` を実行し、PR で `main` へマージ。
+2. `main` で `git tag vX.Y.Z && git push origin vX.Y.Z`。
+3. `.github/workflows/release.yml` が起動し、タグと各ファイルのバージョン一致を検証したうえで Windows（`.msi` / NSIS `.exe`）と Ubuntu（`.deb` / `.AppImage` / `.rpm`）をビルドし、**ドラフト** Release に添付する。
+4. GitHub の Releases でドラフトの内容を確認して Publish する。ハイフン付きタグは prerelease として作成される。
+
+Actions タブから `workflow_dispatch` で手動実行することもできる（ファイル間の一致のみ検証し、ドラフト Release `vX.Y.Z` を作成）。コード署名は行っていないため、Windows では SmartScreen の警告が表示される。
 
 ## 6. キャンバスイベントの取り扱い (PixiJS & React)
 

@@ -1,19 +1,23 @@
-import { IDialogAPI, OpenDialogOptions, SaveDialogOptions } from '../types';
+/* eslint-disable no-alert -- browser stand-ins for the native dialogs */
+import { IDialogAPI, MessageDialogOptions, OpenDialogOptions, SaveDialogOptions } from '../types';
 
 export class MockDialogAPI implements IDialogAPI {
   async open(options?: OpenDialogOptions): Promise<string | string[] | null> {
     console.log('[Mock Dialog] open dialog called with options:', options);
-    
+
     if (options?.directory) {
       const defaultPath = window.prompt('Select a directory (mock):', '/mock/path/to/dir');
       return defaultPath || null;
     }
-    
+
     if (options?.multiple) {
-      const defaultPath = window.prompt('Select multiple files (mock, comma separated):', '/mock/file1.yaml,/mock/file2.yaml');
+      const defaultPath = window.prompt(
+        'Select multiple files (mock, comma separated):',
+        '/mock/file1.yaml,/mock/file2.yaml',
+      );
       return defaultPath ? defaultPath.split(',') : null;
     }
-    
+
     const defaultPath = window.prompt('Select a file (mock):', '/mock/path/to/file.yaml');
     return defaultPath || null;
   }
@@ -27,5 +31,10 @@ export class MockDialogAPI implements IDialogAPI {
   async ask(message: string, options?: any): Promise<boolean> {
     console.log('[Mock Dialog] ask dialog called:', message, options);
     return window.confirm(`[Mock Ask]\n${message}`);
+  }
+
+  async message(message: string, options?: MessageDialogOptions): Promise<void> {
+    console.log('[Mock Dialog] message dialog called:', message, options);
+    window.alert(message);
   }
 }

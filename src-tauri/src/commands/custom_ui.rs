@@ -1,7 +1,7 @@
-use tauri::{command, AppHandle, Manager};
+use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
-use serde_json::Value;
+use tauri::{command, AppHandle, Manager};
 
 pub fn find_file_in_search_paths(app: &AppHandle, filename: &str) -> Option<PathBuf> {
     // 1. Check user config dir (~/.config/waypoint-tool/<filename>)
@@ -114,9 +114,9 @@ pub fn load_custom_ui_preset(app: AppHandle) -> Result<Option<Value>, String> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::Value;
     use std::fs;
     use tempfile::TempDir;
-    use serde_json::Value;
 
     #[test]
     fn test_parse_custom_ui_config_valid() {

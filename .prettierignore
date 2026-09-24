@@ -1,0 +1,12 @@
+dist/
+coverage/
+node_modules/
+src-tauri/
+rust_plugins/
+python_sdk/
+public/
+docs/
+schema/
+examples/
+package-lock.json
+*.md

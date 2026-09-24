@@ -1,7 +1,21 @@
-use tauri::{command, AppHandle};
-use std::fs;
+use crate::{io, map};
 use base64::{engine::general_purpose, Engine as _};
-use crate::{map, io};
+use std::fs;
+use tauri::{command, AppHandle, Manager};
+
+pub mod export_pipeline;
+
+#[command]
+pub fn check_export_conflicts(files: Vec<String>) -> Vec<String> {
+    export_pipeline::check_export_conflicts(files)
+}
+
+#[command]
+pub fn execute_export_package(
+    options: export_pipeline::ExportPackageOptions,
+) -> Result<export_pipeline::ExportResultSummary, String> {
+    export_pipeline::execute_export_package(options)
+}
 
 #[command]
 pub fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
@@ -34,7 +48,12 @@ pub fn load_options_schema(yaml_path: String) -> Result<crate::models::options::
 }
 
 #[command]
-pub fn export_waypoints(path: String, waypoints: Vec<serde_json::Value>, template: Option<String>, image_data_b64: Option<String>) -> Result<(), String> {
+pub fn export_waypoints(
+    path: String,
+    waypoints: Vec<serde_json::Value>,
+    template: Option<String>,
+    image_data_b64: Option<String>,
+) -> Result<(), String> {
     io::export_waypoints(&path, waypoints, template, image_data_b64)
 }
 
@@ -51,7 +70,7 @@ pub fn infer_import_mapping(template: String) -> Result<serde_json::Value, Strin
 #[command]
 pub fn read_image_base64(path: String) -> Result<String, String> {
     let bytes = fs::read(&path).map_err(|e| format!("Failed to read image file: {}", e))?;
-    
+
     // Determine mime type from extension
     let mime_type = match std::path::Path::new(&path)
         .extension()
@@ -66,7 +85,7 @@ pub fn read_image_base64(path: String) -> Result<String, String> {
         Some("webp") => "image/webp",
         _ => "application/octet-stream",
     };
-    
+
     let base64_str = general_purpose::STANDARD.encode(&bytes);
     Ok(format!("data:{};base64,{}", mime_type, base64_str))
 }
@@ -86,6 +105,21 @@ pub use plugins::*;
 
 pub mod custom_ui;
 pub use custom_ui::*;
+
+pub mod venv;
+pub use venv::*;
+
+/// 背景地図タイルを取得（キャッシュ優先）し、`data:` URL として返す。
+#[command]
+pub async fn fetch_map_tile(app: AppHandle, url: String) -> Result<String, String> {
+    let cache_root = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = crate::tiles::fetch_cached(&cache_root, &url, crate::tiles::http_get)?;
+        crate::tiles::to_data_url(&bytes)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[command]
 pub fn force_exit(app: AppHandle) {
@@ -112,9 +146,11 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         read_text_file,
         write_text_file,
         force_exit,
+        fetch_map_tile,
         plugins::fetch_installed_plugins,
         plugins::run_plugin,
         plugins::scan_custom_plugin,
+        plugins::scan_custom_plugins,
         plugins::get_python_environments,
         plugins::scaffold_plugin,
         plugins::check_sdk_version,
@@ -122,7 +158,12 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         read_image_base64,
         open_devtools,
         load_custom_ui_config,
-        load_custom_ui_preset
+        load_custom_ui_preset,
+        venv::check_python_packages,
+        venv::create_virtualenv,
+        venv::install_pip_packages,
+        check_export_conflicts,
+        execute_export_package
     ]
 }
 

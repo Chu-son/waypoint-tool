@@ -11,10 +11,19 @@ UI関連のコンポーネントは `src/components/ui/` に配置し、役割�
 ```
 src/components/ui/
 ├── common/         # アプリ横断で使う汎用UI部品（2ファイル以上で共通利用）
+├── shell/          # TopMenu・ToolPanel・StatusBar・パネル枠などアプリの外枠
+├── modals/         # モーダルダイアログ
+├── trees/          # Waypoint / Annotation ツリー
+├── layers/         # レイヤー一覧パネル
+├── plugins/        # プラグイン一覧・パラメータ・入力エディタ
+├── overlays/       # キャンバス上のフローティング UI
+├── properties/     # Inspector（PropertiesPanel と専用部品）
 ├── settings/       # SettingsModal タブ専用コンポーネント群
-├── properties/     # PropertiesPanel 専用コンポーネント群
-└── *.tsx           # パネル、トップメニュー、モーダルなど大きな単一画面部品
+├── pipeline/       # パイプライン実行 UI
+└── workflow/       # カスタム UI ワークフロー
 ```
+
+`ui/` 直下にはファイルを置きません（配置ルールの詳細は [RULES.md §2.1](./RULES.md)）。
 
 ### 配置の判断基準
 
@@ -37,7 +46,7 @@ Tailwind CSSのクラス文字列を直接JSXに長く書くことは、可読�
 
 ```tsx
 // ❌ 禁止: 長いインラインクラス（可読性が低く、再利用できない）
-<div className="bg-surface-panel/40 backdrop-blur-sm border border-border-base/30 rounded-2xl p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative">
+<div className="bg-surface-panel/40 backdrop-blur-sm border border-border-base/30 rounded-lg p-4 shadow-subtle hover:border-border-base/60 transition-all group overflow-hidden relative">
 
 // ✅ 推奨: 意味を持つコンポーネントに切り出す、あるいは適切なラッパーを使用する
 <LayerCard> ... </LayerCard>
@@ -52,35 +61,95 @@ Tailwind CSSのクラス文字列を直接JSXに長く書くことは、可読�
 
 必ず以下の対応表に基づき、セマンティックなデザイントークンを使用してください。
 
-### カラートークン対応表
+### カラートークン対応表 (Dark & Light)
 
-| 用途 | ✅ デザイントークン | ❌ Raw Tailwind（禁止例） |
-|---|---|---|
-| 基本テキスト | `text-text-base` | `text-slate-200`, `text-white` |
-| サブテキスト・ラベル | `text-text-muted` | `text-slate-400`, `text-gray-400` |
-| 反転テキスト (ボタン等) | `text-text-inverse` | `text-white`, `text-black` |
-| 背景（パネル） | `bg-surface-panel` | `bg-slate-800`, `bg-gray-800` |
-| 背景（ベース） | `bg-surface-base` | `bg-slate-900` |
-| ホバー背景 | `bg-surface-hover` | `bg-slate-700` |
-| ボーダー | `border-border-base` | `border-slate-700`, `border-slate-800` |
-| フォーカス枠線 | `border-border-focus` | `border-blue-500` |
-| プライマリカラー | `text-primary-base`, `bg-primary-base` | `text-blue-500`, `bg-blue-600` |
-| プライマリホバー | `bg-primary-hover` | `bg-blue-700` |
-| プライマリ半透明 | `bg-primary-base/10`, `bg-primary-base/20` | `bg-blue-900/50` |
-| 危険操作（削除等） | `text-danger-base`, `bg-danger-base` | `text-red-500` |
-| アンカー・グループ | `text-accent-anchor`, `bg-accent-anchor` | `text-amber-400`, `bg-amber-950/20` |
-| プラグイン・生成ノード | `text-accent-generator`, `bg-accent-generator` | `text-emerald-400`, `bg-emerald-500/20` |
-| リファレンスレイヤー | `text-accent-reference`, `bg-accent-reference` | `text-purple-400`, `bg-purple-500/20` |
-| 自動化・スクリプト | `text-accent-automation`, `bg-accent-automation` | `text-cyan-400`, `bg-cyan-500/20` |
-| 成功ステータス | `text-status-success`, `bg-status-success` | `text-emerald-500` |
-| 警告ステータス | `text-status-warning`, `bg-status-warning` | `text-amber-500` |
-| 占有グリッド (Free) | `text-occupancy-free`, `bg-occupancy-free` | `text-emerald-400` |
-| 占有グリッド (Obstacle) | `text-occupancy-obstacle`, `bg-occupancy-obstacle` | `text-rose-400` |
-| 占有グリッド (Unknown) | `text-occupancy-unknown`, `bg-occupancy-unknown` | `text-purple-400` |
+| 用途 | ✅ デザイントークン | Linear Dark 値 | Linear Light 値 | ❌ Raw Tailwind（禁止例） |
+|---|---|---|---|---|
+| 基本テキスト | `text-text-base` | `#f7f8f8` | `#17171a` (Deep Charcoal) | `text-slate-200`, `text-white` |
+| サブテキスト・ラベル | `text-text-muted` | `#8a8f98` | `#686b74` (Medium Grey) | `text-slate-400`, `text-gray-400` |
+| 反転テキスト (ボタン等) | `text-text-inverse` | `#ffffff` | `#ffffff` | `text-black` |
+| 背景（ベース/キャンバス） | `bg-surface-base` | `#090a0c` (Charcoal Black) | `#f7f8f9` (Off-white) | `bg-slate-900` |
+| 背景（パネル/モーダル） | `bg-surface-panel` | `#121316` (Deep Charcoal) | `#ffffff` (Pure White) | `bg-slate-800`, `bg-gray-800` |
+| ホバー背景 | `bg-surface-hover` | `rgba(255, 255, 255, 0.05)` | `#f0f1f4` (`rgba(0,0,0,0.04)`) | `bg-slate-700` |
+| ボーダー | `border-border-base` | `rgba(255, 255, 255, 0.08)` | `#e2e4e8` (`rgba(0,0,0,0.08)`) | `border-slate-700`, `border-slate-800` |
+| フォーカス枠線 | `border-border-focus` | `#5e6ad2` | `#5e6ad2` | `border-blue-500` |
+| プライマリカラー | `text-primary-base`, `bg-primary-base` | `#5e6ad2` (Linear Indigo) | `#5e6ad2` (Linear Indigo) | `text-blue-500`, `bg-blue-600` |
+| プライマリホバー | `bg-primary-hover` | `#6f7be8` (明るく) | `#4b55c0` (深く・暗く) | `bg-blue-700` |
+| プライマリ半透明 | `bg-primary-base/10`, `bg-primary-base/20` | `rgba(94, 106, 210, 0.1~0.2)` | `rgba(94, 106, 210, 0.1~0.2)` | `bg-blue-900/50` |
+| 危険操作（削除等） | `text-danger-base`, `bg-danger-base` | `#b91c1c` / `#ef4444` | `#dc2626` | `text-red-500` |
+| アンカー・グループ | `text-accent-anchor`, `bg-accent-anchor` | `#fbbf24` | `#d97706` | `text-amber-400`, `bg-amber-950/20` |
+| プラグイン・生成ノード | `text-accent-generator`, `bg-accent-generator` | `#34d399` | `#059669` | `text-emerald-400`, `bg-emerald-500/20` |
+| リファレンスレイヤー | `text-accent-reference`, `bg-accent-reference` | `#c084fc` | `#7c3aed` | `text-purple-400`, `bg-purple-500/20` |
+| 自動化・スクリプト | `text-accent-automation`, `bg-accent-automation` | `#22d3ee` | `#0891b2` | `text-cyan-400`, `bg-cyan-500/20` |
+| 成功ステータス | `text-status-success`, `bg-status-success` | `#10b981` | `#16a34a` | `text-emerald-500` |
+| 警告ステータス | `text-status-warning`, `bg-status-warning` | `#f59e0b` | `#d97706` | `text-amber-500` |
+| 占有グリッド (Free) | `text-occupancy-free`, `bg-occupancy-free` | `#34d399` | `#059669` | `text-emerald-400` |
+| 占有グリッド (Obstacle) | `text-occupancy-obstacle`, `bg-occupancy-obstacle` | `#fb7185` | `#e11d48` | `text-rose-400` |
+| 占有グリッド (Unknown) | `text-occupancy-unknown`, `bg-occupancy-unknown` | `#c084fc` | `#7c3aed` | `text-purple-400` |
+
+### Linear Light Theme 設計原則
+1. **ブランドカラーの共通化**: ダーク・ライト共通で `primaryBase: #5e6ad2` (Linear Indigo) を基軸とし、ツール全体の統一感を担保します。
+2. **ホバーの反転設計**: ダークモードでは明るく変化（`#6f7be8`）させるのに対し、ライトモードでは白背景上での押し込み感と視認性を保つため**一段深く（暗く: `#4b55c0`）**します。
+3. **計算されたオフホワイト階層**: 眩しさを抑え長時間の作業負荷を軽減するため、キャンバス基底に `#f7f8f9`、浮き上がるパネルに純白 `#ffffff`、静かなホバーに `#f0f1f4` を採用。
+4. **深いチャコールブラック**: 生の純黒（`#000000`）を避け、`#17171a`（ベーステキスト）および `#686b74`（ミューテッド）で洗練された高級感と高コントラストを両立。
+5. **テーマ切り替えと永続化**: SettingsModal（Appearance タブ）のテーマセレクターから即座に Dark / Light の切り替えが可能であり、Zustand の `persist` ミドルウェアによってローカルストレージへ安全に永続化されます。
+6. **アクセントテーマ自由選択**: ライトモード時もダークモードと同様に各アクセントカラー（Indigo, Emerald, Ocean, Amber, Purple, Midnight）を自由に選択可能です。Linear Light のクリーンな白・オフホワイト階層と、各色に対応したコントラスト最適化済みのホバー色（例: Emerald では `#059669`）が自動合成されます。
+7. **CAD / RViz 方式の高コントラストキャンバス**: UIがライトモードであっても、ROS 2D占有グリッドマップ（空き領域が白 254）や明るいウェイポイントの視認性を最大化するため、キャンバス描画領域は常に視認性の高いダークチャコール（`CANVAS_SURFACE_BASE` = `#090a0c`）を維持します（CAD・RViz・Foxglove・Blender方式）。
 
 ---
 
-## 4. コンポーネントAPI設計ルール
+## 4. Linear Style ガイドライン (デスクトップ高密度・角丸・タイポグラフィ)
+
+本プロジェクトのUIは **Linear Style**（精密で落ち着いたプロフェッショナルなダークテーマツール感）に準拠します。
+
+### ① デスクトップ高密度 (32px Desktop Density)
+一般的なWebアプリの 40px/48px スケールではなく、**32px を基準とするデスクトッププロフェッショナルスケール**を採用します。
+
+| 要素 | 基本 (`default`) | 小型 (`sm`) | 極小 (`xs` / `icon-sm`) |
+|---|---|---|---|
+| ボタン (`Button`) | `h-8 px-3 text-[13px] rounded-md` | `h-7 px-2.5 text-xs rounded-md` | `h-6 px-2 text-[11px] rounded` |
+| アイコンボタン | `h-8 w-8 rounded-md` | `h-7 w-7 rounded-md` | `h-6 w-6 rounded` |
+| 入力欄 (`Input`) | `h-8 px-2.5 text-[13px] rounded-md` | `h-7 px-2 text-xs rounded-md` | - |
+| セレクト (`Select`) | `h-8 px-2.5 text-[13px] rounded-md` | `h-7 px-2 text-xs rounded-md` | - |
+| 参照入力 (`BrowseInput`) | `h-8 text-[13px]` | `h-7 text-xs` | - |
+
+### ② 角丸階層ルール (Border Radius Hierarchy)
+> [!CAUTION]
+> **`rounded-2xl` 以上の過度な角丸は全面禁止**です（モバイルアプリ的なバブル感を排除し、ソリッドで洗練された印象を維持するため）。
+
+- **`rounded-md` (6px)**: ボタン、入力欄、セレクト、ツールバーアイテム、ツリービュー項目、Kbdバッジ
+- **`rounded-lg` (8px)**: パネル内カード（`OptionCard`, `LayerCard` 等）、ドロップダウンポップオーバー、サブグループ枠
+- **`rounded-xl` (12px)**: フローティングアクションバナー（`FloatingActionBanner`）、モーダルダイアログ（`Modal`）、全画面オーバーレイ枠
+
+### ③ タイポグラフィ & フォントフィーチャー
+- フォントスタック: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;` (`@fontsource/inter` バンドル)
+- CSS `font-feature-settings`: `"cv02", "cv03", "cv04", "cv11", "tnum"`
+  - `tnum`（等幅数字）により、座標値や角度、インデックスのリアルタイム変化に伴うUIの横揺れを防止。
+  - `cv02`, `cv03`, `cv04`, `cv11` により、Interの文字判別性（小文字 `l` と数字 `1`、数字 `0` とアルファベット `O` など）を最大化。
+
+### ④ 絵文字の全面禁止と Lucide React アイコン統一
+> [!CAUTION]
+> UIラベル、ボタン、リスト項目内で **OS絵文字（`🎯`, `⚓`, `📁`, `📍`, `⚙️` 等）を直接使用することは全面禁止**です。OSやプラットフォームによって色や形状が乖離し、デザインシステムの一貫性を損ねます。
+
+- 目的・用途に応じた Lucide React アイコン（`<Target />`, `<Anchor />`, `<Folder />`, `<MapPin />`, `<Layers />` 等）を必ず使用してください。
+- ツールチップが必要なアイコンには `<span title="説明"><Icon size={14} /></span>` のように親要素で `title` を付与します。
+
+### ⑤ ショートカットキー表記 (`<Kbd>`)
+- キーボードショートカットのキーキャップ表示には、生テキスト（`"Esc"`, `"[Shift]"`）やローカル `<kbd>` を使わず、共通コンポーネント [`<Kbd>`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Kbd.tsx) を使用してください。
+- 例: `<Kbd>Esc</Kbd>`, `<Kbd>Ctrl</Kbd><Kbd>Z</Kbd>`
+
+### ⑥ PixiJS キャンバスデザイン定数 (`canvasConstants.ts`)
+キャンバスレイヤー側の描画色も UI デザイントークンと厳密に同期させるため、[`canvasConstants.ts`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/canvasConstants.ts) で定義された共通定数を使用してください。
+
+- `CANVAS_ACCENT_COLOR` (`0x5e6ad2` / `#5e6ad2`): 選択状態、矩形選択枠、スナップガイド、回転ハンドル
+- `CANVAS_SURFACE_BASE` (`0x090a0c` / `#090a0c`): キャンバス描画領域の背景。ライトモード時もCAD・RVizプロツール同様に高コントラストを維持するためダークチャコールが適用されます。
+- `CANVAS_PREVIEW_COLOR` (`0x8a8f98` / `#8a8f98`): 生成プレビューや下書き状態
+- 要素色（意味ベースの名前）: `CANVAS_HIT_AREA_COLOR`（alpha 0.001 のヒット領域）、`CANVAS_CONTRAST_COLOR`（ハンドル塗り・中心ドット）、`CANVAS_LABEL_BG(_ALT)`、`CANVAS_MUTED_COLOR/FILL`（挿入位置以降・既定フットプリント）、`CANVAS_AXIS_X/Y_COLOR`、`CANVAS_EXPORT_REGION_COLOR`、`CANVAS_MEASURE(_LIGHT)_COLOR`、`CANVAS_ANNOTATION_HIGHLIGHT_COLOR`、`CANVAS_FOOTPRINT_SELECTED_COLOR`、`CANVAS_PLUGIN_INPUT(_LIGHT)_COLOR`、`CANVAS_PLUGIN_HINT_COLOR`、`WAYPOINT_COLORS`（manual / generated / locked / referenced / afterInsertion の stroke・fill）
+- キャンバスレイヤー内でのハードコード色（`0x3b82f6` や `0x1e293b` 等）の直書きは禁止です。ESLint（`no-restricted-syntax`）が `src/components/canvas/` 配下の 6 桁 hex リテラルをエラーにします。新しい色が必要な場合は、用途を表す名前で `canvasConstants.ts` に追加してください。
+
+---
+
+## 5. コンポーネントAPI設計ルール
 
 ### ① `className` Props の伝搬
 すべての共通コンポーネントおよび再利用コンポーネントは、呼び出し側からレイアウト調整ができるよう `className` を props として受け取り、内部クラスと `cn()` で結合してください。
@@ -95,7 +164,7 @@ export function EmptyState({ message, className }: EmptyStateProps) {
   return (
     <div
       className={cn(
-        "text-center py-12 text-text-muted/60 text-sm bg-surface-panel/30 rounded-2xl border-2 border-dashed border-border-base/40 animate-pulse",
+        "text-center py-8 px-4 text-text-muted/70 text-xs bg-surface-panel/20 rounded-lg border border-border-base",
         className
       )}
     >
@@ -115,7 +184,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         type={type}
         className={cn(
-          "w-full rounded border border-border-base bg-surface-base px-3 py-2 text-sm text-text-base outline-none transition-colors focus:border-border-focus focus:ring-2 focus:ring-border-focus/20 disabled:cursor-not-allowed disabled:opacity-60",
+          "w-full rounded-md border border-border-base bg-surface-base px-2.5 h-8 text-[13px] text-text-base outline-none transition-colors focus:border-border-focus focus:ring-1 focus:ring-border-focus/30 disabled:cursor-not-allowed disabled:opacity-60",
           className
         )}
         ref={ref}
@@ -134,19 +203,22 @@ Input.displayName = "Input";
 import { cva } from "class-variance-authority";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-primary-base/20 disabled:opacity-50 disabled:pointer-events-none",
+  "inline-flex items-center justify-center rounded-md font-medium transition-all focus:outline-none focus:ring-1 focus:ring-border-focus/40 disabled:opacity-50 disabled:pointer-events-none select-none",
   {
     variants: {
       variant: {
-        primary: "bg-primary-base text-white hover:bg-primary-hover shadow-lg shadow-primary-base/20",
-        secondary: "bg-surface-panel border border-border-base text-text-base hover:bg-surface-hover",
-        ghost: "text-text-muted hover:text-text-base hover:bg-surface-hover/50",
-        danger: "bg-danger-base text-white hover:bg-danger-hover shadow-lg shadow-danger-base/20",
+        primary: "bg-primary-base text-text-base hover:bg-primary-hover active:bg-primary-active border border-primary-hover/30 shadow-sm",
+        secondary: "bg-surface-panel border border-border-base text-text-base hover:bg-surface-hover hover:border-border-base/80 shadow-sm",
+        ghost: "text-text-muted hover:text-text-base hover:bg-surface-hover",
+        danger: "bg-danger-base text-text-base hover:bg-danger-hover border border-danger-hover/30 shadow-sm",
+        outline: "border border-border-base text-text-base hover:bg-surface-hover",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 px-3 text-xs",
-        icon: "h-10 w-10",
+        default: "h-8 px-3 text-[13px]",
+        sm: "h-7 px-2.5 text-xs",
+        xs: "h-6 px-2 text-[11px] rounded",
+        icon: "h-8 w-8 p-0 shrink-0",
+        "icon-sm": "h-7 w-7 p-0 shrink-0",
       },
     },
     defaultVariants: {
@@ -159,7 +231,7 @@ const buttonVariants = cva(
 
 ---
 
-## 5. 新規UI作成・リファクタリングのチェックリスト
+## 6. 新規UI作成・リファクタリングのチェックリスト
 
 コンポーネントを新規作成またはリファクタリングする際は、以下のステップに従ってください。
 
@@ -171,7 +243,7 @@ const buttonVariants = cva(
 
 ---
 
-## 6. 既存共通コンポーネント（`common/`）の積極活用
+## 7. 既存共通コンポーネント（`common/`）の積極活用
 
 以下のパターンではインラインの `<div className="...">` を使わず、必ず `common/` 内の既存コンポーネントを適用してください。
 
@@ -183,6 +255,7 @@ const buttonVariants = cva(
 | 空データ・選択なし状態の表示 | `EmptyState` |
 | ファイル・ディレクトリ参照入力 | `BrowseInput` |
 | トグルスイッチ | `ToggleSwitch` |
+| キーボードショートカット・キーキャップ表示 | `Kbd` |
 
 ```tsx
 // ❌ 悪い例: div とインラインクラスによる命令的記述
@@ -202,7 +275,7 @@ const buttonVariants = cva(
 
 ---
 
-## 7. レスポンシブ & アダプティブ設計ガイドライン
+## 8. レスポンシブ & アダプティブ設計ガイドライン
 
 本アプリケーションはデスクトップ（Tauri）上で動作し、左右のサイドパネル（左 180〜600px、右 200〜800px）が開閉・リサイズされるため、中央キャンバス領域の有効幅が動的に大きく変化します（約 300px 〜 2500px+）。
 
@@ -296,3 +369,42 @@ export function CustomEditOverlay() {
 - モーダル全体は `w-[90vw] max-w-* max-h-[90vh] flex flex-col` を基本とし、ヘッダー・フッターを固定、コンテンツ領域のみを `overflow-y-auto flex-1` とすること。
 - モーダルコンテンツのパディングは固定値（`p-8`）を避け、レスポンシブクラス（`p-4 sm:p-6 md:p-8`）を使用すること。
 - サイドバー付きモーダル（`SettingsModal` 等）は、狭画面でサイドバーとコンテンツが無理なく収まるようにサイドバー幅を `w-40 sm:w-52 md:w-56`、タブボタンを `truncate` に対応させること。
+
+---
+
+## 6. 新規カラーテーマ追加規約 (Linear Style Theme Authoring Guide)
+
+今後開発者やユーザーが新しいテーマを追加・提案する際は、以下の**「Linear Style 5つの黄金律」**に必ず準拠してください。
+
+### 新テーマ追加のための 5 つの黄金律
+
+1. **基底サーフェス彩度制限律 (Saturation < 5%)**:
+   - `surfaceBase` と `surfacePanel` は彩度 (Saturation) を 5% 未満のディープチャコール (明度 3〜8%) に抑えること。画面全体が原色に染まる「ネオンテーマ」やベタ塗りカラー背景は禁止します。
+2. **文字ニュートラル不変律 (Neutral Text Invariance)**:
+   - `textBase` (`#f7f8f8`) および `textMuted` (`#8a8f98`) はすべてのダークテーマで同一のニュートラル値を保つこと。テーマのアクセントカラーを本文テキストに着色（緑文字、紫文字など）してはなりません。
+3. **1px ヘアライン半透明枠線律**:
+   - `borderBase` は原則透過アルファ `rgba(255, 255, 255, 0.08)` を使用し、太いベタ塗り枠線や高彩度の枠線を避けること。
+4. **アクセントコントラスト律 (WCAG AA 準拠)**:
+   - `primaryBase` は `surfaceBase` に対して十分なコントラスト比（4.5:1 以上）を持つこと。ホバー状態はダークモードでは明度を持ち上げ、ライトモードでは明度を深める（暗くする）こと。
+5. **キャンバス・PixiJS 整合性**:
+   - キャンバス描画領域の背景色は、ROSマップ（白領域=254）とのハイコントラストを担保するため常にダークチャコール（`CANVAS_SURFACE_BASE` = `0x090a0c`）を維持します（CAD・RViz方式。`customUiConfig` で明示的に `surfaceBase` が指定された場合を除く）。選択枠・ハンドルは `primaryBase` と調和させること。
+
+### 確定プリセット一覧表
+
+| プリセット名 | 表示名 | メイン色 (Primary) | ホバー色 (Hover) | 基底背景 (surfaceBase) | パネル背景 (surfacePanel) | 枠線 (borderBase) |
+|---|---|---|---|---|---|---|
+| **`default`** | Linear Indigo | `#5e6ad2` | `#6f7be8` | `#090a0c` | `#121316` | `rgba(255, 255, 255, 0.08)` |
+| **`emerald`** (`roomba`) | Emerald | `#10b981` | `#34d399` | `#080c0a` | `#101512` | `rgba(255, 255, 255, 0.08)` |
+| **`ocean`** | Ocean | `#0ea5e9` | `#38bdf8` | `#080a0f` | `#0f131a` | `rgba(255, 255, 255, 0.08)` |
+| **`amber`** | Amber | `#f59e0b` | `#fbbf24` | `#0c0a09` | `#161311` | `rgba(255, 255, 255, 0.08)` |
+| **`purple`** | Purple | `#8b5cf6` | `#a78bfa` | `#09080e` | `#121018` | `rgba(255, 255, 255, 0.08)` |
+| **`midnight`** | Midnight (OLED) | `#06b6d4` | `#22d3ee` | `#000000` | `#0c0c0d` | `rgba(255, 255, 255, 0.08)` |
+| **`light`** | Linear Light | `#5e6ad2` | `#4b55c0` | `#f7f8f9` | `#ffffff` | `#e2e4e8` |
+
+### テーマ追加時のチェックリスト
+- [ ] `src/utils/themePresets.ts` の `THEME_PRESETS` に定義を追加したか
+- [ ] ダークテーマの場合、`DARK_THEME_PRESETS` メタデータ配列に項目を追加したか
+- [ ] `textBase` は `#f7f8f8`、`textMuted` は `#8a8f98` に保たれているか
+- [ ] `borderBase` は `rgba(255, 255, 255, 0.08)` に設定されているか
+- [ ] `src/utils/themePresets.test.ts` でテストを追加・実行したか
+

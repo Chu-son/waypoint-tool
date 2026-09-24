@@ -1,6 +1,7 @@
-import { NumericInput } from "../NumericInput";
-import { FieldLabel } from "./FieldLabel";
-import { cn } from "../../../utils/cn";
+import { useId } from 'react';
+import { NumericInput } from './NumericInput';
+import { FieldLabel } from './FieldLabel';
+import { cn } from '../../../utils/cn';
 
 export interface LabeledNumericInputProps {
   label: string;
@@ -31,10 +32,14 @@ export function LabeledNumericInput({
   onEditStart,
   onEditEnd,
 }: LabeledNumericInputProps) {
+  const id = useId();
   return (
-    <div className={cn("space-y-0.5", className)}>
-      <FieldLabel className="mb-0.5">{label}</FieldLabel>
+    <div className={cn('space-y-0.5', className)}>
+      <FieldLabel htmlFor={id} className="mb-0.5">
+        {label}
+      </FieldLabel>
       <NumericInput
+        id={id}
         value={value}
         onChange={onChange}
         precision={precision}
@@ -42,7 +47,7 @@ export function LabeledNumericInput({
         min={min}
         max={max}
         disabled={disabled}
-        className={cn("h-7 text-[11px]", inputClassName)}
+        className={cn('h-7 text-[11px]', inputClassName)}
         onEditStart={onEditStart}
         onEditEnd={onEditEnd}
       />

@@ -1,22 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
-import { useAppStore } from "../../../stores/appStore";
-import { RobotFootprint, CircularFootprint, RectangularFootprint, PolygonFootprint } from "../../../types/store";
-import { Button } from "../common/Button";
-import { Input } from "../common/Input";
-import { NumericInput } from "../NumericInput";
-import { FormField } from "../common/FormField";
-import { FieldLabel } from "../common/FieldLabel";
-import { TabSectionHeader } from "./TabSectionHeader";
-import { Save, Plus, Trash2, RotateCcw, Copy, Check } from "lucide-react";
-import { cn } from "../../../utils/cn";
-import { DEFAULT_ROBOT_FOOTPRINT } from "../../../stores/slices/projectSlice";
+import { useState, useEffect, useMemo } from 'react';
+import { useAppStore } from '../../../stores/appStore';
+import { RobotFootprint, CircularFootprint, RectangularFootprint, PolygonFootprint } from '../../../types/store';
+import { Button } from '../common/Button';
+import { Input } from '../common/Input';
+import { NumericInput } from '../common/NumericInput';
+import { FormField } from '../common/FormField';
+import { FieldLabel } from '../common/FieldLabel';
+import { TabSectionHeader } from './TabSectionHeader';
+import { Save, Plus, Trash2, RotateCcw, Copy, Check, Bot } from 'lucide-react';
+import { cn } from '../../../utils/cn';
+import { DEFAULT_ROBOT_FOOTPRINT } from '../../../stores/slices/projectSlice';
+import { notify } from '../../../services/notify';
 
 export function RobotFootprintTab() {
   const globalFootprint = useAppStore((state) => state.robotFootprint);
   const setGlobalFootprint = useAppStore((state) => state.setRobotFootprint);
 
   const [footprint, setFootprint] = useState<RobotFootprint>(globalFootprint || DEFAULT_ROBOT_FOOTPRINT);
-  const [polygonText, setPolygonText] = useState<string>("");
+  const [polygonText, setPolygonText] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
@@ -24,14 +25,14 @@ export function RobotFootprintTab() {
   }, [globalFootprint]);
 
   useEffect(() => {
-    if (footprint.type === "polygon") {
+    if (footprint.type === 'polygon') {
       setPolygonText(JSON.stringify(footprint.points));
     }
   }, [footprint]);
 
   const handleApply = () => {
     setGlobalFootprint(footprint);
-    alert("ロボットフットプリント設定を適用しました。");
+    void notify('ロボットフットプリント設定を適用しました。');
   };
 
   const handleReset = () => {
@@ -67,7 +68,7 @@ export function RobotFootprintTab() {
 
   // Polygon helpers
   const handleAddPoint = () => {
-    if (footprint.type !== "polygon") return;
+    if (footprint.type !== 'polygon') return;
     const lastPoint = footprint.points[footprint.points.length - 1] || [0, 0];
     setFootprint({
       ...footprint,
@@ -76,9 +77,9 @@ export function RobotFootprintTab() {
   };
 
   const handleRemovePoint = (index: number) => {
-    if (footprint.type !== "polygon") return;
+    if (footprint.type !== 'polygon') return;
     if (footprint.points.length <= 3) {
-      alert("多角形フットプリントには最低3つの頂点が必要です。");
+      void notify('多角形フットプリントには最低3つの頂点が必要です。');
       return;
     }
     setFootprint({
@@ -88,8 +89,8 @@ export function RobotFootprintTab() {
   };
 
   const handleUpdatePoint = (index: number, x: number, y: number) => {
-    if (footprint.type !== "polygon") return;
-    const newPoints = footprint.points.map((pt, i) => (i === index ? [x, y] as [number, number] : pt));
+    if (footprint.type !== 'polygon') return;
+    const newPoints = footprint.points.map((pt, i) => (i === index ? ([x, y] as [number, number]) : pt));
     setFootprint({
       ...footprint,
       points: newPoints,
@@ -99,17 +100,23 @@ export function RobotFootprintTab() {
   const handleApplyPolygonText = () => {
     try {
       const parsed = JSON.parse(polygonText);
-      if (Array.isArray(parsed) && parsed.length >= 3 && parsed.every(pt => Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number')) {
-        const points: Array<[number, number]> = parsed.map(pt => [Number(pt[0]), Number(pt[1])]);
+      if (
+        Array.isArray(parsed) &&
+        parsed.length >= 3 &&
+        parsed.every(
+          (pt) => Array.isArray(pt) && pt.length >= 2 && typeof pt[0] === 'number' && typeof pt[1] === 'number',
+        )
+      ) {
+        const points: Array<[number, number]> = parsed.map((pt) => [Number(pt[0]), Number(pt[1])]);
         setFootprint({
           type: 'polygon',
           points,
         });
       } else {
-        alert("無効な頂点リストです。形式: [[x1, y1], [x2, y2], ...]");
+        void notify('無効な頂点リストです。形式: [[x1, y1], [x2, y2], ...]');
       }
     } catch {
-      alert("JSONパースに失敗しました。形式: [[x1, y1], [x2, y2], ...]");
+      void notify('JSONパースに失敗しました。形式: [[x1, y1], [x2, y2], ...]');
     }
   };
 
@@ -118,21 +125,13 @@ export function RobotFootprintTab() {
       <TabSectionHeader
         title="Robot Footprint Settings"
         subtitle="Define the robot's physical dimensions for canvas visualization and plugin collision checking."
+        icon={Bot}
         actions={
           <>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleReset}
-              title="Reset to Default (0.3m Radius Circle)"
-            >
+            <Button variant="secondary" size="sm" onClick={handleReset} title="Reset to Default (0.3m Radius Circle)">
               <RotateCcw size={14} className="mr-1" /> Reset
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleApply}
-            >
+            <Button variant="primary" size="sm" onClick={handleApply}>
               <Save size={14} className="mr-1" /> Apply
             </Button>
           </>
@@ -156,13 +155,13 @@ export function RobotFootprintTab() {
                 <Button
                   key={item.type}
                   type="button"
-                  variant={footprint.type === item.type ? "secondary" : "ghost"}
+                  variant={footprint.type === item.type ? 'secondary' : 'ghost'}
                   onClick={() => handleTypeChange(item.type as any)}
                   className={cn(
-                    "h-10 text-xs font-semibold justify-center border",
+                    'h-8 text-[13px] font-medium justify-center rounded-md border',
                     footprint.type === item.type
-                      ? "bg-primary-base/15 border-primary-base text-primary-base shadow-sm"
-                      : "border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover"
+                      ? 'bg-primary-base/15 border-primary-base text-primary-base shadow-sm'
+                      : 'border-border-base/50 text-text-muted hover:text-text-base hover:bg-surface-hover',
                   )}
                 >
                   {item.label}
@@ -172,21 +171,18 @@ export function RobotFootprintTab() {
           </FormField>
 
           {/* Specific Parameters Form */}
-          {footprint.type === "circular" && (
-            <CircularEditor
-              footprint={footprint}
-              onChange={(radius) => setFootprint({ type: 'circular', radius })}
-            />
+          {footprint.type === 'circular' && (
+            <CircularEditor footprint={footprint} onChange={(radius) => setFootprint({ type: 'circular', radius })} />
           )}
 
-          {footprint.type === "rectangular" && (
+          {footprint.type === 'rectangular' && (
             <RectangularEditor
               footprint={footprint}
               onChange={(updates) => setFootprint({ ...footprint, ...updates })}
             />
           )}
 
-          {footprint.type === "polygon" && (
+          {footprint.type === 'polygon' && (
             <PolygonEditor
               footprint={footprint}
               polygonText={polygonText}
@@ -203,20 +199,22 @@ export function RobotFootprintTab() {
 
         {/* Right column: SVG Visual Preview */}
         <div className="col-span-5">
-          <div className="bg-surface-panel/50 border border-border-base/40 rounded-2xl p-4 flex flex-col items-center sticky top-0">
+          <div className="bg-surface-panel/50 border border-border-base/40 rounded-lg p-4 flex flex-col items-center sticky top-0">
             <div className="w-full flex items-center justify-between mb-2">
               <FieldLabel className="text-xs font-bold text-text-base">Footprint Preview</FieldLabel>
               <span className="text-[10px] text-text-muted font-mono">X: Red (Forward), Y: Green</span>
             </div>
-            
-            <div className="w-full aspect-square bg-surface-base rounded-xl border border-border-base/50 relative overflow-hidden flex items-center justify-center shadow-inner">
+
+            <div className="w-full aspect-square bg-surface-base rounded-md border border-border-base/50 relative overflow-hidden flex items-center justify-center shadow-inner">
               <FootprintSvgPreview footprint={footprint} />
             </div>
 
             <div className="mt-3 text-[11px] text-text-muted text-center leading-tight">
-              {footprint.type === "circular" && `Circular: Radius ${footprint.radius.toFixed(3)} m (Diameter ${(footprint.radius * 2).toFixed(3)} m)`}
-              {footprint.type === "rectangular" && `Rectangular: ${footprint.length.toFixed(3)} m (L) × ${footprint.width.toFixed(3)} m (W), Offset (${(footprint.offset_x ?? 0).toFixed(2)}, ${(footprint.offset_y ?? 0).toFixed(2)})`}
-              {footprint.type === "polygon" && `Polygon: ${footprint.points.length} vertices`}
+              {footprint.type === 'circular' &&
+                `Circular: Radius ${footprint.radius.toFixed(3)} m (Diameter ${(footprint.radius * 2).toFixed(3)} m)`}
+              {footprint.type === 'rectangular' &&
+                `Rectangular: ${footprint.length.toFixed(3)} m (L) × ${footprint.width.toFixed(3)} m (W), Offset (${(footprint.offset_x ?? 0).toFixed(2)}, ${(footprint.offset_y ?? 0).toFixed(2)})`}
+              {footprint.type === 'polygon' && `Polygon: ${footprint.points.length} vertices`}
             </div>
           </div>
         </div>
@@ -229,19 +227,10 @@ export function RobotFootprintTab() {
 // Sub Editors
 // -----------------------------------------------------------------------------
 
-function CircularEditor({
-  footprint,
-  onChange,
-}: {
-  footprint: CircularFootprint;
-  onChange: (radius: number) => void;
-}) {
+function CircularEditor({ footprint, onChange }: { footprint: CircularFootprint; onChange: (radius: number) => void }) {
   return (
     <div className="p-4 bg-surface-panel/30 border border-border-base/30 rounded-xl space-y-4">
-      <FormField
-        label="Radius (m)"
-        description="The distance from the robot center to its outer circular boundary."
-      >
+      <FormField label="Radius (m)" description="The distance from the robot center to its outer circular boundary.">
         <NumericInput
           step={0.01}
           min={0.01}
@@ -249,7 +238,7 @@ function CircularEditor({
           precision={3}
           value={footprint.radius}
           onChange={onChange}
-          className="h-10 text-sm font-mono"
+          className="font-mono"
           placeholder="0.3"
         />
       </FormField>
@@ -267,60 +256,48 @@ function RectangularEditor({
   return (
     <div className="p-4 bg-surface-panel/30 border border-border-base/30 rounded-xl space-y-4">
       <div className="grid grid-cols-2 gap-3">
-        <FormField
-          label="Length (X direction / meters)"
-          description="Front-to-back dimension."
-        >
+        <FormField label="Length (X direction / meters)" description="Front-to-back dimension.">
           <NumericInput
             step={0.01}
             min={0.01}
             precision={3}
             value={footprint.length}
             onChange={(val) => onChange({ length: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.65"
           />
         </FormField>
-        <FormField
-          label="Width (Y direction / meters)"
-          description="Left-to-right dimension."
-        >
+        <FormField label="Width (Y direction / meters)" description="Left-to-right dimension.">
           <NumericInput
             step={0.01}
             min={0.01}
             precision={3}
             value={footprint.width}
             onChange={(val) => onChange({ width: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.45"
           />
         </FormField>
       </div>
 
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border-base/30">
-        <FormField
-          label="Offset X (meters)"
-          description="Offset of center from robot origin."
-        >
+        <FormField label="Offset X (meters)" description="Offset of center from robot origin.">
           <NumericInput
             step={0.01}
             precision={3}
             value={footprint.offset_x ?? 0}
             onChange={(val) => onChange({ offset_x: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.0"
           />
         </FormField>
-        <FormField
-          label="Offset Y (meters)"
-          description="Offset of center from robot origin."
-        >
+        <FormField label="Offset Y (meters)" description="Offset of center from robot origin.">
           <NumericInput
             step={0.01}
             precision={3}
             value={footprint.offset_y ?? 0}
             onChange={(val) => onChange({ offset_y: val })}
-            className="h-9 text-xs font-mono"
+            className="font-mono"
             placeholder="0.0"
           />
         </FormField>
@@ -362,7 +339,10 @@ function PolygonEditor({
       {/* Vertices List Table */}
       <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
         {footprint.points.map((pt, idx) => (
-          <div key={idx} className="flex items-center gap-2 bg-surface-panel/50 p-1.5 rounded-lg border border-border-base/30">
+          <div
+            key={idx}
+            className="flex items-center gap-2 bg-surface-panel/50 p-1.5 rounded-lg border border-border-base/30"
+          >
             <span className="w-6 text-[10px] text-text-muted font-mono text-center">{idx + 1}</span>
             <div className="flex-1 flex items-center gap-1">
               <span className="text-[10px] text-text-muted font-mono">X:</span>
@@ -413,7 +393,7 @@ function PolygonEditor({
             }}
           >
             {isCopied ? <Check size={11} className="mr-1 text-status-success" /> : <Copy size={11} className="mr-1" />}
-            {isCopied ? "Copied" : "Copy"}
+            {isCopied ? 'Copied' : 'Copy'}
           </Button>
         </div>
         <div className="flex gap-2">
@@ -440,18 +420,26 @@ function PolygonEditor({
 function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
   // Determine bounds to compute viewBox
   const bounds = useMemo(() => {
-    let minX = -0.5, maxX = 0.5, minY = -0.5, maxY = 0.5;
-    if (footprint.type === "circular") {
+    let minX = -0.5,
+      maxX = 0.5,
+      minY = -0.5,
+      maxY = 0.5;
+    if (footprint.type === 'circular') {
       const r = Math.max(footprint.radius, 0.1);
-      minX = -r; maxX = r; minY = -r; maxY = r;
-    } else if (footprint.type === "rectangular") {
+      minX = -r;
+      maxX = r;
+      minY = -r;
+      maxY = r;
+    } else if (footprint.type === 'rectangular') {
       const halfL = footprint.length / 2;
       const halfW = footprint.width / 2;
       const ox = footprint.offset_x || 0;
       const oy = footprint.offset_y || 0;
-      minX = ox - halfL; maxX = ox + halfL;
-      minY = oy - halfW; maxY = oy + halfW;
-    } else if (footprint.type === "polygon") {
+      minX = ox - halfL;
+      maxX = ox + halfL;
+      minY = oy - halfW;
+      maxY = oy + halfW;
+    } else if (footprint.type === 'polygon') {
       if (footprint.points.length > 0) {
         minX = Math.min(...footprint.points.map((p) => p[0]));
         maxX = Math.max(...footprint.points.map((p) => p[0]));
@@ -466,7 +454,7 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
   }, [footprint]);
 
   const size = 220;
-  const scale = (size / 2) / bounds.range;
+  const scale = size / 2 / bounds.range;
   const cx = size / 2;
   const cy = size / 2;
 
@@ -479,16 +467,38 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
       {/* Grid lines */}
       <defs>
         <pattern id="footprint-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--color-border-base)" strokeOpacity="0.3" strokeWidth="1" />
+          <path
+            d="M 20 0 L 0 0 0 20"
+            fill="none"
+            stroke="var(--color-border-base)"
+            strokeOpacity="0.3"
+            strokeWidth="1"
+          />
         </pattern>
       </defs>
       <rect width={size} height={size} fill="url(#footprint-grid)" />
 
       {/* Coordinate Axes */}
       {/* X Axis (+X Forward/Right) */}
-      <line x1={toSvgX(-bounds.range)} y1={cy} x2={toSvgX(bounds.range)} y2={cy} stroke="rgba(239, 68, 68, 0.4)" strokeWidth="1" strokeDasharray="3 3" />
+      <line
+        x1={toSvgX(-bounds.range)}
+        y1={cy}
+        x2={toSvgX(bounds.range)}
+        y2={cy}
+        stroke="rgba(239, 68, 68, 0.4)"
+        strokeWidth="1"
+        strokeDasharray="3 3"
+      />
       {/* Y Axis (+Y Left/Up) */}
-      <line x1={cx} y1={toSvgY(-bounds.range)} x2={cx} y2={toSvgY(bounds.range)} stroke="rgba(34, 197, 94, 0.4)" strokeWidth="1" strokeDasharray="3 3" />
+      <line
+        x1={cx}
+        y1={toSvgY(-bounds.range)}
+        x2={cx}
+        y2={toSvgY(bounds.range)}
+        stroke="rgba(34, 197, 94, 0.4)"
+        strokeWidth="1"
+        strokeDasharray="3 3"
+      />
 
       {/* Center Origin Cross & Forward Arrow */}
       <line x1={cx} y1={cy} x2={cx + 30} y2={cy} stroke="#ef4444" strokeWidth="2" />
@@ -500,7 +510,7 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
       <circle cx={cx} cy={cy} r="3" fill="var(--color-primary-base)" />
 
       {/* Shape Rendering */}
-      {footprint.type === "circular" && (
+      {footprint.type === 'circular' && (
         <circle
           cx={cx}
           cy={cy}
@@ -512,7 +522,7 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
         />
       )}
 
-      {footprint.type === "rectangular" && (
+      {footprint.type === 'rectangular' && (
         <rect
           x={toSvgX((footprint.offset_x || 0) - footprint.length / 2)}
           y={toSvgY((footprint.offset_y || 0) + footprint.width / 2)}
@@ -526,9 +536,9 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
         />
       )}
 
-      {footprint.type === "polygon" && footprint.points.length >= 3 && (
+      {footprint.type === 'polygon' && footprint.points.length >= 3 && (
         <polygon
-          points={footprint.points.map((p) => `${toSvgX(p[0])},${toSvgY(p[1])}`).join(" ")}
+          points={footprint.points.map((p) => `${toSvgX(p[0])},${toSvgY(p[1])}`).join(' ')}
           fill="var(--color-primary-base)"
           fillOpacity="0.15"
           stroke="var(--color-primary-base)"
@@ -537,8 +547,12 @@ function FootprintSvgPreview({ footprint }: { footprint: RobotFootprint }) {
       )}
 
       {/* Axis Labels */}
-      <text x={cx + 38} y={cy + 4} fill="#ef4444" fontSize="10" fontWeight="bold" fontFamily="monospace">+X</text>
-      <text x={cx + 4} y={cy - 38} fill="#22c55e" fontSize="10" fontWeight="bold" fontFamily="monospace">+Y</text>
+      <text x={cx + 38} y={cy + 4} fill="#ef4444" fontSize="10" fontWeight="bold" fontFamily="monospace">
+        +X
+      </text>
+      <text x={cx + 4} y={cy - 38} fill="#22c55e" fontSize="10" fontWeight="bold" fontFamily="monospace">
+        +Y
+      </text>
     </svg>
   );
 }

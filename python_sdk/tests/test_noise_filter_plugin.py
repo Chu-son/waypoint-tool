@@ -332,6 +332,23 @@ class TestNoiseFilterPlugin(unittest.TestCase):
             sys.stdin = old_stdin
             sys.stdout = old_stdout
 
+    def test_roi_region_string_or_invalid_fallback(self):
+        """Verify that string or invalid roi_region in interaction_data does not crash."""
+        gen = MorphologicalNoiseFilterGenerator()
+        grid_data = self._create_mock_grid(
+            5, 5, resolution=0.05,
+            default_val=OccupancyGrid.FREE,
+            custom_cells=[(2, 2, OccupancyGrid.OBSTACLE)]
+        )
+        for invalid_val in ["sweep_rect", "", "   ", 123, ["not", "a", "dict"]]:
+            context = {
+                "occupancy_grid": grid_data,
+                "interaction_data": {"roi_region": invalid_val},
+                "properties": {"mode": "remove_obstacles", "noise_size": 0.10}
+            }
+            res = gen.generate_layer(context)
+            self.assertIn("image_base64", res)
+
 
 if __name__ == '__main__':
     unittest.main()

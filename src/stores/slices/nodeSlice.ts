@@ -1,7 +1,8 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { WaypointNode, InsertionTarget } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
+import { detachFromTree, insertIntoTree } from '../../utils/treeOps';
 import {
   findHighestLevelParent,
   findNodeParentId,
@@ -13,13 +14,15 @@ import {
   expandSelectionWithDescendants,
   mapInsertionTarget,
 } from '../../utils/treeUtils';
+import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from '../../utils/mapElementTreeUtils';
+import { WaypointClipboardPayload } from '../../utils/mapElementClipboard';
 
 export type NodeSlice = {
   nodes: Record<string, WaypointNode>;
   rootNodeIds: string[];
   selectedNodeIds: string[];
   insertionTarget: InsertionTarget | null;
-  
+
   anchorNodeId: string | null;
   setAnchorNode: (id: string | null) => void;
   addNode: (node: WaypointNode, parentId?: string | null, options?: { skipRecalculate?: boolean }) => void;
@@ -27,7 +30,7 @@ export type NodeSlice = {
     nodes: WaypointNode[],
     parentId?: string | null,
     targetIndex?: number,
-    options?: { skipRecalculate?: boolean }
+    options?: { skipRecalculate?: boolean },
   ) => void;
   updateNode: (id: string, updates: Partial<WaypointNode>, options?: { skipRecalculate?: boolean }) => void;
   updateNodes: (updates: Record<string, Partial<WaypointNode>>, options?: { skipRecalculate?: boolean }) => void;
@@ -43,6 +46,7 @@ export type NodeSlice = {
   deselectAllNodes: () => void;
   explodeGenerator: (id: string) => void;
   duplicateNodes: (ids: string[]) => string[];
+  pasteWaypoints: (payload: WaypointClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setInsertionTarget: (target: InsertionTarget | null) => void;
 };
 
@@ -55,15 +59,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
   setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
 
-  setInsertionTarget: (target: InsertionTarget | null) => set((state) => ({
-    insertionTarget: validateAndCorrectInsertionTarget(target, state.rootNodeIds, state.nodes),
-  })),
+  setInsertionTarget: (target: InsertionTarget | null) =>
+    set((state) => ({
+      insertionTarget: validateAndCorrectInsertionTarget(target, state.rootNodeIds, state.nodes),
+    })),
 
   addNodes: (
     nodesToAdd: WaypointNode[],
     parentId?: string | null,
     targetIndex?: number,
-    options?: { skipRecalculate?: boolean }
+    options?: { skipRecalculate?: boolean },
   ) => {
     if (!nodesToAdd || nodesToAdd.length === 0) return;
     get().pushHistorySnapshot();
@@ -76,20 +81,21 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       let newRootIds = [...state.rootNodeIds];
 
       const isExplicitPlacement = parentId !== undefined || targetIndex !== undefined;
-      const effectiveParentId = parentId !== undefined
-        ? (parentId ?? undefined)
-        : (state.insertionTarget?.parentId ?? undefined);
+      const effectiveParentId =
+        parentId !== undefined ? (parentId ?? undefined) : (state.insertionTarget?.parentId ?? undefined);
 
       let nextInsertionTarget = state.insertionTarget;
 
       if (effectiveParentId && newNodes[effectiveParentId]) {
         const parent = newNodes[effectiveParentId];
         const children = [...(parent.children_ids || [])];
-        let insIdx = targetIndex !== undefined
-          ? Math.min(targetIndex, children.length)
-          : children.length;
+        let insIdx = targetIndex !== undefined ? Math.min(targetIndex, children.length) : children.length;
 
-        if (!isExplicitPlacement && state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+        if (
+          !isExplicitPlacement &&
+          state.insertionTarget?.parentId === effectiveParentId &&
+          state.insertionTarget.index >= 0
+        ) {
           insIdx = Math.min(state.insertionTarget.index, children.length);
         }
 
@@ -99,15 +105,22 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
           children_ids: children,
         };
 
-        if (!isExplicitPlacement && state.insertionTarget?.parentId === effectiveParentId && state.insertionTarget.index >= 0) {
+        if (
+          !isExplicitPlacement &&
+          state.insertionTarget?.parentId === effectiveParentId &&
+          state.insertionTarget.index >= 0
+        ) {
           nextInsertionTarget = { parentId: effectiveParentId, index: insIdx + nodeIds.length };
         }
       } else {
-        let insIdx = targetIndex !== undefined
-          ? Math.min(targetIndex, newRootIds.length)
-          : newRootIds.length;
+        let insIdx = targetIndex !== undefined ? Math.min(targetIndex, newRootIds.length) : newRootIds.length;
 
-        if (!isExplicitPlacement && state.insertionTarget?.parentId === null && state.insertionTarget !== null && state.insertionTarget.index >= 0) {
+        if (
+          !isExplicitPlacement &&
+          state.insertionTarget?.parentId === null &&
+          state.insertionTarget !== null &&
+          state.insertionTarget.index >= 0
+        ) {
           insIdx = Math.min(state.insertionTarget.index, newRootIds.length);
         }
 
@@ -144,9 +157,9 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       return {
         nodes: {
           ...state.nodes,
-          [id]: { ...existing, ...updates }
+          [id]: { ...existing, ...updates },
         },
-        isDirty: true
+        isDirty: true,
       };
     });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
@@ -171,7 +184,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       });
       return {
         nodes: nextNodes,
-        isDirty: true
+        isDirty: true,
       };
     });
     if (!options?.skipRecalculate && get().autoRecalculatePath && get().activePathCalculatorPluginId) {
@@ -190,7 +203,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       const { parentId: targetParentId, insertIndex } = findHighestLevelParent(
         selectedIds,
         state.rootNodeIds,
-        state.nodes
+        state.nodes,
       );
 
       // 2. 連番でグループ名を生成 ("Group 1", "Group 2", ...)
@@ -265,14 +278,19 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
+      const nextSelected = expandSelectionWithDescendants([newGroupId], newNodes);
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: expandSelectionWithDescendants([newGroupId], newNodes),
+        selectedNodeIds: nextSelected,
+        selection: { type: 'nodes', ids: nextSelected },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
         isDirty: true,
       };
     });
@@ -288,7 +306,10 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     get().pushHistorySnapshot();
     set((state) => {
       const groupNode = state.nodes[groupId];
-      if (!groupNode || (groupNode.type !== 'manual_group' && groupNode.type !== 'group' && groupNode.type !== 'generator')) {
+      if (
+        !groupNode ||
+        (groupNode.type !== 'manual_group' && groupNode.type !== 'group' && groupNode.type !== 'generator')
+      ) {
         return state;
       }
 
@@ -321,14 +342,19 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
+      const nextSelected = expandSelectionWithDescendants(childIds, newNodes);
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: expandSelectionWithDescendants(childIds, newNodes),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
         isDirty: true,
       };
     });
@@ -383,67 +409,24 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
       if (directMovingIds.length === 0) return state;
 
-      const directMovingSet = new Set(directMovingIds);
-      const newNodes = { ...state.nodes };
-      let newRootIds = [...state.rootNodeIds];
-
-      // 3. 元の親 / Root から削除
-      newRootIds = newRootIds.filter((id) => !directMovingSet.has(id));
-      Object.keys(newNodes).forEach((nid) => {
-        const node = newNodes[nid];
-        if (node.children_ids) {
-          newNodes[nid] = {
-            ...node,
-            children_ids: node.children_ids.filter((cid) => !directMovingSet.has(cid)),
-          };
-        }
-      });
-
-      // 4. ドロップ位置に挿入
-      if (position === 'inside') {
-        const targetNode = newNodes[targetId];
-        if (targetNode) {
-          newNodes[targetId] = {
-            ...targetNode,
-            children_ids: [...(targetNode.children_ids || []), ...directMovingIds],
-          };
-        }
-      } else {
-        // targetId の親を特定
-        const targetParentId = findNodeParentId(targetId, newRootIds, newNodes);
-
-        if (targetParentId && newNodes[targetParentId]) {
-          const parent = newNodes[targetParentId];
-          const siblings = [...(parent.children_ids || [])];
-          let targetIndex = siblings.indexOf(targetId);
-          if (targetIndex === -1) {
-            targetIndex = siblings.length;
-          } else if (position === 'after') {
-            targetIndex += 1;
-          }
-          siblings.splice(targetIndex, 0, ...directMovingIds);
-          newNodes[targetParentId] = {
-            ...parent,
-            children_ids: siblings,
-          };
-        } else {
-          // Root 階層に挿入
-          let targetIndex = newRootIds.indexOf(targetId);
-          if (targetIndex === -1) {
-            targetIndex = newRootIds.length;
-          } else if (position === 'after') {
-            targetIndex += 1;
-          }
-          newRootIds.splice(targetIndex, 0, ...directMovingIds);
-        }
-      }
+      // 3. 元の親 / Root から削除し、4. ドロップ位置に挿入
+      const detached = detachFromTree({ rootIds: state.rootNodeIds, containers: state.nodes }, directMovingIds);
+      const { rootIds: newRootIds, containers: newNodes } = insertIntoTree(
+        detached,
+        directMovingIds,
+        targetId,
+        position,
+        position === 'inside'
+          ? undefined
+          : (findNodeParentId(targetId, detached.rootIds, detached.containers) ?? undefined),
+      );
 
       const nextTarget = mapInsertionTarget(
         state.insertionTarget,
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
       return {
@@ -509,14 +492,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         state.rootNodeIds,
         state.nodes,
         newRootIds,
-        newNodes
+        newNodes,
       );
 
+      const nextSelected = state.selectedNodeIds.filter((id) => !idsToRemove.has(id));
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: nextTarget,
-        selectedNodeIds: state.selectedNodeIds.filter((id) => !idsToRemove.has(id)),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
         anchorNodeId: state.anchorNodeId && idsToRemove.has(state.anchorNodeId) ? null : state.anchorNodeId,
         isDirty: true,
       };
@@ -526,124 +511,67 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     }
   },
 
-  selectNodes: (ids: string[], multi = false) => set((state) => {
+  selectNodes: (ids: string[], multi = false) => {
+    const state = get();
     // グループが含まれる場合、その全子孫ノードIDを自動収集して展開（generatorは除外）
     const targetIds = expandSelectionWithDescendants(ids, state.nodes);
 
-    const nextIds = multi ? (() => {
-      const current = new Set(state.selectedNodeIds);
-      const allSelected = targetIds.every((id) => current.has(id));
-      if (allSelected) {
-        targetIds.forEach((id) => current.delete(id));
-      } else {
-        targetIds.forEach((id) => current.add(id));
-      }
-      return Array.from(current);
-    })() : targetIds;
+    const nextIds = multi
+      ? (() => {
+          const current = new Set(state.selectedNodeIds);
+          const allSelected = targetIds.every((id) => current.has(id));
+          if (allSelected) {
+            targetIds.forEach((id) => current.delete(id));
+          } else {
+            targetIds.forEach((id) => current.add(id));
+          }
+          return Array.from(current);
+        })()
+      : targetIds;
 
-    const updates: Partial<AppState> = { selectedNodeIds: nextIds };
-    if (nextIds.length > 0) {
-      updates.rightPanelActiveTab = 'inspector';
-      updates.activeCustomLayerId = null;
-      if (state.isAnnotationEditMode) {
-        updates.isAnnotationEditMode = false;
-      }
+    state.setSelection(nextIds.length > 0 ? { type: 'nodes', ids: nextIds } : { type: 'none' });
+    if (nextIds.length > 0 && state.isAnnotationEditMode) {
+      set({ isAnnotationEditMode: false });
     }
-    if (state.elementCopyState) {
-      const targetId = nextIds.length === 1 ? nextIds[0] : null;
-      updates.elementCopyState = { ...state.elementCopyState, previewNodeId: targetId };
-    }
-    return updates;
-  }),
+  },
 
-  selectAllNodes: () => set((state) => ({
-    selectedNodeIds: Object.keys(state.nodes)
-  })),
-  
-  deselectAllNodes: () => set({ selectedNodeIds: [] }),
+  selectAllNodes: () => {
+    get().setSelection({ type: 'nodes', ids: Object.keys(get().nodes) });
+  },
+
+  deselectAllNodes: () => {
+    get().setSelection({ type: 'none' });
+  },
 
   duplicateNodes: (ids: string[]) => {
     if (!ids || ids.length === 0) return [];
     get().pushHistorySnapshot();
 
-    const createdTopLevelIds: string[] = [];
+    let createdTopLevelIds: string[] = [];
 
     set((state) => {
-      const newNodes = { ...state.nodes };
-      let newRootIds = [...state.rootNodeIds];
-      const idsSet = new Set(ids);
-
-      // 選択ノード群から子孫ノードを除外したトップレベルID群を特定（ツリー順序を維持）
       const flatNodeIds = getFlattenedNodeIds(state.rootNodeIds, state.nodes);
-      const topLevelIds: string[] = [];
-
-      flatNodeIds.forEach((id) => {
-        if (idsSet.has(id)) {
-          const isDescendant = topLevelIds.some((pId) => {
-            const desc = collectDescendantIds(pId, state.nodes);
-            return desc.includes(id);
-          });
-          if (!isDescendant) {
-            topLevelIds.push(id);
-          }
-        }
-      });
-
-      ids.forEach((id) => {
-        if (!topLevelIds.includes(id)) {
-          const isDescendant = topLevelIds.some((pId) => {
-            const desc = collectDescendantIds(pId, state.nodes);
-            return desc.includes(id);
-          });
-          if (!isDescendant) {
-            topLevelIds.push(id);
-          }
-        }
-      });
-
+      const topLevelIds = filterTopLevelIds(ids, flatNodeIds, (id) => collectDescendantIds(id, state.nodes));
       if (topLevelIds.length === 0) return state;
 
-      // 再帰的にノードとその子孫をクローンするヘルパー
-      const cloneNodeRecursive = (origId: string): WaypointNode | null => {
-        const original = state.nodes[origId];
-        if (!original) return null;
+      const existingNames = new Set(
+        Object.values(state.nodes)
+          .map((n) => n.name)
+          .filter(Boolean) as string[],
+      );
 
-        const newId = uuidv4();
-        const duplicated: WaypointNode = {
-          ...structuredClone(original),
-          id: newId,
-          name: original.name ? `${original.name} (Copy)` : undefined,
-        };
-
-        if (duplicated.transform) {
-          duplicated.transform = {
-            ...duplicated.transform,
-            x: duplicated.transform.x + 0.5,
-            y: duplicated.transform.y + 0.5,
-          };
-        }
-
-        if (original.children_ids && original.children_ids.length > 0) {
-          const newChildIds: string[] = [];
-          original.children_ids.forEach((cid) => {
-            const childClone = cloneNodeRecursive(cid);
-            if (childClone) {
-              newChildIds.push(childClone.id);
-            }
-          });
-          duplicated.children_ids = newChildIds;
-        }
-
-        newNodes[newId] = duplicated;
-        return duplicated;
-      };
-
-      topLevelIds.forEach((id) => {
-        const cloned = cloneNodeRecursive(id);
-        if (cloned) {
-          createdTopLevelIds.push(cloned.id);
-        }
+      const remapResult = remapHierarchicalIds(topLevelIds, state.nodes, {
+        onCloneItem: (cloned) => {
+          if (cloned.name) {
+            cloned.name = resolveMapElementName(cloned.name, { existingNames, forceCopySuffix: true });
+          }
+          // オフセットは加算せず元座標をそのまま維持
+        },
       });
+
+      createdTopLevelIds = remapResult.newTopLevelIds;
+      const newNodes = { ...state.nodes, ...remapResult.newItems };
+      let newRootIds = [...state.rootNodeIds];
 
       let nextInsertionTarget = state.insertionTarget;
       const validTarget = validateAndCorrectInsertionTarget(state.insertionTarget, newRootIds, newNodes);
@@ -673,11 +601,16 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
         nextInsertionTarget = null;
       }
 
+      const nextSelected = expandSelectionWithDescendants(createdTopLevelIds, newNodes);
       return {
         nodes: newNodes,
         rootNodeIds: newRootIds,
         insertionTarget: validateAndCorrectInsertionTarget(nextInsertionTarget, newRootIds, newNodes),
-        selectedNodeIds: expandSelectionWithDescendants(createdTopLevelIds, newNodes),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
         isDirty: true,
       };
     });
@@ -687,5 +620,127 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     }
 
     return createdTopLevelIds;
+  },
+
+  pasteWaypoints: (payload: WaypointClipboardPayload, options?: { asGroup?: boolean }) => {
+    if (!payload || !payload.topLevelIds || payload.topLevelIds.length === 0) return [];
+    get().pushHistorySnapshot();
+
+    let finalTopLevelIds: string[] = [];
+
+    set((state) => {
+      const existingNames = new Set(
+        Object.values(state.nodes)
+          .map((n) => n.name)
+          .filter(Boolean) as string[],
+      );
+
+      // 1. クリップボード内のノード群のIDを新規UUIDへ再採番
+      const remapResult = remapHierarchicalIds(payload.topLevelIds, payload.nodes, {
+        onCloneItem: (cloned) => {
+          if (cloned.name) {
+            // 同名が存在すれば (Copy) を付加、別ウィンドウ等で同名がなければ元の名前を維持
+            cloned.name = resolveMapElementName(cloned.name, { existingNames, forceCopySuffix: false });
+          }
+        },
+      });
+
+      const newNodes = { ...state.nodes, ...remapResult.newItems };
+      let newRootIds = [...state.rootNodeIds];
+      let insertTopLevelIds = remapResult.newTopLevelIds;
+
+      // 2. asGroup が指定されている場合、新規 manual_group を作成してまとめる
+      if (options?.asGroup) {
+        const newGroupId = uuidv4();
+        const existingGroupNames = Object.values(state.nodes)
+          .filter((n) => n.type === 'manual_group' || n.type === 'group' || n.type === 'generator')
+          .map((n) => n.name);
+        const groupName = getNextSequentialName('Group', existingGroupNames);
+
+        const groupNode: WaypointNode = {
+          id: newGroupId,
+          type: 'manual_group',
+          name: groupName,
+          children_ids: remapResult.newTopLevelIds,
+        };
+
+        newNodes[newGroupId] = groupNode;
+        insertTopLevelIds = [newGroupId];
+      }
+
+      finalTopLevelIds = insertTopLevelIds;
+
+      // 3. 挿入位置の決定（insertionTarget 優先、次に単一選択ノード直後、または末尾）
+      let targetToUse = state.insertionTarget;
+      if (!targetToUse && state.selectedNodeIds.length === 1) {
+        const selId = state.selectedNodeIds[0];
+        const selNode = state.nodes[selId];
+        if (selNode && isInsertableContainer(selNode)) {
+          // グループ選択中ならそのグループの末尾
+          targetToUse = { parentId: selId, index: (selNode.children_ids || []).length };
+        } else {
+          // ノード選択中ならその直後
+          const parentId = findNodeParentId(selId, state.rootNodeIds, state.nodes);
+          const siblings = parentId ? state.nodes[parentId]?.children_ids || [] : state.rootNodeIds;
+          const idx = siblings.indexOf(selId);
+          if (idx !== -1) {
+            targetToUse = { parentId, index: idx + 1 };
+          }
+        }
+      }
+
+      let nextInsertionTarget: InsertionTarget | null = null;
+      const validTarget = validateAndCorrectInsertionTarget(targetToUse, newRootIds, newNodes);
+
+      if (validTarget) {
+        if (validTarget.parentId !== null && newNodes[validTarget.parentId]) {
+          const parent = newNodes[validTarget.parentId];
+          const siblings = [...(parent.children_ids || [])];
+          siblings.splice(validTarget.index, 0, ...insertTopLevelIds);
+          newNodes[validTarget.parentId] = {
+            ...parent,
+            children_ids: siblings,
+          };
+          // 元の insertionTarget が明示的に設定されていた場合のみインデックスを進め、
+          // 選択フォールバック等で挿入した場合は insertionTarget を null のままにして不要なバー残留を防ぐ
+          if (state.insertionTarget !== null) {
+            nextInsertionTarget = {
+              parentId: validTarget.parentId,
+              index: validTarget.index + insertTopLevelIds.length,
+            };
+          }
+        } else {
+          newRootIds.splice(validTarget.index, 0, ...insertTopLevelIds);
+          if (state.insertionTarget !== null) {
+            nextInsertionTarget = {
+              parentId: null,
+              index: validTarget.index + insertTopLevelIds.length,
+            };
+          }
+        }
+      } else {
+        newRootIds.push(...insertTopLevelIds);
+        nextInsertionTarget = null;
+      }
+
+      const nextSelected = expandSelectionWithDescendants(finalTopLevelIds, newNodes);
+      return {
+        nodes: newNodes,
+        rootNodeIds: newRootIds,
+        insertionTarget: validateAndCorrectInsertionTarget(nextInsertionTarget, newRootIds, newNodes),
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
+        isDirty: true,
+      };
+    });
+
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(150);
+    }
+
+    return finalTopLevelIds;
   },
 });

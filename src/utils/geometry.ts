@@ -12,15 +12,15 @@ export interface BoundingBox {
 /**
  * Calculates the bounding box for an array of 2D points with optional margin.
  */
-export function computePointsBoundingBox(
-  points: { x: number; y: number }[],
-  margin = 0
-): BoundingBox {
+export function computePointsBoundingBox(points: { x: number; y: number }[], margin = 0): BoundingBox {
   if (!points.length) {
     return { minX: 0, maxX: 0, minY: 0, maxY: 0, width: 0, height: 0, cx: 0, cy: 0 };
   }
 
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
   for (const p of points) {
     if (p.x < minX) minX = p.x;
     if (p.x > maxX) maxX = p.x;

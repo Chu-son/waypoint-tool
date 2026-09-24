@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
-import { buildProjectData } from './projectSlice';
+import { buildProjectData } from '../serialization/projectSerializer';
 import { StrictProjectData } from '../../types/store';
 import {
   DEFAULT_ROBOT_FOOTPRINT,
@@ -8,6 +8,7 @@ import {
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
 } from '../migrations/projectMigration';
+import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 
 describe('projectPersistence roundtrip & strict validation', () => {
   beforeEach(() => {
@@ -32,7 +33,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
         {
           id: 'map-1',
           name: 'Main Map',
-          info: { resolution: 0.05, origin: [0, 0, 0] },
+          info: { resolution: 0.05, origin: [0, 0, 0], initial_origin: [0, 0, 0] },
           image_base64: 'data:image/png;base64,dummy',
           width: 800,
           height: 600,
@@ -52,9 +53,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
           z_index: 0,
           blend_mode: 'overwrite',
           is_reference: false,
-          editObjects: [
-            { id: 'obj-1', type: 'rect', cx: 10, cy: 10, width: 20, height: 20, angle: 0, fillValue: 0 },
-          ],
+          editObjects: [{ id: 'obj-1', type: 'rect', cx: 10, cy: 10, width: 20, height: 20, angle: 0, fillValue: 0 }],
         },
       ],
       annotation_objects: [
@@ -68,6 +67,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
           visible: true,
           labelVisible: true,
           group_id: 'grp-1',
+          options: {},
         },
       ],
       annotation_groups: {
@@ -122,6 +122,14 @@ describe('projectPersistence roundtrip & strict validation', () => {
         defaultNegate: 1,
       },
       default_map_opacity: 0.65,
+      geo_map: {
+        enabled: true,
+        basemapId: 'esri_imagery',
+        customBasemap: { urlTemplate: 'https://t.example/{z}/{x}/{y}.png', maxZoom: 16, attribution: 'Example' },
+        opacity: 0.4,
+        origin: { kind: 'utm', zone: 54, hemisphere: 'N', easting: 388500.5, northing: 3949000.25 },
+        alignment: { dx: 3.5, dy: -2, yawDeg: 12.5 },
+      },
       left_panel_view_mode: 'split',
       right_panel_view_mode: 'split',
       active_path_calculator_plugin_id: 'dijkstra-plugin',
@@ -133,6 +141,29 @@ describe('projectPersistence roundtrip & strict validation', () => {
       sync_path_width_with_footprint: true,
       index_start_index: 1,
       decimal_precision: 4,
+      conditional_styles: [],
+      conditional_styles_enabled: true,
+      export_profiles: [
+        {
+          id: 'test-profile-1',
+          name: 'Test Profile',
+          description: 'A test profile',
+          outputRootDir: '/tmp/export',
+          conflictResolution: 'backup_file',
+          items: [
+            {
+              id: 'item-1',
+              type: 'waypoint_default',
+              sourceId: '__default_yaml__',
+              relativePathPattern: 'waypoints/{{yyyymmdd}}_test.yaml',
+              mapFormat: 'ros_standard',
+              includeMapImage: false,
+              enabled: true,
+            },
+          ],
+        },
+      ],
+      active_export_profile_id: 'test-profile-1',
       custom_ui_data: {
         workflow_state: {
           current_step_index: 3,
@@ -146,7 +177,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     useAppStore.getState().setProjectData(fullProjectData);
     const saved = buildProjectData(useAppStore.getState());
 
-    // 1. StrictProjectData has all 27 required top-level keys
+    // 1. StrictProjectData has all required top-level keys
     const expectedKeys: (keyof StrictProjectData)[] = [
       'version',
       'root_node_ids',
@@ -174,6 +205,11 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'sync_path_width_with_footprint',
       'index_start_index',
       'decimal_precision',
+      'conditional_styles',
+      'conditional_styles_enabled',
+      'export_profiles',
+      'active_export_profile_id',
+      'geo_map',
       'custom_ui_data',
     ];
 
@@ -195,6 +231,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.robot_footprint).toEqual(fullProjectData.robot_footprint);
     expect(saved.occupancy_settings).toEqual(fullProjectData.occupancy_settings);
     expect(saved.default_map_opacity).toBe(0.65);
+    expect(saved.geo_map).toEqual(fullProjectData.geo_map);
     expect(saved.left_panel_view_mode).toBe('split');
     expect(saved.right_panel_view_mode).toBe('split');
     expect(saved.active_path_calculator_plugin_id).toBe('dijkstra-plugin');
@@ -206,6 +243,10 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.sync_path_width_with_footprint).toBe(true);
     expect(saved.index_start_index).toBe(1);
     expect(saved.decimal_precision).toBe(4);
+    expect(saved.conditional_styles).toEqual(fullProjectData.conditional_styles);
+    expect(saved.conditional_styles_enabled).toBe(fullProjectData.conditional_styles_enabled);
+    expect(saved.export_profiles).toEqual(fullProjectData.export_profiles);
+    expect(saved.active_export_profile_id).toBe(fullProjectData.active_export_profile_id);
     expect(saved.custom_ui_data.workflow_state).toEqual(fullProjectData.custom_ui_data.workflow_state);
   });
 
@@ -243,6 +284,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       index_start_index: 1,
       decimal_precision: 2,
       default_map_opacity: 0.9,
+      geo_map: { enabled: true, alignment: { dx: 5, dy: 6, yawDeg: 7 } },
       path_color: '#123456',
       auto_recalculate_path: false,
       custom_ui_data: {
@@ -256,6 +298,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(useAppStore.getState().indexStartIndex).toBe(1);
     expect(useAppStore.getState().decimalPrecision).toBe(2);
     expect(useAppStore.getState().defaultMapOpacity).toBe(0.9);
+    expect(useAppStore.getState().geoMap.enabled).toBe(true);
     expect(useAppStore.getState().autoRecalculatePath).toBe(false);
     expect(useAppStore.getState().currentStepIndex).toBe(5);
 
@@ -266,6 +309,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(state.indexStartIndex).toBe(0);
     expect(state.decimalPrecision).toBe(6);
     expect(state.defaultMapOpacity).toBe(DEFAULT_MAP_OPACITY);
+    expect(state.geoMap).toEqual(DEFAULT_GEO_MAP);
     expect(state.defaultExportFormats).toEqual(DEFAULT_EXPORT_FORMATS);
     expect(state.robotFootprint).toEqual(DEFAULT_ROBOT_FOOTPRINT);
     expect(state.occupancySettings).toEqual(DEFAULT_OCCUPANCY_SETTINGS);
@@ -365,6 +409,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       robot_footprint: DEFAULT_ROBOT_FOOTPRINT,
       occupancy_settings: DEFAULT_OCCUPANCY_SETTINGS,
       default_map_opacity: DEFAULT_MAP_OPACITY,
+      geo_map: DEFAULT_GEO_MAP,
       left_panel_view_mode: 'tabs',
       right_panel_view_mode: 'tabs',
       active_path_calculator_plugin_id: null,
@@ -376,6 +421,10 @@ describe('projectPersistence roundtrip & strict validation', () => {
       sync_path_width_with_footprint: false,
       index_start_index: 0,
       decimal_precision: 6,
+      conditional_styles: [],
+      conditional_styles_enabled: true,
+      export_profiles: [],
+      active_export_profile_id: null,
       custom_ui_data: {
         workflow_state: {
           current_step_index: 0,

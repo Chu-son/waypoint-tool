@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { CustomUiConfig } from '../../types/customUi';
 import { BackendAPI } from '../../api';
 
@@ -25,10 +25,11 @@ export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> 
   customUiPresetType: null,
   customUiPresetPath: null,
 
-  setCustomUiConfig: (config) => set({
-    customUiConfig: config,
-    isCustomUiMode: config !== null,
-  }),
+  setCustomUiConfig: (config) =>
+    set({
+      customUiConfig: config,
+      isCustomUiMode: config !== null,
+    }),
 
   setIsCustomUiMode: (enabled) => set({ isCustomUiMode: enabled }),
 

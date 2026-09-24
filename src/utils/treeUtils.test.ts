@@ -17,8 +17,11 @@ import {
   mapInsertionTarget,
   escapeCollapsedInsertionTarget,
   determineMultiDepthDropTarget,
+  getAncestorIds,
+  getHighlightedContainerIds,
+  getAnnotationParentId,
 } from './treeUtils';
-import { WaypointNode } from '../types/store';
+import { WaypointNode, AnnotationGroup, AnnotationObject } from '../types/store';
 
 describe('treeUtils', () => {
   const nodes: Record<string, WaypointNode> = {
@@ -299,12 +302,16 @@ describe('treeUtils', () => {
     });
 
     it('falls back to root and clamps index when parent is deleted/missing', () => {
-      expect(validateAndCorrectInsertionTarget({ parentId: 'deleted-group', index: 2 }, testRootIds, testNodes)).toEqual({
+      expect(
+        validateAndCorrectInsertionTarget({ parentId: 'deleted-group', index: 2 }, testRootIds, testNodes),
+      ).toEqual({
         parentId: null,
         index: 2,
       });
 
-      expect(validateAndCorrectInsertionTarget({ parentId: 'deleted-group', index: 99 }, testRootIds, testNodes)).toEqual({
+      expect(
+        validateAndCorrectInsertionTarget({ parentId: 'deleted-group', index: 99 }, testRootIds, testNodes),
+      ).toEqual({
         parentId: null,
         index: 3,
       });
@@ -321,11 +328,7 @@ describe('treeUtils', () => {
       const genRoots = ['wp-1', 'gen-1', 'wp-2'];
 
       // When target points inside generator 'gen-1'
-      const corrected = validateAndCorrectInsertionTarget(
-        { parentId: 'gen-1', index: 1 },
-        genRoots,
-        genNodes
-      );
+      const corrected = validateAndCorrectInsertionTarget({ parentId: 'gen-1', index: 1 }, genRoots, genNodes);
       // gen-1 is at root index 1, so escaping places target after gen-1 at root index 2
       expect(corrected).toEqual({
         parentId: null,
@@ -353,13 +356,13 @@ describe('treeUtils', () => {
 
   describe('expandSelectionWithDescendants', () => {
     const testNodes: Record<string, WaypointNode> = {
-      'g1': { id: 'g1', type: 'manual_group', children_ids: ['w1', 'g2'] },
-      'w1': { id: 'w1', type: 'manual' },
-      'g2': { id: 'g2', type: 'manual_group', children_ids: ['w2'] },
-      'w2': { id: 'w2', type: 'manual' },
-      'gen': { id: 'gen', type: 'generator', children_ids: ['gw1'] },
-      'gw1': { id: 'gw1', type: 'manual' },
-      'root_w': { id: 'root_w', type: 'manual' },
+      g1: { id: 'g1', type: 'manual_group', children_ids: ['w1', 'g2'] },
+      w1: { id: 'w1', type: 'manual' },
+      g2: { id: 'g2', type: 'manual_group', children_ids: ['w2'] },
+      w2: { id: 'w2', type: 'manual' },
+      gen: { id: 'gen', type: 'generator', children_ids: ['gw1'] },
+      gw1: { id: 'gw1', type: 'manual' },
+      root_w: { id: 'root_w', type: 'manual' },
     };
 
     it('expands manual_group descendants recursively', () => {
@@ -381,9 +384,9 @@ describe('treeUtils', () => {
   describe('mapInsertionTarget', () => {
     it('maps insertion target when anchor node survives after transformation', () => {
       const oldNodes: Record<string, WaypointNode> = {
-        'w1': { id: 'w1', type: 'manual' },
-        'w2': { id: 'w2', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        w2: { id: 'w2', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const oldRoots = ['w1', 'w2', 'w3'];
 
@@ -392,8 +395,8 @@ describe('treeUtils', () => {
 
       // w1 is deleted, w2 moves to index 0
       const newNodes: Record<string, WaypointNode> = {
-        'w2': { id: 'w2', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w2: { id: 'w2', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const newRoots = ['w2', 'w3'];
 
@@ -404,9 +407,9 @@ describe('treeUtils', () => {
 
     it('tracks preceding sibling when anchor node is deleted', () => {
       const oldNodes: Record<string, WaypointNode> = {
-        'w1': { id: 'w1', type: 'manual' },
-        'w2': { id: 'w2', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        w2: { id: 'w2', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const oldRoots = ['w1', 'w2', 'w3'];
 
@@ -415,8 +418,8 @@ describe('treeUtils', () => {
 
       // w2 is deleted, w1 and w3 remain
       const newNodes: Record<string, WaypointNode> = {
-        'w1': { id: 'w1', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const newRoots = ['w1', 'w3'];
 
@@ -427,9 +430,9 @@ describe('treeUtils', () => {
 
     it('tracks ungrouped node when group is dissolved', () => {
       const oldNodes: Record<string, WaypointNode> = {
-        'grp': { id: 'grp', type: 'manual_group', children_ids: ['w1', 'w2'] },
-        'w1': { id: 'w1', type: 'manual' },
-        'w2': { id: 'w2', type: 'manual' },
+        grp: { id: 'grp', type: 'manual_group', children_ids: ['w1', 'w2'] },
+        w1: { id: 'w1', type: 'manual' },
+        w2: { id: 'w2', type: 'manual' },
       };
       const oldRoots = ['grp'];
 
@@ -438,8 +441,8 @@ describe('treeUtils', () => {
 
       // grp is ungrouped; w1 and w2 are now at root
       const newNodes: Record<string, WaypointNode> = {
-        'w1': { id: 'w1', type: 'manual' },
-        'w2': { id: 'w2', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        w2: { id: 'w2', type: 'manual' },
       };
       const newRoots = ['w1', 'w2'];
 
@@ -451,11 +454,11 @@ describe('treeUtils', () => {
     it('maintains position at Root index when Group is deleted after insertion target was set after Group', () => {
       // root: ['w0', 'w1', 'grp', 'w3']
       const oldNodes: Record<string, WaypointNode> = {
-        'w0': { id: 'w0', type: 'manual' },
-        'w1': { id: 'w1', type: 'manual' },
-        'grp': { id: 'grp', type: 'manual_group', children_ids: ['c1'] },
-        'c1': { id: 'c1', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w0: { id: 'w0', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        grp: { id: 'grp', type: 'manual_group', children_ids: ['c1'] },
+        c1: { id: 'c1', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const oldRoots = ['w0', 'w1', 'grp', 'w3'];
 
@@ -464,9 +467,9 @@ describe('treeUtils', () => {
 
       // grp and its children are deleted
       const newNodes: Record<string, WaypointNode> = {
-        'w0': { id: 'w0', type: 'manual' },
-        'w1': { id: 'w1', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w0: { id: 'w0', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const newRoots = ['w0', 'w1', 'w3'];
 
@@ -478,12 +481,12 @@ describe('treeUtils', () => {
     it('falls back to Group position at Root when target was inside Group and Group is deleted', () => {
       // root: ['w0', 'w1', 'grp', 'w3']
       const oldNodes: Record<string, WaypointNode> = {
-        'w0': { id: 'w0', type: 'manual' },
-        'w1': { id: 'w1', type: 'manual' },
-        'grp': { id: 'grp', type: 'manual_group', children_ids: ['c1', 'c2'] },
-        'c1': { id: 'c1', type: 'manual' },
-        'c2': { id: 'c2', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w0: { id: 'w0', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        grp: { id: 'grp', type: 'manual_group', children_ids: ['c1', 'c2'] },
+        c1: { id: 'c1', type: 'manual' },
+        c2: { id: 'c2', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const oldRoots = ['w0', 'w1', 'grp', 'w3'];
 
@@ -492,9 +495,9 @@ describe('treeUtils', () => {
 
       // grp and all children deleted
       const newNodes: Record<string, WaypointNode> = {
-        'w0': { id: 'w0', type: 'manual' },
-        'w1': { id: 'w1', type: 'manual' },
-        'w3': { id: 'w3', type: 'manual' },
+        w0: { id: 'w0', type: 'manual' },
+        w1: { id: 'w1', type: 'manual' },
+        w3: { id: 'w3', type: 'manual' },
       };
       const newRoots = ['w0', 'w1', 'w3'];
 
@@ -507,12 +510,12 @@ describe('treeUtils', () => {
       // parentGrp has ['w_prev', 'subgrp', 'w_next']
       // subgrp has ['sub_c1', 'sub_c2']
       const oldNodes: Record<string, WaypointNode> = {
-        'parentGrp': { id: 'parentGrp', type: 'manual_group', children_ids: ['w_prev', 'subgrp', 'w_next'] },
-        'w_prev': { id: 'w_prev', type: 'manual' },
-        'subgrp': { id: 'subgrp', type: 'manual_group', children_ids: ['sub_c1', 'sub_c2'] },
-        'sub_c1': { id: 'sub_c1', type: 'manual' },
-        'sub_c2': { id: 'sub_c2', type: 'manual' },
-        'w_next': { id: 'w_next', type: 'manual' },
+        parentGrp: { id: 'parentGrp', type: 'manual_group', children_ids: ['w_prev', 'subgrp', 'w_next'] },
+        w_prev: { id: 'w_prev', type: 'manual' },
+        subgrp: { id: 'subgrp', type: 'manual_group', children_ids: ['sub_c1', 'sub_c2'] },
+        sub_c1: { id: 'sub_c1', type: 'manual' },
+        sub_c2: { id: 'sub_c2', type: 'manual' },
+        w_next: { id: 'w_next', type: 'manual' },
       };
       const oldRoots = ['parentGrp'];
 
@@ -521,9 +524,9 @@ describe('treeUtils', () => {
 
       // subgrp deleted, parentGrp remains with ['w_prev', 'w_next']
       const newNodes: Record<string, WaypointNode> = {
-        'parentGrp': { id: 'parentGrp', type: 'manual_group', children_ids: ['w_prev', 'w_next'] },
-        'w_prev': { id: 'w_prev', type: 'manual' },
-        'w_next': { id: 'w_next', type: 'manual' },
+        parentGrp: { id: 'parentGrp', type: 'manual_group', children_ids: ['w_prev', 'w_next'] },
+        w_prev: { id: 'w_prev', type: 'manual' },
+        w_next: { id: 'w_next', type: 'manual' },
       };
       const newRoots = ['parentGrp'];
 
@@ -536,7 +539,7 @@ describe('treeUtils', () => {
   describe('escapeCollapsedInsertionTarget', () => {
     const testNodes: Record<string, WaypointNode> = {
       'grp-1': { id: 'grp-1', type: 'manual_group', children_ids: ['c1', 'subgrp-1'] },
-      'c1': { id: 'c1', type: 'manual' },
+      c1: { id: 'c1', type: 'manual' },
       'subgrp-1': { id: 'subgrp-1', type: 'manual_group', children_ids: ['sub-c1'] },
       'sub-c1': { id: 'sub-c1', type: 'manual' },
       'wp-end': { id: 'wp-end', type: 'manual' },
@@ -589,8 +592,8 @@ describe('treeUtils', () => {
     const testNodes: Record<string, WaypointNode> = {
       'wp-0': { id: 'wp-0', type: 'manual' },
       'grp-1': { id: 'grp-1', type: 'manual_group', children_ids: ['c1', 'c2'] },
-      'c1': { id: 'c1', type: 'manual' },
-      'c2': { id: 'c2', type: 'manual' },
+      c1: { id: 'c1', type: 'manual' },
+      c2: { id: 'c2', type: 'manual' },
       'wp-end': { id: 'wp-end', type: 'manual' },
     };
     const testRoots = ['wp-0', 'grp-1', 'wp-end'];
@@ -752,5 +755,104 @@ describe('treeUtils', () => {
       expect(targetOutermost).toEqual({ parentId: null, index: 1 });
     });
   });
-});
 
+  describe('getAncestorIds & getHighlightedContainerIds', () => {
+    const parentMap: Record<string, string | null> = {
+      'root-1': null,
+      'grp-1': null,
+      'wp-1': 'grp-1',
+      'subgrp-1': 'grp-1',
+      'wp-nested': 'subgrp-1',
+      'deep-grp': 'subgrp-1',
+      'wp-deep': 'deep-grp',
+    };
+    const getParent = (id: string) => parentMap[id] ?? null;
+
+    it('returns empty array for root items without ancestors', () => {
+      expect(getAncestorIds('root-1', getParent)).toEqual([]);
+      expect(getAncestorIds('grp-1', getParent)).toEqual([]);
+    });
+
+    it('returns direct parent for single-level child', () => {
+      expect(getAncestorIds('wp-1', getParent)).toEqual(['grp-1']);
+    });
+
+    it('returns all ancestors in bottom-up order for deeply nested item', () => {
+      expect(getAncestorIds('wp-deep', getParent)).toEqual(['deep-grp', 'subgrp-1', 'grp-1']);
+    });
+
+    it('prevents infinite loop on circular parent reference', () => {
+      const circularMap: Record<string, string | null> = {
+        a: 'b',
+        b: 'c',
+        c: 'a',
+      };
+      expect(getAncestorIds('a', (id) => circularMap[id] ?? null)).toEqual(['b', 'c']);
+    });
+
+    it('getHighlightedContainerIds collects unique ancestors from multiple selected ids', () => {
+      const selected = ['wp-1', 'wp-deep'];
+      const highlighted = getHighlightedContainerIds(selected, getParent);
+      expect(Array.from(highlighted)).toEqual(['grp-1', 'deep-grp', 'subgrp-1']);
+    });
+
+    it('returns empty set when no items or only root items are selected', () => {
+      expect(getHighlightedContainerIds([], getParent).size).toBe(0);
+      expect(getHighlightedContainerIds(['root-1'], getParent).size).toBe(0);
+    });
+  });
+
+  describe('getAnnotationParentId', () => {
+    const annotObjects: Record<string, AnnotationObject> = {
+      'obj-1': {
+        id: 'obj-1',
+        type: 'point',
+        name: 'Obj 1',
+        color: '#ff0000',
+        visible: true,
+        labelVisible: true,
+        x: 0,
+        y: 0,
+        group_id: 'grp-a',
+      },
+      'obj-root': {
+        id: 'obj-root',
+        type: 'point',
+        name: 'Obj Root',
+        color: '#ff0000',
+        visible: true,
+        labelVisible: true,
+        x: 0,
+        y: 0,
+      },
+    };
+    const annotGroups: Record<string, AnnotationGroup> = {
+      'grp-a': {
+        id: 'grp-a',
+        type: 'manual_group',
+        name: 'Grp A',
+        visible: true,
+        children_ids: ['obj-1'],
+        parent_id: 'grp-top',
+      },
+      'grp-top': { id: 'grp-top', type: 'manual_group', name: 'Grp Top', visible: true, children_ids: ['grp-a'] },
+    };
+    const rootAnnotIds = ['grp-top', 'obj-root'];
+
+    it('returns group_id for annotation object inside a group', () => {
+      expect(getAnnotationParentId('obj-1', rootAnnotIds, annotGroups, annotObjects)).toBe('grp-a');
+    });
+
+    it('returns null for root annotation object', () => {
+      expect(getAnnotationParentId('obj-root', rootAnnotIds, annotGroups, annotObjects)).toBeNull();
+    });
+
+    it('returns parent_id for child annotation group', () => {
+      expect(getAnnotationParentId('grp-a', rootAnnotIds, annotGroups, annotObjects)).toBe('grp-top');
+    });
+
+    it('returns null for root annotation group', () => {
+      expect(getAnnotationParentId('grp-top', rootAnnotIds, annotGroups, annotObjects)).toBeNull();
+    });
+  });
+});

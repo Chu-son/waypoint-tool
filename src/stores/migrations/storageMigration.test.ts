@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  migrateStorage,
-  DEFAULT_STORAGE_STATE,
-  STORAGE_VERSION,
-} from './storageMigration';
+import { migrateStorage, DEFAULT_STORAGE_STATE, STORAGE_VERSION } from './storageMigration';
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 
 describe('storageMigration', () => {
@@ -12,8 +8,12 @@ describe('storageMigration', () => {
     expect(migrateStorage(undefined, 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage('corrupt', 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage(12345, 0)).toEqual(DEFAULT_STORAGE_STATE);
-    expect(STORAGE_VERSION).toBe(2);
+    expect(STORAGE_VERSION).toBe(3);
     expect(DEFAULT_STORAGE_STATE.pluginSettings).toEqual([]);
+    expect(DEFAULT_STORAGE_STATE.panelLayout).toEqual({
+      leftTabs: ['waypoints', 'annotations', 'plugins'],
+      rightTabs: ['layers', 'inspector'],
+    });
   });
 
   it('promotes defaultExportFormats string array to object array on v0 migration', () => {
@@ -57,6 +57,25 @@ describe('storageMigration', () => {
     expect(corruptIndex.indexStartIndex).toBe(0);
   });
 
+  it('normalizes themeMode to dark or light correctly', () => {
+    expect(migrateStorage({ themeMode: 'light' }, 2).themeMode).toBe('light');
+    expect(migrateStorage({ themeMode: 'dark' }, 2).themeMode).toBe('dark');
+    expect(migrateStorage({ themeMode: 'unknown' }, 2).themeMode).toBe('light');
+    expect(migrateStorage({}, 2).themeMode).toBe('light');
+  });
+
+  it('normalizes and preserves themePreset correctly', () => {
+    expect(DEFAULT_STORAGE_STATE.themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: 'emerald' }, 2).themePreset).toBe('emerald');
+    expect(migrateStorage({ themePreset: 'ocean' }, 2).themePreset).toBe('ocean');
+    expect(migrateStorage({ themePreset: 'roomba' }, 2).themePreset).toBe('emerald');
+    expect(migrateStorage({ themePreset: 'dark' }, 2).themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: 'invalid_xyz' }, 2).themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: '' }, 2).themePreset).toBe('default');
+    expect(migrateStorage({ themePreset: null as any }, 2).themePreset).toBe('default');
+    expect(migrateStorage({}, 2).themePreset).toBe('default');
+  });
+
   it('fills missing default properties when partial state is provided', () => {
     const partialState = {
       lastDirectory: '/home/user/maps',
@@ -96,5 +115,39 @@ describe('storageMigration', () => {
     };
     const migrated = migrateStorage(state, 2);
     expect(migrated.pluginSettings).toEqual(validSettings);
+  });
+
+  it('migrates v2 state to v3 with panelLayout normalization and project tab expansion', () => {
+    const v2StateWithProject = {
+      panelLayout: {
+        leftTabs: ['project', 'plugins'],
+        rightTabs: ['layers', 'inspector'],
+      },
+      leftPanelActiveTab: 'project',
+      rightPanelActiveTab: 'inspector',
+    };
+    const migrated = migrateStorage(v2StateWithProject, 2);
+    expect(migrated.panelLayout).toEqual({
+      leftTabs: ['waypoints', 'annotations', 'plugins'],
+      rightTabs: ['layers', 'inspector'],
+    });
+    expect(migrated.leftPanelActiveTab).toBe('waypoints');
+    expect(migrated.rightPanelActiveTab).toBe('inspector');
+  });
+
+  it('ensures missing builtin tabs are supplemented in panelLayout', () => {
+    const partialLayoutState = {
+      panelLayout: {
+        leftTabs: ['waypoints'],
+        rightTabs: ['inspector'],
+      },
+    };
+    const migrated = migrateStorage(partialLayoutState, 2);
+    expect(migrated.panelLayout).toBeDefined();
+    expect(migrated.panelLayout!.leftTabs).toContain('waypoints');
+    expect(migrated.panelLayout!.leftTabs).toContain('annotations');
+    expect(migrated.panelLayout!.leftTabs).toContain('plugins');
+    expect(migrated.panelLayout!.rightTabs).toContain('inspector');
+    expect(migrated.panelLayout!.rightTabs).toContain('layers');
   });
 });

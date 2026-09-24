@@ -7,6 +7,8 @@ import {
   DEFAULT_OCCUPANCY_SETTINGS,
   DEFAULT_MAP_OPACITY,
   DEFAULT_EXPORT_FORMATS,
+  DEFAULT_CONDITIONAL_STYLES,
+  DEFAULT_CONDITIONAL_STYLES_ENABLED,
 } from './projectMigration';
 
 describe('projectMigration', () => {
@@ -22,6 +24,8 @@ describe('projectMigration', () => {
     expect(defaultData.occupancy_settings).toEqual(DEFAULT_OCCUPANCY_SETTINGS);
     expect(defaultData.default_map_opacity).toBe(DEFAULT_MAP_OPACITY);
     expect(defaultData.default_export_formats).toEqual(DEFAULT_EXPORT_FORMATS);
+    expect(defaultData.conditional_styles).toEqual(DEFAULT_CONDITIONAL_STYLES);
+    expect(defaultData.conditional_styles_enabled).toBe(DEFAULT_CONDITIONAL_STYLES_ENABLED);
   });
 
   it('migrates legacy v0 project with edit_layers and generated_layers to custom_layers', () => {
@@ -139,9 +143,7 @@ describe('projectMigration', () => {
           height: 500,
         },
       ],
-      annotationObjects: [
-        { id: 'ann-1', name: 'Point Ann' },
-      ],
+      annotationObjects: [{ id: 'ann-1', name: 'Point Ann' }],
       leftPanelViewMode: 'split',
       rightPanelViewMode: 'tabs',
       activePathCalculatorPluginId: 'plug-1',
@@ -225,7 +227,7 @@ describe('projectMigration', () => {
     expect(normalized.root_annotation_ids).toEqual(['ann-1', 'ann-2']);
   });
 
-  it('fully populates all 27 StrictProjectData fields when input is { version: 1 } without crashing', () => {
+  it('fully populates all 29 StrictProjectData fields when input is { version: 1 } without crashing', () => {
     const incompleteV1 = { version: 1 };
     let normalized: any;
     expect(() => {
@@ -259,6 +261,11 @@ describe('projectMigration', () => {
       'sync_path_width_with_footprint',
       'index_start_index',
       'decimal_precision',
+      'conditional_styles',
+      'conditional_styles_enabled',
+      'export_profiles',
+      'active_export_profile_id',
+      'geo_map',
       'custom_ui_data',
     ];
 
@@ -312,7 +319,11 @@ describe('projectMigration', () => {
     const polygonData = {
       robot_footprint: {
         type: 'polygon',
-        points: [[0, 0], [1, 0], [0, 1]],
+        points: [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+        ],
         radius: 0.5, // spurious radius
       },
     };
@@ -437,5 +448,109 @@ describe('projectMigration', () => {
     expect(normalized.nodes['gen-1'].plugin_id).toBe('sweep_offset_lines_generator');
     expect(normalized.nodes['gen-2'].plugin_id).toBe('sweep_generator_rs');
     expect(normalized.nodes['gen-3'].plugin_id).toBe('sweep_offset_lines_generator');
+  });
+
+  it('normalizes map layer origin and initial_origin properly', () => {
+    const rawData = {
+      map_layers: [
+        {
+          id: 'map-1',
+          name: 'Map 1',
+          info: {
+            origin: [1.5, 2.5, 0.1],
+          },
+        },
+        {
+          id: 'map-2',
+          name: 'Map 2',
+          info: {
+            origin: [5.0, 5.0, 0.0],
+            initial_origin: [0.0, 0.0, 0.0],
+          },
+        },
+        {
+          id: 'map-3',
+          name: 'Map 3',
+          info: {},
+        },
+      ],
+    };
+
+    const normalized = migrateAndNormalizeProjectData(rawData);
+    expect(normalized.map_layers).toHaveLength(3);
+
+    // Map 1: initial_origin should be copied from origin if missing
+    expect(normalized.map_layers[0].info.origin).toEqual([1.5, 2.5, 0.1]);
+    expect(normalized.map_layers[0].info.initial_origin).toEqual([1.5, 2.5, 0.1]);
+
+    // Map 2: initial_origin should be preserved if already present
+    expect(normalized.map_layers[1].info.origin).toEqual([5.0, 5.0, 0.0]);
+    expect(normalized.map_layers[1].info.initial_origin).toEqual([0.0, 0.0, 0.0]);
+
+    // Map 3: fallback to [0, 0, 0]
+    expect(normalized.map_layers[2].info.origin).toEqual([0, 0, 0]);
+    expect(normalized.map_layers[2].info.initial_origin).toEqual([0, 0, 0]);
+  });
+
+  it('preserves conditional_styles and normalizes annotation options', () => {
+    const rawData = {
+      conditional_styles: [
+        {
+          id: 'rule-1',
+          name: 'Fast Speed Red',
+          targetElement: 'waypoint',
+          enabled: true,
+          stopIfMatched: false,
+          condition: {
+            id: 'g-1',
+            type: 'group',
+            logicalOperator: 'and',
+            children: [
+              {
+                id: 'r-1',
+                type: 'rule',
+                property: 'options.speed',
+                operator: 'greater_than',
+                value: 1.5,
+              },
+            ],
+          },
+          style: {
+            waypoint: {
+              color: '#FF0000',
+              shape: 'star',
+            },
+          },
+        },
+      ],
+      conditional_styles_enabled: false,
+      annotation_objects: [
+        {
+          id: 'ann-1',
+          name: 'Zone A',
+          type: 'rect',
+          visible: true,
+          labelVisible: true,
+          options: { zone_type: 'danger' },
+        },
+        {
+          id: 'ann-2',
+          name: 'Point B',
+          type: 'point',
+          visible: true,
+          labelVisible: false,
+          // options missing
+        },
+      ],
+    };
+
+    const normalized = migrateAndNormalizeProjectData(rawData);
+    expect(normalized.conditional_styles).toHaveLength(1);
+    expect(normalized.conditional_styles[0].name).toBe('Fast Speed Red');
+    expect(normalized.conditional_styles_enabled).toBe(false);
+
+    expect(normalized.annotation_objects).toHaveLength(2);
+    expect(normalized.annotation_objects[0].options).toEqual({ zone_type: 'danger' });
+    expect(normalized.annotation_objects[1].options).toEqual({});
   });
 });

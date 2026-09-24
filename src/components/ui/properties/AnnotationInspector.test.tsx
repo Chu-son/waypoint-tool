@@ -76,4 +76,40 @@ describe('AnnotationInspector', () => {
     expect(screen.getByText('Width (m)')).toBeInTheDocument();
     expect(screen.getByText('Height (m)')).toBeInTheDocument();
   });
+
+  it('renders custom options when optionsSchema exists and handles changes', () => {
+    const point: PointAnnotation = {
+      id: 'pt-2',
+      name: 'Charge Point',
+      type: 'point',
+      x: 1.0,
+      y: 2.0,
+      visible: true,
+      labelVisible: true,
+      color: '#3B82F6',
+      options: {
+        type: 'charge',
+      },
+    };
+
+    useAppStore.setState({
+      selectedAnnotationIds: ['pt-2'],
+      annotationObjects: { 'pt-2': point },
+      optionsSchema: {
+        options: [{ name: 'type', label: 'Type', type: 'string', default: 'normal' }],
+      },
+    });
+
+    render(<AnnotationInspector />);
+    expect(screen.getByText(/カスタムオプション/)).toBeInTheDocument();
+    const typeInput = screen.getByDisplayValue('charge');
+    expect(typeInput).toBeInTheDocument();
+
+    fireEvent.change(typeInput, { target: { value: 'dock' } });
+    expect(mockUpdateAnnotationObject).toHaveBeenCalledWith('pt-2', {
+      options: {
+        type: 'dock',
+      },
+    });
+  });
 });

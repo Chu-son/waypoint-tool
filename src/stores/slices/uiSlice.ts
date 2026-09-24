@@ -1,16 +1,15 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 import { v4 as uuidv4 } from 'uuid';
+import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
+import { DEFAULT_PANEL_LAYOUT } from '../migrations/storageMigration';
+import type { ElementCopyState, PanelLayout } from '../../types/ui';
 
-export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
-export type ElementCopyCoordSystem = 'world' | 'anchor';
-
-export type ElementCopyState = {
-  field: ElementCopyField;
-  value: number;
-  coordSystem: ElementCopyCoordSystem;
-  previewNodeId: string | null;
-} | null;
+export interface TreeRevealTarget {
+  type: 'node' | 'annotation';
+  id: string;
+  timestamp: number;
+}
 
 export interface LoadingTask {
   id: string;
@@ -21,27 +20,42 @@ export interface LoadingTask {
 }
 
 export type UISlice = {
-  activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region';
+  activeTool:
+    'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region' | 'measure' | 'geo_align';
   isSidebarOpen: boolean;
   mouseCenteredZoom: boolean;
   visibleAttributes: string[];
   indexStartIndex: 0 | 1;
+  themeMode: 'dark' | 'light';
+  setThemeMode: (mode: 'dark' | 'light') => void;
+  themePreset: string;
+  setThemePreset: (preset: string) => void;
   isDirty: boolean;
   decimalPrecision: number;
   elementCopyState: ElementCopyState;
   setElementCopyState: (state: ElementCopyState) => void;
   clearElementCopyState: () => void;
-  
+
+  treeRevealTarget: TreeRevealTarget | null;
+  revealInTree: (type: 'node' | 'annotation', id: string) => void;
+  clearTreeRevealTarget: () => void;
+
   leftPanelWidth: number;
   rightPanelWidth: number;
   showProperties: boolean;
+  panelLayout: PanelLayout;
   leftPanelActiveTab: string;
   rightPanelActiveTab: string;
   leftPanelViewMode: 'tabs' | 'split';
   rightPanelViewMode: 'tabs' | 'split';
   isLeftPanelOpen: boolean;
   isRightPanelOpen: boolean;
-  
+
+  moveTabToPanel: (tabId: string, targetPanel: 'left' | 'right') => void;
+  reorderTab: (panel: 'left' | 'right', fromIndex: number, toIndex: number) => void;
+  activateTab: (tabId: string) => void;
+  resetPanelLayout: () => void;
+
   isSettingsModalOpen: boolean;
   isExportModalOpen: boolean;
   isImportModalOpen: boolean;
@@ -49,7 +63,7 @@ export type UISlice = {
   isShortcutsModalOpen: boolean;
   isWelcomeModalOpen: boolean;
   isInitialLaunch: boolean;
-  settingsModalTab: 'general' | 'options' | 'robot' | 'export' | 'plugins';
+  settingsModalTab: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles';
 
   // Plugin Data Viewer Modal State
   pluginDataModalState: {
@@ -82,7 +96,7 @@ export type UISlice = {
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
   setIsDirty: (dirty: boolean) => void;
-  
+
   setLeftPanelActiveTab: (tab: string) => void;
   setRightPanelActiveTab: (tab: string) => void;
   setLeftPanelViewMode: (mode: 'tabs' | 'split') => void;
@@ -93,22 +107,25 @@ export type UISlice = {
   setRightPanelWidth: (width: number) => void;
   setShowProperties: (show: boolean) => void;
   resetWindowLayout: () => void;
-  
-  setSettingsModalOpen: (open: boolean, tab?: 'general' | 'options' | 'robot' | 'export' | 'plugins') => void;
+
+  setSettingsModalOpen: (
+    open: boolean,
+    tab?: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles',
+  ) => void;
   setExportModalOpen: (open: boolean) => void;
   setImportModalOpen: (open: boolean) => void;
   setExportMapsModalOpen: (open: boolean) => void;
   setShortcutsModalOpen: (open: boolean) => void;
   setWelcomeModalOpen: (open: boolean) => void;
   setIsInitialLaunch: (initial: boolean) => void;
-  
+
   // Loading Tasks State
   activeLoadingTasks: Record<string, LoadingTask>;
   startLoading: (task: { id?: string; message: string; detail?: string; blocking?: boolean }) => string;
   stopLoading: (id: string) => void;
   runWithLoading: <T>(
     options: { id?: string; message: string; detail?: string; blocking?: boolean },
-    fn: () => Promise<T>
+    fn: () => Promise<T>,
   ) => Promise<T>;
 
   // Note: setDirty is mapped to setIsDirty in original store
@@ -160,14 +177,53 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   mouseCenteredZoom: true,
   visibleAttributes: [],
   indexStartIndex: 0,
+  themeMode: 'light',
+  setThemeMode: (mode: 'dark' | 'light') => set({ themeMode: mode === 'light' ? 'light' : 'dark' }),
+  themePreset: 'default',
+  setThemePreset: (preset: string) => {
+    const normalized =
+      preset === 'roomba'
+        ? 'emerald'
+        : preset === 'dark'
+          ? 'default'
+          : VALID_DARK_THEME_PRESET_IDS.includes(preset)
+            ? preset
+            : 'default';
+    set({ themePreset: normalized });
+  },
   isDirty: false,
   decimalPrecision: 6,
   elementCopyState: null,
 
-  setElementCopyState: (state: ElementCopyState) => set({ elementCopyState: state }),
-  clearElementCopyState: () => set({ elementCopyState: null }),
+  setElementCopyState: (copyState: ElementCopyState) => {
+    set({ elementCopyState: copyState });
+    if (copyState) {
+      get().transitionToMode?.({
+        mode: 'element_paste',
+        field: copyState.field,
+        value: copyState.value,
+        coordSystem: copyState.coordSystem,
+        previewNodeId: copyState.previewNodeId,
+      });
+    } else {
+      const state = get();
+      if (state.appMode?.mode === 'element_paste') {
+        state.transitionToMode?.({ mode: 'select' });
+      }
+    }
+  },
+  clearElementCopyState: () => {
+    const state = get();
+    if (state.appMode?.mode === 'element_paste') {
+      state.transitionToMode?.({ mode: 'select' });
+    }
+    set({ elementCopyState: null });
+  },
 
-  leftPanelActiveTab: 'project',
+  treeRevealTarget: null,
+
+  panelLayout: DEFAULT_PANEL_LAYOUT,
+  leftPanelActiveTab: 'waypoints',
   rightPanelActiveTab: 'layers',
   leftPanelViewMode: 'tabs',
   rightPanelViewMode: 'tabs',
@@ -192,7 +248,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     subtitle: undefined,
     data: null,
   },
-  openPluginDataModal: (title, data, subtitle) =>
+  openPluginDataModal: (title, data, subtitle) => {
+    get().pushModal?.('plugin_data');
     set({
       pluginDataModalState: {
         isOpen: true,
@@ -200,14 +257,17 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         subtitle,
         data,
       },
-    }),
-  closePluginDataModal: () =>
+    });
+  },
+  closePluginDataModal: () => {
+    get().closeModal?.('plugin_data');
     set((state) => ({
       pluginDataModalState: {
         ...state.pluginDataModalState,
         isOpen: false,
       },
-    })),
+    }));
+  },
 
   isMapEditMode: false,
   mapEditSubTool: 'rect',
@@ -217,42 +277,218 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   activeMapLayerId: null,
   selectedEditObjectId: null,
 
-  setMapEditMode: (enabled) => set((state) => ({
-    isMapEditMode: enabled,
-    isAnnotationEditMode: enabled ? false : state.isAnnotationEditMode,
-  })),
+  setMapEditMode: (enabled) => {
+    const state = get();
+    if (enabled) {
+      if (state.transitionToMode) {
+        state.transitionToMode({
+          mode: 'custom_layer_edit',
+          subTool: state.mapEditSubTool,
+          targetLayerId:
+            state.activeCustomLayerId ||
+            state.activeEditLayerId ||
+            state.customLayers?.find((l) => l.type === 'manual')?.id ||
+            '',
+          fillValue: state.mapEditFillValue,
+          brushSize: state.mapEditBrushSize,
+        });
+      } else {
+        set({ isMapEditMode: true });
+      }
+    } else {
+      set({ isMapEditMode: false });
+      if (state.appMode?.mode === 'custom_layer_edit') {
+        state.transitionToMode?.({ mode: 'select' });
+      }
+    }
+  },
   setMapEditSubTool: (tool) => set({ mapEditSubTool: tool }),
   setMapEditFillValue: (value) => set({ mapEditFillValue: value }),
   setMapEditBrushSize: (size) => set({ mapEditBrushSize: size }),
   setActiveEditLayerId: (id) => set({ activeEditLayerId: id }),
   setActiveMapLayerId: (id) => set({ activeMapLayerId: id }),
-  setSelectedEditObjectId: (id) => set({ selectedEditObjectId: id }),
+  setSelectedEditObjectId: (id) => {
+    const state = get();
+    set({ selectedEditObjectId: id });
+    if (id) {
+      const layerId = state.activeCustomLayerId || state.activeEditLayerId || '';
+      state.setSelection?.({
+        type: 'custom_layer',
+        layerId,
+        selectedObjectId: id,
+      });
+    }
+  },
 
   setDirty: (dirty: boolean) => set({ isDirty: dirty }),
   setIsDirty: (dirty: boolean) => set({ isDirty: dirty }),
 
-  setActiveTool: (tool: AppState['activeTool']) => set((state) => {
-    const updates: Partial<AppState> = { activeTool: tool };
-    if (tool === 'add_generator') {
-      updates.rightPanelActiveTab = 'inspector';
-    }
-    if (tool !== 'select' && state.isAnnotationEditMode) {
-      updates.isAnnotationEditMode = false;
-    }
+  setActiveTool: (tool: AppState['activeTool']) => {
+    const state = get();
     if (state.isMapEditMode) {
-      updates.isMapEditMode = false;
+      set({ isMapEditMode: false });
     }
-    return updates;
-  }),
+    if (state.transitionToMode) {
+      if (tool === 'select') {
+        state.transitionToMode({ mode: 'select' });
+      } else if (tool === 'add_point') {
+        state.transitionToMode({
+          mode: 'waypoint_add',
+          snapInput: '',
+          lockedWaypointId: null,
+          forcedAxis: null,
+          forcedSign: null,
+        });
+      } else if (tool === 'add_generator') {
+        state.transitionToMode({
+          mode: 'generator_add',
+          pluginId: state.activePluginId,
+        });
+      } else if (tool === 'add_export_region') {
+        state.transitionToMode({
+          mode: 'export_region_edit',
+        });
+      } else if (tool === 'measure') {
+        state.transitionToMode({
+          mode: 'measure',
+        });
+      } else if (tool === 'geo_align') {
+        state.transitionToMode({ mode: 'geo_map_align' });
+      } else {
+        state.transitionToMode({ mode: 'select' });
+      }
+    } else {
+      set({ activeTool: tool, isMapEditMode: false });
+    }
+  },
 
-  toggleAttributeVisibility: (attr: string) => set((state) => {
-    const next = state.visibleAttributes.includes(attr) 
-      ? state.visibleAttributes.filter(a => a !== attr)
-      : [...state.visibleAttributes, attr];
-    return { visibleAttributes: next, isDirty: true };
-  }),
+  toggleAttributeVisibility: (attr: string) =>
+    set((state) => {
+      const next = state.visibleAttributes.includes(attr)
+        ? state.visibleAttributes.filter((a) => a !== attr)
+        : [...state.visibleAttributes, attr];
+      return { visibleAttributes: next, isDirty: true };
+    }),
 
   setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
+
+  revealInTree: (type, id) => {
+    const targetTab = type === 'node' ? 'waypoints' : 'annotations';
+    get().activateTab(targetTab);
+    set({
+      treeRevealTarget: { type, id, timestamp: Date.now() },
+    });
+  },
+  clearTreeRevealTarget: () => set({ treeRevealTarget: null }),
+
+  moveTabToPanel: (tabId, targetPanel) => {
+    const state = get();
+    const currentLayout = state.panelLayout;
+    const sourcePanel = targetPanel === 'left' ? 'right' : 'left';
+    const sourceKey = sourcePanel === 'left' ? 'leftTabs' : 'rightTabs';
+    const targetKey = targetPanel === 'left' ? 'leftTabs' : 'rightTabs';
+
+    if (!currentLayout[sourceKey].includes(tabId)) {
+      return;
+    }
+
+    const nextSourceTabs = currentLayout[sourceKey].filter((t) => t !== tabId);
+    const nextTargetTabs = [...currentLayout[targetKey], tabId];
+
+    const nextLayout: PanelLayout = {
+      ...currentLayout,
+      [sourceKey]: nextSourceTabs,
+      [targetKey]: nextTargetTabs,
+    };
+
+    const updates: Partial<AppState> = {
+      panelLayout: nextLayout,
+      isDirty: true,
+    };
+
+    // 移動先パネルを開き、移動したタブをアクティブにする
+    if (targetPanel === 'left') {
+      updates.isLeftPanelOpen = true;
+      updates.leftPanelActiveTab = tabId;
+    } else {
+      updates.isRightPanelOpen = true;
+      updates.rightPanelActiveTab = tabId;
+    }
+
+    // 移動元パネルのアクティブタブが移動対象だった場合、残りの先頭タブに切り替える
+    if (sourcePanel === 'left') {
+      if (state.leftPanelActiveTab === tabId) {
+        updates.leftPanelActiveTab = nextSourceTabs[0] || '';
+      }
+      if (nextSourceTabs.length === 0) {
+        updates.isLeftPanelOpen = false;
+      }
+    } else {
+      if (state.rightPanelActiveTab === tabId) {
+        updates.rightPanelActiveTab = nextSourceTabs[0] || '';
+      }
+      if (nextSourceTabs.length === 0) {
+        updates.isRightPanelOpen = false;
+      }
+    }
+
+    set(updates as any);
+  },
+
+  reorderTab: (panel, fromIndex, toIndex) => {
+    const state = get();
+    const key = panel === 'left' ? 'leftTabs' : 'rightTabs';
+    const tabs = [...state.panelLayout[key]];
+    if (fromIndex < 0 || fromIndex >= tabs.length || toIndex < 0 || toIndex >= tabs.length || fromIndex === toIndex) {
+      return;
+    }
+    const [moved] = tabs.splice(fromIndex, 1);
+    tabs.splice(toIndex, 0, moved);
+    set({
+      panelLayout: {
+        ...state.panelLayout,
+        [key]: tabs,
+      },
+      isDirty: true,
+    });
+  },
+
+  activateTab: (tabId) => {
+    const state = get();
+    const normalizedTabId = tabId === 'project' ? 'waypoints' : tabId;
+
+    if (state.panelLayout.leftTabs.includes(normalizedTabId)) {
+      set({
+        isLeftPanelOpen: true,
+        leftPanelActiveTab: normalizedTabId,
+      });
+    } else if (state.panelLayout.rightTabs.includes(normalizedTabId)) {
+      set({
+        isRightPanelOpen: true,
+        rightPanelActiveTab: normalizedTabId,
+      });
+    } else {
+      // 未知またはカスタムタブの場合は現在右パネルで開く
+      set({
+        isRightPanelOpen: true,
+        rightPanelActiveTab: normalizedTabId,
+      });
+    }
+  },
+
+  resetPanelLayout: () => {
+    set({
+      panelLayout: {
+        leftTabs: [...DEFAULT_PANEL_LAYOUT.leftTabs],
+        rightTabs: [...DEFAULT_PANEL_LAYOUT.rightTabs],
+      },
+      leftPanelActiveTab: 'waypoints',
+      rightPanelActiveTab: 'layers',
+      isLeftPanelOpen: true,
+      isRightPanelOpen: true,
+      isDirty: true,
+    });
+  },
 
   setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
   setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
@@ -263,27 +499,45 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setLeftPanelWidth: (width) => set({ leftPanelWidth: width, isDirty: true }),
   setRightPanelWidth: (width) => set({ rightPanelWidth: width, isDirty: true }),
   setShowProperties: (show) => set({ showProperties: show, isDirty: true }),
-  
-  resetWindowLayout: () => set({
-    isLeftPanelOpen: true,
-    isRightPanelOpen: true,
-    leftPanelViewMode: 'tabs',
-    rightPanelViewMode: 'tabs',
-    leftPanelActiveTab: 'project',
-    rightPanelActiveTab: 'layers',
-    leftPanelWidth: 280,
-    rightPanelWidth: 320,
-    isDirty: true
-  }),
 
-  setSettingsModalOpen: (open, tab) => set((state) => ({
-    isSettingsModalOpen: open,
-    settingsModalTab: tab || state.settingsModalTab
-  })),
-  setExportModalOpen: (open) => set({ isExportModalOpen: open }),
-  setImportModalOpen: (open) => set({ isImportModalOpen: open }),
-  setExportMapsModalOpen: (open) => set({ isExportMapsModalOpen: open }),
-  setShortcutsModalOpen: (open) => set({ isShortcutsModalOpen: open }),
-  setWelcomeModalOpen: (open) => set({ isWelcomeModalOpen: open }),
+  resetWindowLayout: () => {
+    get().resetPanelLayout();
+    set({
+      leftPanelViewMode: 'tabs',
+      rightPanelViewMode: 'tabs',
+      leftPanelWidth: 280,
+      rightPanelWidth: 320,
+      isDirty: true,
+    });
+  },
+
+  setSettingsModalOpen: (open, tab) => {
+    if (open) {
+      get().pushModal?.('settings');
+      if (tab) set({ settingsModalTab: tab });
+    } else {
+      get().closeModal?.('settings');
+    }
+  },
+  setExportModalOpen: (open) => {
+    if (open) get().pushModal?.('export');
+    else get().closeModal?.('export');
+  },
+  setImportModalOpen: (open) => {
+    if (open) get().pushModal?.('import');
+    else get().closeModal?.('import');
+  },
+  setExportMapsModalOpen: (open) => {
+    if (open) get().pushModal?.('export_maps');
+    else get().closeModal?.('export_maps');
+  },
+  setShortcutsModalOpen: (open) => {
+    if (open) get().pushModal?.('shortcuts');
+    else get().closeModal?.('shortcuts');
+  },
+  setWelcomeModalOpen: (open) => {
+    if (open) get().pushModal?.('welcome');
+    else get().closeModal?.('welcome');
+  },
   setIsInitialLaunch: (initial) => set({ isInitialLaunch: initial }),
 });

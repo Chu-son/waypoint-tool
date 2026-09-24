@@ -1,20 +1,22 @@
-import { useState, useEffect } from "react";
-import { useAppStore } from "../../../stores/appStore";
-import { DialogAPI } from "../../../api";
-import { PluginInstance } from "../../../types/store";
-import { Button } from "../common/Button";
-import { Label } from "../common/Label";
-import { Select } from "../common/Select";
-import { Input } from "../common/Input";
-import { Slider } from "../common/Slider";
-import { Checkbox } from "../common/Checkbox";
-import { AlertBox } from "../common/AlertBox";
-import { FieldLabel } from "../common/FieldLabel";
-import { PluginPropertyEditor } from "../PluginPropertyEditor";
-import { PluginInputEditor } from "../PluginInputEditor";
-import { PluginDataViewer } from "../common/PluginDataViewer";
-import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Square, Circle, Slash, Bookmark, Code2, Maximize2 } from "lucide-react";
-import { cn } from "../../../utils/cn";
+import { ManualLayerTools } from './ManualLayerTools';
+import { useState, useEffect, useRef } from 'react';
+import { useAppStore } from '../../../stores/appStore';
+import { DialogAPI } from '../../../api';
+import { PluginInstance } from '../../../types/store';
+import { Button } from '../common/Button';
+import { Label } from '../common/Label';
+import { Select } from '../common/Select';
+import { Input } from '../common/Input';
+import { Slider } from '../common/Slider';
+import { Checkbox } from '../common/Checkbox';
+import { AlertBox } from '../common/AlertBox';
+import { FieldLabel } from '../common/FieldLabel';
+import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
+import { PipelineInspector } from './PipelineInspector';
+import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Bookmark } from 'lucide-react';
+import { cn } from '../../../utils/cn';
+import { InternalPropertiesSection } from './InternalPropertiesSection';
 
 export function CustomLayerInspector() {
   const customLayers = useAppStore((state) => state.customLayers) || [];
@@ -22,8 +24,6 @@ export function CustomLayerInspector() {
   const setActiveCustomLayerId = useAppStore((state) => state.setActiveCustomLayerId);
   const updateCustomLayer = useAppStore((state) => state.updateCustomLayer);
   const removeCustomLayer = useAppStore((state) => state.removeCustomLayer);
-  const removeEditObject = useAppStore((state) => state.removeEditObject);
-  const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
 
   const plugins = useAppStore((state) => state.plugins) || {};
   const pluginInteractionData = useAppStore((state) => state.pluginInteractionData) || {};
@@ -39,52 +39,55 @@ export function CustomLayerInspector() {
   // Map Edit States
   const isMapEditMode = useAppStore((state) => state.isMapEditMode);
   const setMapEditMode = useAppStore((state) => state.setMapEditMode);
-  const mapEditSubTool = useAppStore((state) => state.mapEditSubTool);
-  const setMapEditSubTool = useAppStore((state) => state.setMapEditSubTool);
-  const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
-  const setMapEditFillValue = useAppStore((state) => state.setMapEditFillValue);
-  const mapEditBrushSize = useAppStore((state) => state.mapEditBrushSize);
-  const setMapEditBrushSize = useAppStore((state) => state.setMapEditBrushSize);
-  const selectedEditObjectId = useAppStore((state) => state.selectedEditObjectId);
-  const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
 
   const existingLayer = customLayers.find((l) => l.id === activeCustomLayerId);
-  const isNewPluginLayer = !existingLayer || activeCustomLayerId === "new";
+  const isNewPluginLayer = !existingLayer || activeCustomLayerId === 'new';
 
   const layerPlugins = Object.values(plugins).filter(
-    (p) => p && p.manifest && p.manifest.category === "map_layer_generator"
+    (p) => p && p.manifest && p.manifest.category === 'map_layer_generator',
   );
 
   const [selectedPluginId, setSelectedPluginId] = useState<string>(() => {
-    if (existingLayer && existingLayer.type === "plugin") return existingLayer.plugin_id;
-    if (activePluginId && plugins[activePluginId]?.manifest.category === "map_layer_generator") {
+    if (existingLayer && existingLayer.type === 'plugin') return existingLayer.plugin_id;
+    if (activePluginId && plugins[activePluginId]?.manifest.category === 'map_layer_generator') {
       return activePluginId;
     }
-    return layerPlugins[0]?.id || "";
+    return layerPlugins[0]?.id || '';
   });
 
   const [params, setParams] = useState<Record<string, any>>({});
-  const [layerName, setLayerName] = useState<string>("");
+  const [layerName, setLayerName] = useState<string>('');
   const [layerOpacity, setLayerOpacity] = useState<number>(1.0);
-  const [blendMode, setBlendMode] = useState<"overwrite" | "merge_obstacles" | "merge_free">("overwrite");
+  const [blendMode, setBlendMode] = useState<'overwrite' | 'merge_obstacles' | 'merge_free'>('overwrite');
   const [isReference, setIsReference] = useState<boolean>(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
+
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const activePlugin: PluginInstance | undefined = plugins[selectedPluginId];
 
   // Initialize state on active layer change
   useEffect(() => {
+    if (existingLayer?.pipeline_metadata) {
+      return; // Skip side effects for pipeline-bound layers; PipelineInspector handles its own lifecycle
+    }
+
     if (existingLayer) {
       setLayerName(existingLayer.name);
       setLayerOpacity(existingLayer.opacity ?? 1.0);
-      setBlendMode(existingLayer.blend_mode || "overwrite");
+      setBlendMode(existingLayer.blend_mode || 'overwrite');
       setIsReference(!!existingLayer.is_reference);
 
-      if (existingLayer.type === "plugin") {
+      if (existingLayer.type === 'plugin') {
         setSelectedPluginId(existingLayer.plugin_id);
         setActivePlugin(existingLayer.plugin_id);
-        setActiveTool("add_generator");
         setParams({ ...existingLayer.params });
 
         clearPluginInteractionData();
@@ -94,27 +97,30 @@ export function CustomLayerInspector() {
           });
         }
       } else {
-        // Manual layer
-        setActiveTool("select");
+        // Manual layer: マップ編集モード開始直後の呼び出しで isMapEditMode/activeCustomLayerId をリセットしないよう回避
+        if (!isMapEditMode) {
+          setActiveTool('select');
+        }
       }
     } else {
       // New plugin layer creation
-      const pluginIdToUse = (activePluginId && plugins[activePluginId]?.manifest.category === "map_layer_generator")
-        ? activePluginId
-        : (layerPlugins[0]?.id || "");
+      const pluginIdToUse =
+        activePluginId && plugins[activePluginId]?.manifest.category === 'map_layer_generator'
+          ? activePluginId
+          : layerPlugins[0]?.id || '';
 
       setSelectedPluginId(pluginIdToUse);
       setActivePlugin(pluginIdToUse);
-      setActiveTool("add_generator");
-      setLayerName(plugins[pluginIdToUse]?.manifest.name || "Generated Layer");
+      setActiveTool('add_generator');
+      setLayerName(plugins[pluginIdToUse]?.manifest.name || 'Generated Layer');
       setLayerOpacity(0.7);
-      setBlendMode("overwrite");
+      setBlendMode('overwrite');
       setIsReference(false);
 
       if (pluginIdToUse && plugins[pluginIdToUse]) {
         const initialParams: Record<string, any> = {};
         plugins[pluginIdToUse].manifest.properties?.forEach((prop) => {
-          if (prop.name) initialParams[prop.name] = prop.default ?? "";
+          if (prop.name) initialParams[prop.name] = prop.default ?? '';
         });
         setParams(initialParams);
       } else {
@@ -123,14 +129,22 @@ export function CustomLayerInspector() {
       clearPluginInteractionData();
     }
     setErrorInfo(null);
-  }, [activeCustomLayerId]);
+  }, [activeCustomLayerId, isMapEditMode]);
 
   // Sync active properties to store for canvas interaction hints
   useEffect(() => {
-    if (activePlugin && setPluginActiveProperties && (isNewPluginLayer || existingLayer?.type === "plugin")) {
+    if (existingLayer?.pipeline_metadata) return;
+    if (activePlugin && setPluginActiveProperties && (isNewPluginLayer || existingLayer?.type === 'plugin')) {
       setPluginActiveProperties(params);
     }
-  }, [params, activePlugin, setPluginActiveProperties, isNewPluginLayer, existingLayer?.type]);
+  }, [
+    params,
+    activePlugin,
+    setPluginActiveProperties,
+    isNewPluginLayer,
+    existingLayer?.type,
+    existingLayer?.pipeline_metadata,
+  ]);
 
   const handlePluginChange = (pluginId: string) => {
     setSelectedPluginId(pluginId);
@@ -139,7 +153,7 @@ export function CustomLayerInspector() {
     if (p) {
       const initialParams: Record<string, any> = {};
       p.manifest.properties?.forEach((prop) => {
-        if (prop.name) initialParams[prop.name] = prop.default ?? "";
+        if (prop.name) initialParams[prop.name] = prop.default ?? '';
       });
       setParams(initialParams);
       if (isNewPluginLayer) {
@@ -159,7 +173,7 @@ export function CustomLayerInspector() {
     try {
       await runWithLoading(
         {
-          message: "カスタムレイヤーを生成中...",
+          message: 'カスタムレイヤーを生成中...',
           detail: activePlugin.manifest.name || activePlugin.id,
           blocking: true,
         },
@@ -189,37 +203,47 @@ export function CustomLayerInspector() {
               blend_mode: blendMode,
               is_reference: isReference,
             });
-            setActiveTool("select");
+            setActiveTool('select');
           }
-        }
+        },
       );
     } catch (err: any) {
-      console.error("Custom layer generation failed:", err);
-      setErrorInfo(err.toString());
+      console.error('Custom layer generation failed:', err);
+      if (isMountedRef.current) {
+        setErrorInfo(err.toString());
+      }
     } finally {
-      setIsExecuting(false);
+      if (isMountedRef.current) {
+        setIsExecuting(false);
+      }
     }
   };
 
   const handleClose = () => {
     setActiveCustomLayerId(null);
     setMapEditMode(false);
-    setActiveTool("select");
+    setActiveTool('select');
     setActivePlugin(null);
     clearPluginInteractionData();
   };
 
   const handleDelete = async () => {
     if (!existingLayer) return;
-    const confirmed = await DialogAPI.ask(
-      `カスタムレイヤー「${existingLayer.name}」を削除してもよろしいですか？`,
-      { title: "レイヤーの削除", kind: "warning" }
-    );
+    const confirmed = await DialogAPI.ask(`カスタムレイヤー「${existingLayer.name}」を削除してもよろしいですか？`, {
+      title: 'レイヤーの削除',
+      kind: 'warning',
+    });
     if (confirmed) {
       removeCustomLayer(existingLayer.id);
       handleClose();
     }
   };
+
+  if (existingLayer?.pipeline_metadata) {
+    return (
+      <PipelineInspector pipelineMetadata={existingLayer.pipeline_metadata} targetCustomLayerId={existingLayer.id} />
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto w-full flex flex-col bg-surface-panel/30 divide-y divide-border-base/30">
@@ -227,28 +251,30 @@ export function CustomLayerInspector() {
       <div className="p-4 bg-surface-panel/50 flex justify-between items-start">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <div className={cn(
-              "p-1.5 rounded-lg",
-              isNewPluginLayer || existingLayer?.type === "plugin"
-                ? "bg-accent-automation/10 text-accent-automation"
-                : "bg-primary-base/10 text-primary-base"
-            )}>
-              {isNewPluginLayer || existingLayer?.type === "plugin" ? <Sparkles size={16} /> : <Pencil size={16} />}
+            <div
+              className={cn(
+                'p-1.5 rounded-lg',
+                isNewPluginLayer || existingLayer?.type === 'plugin'
+                  ? 'bg-accent-automation/10 text-accent-automation'
+                  : 'bg-primary-base/10 text-primary-base',
+              )}
+            >
+              {isNewPluginLayer || existingLayer?.type === 'plugin' ? <Sparkles size={16} /> : <Pencil size={16} />}
             </div>
             <div>
               <span className="text-xs font-bold text-text-base">
                 {isNewPluginLayer
-                  ? "Generate Plugin Layer"
-                  : existingLayer?.type === "manual"
-                  ? "Manual Custom Layer"
-                  : "Plugin Custom Layer"}
+                  ? 'Generate Plugin Layer'
+                  : existingLayer?.type === 'manual'
+                    ? 'Manual Custom Layer'
+                    : 'Plugin Custom Layer'}
               </span>
               <p className="text-[10px] text-text-muted">
                 {isNewPluginLayer
-                  ? "Configure and generate an overlay layer"
-                  : existingLayer?.type === "manual"
-                  ? "Vector draw tools and layer settings"
-                  : activePlugin?.manifest.name}
+                  ? 'Configure and generate an overlay layer'
+                  : existingLayer?.type === 'manual'
+                    ? 'Vector draw tools and layer settings'
+                    : activePlugin?.manifest.name}
               </p>
             </div>
           </div>
@@ -283,193 +309,10 @@ export function CustomLayerInspector() {
         )}
 
         {/* --- SECTION A: Manual Vector Layer Tools --- */}
-        {existingLayer && existingLayer.type === "manual" && (
-          <div className="space-y-4">
-            {/* Draw Mode Banner / Toggle */}
-            <div className="space-y-2">
-              <FieldLabel className="text-[10px]">Vector Drawing Tools</FieldLabel>
-              <div className="grid grid-cols-4 gap-1.5 bg-surface-base/60 p-1 rounded-xl border border-border-base/40">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMapEditSubTool("line");
-                    setMapEditMode(true);
-                  }}
-                  className={cn(
-                    "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
-                    isMapEditMode && mapEditSubTool === "line"
-                      ? "bg-primary-base text-text-inverse shadow-sm"
-                      : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-                  )}
-                >
-                  <Slash size={14} />
-                  <span>Line</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMapEditSubTool("rect");
-                    setMapEditMode(true);
-                  }}
-                  className={cn(
-                    "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
-                    isMapEditMode && mapEditSubTool === "rect"
-                      ? "bg-primary-base text-text-inverse shadow-sm"
-                      : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-                  )}
-                >
-                  <Square size={14} />
-                  <span>Rectangle</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMapEditSubTool("circle");
-                    setMapEditMode(true);
-                  }}
-                  className={cn(
-                    "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
-                    isMapEditMode && mapEditSubTool === "circle"
-                      ? "bg-primary-base text-text-inverse shadow-sm"
-                      : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-                  )}
-                >
-                  <Circle size={14} />
-                  <span>Circle</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMapEditSubTool("freehand");
-                    setMapEditMode(true);
-                  }}
-                  className={cn(
-                    "flex flex-col items-center justify-center py-2 px-1 rounded-lg text-[10px] font-semibold gap-1 transition-all",
-                    isMapEditMode && mapEditSubTool === "freehand"
-                      ? "bg-primary-base text-text-inverse shadow-sm"
-                      : "text-text-muted hover:text-text-base hover:bg-surface-hover/50"
-                  )}
-                >
-                  <Pencil size={14} />
-                  <span>Brush</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Fill Mode: Obstacle vs Free Space */}
-            <div className="space-y-1.5">
-              <Label className="text-[11px] font-semibold text-text-muted">Paint Fill Type</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMapEditFillValue(0)}
-                  className={cn(
-                    "flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all",
-                    mapEditFillValue === 0
-                      ? "bg-surface-base border-border-base text-text-inverse shadow-sm"
-                      : "bg-surface-panel border-border-base/40 text-text-muted hover:text-text-base"
-                  )}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-surface-base border border-border-base" />
-                  <span>Obstacle (0)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMapEditFillValue(255)}
-                  className={cn(
-                    "flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1.5 transition-all",
-                    mapEditFillValue === 255
-                      ? "bg-text-inverse border-border-base text-surface-base shadow-sm"
-                      : "bg-surface-panel border-border-base/40 text-text-muted hover:text-text-base"
-                  )}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-text-inverse border border-border-base" />
-                  <span>Free (255)</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Brush Size (for Freehand) */}
-            {mapEditSubTool === "freehand" && (
-              <div className="space-y-1">
-                <div className="flex justify-between items-center text-[10px] text-text-muted font-medium">
-                  <span>Brush Radius</span>
-                  <span>{mapEditBrushSize} px</span>
-                </div>
-                <Slider
-                  min={2}
-                  max={50}
-                  step={1}
-                  value={mapEditBrushSize}
-                  onChange={(e) => setMapEditBrushSize(parseInt(e.target.value))}
-                />
-              </div>
-            )}
-
-            {/* Vector Objects Count & List */}
-            <div className="space-y-2 pt-2 border-t border-border-base/30">
-              <div className="flex justify-between items-center">
-                <FieldLabel className="text-[10px]">Drawn Objects</FieldLabel>
-                <span className="text-[10px] text-text-muted">
-                  {existingLayer.editObjects.length} objects
-                </span>
-              </div>
-              {existingLayer.editObjects.length === 0 ? (
-                <p className="text-[11px] text-text-muted bg-surface-base/40 p-2.5 rounded-xl text-center border border-border-base/20">
-                  No objects drawn yet. Drag on canvas to draw.
-                </p>
-              ) : (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                  {existingLayer.editObjects.map((obj, idx) => (
-                    <div
-                      key={obj.id}
-                      onClick={() => setSelectedEditObjectId(obj.id)}
-                      className={cn(
-                        "p-2 rounded-xl border text-xs flex items-center justify-between cursor-pointer transition-all",
-                        selectedEditObjectId === obj.id
-                          ? "bg-primary-base/10 border-primary-base/50 text-text-base"
-                          : "bg-surface-base/40 border-border-base/30 text-text-muted hover:bg-surface-hover/40"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        {obj.type === "line" ? (
-                          <Slash size={13} />
-                        ) : obj.type === "rect" ? (
-                          <Square size={13} />
-                        ) : obj.type === "circle" ? (
-                          <Circle size={13} />
-                        ) : (
-                          <Pencil size={13} />
-                        )}
-                        <span className="font-medium capitalize">{obj.type} #{idx + 1}</span>
-                        <span className="text-[9px] px-1 py-0.5 rounded bg-surface-panel/80 text-text-muted">
-                          {obj.fillValue === 0 ? "Obstacle" : "Free"}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-text-muted hover:text-danger-base"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeEditObject(existingLayer.id, obj.id);
-                        }}
-                      >
-                        <Trash2 size={12} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {existingLayer && existingLayer.type === 'manual' && <ManualLayerTools layer={existingLayer} />}
 
         {/* --- SECTION B: Plugin Generator Layer Settings --- */}
-        {(isNewPluginLayer || existingLayer?.type === "plugin") && (
+        {(isNewPluginLayer || existingLayer?.type === 'plugin') && (
           <div className="space-y-4">
             {isNewPluginLayer && (
               <div className="space-y-1.5">
@@ -539,47 +382,13 @@ export function CustomLayerInspector() {
             )}
 
             {/* Internal Properties (Read-only Metadata) */}
-            {!isNewPluginLayer && existingLayer?.type === "plugin" && (
-              <div className="space-y-2 pt-3 border-t border-border-base/40">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Code2 size={13} className="text-accent-automation" />
-                    <span className="text-[11px] font-bold text-text-base">内部プロパティ (Internal Properties)</span>
-                  </div>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface-hover text-text-muted border border-border-base/30 font-mono">
-                    Read-only
-                  </span>
-                </div>
-
-                {(existingLayer as any).plugin_data && Object.keys((existingLayer as any).plugin_data).length > 0 ? (
-                  <div className="space-y-1.5">
-                    <PluginDataViewer
-                      data={(existingLayer as any).plugin_data}
-                      title="Layer Plugin Data"
-                      defaultExpanded={true}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        openPluginDataModal(
-                          `カスタムレイヤー: ${existingLayer.name}`,
-                          (existingLayer as any).plugin_data,
-                          `プラグイン: ${(existingLayer as any).plugin_id} • 内部メタデータ (Read-only)`
-                        )
-                      }
-                      className="w-full text-[10px] text-accent-automation hover:bg-accent-automation/10 gap-1 h-6"
-                    >
-                      <Maximize2 size={11} />
-                      <span>全画面ダイアログで開く</span>
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-text-muted/60 bg-surface-base/30 p-2 rounded-lg border border-border-base/20 italic">
-                    内部プロパティ（plugin_data）はありません。
-                  </p>
-                )}
-              </div>
+            {!isNewPluginLayer && existingLayer?.type === 'plugin' && (
+              <InternalPropertiesSection
+                data={existingLayer.plugin_data}
+                viewerTitle="Layer Plugin Data"
+                modalTitle={`カスタムレイヤー: ${existingLayer.name}`}
+                modalSubtitle={`プラグイン: ${existingLayer.plugin_id} • 内部メタデータ (Read-only)`}
+              />
             )}
           </div>
         )}
@@ -592,7 +401,10 @@ export function CustomLayerInspector() {
           <div className="p-3 rounded-xl bg-surface-base/50 border border-border-base/40 space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Bookmark size={15} className={isReference ? "text-accent-reference fill-accent-reference" : "text-text-muted"} />
+                <Bookmark
+                  size={15}
+                  className={isReference ? 'text-accent-reference fill-accent-reference' : 'text-text-muted'}
+                />
                 <span className="text-xs font-bold text-text-base">Reference Layer</span>
               </div>
               <Checkbox
@@ -645,8 +457,8 @@ export function CustomLayerInspector() {
                   }
                 }}
                 className={cn(
-                  "h-7 text-xs bg-surface-base border-border-base/50 w-36",
-                  isReference && "opacity-50 cursor-not-allowed bg-surface-base/30"
+                  'h-7 text-xs bg-surface-base border-border-base/50 w-36',
+                  isReference && 'opacity-50 cursor-not-allowed bg-surface-base/30',
                 )}
               >
                 <option value="overwrite">Overwrite</option>
@@ -655,9 +467,7 @@ export function CustomLayerInspector() {
               </Select>
             </div>
             {isReference && (
-              <p className="text-[9px] text-accent-reference/80 text-right">
-                ※ 参照レイヤーのため合成されません
-              </p>
+              <p className="text-[9px] text-accent-reference/80 text-right">※ 参照レイヤーのため合成されません</p>
             )}
           </div>
         </div>
@@ -672,12 +482,12 @@ export function CustomLayerInspector() {
 
         {/* --- Action Buttons --- */}
         <div className="pt-3 space-y-2">
-          {(isNewPluginLayer || existingLayer?.type === "plugin") && (
+          {(isNewPluginLayer || existingLayer?.type === 'plugin') && (
             <Button
               variant="primary"
               onClick={handleExecutePlugin}
               disabled={isExecuting || !activePlugin}
-              className="w-full h-9 text-xs font-bold gap-2 text-text-inverse shadow-md"
+              className="w-full gap-2 text-text-inverse"
             >
               {isExecuting ? (
                 <>
@@ -687,7 +497,7 @@ export function CustomLayerInspector() {
               ) : (
                 <>
                   <Play size={14} className="fill-current" />
-                  <span>{isNewPluginLayer ? "Generate Layer" : "Re-generate Layer"}</span>
+                  <span>{isNewPluginLayer ? 'Generate Layer' : 'Re-generate Layer'}</span>
                 </>
               )}
             </Button>

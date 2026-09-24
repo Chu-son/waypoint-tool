@@ -107,7 +107,7 @@ describe('projectSlice - currentProjectPath & save behaviors', () => {
         expect.stringContaining(existingPath),
         expect.objectContaining({
           title: '上書き保存の確認',
-        })
+        }),
       );
       // Should NOT show file save dialog
       expect(saveDialogSpy).not.toHaveBeenCalled();
@@ -132,6 +132,29 @@ describe('projectSlice - currentProjectPath & save behaviors', () => {
       expect(saveBackendSpy).not.toHaveBeenCalled();
       expect(useAppStore.getState().currentProjectPath).toBe(existingPath);
       expect(useAppStore.getState().isDirty).toBe(true);
+    });
+
+    it('invokes abortCanvasGestures on resetProject and setProjectData', () => {
+      const abortSpy = vi.fn().mockReturnValue(true);
+      const unregister = useAppStore.getState().registerCanvasAbortHandler(abortSpy);
+
+      useAppStore.getState().resetProject();
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+
+      useAppStore.getState().setProjectData({
+        root_node_ids: [],
+        nodes: {},
+        map_layers: [],
+        custom_layers: [],
+        annotation_objects: [],
+        export_regions: [],
+        options_schema: null,
+        export_templates: [],
+        default_export_formats: [],
+      });
+      expect(abortSpy).toHaveBeenCalledTimes(2);
+
+      unregister();
     });
   });
 });

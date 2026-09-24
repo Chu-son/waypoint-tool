@@ -19,7 +19,12 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('load_options_schema', { yamlPath });
   }
 
-  async exportWaypoints(path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void> {
+  async exportWaypoints(
+    path: string,
+    waypoints: Record<string, any>[],
+    template?: string,
+    imageB64?: string,
+  ): Promise<void> {
     return invoke('export_waypoints', { path, waypoints, template: template || null, imageDataB64: imageB64 || null });
   }
 
@@ -37,6 +42,10 @@ export class TauriBackendAPI implements IBackendAPI {
 
   async scanCustomPlugin(path: string): Promise<PluginInstance> {
     return invoke('scan_custom_plugin', { path });
+  }
+
+  async scanCustomPlugins(path: string): Promise<PluginInstance[]> {
+    return invoke('scan_custom_plugins', { path });
   }
 
   async runPlugin(
@@ -77,7 +86,7 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('read_text_file', { path });
   }
 
-  async writeTextFile(path: string, content: String): Promise<void> {
+  async writeTextFile(path: string, content: string): Promise<void> {
     return invoke('write_text_file', { path, content });
   }
 
@@ -89,11 +98,35 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('blend_map_preview', { layers });
   }
 
+  async fetchMapTile(url: string): Promise<string> {
+    return invoke('fetch_map_tile', { url });
+  }
+
   async loadCustomUiConfig(): Promise<any> {
     return invoke('load_custom_ui_config');
   }
 
   async loadCustomUiPreset(): Promise<any> {
     return invoke('load_custom_ui_preset');
+  }
+
+  async checkPythonPackages(pythonPath: string, packages: string[]): Promise<Record<string, boolean>> {
+    return invoke('check_python_packages', { pythonPath, packages });
+  }
+
+  async createVirtualenv(targetDir: string, basePython?: string): Promise<string> {
+    return invoke('create_virtualenv', { targetDir, basePython });
+  }
+
+  async installPipPackages(pythonPath: string, packages: string[]): Promise<string> {
+    return invoke('install_pip_packages', { pythonPath, packages });
+  }
+
+  async checkExportConflicts(files: string[]): Promise<string[]> {
+    return invoke('check_export_conflicts', { files });
+  }
+
+  async executeExportPackage(options: any): Promise<any> {
+    return invoke('execute_export_package', { options });
   }
 }

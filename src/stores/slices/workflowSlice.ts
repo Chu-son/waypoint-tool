@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../appStore';
+import type { AppState } from '../appStore';
 
 export type WorkflowState = {
   currentStepIndex: number;
@@ -63,46 +63,51 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
     }
   },
 
-  resetWorkflow: () => set({
-    currentStepIndex: 0,
-    maxReachedStepIndex: 0,
-    workflowVariables: {},
-    stepExecutionIds: {},
-    isAnnotationEditMode: false,
-  }),
+  resetWorkflow: () =>
+    set({
+      currentStepIndex: 0,
+      maxReachedStepIndex: 0,
+      workflowVariables: {},
+      stepExecutionIds: {},
+      isAnnotationEditMode: false,
+    }),
 
-  setWorkflowVariable: (key: string, value: any) => set((state) => ({
-    workflowVariables: {
-      ...state.workflowVariables,
-      [key]: value,
-    },
-    isDirty: true,
-  })),
+  setWorkflowVariable: (key: string, value: any) =>
+    set((state) => ({
+      workflowVariables: {
+        ...state.workflowVariables,
+        [key]: value,
+      },
+      isDirty: true,
+    })),
 
-  setWorkflowVariables: (variables: Record<string, any>) => set((state) => ({
-    workflowVariables: {
-      ...state.workflowVariables,
-      ...variables,
-    },
-    isDirty: true,
-  })),
+  setWorkflowVariables: (variables: Record<string, any>) =>
+    set((state) => ({
+      workflowVariables: {
+        ...state.workflowVariables,
+        ...variables,
+      },
+      isDirty: true,
+    })),
 
-  setStepExecutionId: (stepId: string, executionId: string) => set((state) => ({
-    stepExecutionIds: {
-      ...state.stepExecutionIds,
-      [stepId]: executionId,
-    },
-    isDirty: true,
-  })),
+  setStepExecutionId: (stepId: string, executionId: string) =>
+    set((state) => ({
+      stepExecutionIds: {
+        ...state.stepExecutionIds,
+        [stepId]: executionId,
+      },
+      isDirty: true,
+    })),
 
-  setWorkflowState: (incomingState: Partial<WorkflowState>) => set((state) => ({
-    currentStepIndex: incomingState.currentStepIndex ?? state.currentStepIndex,
-    maxReachedStepIndex: incomingState.maxReachedStepIndex ?? state.maxReachedStepIndex,
-    workflowVariables: incomingState.workflowVariables
-      ? { ...state.workflowVariables, ...incomingState.workflowVariables }
-      : state.workflowVariables,
-    stepExecutionIds: incomingState.stepExecutionIds
-      ? { ...state.stepExecutionIds, ...incomingState.stepExecutionIds }
-      : state.stepExecutionIds,
-  })),
+  setWorkflowState: (incomingState: Partial<WorkflowState>) =>
+    set((state) => ({
+      currentStepIndex: incomingState.currentStepIndex ?? state.currentStepIndex,
+      maxReachedStepIndex: incomingState.maxReachedStepIndex ?? state.maxReachedStepIndex,
+      workflowVariables: incomingState.workflowVariables
+        ? { ...state.workflowVariables, ...incomingState.workflowVariables }
+        : state.workflowVariables,
+      stepExecutionIds: incomingState.stepExecutionIds
+        ? { ...state.stepExecutionIds, ...incomingState.stepExecutionIds }
+        : state.stepExecutionIds,
+    })),
 });

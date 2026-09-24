@@ -1,47 +1,42 @@
-import "./App.css";
-import { useEffect, useCallback, useMemo } from "react";
-import { ToolPanel } from "./components/ui/ToolPanel";
-import { TopMenu } from "./components/ui/TopMenu";
-import { ObjectsPanel } from "./components/ui/ObjectsPanel";
-import { LayerPanel } from "./components/ui/LayerPanel";
-import { PluginListPanel } from "./components/ui/PluginListPanel";
-import { PanelContainer, PanelTab } from "./components/ui/PanelContainer";
-import { MapCanvas } from "./components/canvas/MapCanvas";
-import { SettingsModal } from "./components/ui/SettingsModal";
-import { KeyboardShortcutsModal } from "./components/ui/KeyboardShortcutsModal";
-import { ExportMapsModal } from "./components/ui/ExportMapsModal";
-import { WelcomeModal } from "./components/ui/WelcomeModal";
-import { PluginDataModal } from "./components/ui/PluginDataModal";
-import { StatusBar } from "./components/ui/StatusBar";
-import { ElementCopyOverlay } from "./components/ui/ElementCopyOverlay";
-import { MapEditOverlay } from "./components/ui/MapEditOverlay";
-import { AnnotationEditOverlay } from "./components/ui/AnnotationEditOverlay";
-import { LoadingOverlay } from "./components/ui/common/LoadingOverlay";
-import { BackgroundLoadingBadge } from "./components/ui/common/BackgroundLoadingBadge";
-import { ShortcutManager } from "./components/common/ShortcutManager";
-import { ErrorBoundary } from "./components/common/ErrorBoundary";
-import { ThemeInjector } from "./components/ui/ThemeInjector";
-import { resolvePanelTabs, useInspectorPanelComponent } from "./components/ui/PanelRegistry";
-import { useAppStore } from "./stores/appStore";
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Layers, 
-  Box, 
-  Puzzle, 
-  Settings2 
-} from "lucide-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
-import { DialogAPI, BackendAPI } from "./api";
-import { Button } from "./components/ui/common/Button";
+import './App.css';
+import { useEffect, useCallback, useMemo } from 'react';
+import { ToolPanel } from './components/ui/shell/ToolPanel';
+import { TopMenu } from './components/ui/shell/TopMenu';
+import { PanelContainer, PanelTab } from './components/ui/shell/PanelContainer';
+import { MapCanvas } from './components/canvas/MapCanvas';
+import { SettingsModal } from './components/ui/modals/SettingsModal';
+import { ExportModal } from './components/ui/modals/ExportModal';
+import { ImportModal } from './components/ui/modals/ImportModal';
+import { KeyboardShortcutsModal } from './components/ui/modals/KeyboardShortcutsModal';
+import { ExportMapsModal } from './components/ui/modals/ExportMapsModal';
+import { WelcomeModal } from './components/ui/modals/WelcomeModal';
+import { PluginDataModal } from './components/ui/modals/PluginDataModal';
+import { StatusBar } from './components/ui/shell/StatusBar';
+import { ElementCopyOverlay } from './components/ui/overlays/ElementCopyOverlay';
+import { MapEditOverlay } from './components/ui/overlays/MapEditOverlay';
+import { AnnotationEditOverlay } from './components/ui/overlays/AnnotationEditOverlay';
+import { MeasureOverlay } from './components/ui/overlays/MeasureOverlay';
+import { LoadingOverlay } from './components/ui/common/LoadingOverlay';
+import { BackgroundLoadingBadge } from './components/ui/common/BackgroundLoadingBadge';
+import { ShortcutManager } from './components/common/ShortcutManager';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ThemeInjector } from './components/ui/shell/ThemeInjector';
+import {
+  resolvePanelTabs,
+  resolveBuiltinPanelTab,
+  useInspectorPanelComponent,
+} from './components/ui/shell/PanelRegistry';
+import { useAppStore } from './stores/appStore';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AppAPI, DialogAPI, BackendAPI } from './api';
+import { Button } from './components/ui/common/Button';
+import { extractProjectName, formatWindowTitle } from './utils/projectUtils';
 
-const isTauri = () => '__TAURI_INTERNALS__' in window;
-
-import { PluginInstance } from "./types/store";
+import { PluginInstance } from './types/store';
 
 function App() {
   // Sidebar States from Store
+  const panelLayout = useAppStore((state) => state.panelLayout);
   const leftPanelActiveTab = useAppStore((state) => state.leftPanelActiveTab);
   const rightPanelActiveTab = useAppStore((state) => state.rightPanelActiveTab);
   const leftPanelViewMode = useAppStore((state) => state.leftPanelViewMode);
@@ -49,6 +44,9 @@ function App() {
   const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
 
+  const moveTabToPanel = useAppStore((state) => state.moveTabToPanel);
+  const reorderTab = useAppStore((state) => state.reorderTab);
+  const resetPanelLayout = useAppStore((state) => state.resetPanelLayout);
   const setLeftPanelActiveTab = useAppStore((state) => state.setLeftPanelActiveTab);
   const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
   const setLeftPanelViewMode = useAppStore((state) => state.setLeftPanelViewMode);
@@ -58,7 +56,13 @@ function App() {
 
   const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
-  
+
+  const isExportModalOpen = useAppStore((state) => state.isExportModalOpen);
+  const setExportModalOpen = useAppStore((state) => state.setExportModalOpen);
+
+  const isImportModalOpen = useAppStore((state) => state.isImportModalOpen);
+  const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
+
   const isShortcutsModalOpen = useAppStore((state) => state.isShortcutsModalOpen);
   const setShortcutsModalOpen = useAppStore((state) => state.setShortcutsModalOpen);
 
@@ -72,6 +76,9 @@ function App() {
 
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+  const currentProjectPath = useAppStore((state) => state.currentProjectPath);
+  const isDirty = useAppStore((state) => state.isDirty);
+  const getEffectiveBrandName = useAppStore((state) => state.getEffectiveBrandName);
 
   useEffect(() => {
     const initApp = async () => {
@@ -108,9 +115,7 @@ function App() {
         for (const setting of storeSettings) {
           if (!setting.isBuiltin && setting.path && setting.enabled !== false) {
             try {
-              const customPlugin = await BackendAPI.scanCustomPlugin(
-                setting.path,
-              );
+              const customPlugin = await BackendAPI.scanCustomPlugin(setting.path);
               pluginMap[customPlugin.id] = customPlugin;
               // If ID changed or wasn't set somehow, fix it up
               if (setting.id !== customPlugin.id) {
@@ -118,10 +123,7 @@ function App() {
                 settingsChanged = true;
               }
             } catch (err) {
-              console.warn(
-                `Failed to load custom plugin from ${setting.path}:`,
-                err,
-              );
+              console.warn(`Failed to load custom plugin from ${setting.path}:`, err);
             }
           }
         }
@@ -154,39 +156,35 @@ function App() {
           useAppStore.getState().setPluginSettings(uniqueSettings);
         }
       } catch (e) {
-        console.error("Failed to load plugins:", e);
+        console.error('Failed to load plugins:', e);
       }
     };
     initApp();
   }, []);
 
-  // Update window title if Custom UI title is configured
+  // Update window title based on project name, dirty state, and brand
   useEffect(() => {
-    if (!isTauri()) return;
-    if (isCustomUiMode && customUiConfig?.brand?.windowTitle) {
-      getCurrentWindow().setTitle(customUiConfig.brand.windowTitle).catch(() => {});
-    } else {
-      getCurrentWindow().setTitle("Waypoint Tool").catch(() => {});
-    }
-  }, [isCustomUiMode, customUiConfig]);
+    const brandName =
+      isCustomUiMode && customUiConfig?.brand?.windowTitle
+        ? customUiConfig.brand.windowTitle
+        : typeof getEffectiveBrandName === 'function'
+          ? getEffectiveBrandName()
+          : 'Waypoint Tool';
+    const projectName = extractProjectName(currentProjectPath);
+    const title = formatWindowTitle(projectName, isDirty, brandName);
+    AppAPI.setWindowTitle(title).catch(() => {});
+  }, [isCustomUiMode, customUiConfig, currentProjectPath, isDirty, getEffectiveBrandName]);
 
-  // Initialization moved to ShortcutManager for shortcuts, 
+  // Initialization moved to ShortcutManager for shortcuts,
   // though basic initialization remains in App for now.
 
   useEffect(() => {
-    if (!isTauri()) return;
-    const unlistenPromise = getCurrentWindow().onCloseRequested(async (event) => {
-      // Completely intercept the closing event to bypass tauri-plugin-window-state race conditions
-      event.preventDefault();
-
+    const unlistenPromise = AppAPI.onCloseRequested(async () => {
       if (useAppStore.getState().isDirty) {
-        const confirmed = await DialogAPI.ask(
-          "未保存の変更があります。保存せずに終了してもよろしいですか？",
-          {
-            title: "終了の確認",
-            kind: "warning",
-          },
-        );
+        const confirmed = await DialogAPI.ask('未保存の変更があります。保存せずに終了してもよろしいですか？', {
+          title: '終了の確認',
+          kind: 'warning',
+        });
 
         if (!confirmed) {
           return; // Abort close
@@ -197,15 +195,13 @@ function App() {
       useAppStore.getState().setIsDirty(false);
       try {
         // Explicitly trigger window state saving before we force destroy
-        const { saveWindowState, StateFlags } =
-          await import("@tauri-apps/plugin-window-state");
-        await saveWindowState(StateFlags.ALL);
+        await AppAPI.saveWindowState();
       } catch (err) {
-        console.error("Failed to save window state", err);
+        console.error('Failed to save window state', err);
       }
 
       setTimeout(() => {
-        invoke("force_exit");
+        void AppAPI.forceExit();
       }, 50);
     });
 
@@ -225,13 +221,13 @@ function App() {
         setLeftWidth(Math.max(180, Math.min(newWidth, 600)));
       };
       const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        document.body.style.cursor = "default";
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'default';
       };
-      document.body.style.cursor = "col-resize";
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     },
     [leftWidth],
   );
@@ -247,48 +243,30 @@ function App() {
         setRightWidth(Math.max(200, Math.min(newWidth, 800)));
       };
       const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        document.body.style.cursor = "default";
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        document.body.style.cursor = 'default';
       };
-      document.body.style.cursor = "col-resize";
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
     },
     [rightWidth],
   );
 
   const inspectorComponent = useInspectorPanelComponent();
 
-  const defaultLeftPanels: PanelTab[] = useMemo(() => [
-    {
-      id: "project",
-      title: "Objects",
-      icon: <Box size={14} />,
-      component: <ObjectsPanel />
-    },
-    {
-      id: "plugins",
-      title: "Plugins",
-      icon: <Puzzle size={14} />,
-      component: <PluginListPanel />
-    }
-  ], []);
+  const defaultLeftPanels: PanelTab[] = useMemo(() => {
+    return (panelLayout?.leftTabs || [])
+      .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
+      .filter((tab): tab is PanelTab => tab !== null);
+  }, [panelLayout?.leftTabs, inspectorComponent]);
 
-  const defaultRightPanels: PanelTab[] = useMemo(() => [
-    {
-      id: "layers",
-      title: "Layers",
-      icon: <Layers size={14} />,
-      component: <LayerPanel />
-    },
-    {
-      id: "inspector",
-      title: "Inspector",
-      icon: <Settings2 size={14} />,
-      component: inspectorComponent,
-    },
-  ], [inspectorComponent]);
+  const defaultRightPanels: PanelTab[] = useMemo(() => {
+    return (panelLayout?.rightTabs || [])
+      .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
+      .filter((tab): tab is PanelTab => tab !== null);
+  }, [panelLayout?.rightTabs, inspectorComponent]);
 
   const leftPanels = useMemo(() => {
     if (isCustomUiMode && customUiConfig?.layout?.leftPanel?.tabs) {
@@ -314,7 +292,7 @@ function App() {
         <ToolPanel />
 
         {/* Left Panel */}
-        {isLeftPanelOpen && (
+        {isLeftPanelOpen && leftPanels.length > 0 && (
           <>
             <div
               style={{ width: leftWidth }}
@@ -329,6 +307,10 @@ function App() {
                   onViewModeChange={setLeftPanelViewMode}
                   onClose={() => setLeftPanelOpen(false)}
                   closeIcon={<ChevronLeft size={16} />}
+                  side="left"
+                  onMoveTabToPanel={moveTabToPanel}
+                  onReorderTab={reorderTab}
+                  onResetLayout={resetPanelLayout}
                 />
               </ErrorBoundary>
             </div>
@@ -345,30 +327,33 @@ function App() {
           <ElementCopyOverlay />
           <MapEditOverlay />
           <AnnotationEditOverlay />
+          <MeasureOverlay />
           <BackgroundLoadingBadge />
           {/* Top Floating Bar for restoring panels if closed */}
           <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
-            {!isLeftPanelOpen ? (
+            {!isLeftPanelOpen && leftPanels.length > 0 ? (
               <Button
                 variant="secondary"
                 size="icon"
                 onClick={() => setLeftPanelOpen(true)}
-                className="pointer-events-auto h-10 w-10 bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                title="Open Left Panel"
               >
-                <ChevronRight size={20} />
+                <ChevronRight size={16} />
               </Button>
             ) : (
               <div />
             )}
 
-            {!isRightPanelOpen ? (
+            {!isRightPanelOpen && rightPanels.length > 0 ? (
               <Button
                 variant="secondary"
                 size="icon"
                 onClick={() => setRightPanelOpen(true)}
-                className="pointer-events-auto h-10 w-10 bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
+                title="Open Right Panel"
               >
-                <ChevronLeft size={20} />
+                <ChevronLeft size={16} />
               </Button>
             ) : (
               <div />
@@ -381,7 +366,7 @@ function App() {
         </div>
 
         {/* Right Panel */}
-        {isRightPanelOpen && (
+        {isRightPanelOpen && rightPanels.length > 0 && (
           <>
             {/* Dragger */}
             <div
@@ -401,6 +386,10 @@ function App() {
                   onViewModeChange={setRightPanelViewMode}
                   onClose={() => setRightPanelOpen(false)}
                   closeIcon={<ChevronRight size={16} />}
+                  side="right"
+                  onMoveTabToPanel={moveTabToPanel}
+                  onReorderTab={reorderTab}
+                  onResetLayout={resetPanelLayout}
                 />
               </ErrorBoundary>
             </div>
@@ -409,20 +398,17 @@ function App() {
       </div>
       <StatusBar />
       <ErrorBoundary fallbackTitle="設定画面の表示中にエラーが発生しました">
-        <SettingsModal
-          isOpen={isSettingsModalOpen}
-          onClose={() => setSettingsModalOpen(false)}
-        />
+        <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="エクスポート画面の表示中にエラーが発生しました">
+        <ExportModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="インポート画面の表示中にエラーが発生しました">
+        <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} />
       </ErrorBoundary>
       <ExportMapsModal />
-      <KeyboardShortcutsModal
-        isOpen={isShortcutsModalOpen}
-        onClose={() => setShortcutsModalOpen(false)}
-      />
-      <WelcomeModal
-        isOpen={isWelcomeModalOpen}
-        onClose={() => setWelcomeModalOpen(false)}
-      />
+      <KeyboardShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setShortcutsModalOpen(false)} />
+      <WelcomeModal isOpen={isWelcomeModalOpen} onClose={() => setWelcomeModalOpen(false)} />
       <PluginDataModal />
       <LoadingOverlay />
     </div>

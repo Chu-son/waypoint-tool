@@ -24,9 +24,9 @@ describe('AppStore Zustand Store', () => {
 
   it('should set options schema and mark as dirty', () => {
     const { setOptionsSchema } = useAppStore.getState();
-    
+
     setOptionsSchema({ options: [{ name: 'speed', label: 'Speed', type: 'float' }] });
-    
+
     const state = useAppStore.getState();
     expect(state.optionsSchema?.options[0].name).toBe('speed');
     expect(state.isDirty).toBe(true);
@@ -34,14 +34,20 @@ describe('AppStore Zustand Store', () => {
 
   it('should manage export templates', () => {
     const { addExportTemplate, updateExportTemplate, removeExportTemplate } = useAppStore.getState();
-    
+
     // Add template
-    addExportTemplate({ id: 'template-id-1', name: 'Template 1', extension: 'txt', suffix: '', content: 'test content' });
+    addExportTemplate({
+      id: 'template-id-1',
+      name: 'Template 1',
+      extension: 'txt',
+      suffix: '',
+      content: 'test content',
+    });
     let state = useAppStore.getState();
     expect(state.exportTemplates.length).toBe(1);
     expect(state.exportTemplates[0].name).toBe('Template 1');
     expect(state.isDirty).toBe(true);
-    
+
     const tId = state.exportTemplates[0].id;
 
     // Update template
@@ -57,7 +63,7 @@ describe('AppStore Zustand Store', () => {
 
   it('should add a manual node to the tree', () => {
     const { addNode } = useAppStore.getState();
-    
+
     const newNode = {
       id: 'node-1',
       type: 'manual' as const,
@@ -65,7 +71,7 @@ describe('AppStore Zustand Store', () => {
     };
 
     addNode(newNode);
-    
+
     const state = useAppStore.getState();
     expect(state.nodes['node-1']).toBeDefined();
     expect(state.rootNodeIds).toContain('node-1');
@@ -75,9 +81,9 @@ describe('AppStore Zustand Store', () => {
   it('should remove a node from the tree', () => {
     const { addNode, removeNodes } = useAppStore.getState();
     addNode({ id: 'node-2', type: 'manual' });
-    
+
     removeNodes(['node-2']);
-    
+
     const state = useAppStore.getState();
     expect(state.nodes['node-2']).toBeUndefined();
     expect(state.rootNodeIds).not.toContain('node-2');
@@ -88,13 +94,13 @@ describe('AppStore Zustand Store', () => {
     addNode({ id: 'parent-1', type: 'generator' });
     addNode({ id: 'child-1', type: 'manual' }, 'parent-1');
     addNode({ id: 'child-2', type: 'manual' }, 'parent-1');
-    
+
     let state = useAppStore.getState();
     expect(state.nodes['parent-1'].children_ids).toEqual(['child-1', 'child-2']);
-    
+
     // Remove parent should remove children
     removeNodes(['parent-1']);
-    
+
     state = useAppStore.getState();
     expect(state.nodes['parent-1']).toBeUndefined();
     expect(state.nodes['child-1']).toBeUndefined();
@@ -103,16 +109,16 @@ describe('AppStore Zustand Store', () => {
 
   it('should handle multi-selection logic correctly', () => {
     const { selectNodes } = useAppStore.getState();
-    
+
     // Select single
     selectNodes(['node-1']);
     expect(useAppStore.getState().selectedNodeIds).toEqual(['node-1']);
-    
+
     // Multi-select adding
     selectNodes(['node-2'], true);
     expect(useAppStore.getState().selectedNodeIds).toContain('node-1');
     expect(useAppStore.getState().selectedNodeIds).toContain('node-2');
-    
+
     // Multi-select toggling (removing)
     selectNodes(['node-1'], true);
     expect(useAppStore.getState().selectedNodeIds).not.toContain('node-1');
@@ -121,20 +127,20 @@ describe('AppStore Zustand Store', () => {
 
   it('should handle map layer operations', () => {
     const { addMapLayer, updateMapLayer, removeMapLayer, reorderMapLayers } = useAppStore.getState();
-    
+
     addMapLayer('Map 1', null, 'base1', 100, 100);
     const id1 = useAppStore.getState().mapLayers[0].id;
 
     addMapLayer('Map 2', null, 'base2', 100, 100);
     const id2 = useAppStore.getState().mapLayers[0].id; // Map 2 is at index 0 now
-    
+
     let state = useAppStore.getState();
     expect(state.mapLayers.length).toBe(2);
     expect(state.isDirty).toBe(true);
-    
+
     updateMapLayer(id1, { visible: false });
     expect(useAppStore.getState().mapLayers[1].visible).toBe(false);
-    
+
     reorderMapLayers(0, 1);
     state = useAppStore.getState();
     // Before: [id2, id1]. Move 0 to 1 -> [id1, id2]
@@ -142,7 +148,7 @@ describe('AppStore Zustand Store', () => {
     expect(state.mapLayers[1].id).toBe(id2);
     expect(state.mapLayers[0].z_index).toBeGreaterThanOrEqual(0);
     expect(state.mapLayers[1].z_index).toBeGreaterThanOrEqual(0);
-    
+
     removeMapLayer(id2);
     expect(useAppStore.getState().mapLayers.length).toBe(1);
     expect(useAppStore.getState().mapLayers[0].id).toBe(id1);
@@ -152,13 +158,13 @@ describe('AppStore Zustand Store', () => {
     const { setProjectData, setIsDirty } = useAppStore.getState();
     setIsDirty(true);
     expect(useAppStore.getState().isDirty).toBe(true);
-    
+
     setProjectData({
       rootNodeIds: [],
       nodes: {},
       mapLayers: [],
     });
-    
+
     expect(useAppStore.getState().isDirty).toBe(false);
   });
 
@@ -273,7 +279,7 @@ describe('AppStore Zustand Store', () => {
     const { updateDefaultExportFormat } = useAppStore.getState();
     updateDefaultExportFormat('__default_yaml__', { suffix: '_waypoints' });
 
-    const fmt = useAppStore.getState().defaultExportFormats.find(f => f.id === '__default_yaml__');
+    const fmt = useAppStore.getState().defaultExportFormats.find((f) => f.id === '__default_yaml__');
     expect(fmt?.suffix).toBe('_waypoints');
     expect(useAppStore.getState().isDirty).toBe(true);
   });
@@ -285,11 +291,21 @@ describe('AppStore Zustand Store', () => {
     setProjectData({
       root_node_ids: ['wp1', 'wp2'],
       nodes: {
-        'wp1': { id: 'wp1', type: 'manual', transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 } },
-        'wp2': { id: 'wp2', type: 'generator', children_ids: [] },
+        wp1: { id: 'wp1', type: 'manual', transform: { x: 10, y: 20, qx: 0, qy: 0, qz: 0, qw: 1 } },
+        wp2: { id: 'wp2', type: 'generator', children_ids: [] },
       },
       map_layers: [
-        { id: 'ml1', name: 'Floor', info: null, image_base64: 'b64', visible: true, opacity: 1, z_index: 0, width: 100, height: 100 },
+        {
+          id: 'ml1',
+          name: 'Floor',
+          info: null,
+          image_base64: 'b64',
+          visible: true,
+          opacity: 1,
+          z_index: 0,
+          width: 100,
+          height: 100,
+        },
       ],
     } as any);
 
@@ -342,7 +358,12 @@ describe('AppStore Zustand Store', () => {
       nodes: {},
       robot_footprint: {
         type: 'polygon',
-        points: [[0.5, 0.5], [-0.5, 0.5], [-0.5, -0.5], [0.5, -0.5]],
+        points: [
+          [0.5, 0.5],
+          [-0.5, 0.5],
+          [-0.5, -0.5],
+          [0.5, -0.5],
+        ],
       },
     });
 
@@ -430,8 +451,28 @@ describe('AppStore Zustand Store', () => {
       nodes: {},
       default_map_opacity: 0.75,
       map_layers: [
-        { id: 'm1', name: 'Map 1', info: null, image_base64: 'b1', visible: true, opacity: 0.3, z_index: 0, width: 100, height: 100 },
-        { id: 'm2', name: 'Map 2', info: null, image_base64: 'b2', visible: false, opacity: 0.9, z_index: 1, width: 100, height: 100 },
+        {
+          id: 'm1',
+          name: 'Map 1',
+          info: null,
+          image_base64: 'b1',
+          visible: true,
+          opacity: 0.3,
+          z_index: 0,
+          width: 100,
+          height: 100,
+        },
+        {
+          id: 'm2',
+          name: 'Map 2',
+          info: null,
+          image_base64: 'b2',
+          visible: false,
+          opacity: 0.9,
+          z_index: 1,
+          width: 100,
+          height: 100,
+        },
       ],
     });
 
@@ -448,7 +489,7 @@ describe('AppStore Zustand Store', () => {
 
   it('should clear isMapEditMode and handle state transitions on setActiveTool', () => {
     const store = useAppStore.getState();
-    
+
     // Set map edit mode to true
     store.setMapEditMode(true);
     expect(useAppStore.getState().isMapEditMode).toBe(true);

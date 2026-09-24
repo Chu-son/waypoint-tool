@@ -127,10 +127,7 @@ describe('generatorStashUtils', () => {
         id: 'gen-1',
         type: 'generator',
         children_ids: ['child-0'], // 1 node left, baseline had 2
-        baseline_waypoints: [
-          { transform: makeTransform(0, 0, 0) },
-          { transform: makeTransform(1, 0, 0) },
-        ],
+        baseline_waypoints: [{ transform: makeTransform(0, 0, 0) }, { transform: makeTransform(1, 0, 0) }],
       };
 
       const nodes: Record<string, WaypointNode> = {
@@ -185,9 +182,7 @@ describe('generatorStashUtils', () => {
 
     it('safely handles index mismatch when regenerated point count decreases', () => {
       // Regenerated points decreased to 1 point
-      const newGeneratedWaypoints = [
-        { x: 5, y: 5, yaw: 0 },
-      ];
+      const newGeneratedWaypoints = [{ x: 5, y: 5, yaw: 0 }];
 
       // Stash had modifications on index 0 and index 2
       const stash = {

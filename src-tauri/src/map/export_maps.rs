@@ -1,11 +1,10 @@
+use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
+use base64::{engine::general_purpose, Engine as _};
+use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use image::{codecs::pnm, ImageEncoder, ExtendedColorType};
-use base64::{engine::general_purpose, Engine as _};
-use crate::models::MapInfo;
-use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
 
 #[derive(Debug, Deserialize)]
 pub struct ExportMapsOptions {
@@ -39,10 +38,16 @@ pub struct ExportLayer {
     pub id: String,
     pub name: String,
     pub image_base64: Option<String>,
-    pub info: Option<MapInfo>,
+    pub info: Option<ExportLayerInfo>,
     pub opacity: f64,
     pub blend_mode: String,
     pub z_index: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ExportLayerInfo {
+    pub resolution: f64,
+    pub origin: [f64; 3],
 }
 
 pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
@@ -65,12 +70,15 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
             } else {
                 b64
             };
-            
+
             if let Ok(bytes) = general_purpose::STANDARD.decode(b64_data) {
                 if let Ok(img) = image::load_from_memory(&bytes) {
                     decoded_layers.push((layer, img));
                 } else {
-                    println!("Warning: Failed to load image from decoded bytes for layer {}", layer.id);
+                    println!(
+                        "Warning: Failed to load image from decoded bytes for layer {}",
+                        layer.id
+                    );
                 }
             } else {
                 println!("Warning: Failed to decode base64 for layer {}", layer.id);
@@ -81,7 +89,7 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
     for region in options.regions {
         // Base resolution
         let resolution = 0.05; // Default standard ROS resolution
-        
+
         let width_px = (region.rect.width / resolution).round() as u32;
         let height_px = (region.rect.height / resolution).round() as u32;
 
@@ -126,22 +134,24 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
         if options.format == "ros_standard" {
             let img_filename = format!("{}.pgm", region.name);
             let img_path = save_dir.join(&img_filename);
-            
+
             // convert to luma8
             let luma_img = image::DynamicImage::ImageRgba8(out_img).into_luma8();
-            
+
             let mut pgm_file = fs::File::create(&img_path)
                 .map_err(|e| format!("Failed to create image file {}: {}", img_filename, e))?;
-            
-            let encoder = pnm::PnmEncoder::new(&mut pgm_file)
-                .with_subtype(pnm::PnmSubtype::Graymap(pnm::SampleEncoding::Binary));
-                
-            encoder.write_image(
-                luma_img.as_raw(),
-                luma_img.width(),
-                luma_img.height(),
-                ExtendedColorType::L8
-            ).map_err(|e| format!("Failed to save image {}: {}", img_filename, e))?;
+
+            let encoder =
+                pnm::PnmEncoder::new(&mut pgm_file).with_subtype(pnm::PnmSubtype::Graymap(pnm::SampleEncoding::Binary));
+
+            encoder
+                .write_image(
+                    luma_img.as_raw(),
+                    luma_img.width(),
+                    luma_img.height(),
+                    ExtendedColorType::L8,
+                )
+                .map_err(|e| format!("Failed to save image {}: {}", img_filename, e))?;
 
             let yaml_filename = format!("{}.yaml", region.name);
             let yaml_path = save_dir.join(&yaml_filename);
@@ -149,11 +159,14 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
                 "image: {}\nresolution: {}\norigin: [{:.6}, {:.6}, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n",
                 img_filename, resolution, region.rect.x, region.rect.y
             );
-            fs::write(yaml_path, yaml_content).map_err(|e| format!("Failed to write yaml for {}: {}", region.name, e))?;
+            fs::write(yaml_path, yaml_content)
+                .map_err(|e| format!("Failed to write yaml for {}: {}", region.name, e))?;
         } else {
             let img_filename = format!("{}.png", region.name);
             let img_path = save_dir.join(&img_filename);
-            out_img.save(&img_path).map_err(|e| format!("Failed to save image {}: {}", img_filename, e))?;
+            out_img
+                .save(&img_path)
+                .map_err(|e| format!("Failed to save image {}: {}", img_filename, e))?;
         }
 
         map_names.push(region.name);
@@ -166,4 +179,41 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deserialize_options_without_unused_map_info_fields() {
+        let json = r#"
+        {
+            "saveDir": "/tmp/export",
+            "format": "png_only",
+            "mapListFilename": null,
+            "regions": [],
+            "layers": [
+                {
+                    "id": "map-1",
+                    "name": "Map 1",
+                    "image_base64": "data:image/png;base64,AA==",
+                    "info": {
+                        "resolution": 0.05,
+                        "origin": [1.0, 2.0, 0.0]
+                    },
+                    "opacity": 1.0,
+                    "blend_mode": "overwrite",
+                    "z_index": 0
+                }
+            ]
+        }
+        "#;
+
+        let options: ExportMapsOptions = serde_json::from_str(json).unwrap();
+        let info = options.layers[0].info.as_ref().unwrap();
+
+        assert_eq!(info.resolution, 0.05);
+        assert_eq!(info.origin, [1.0, 2.0, 0.0]);
+    }
 }

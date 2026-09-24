@@ -1,5 +1,5 @@
 import { WaypointNode, Transform } from '../types/store';
-import { ElementCopyState } from '../stores/slices/uiSlice';
+import type { ElementCopyState } from '../types/ui';
 
 export interface AnchorRelativeTransform {
   relX: number;
@@ -15,10 +15,7 @@ export function quaternionToYaw(transform: Partial<Transform> | undefined | null
   const qz = transform.qz || 0;
   const qw = transform.qw ?? 1;
 
-  const yaw = Math.atan2(
-    2.0 * (qw * qz + qx * qy),
-    1.0 - 2.0 * (qy * qy + qz * qz)
-  );
+  const yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
   return isFinite(yaw) ? yaw : 0;
 }
 
@@ -34,7 +31,7 @@ export function yawToQuaternion(yaw: number): { qx: number; qy: number; qz: numb
 
 export function calculateAnchorRelativeTransform(
   targetTransform: Partial<Transform>,
-  anchorTransform: Partial<Transform>
+  anchorTransform: Partial<Transform>,
 ): AnchorRelativeTransform {
   const ax = anchorTransform.x ?? 0;
   const ay = anchorTransform.y ?? 0;
@@ -65,7 +62,7 @@ export function applyElementPaste(
   copyState: NonNullable<ElementCopyState>,
   anchorNodeId: string | null,
   nodes: Record<string, WaypointNode>,
-  updateNode: (id: string, updates: Partial<WaypointNode>) => void
+  updateNode: (id: string, updates: Partial<WaypointNode>) => void,
 ) {
   if (!targetNode.transform) return;
   const tf = targetNode.transform;
@@ -89,10 +86,10 @@ export function applyElementPaste(
     }
   } else {
     if (!anchorNodeId || !nodes[anchorNodeId] || !nodes[anchorNodeId].transform) {
-      console.error(
-        '[applyElementPaste] anchor-relative paste was attempted but anchorNode is missing.',
-        { anchorNodeId, copyState }
-      );
+      console.error('[applyElementPaste] anchor-relative paste was attempted but anchorNode is missing.', {
+        anchorNodeId,
+        copyState,
+      });
       return;
     }
     const anchor = nodes[anchorNodeId];

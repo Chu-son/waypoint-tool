@@ -4,15 +4,31 @@ import { persist } from 'zustand/middleware';
 import { NodeSlice, createNodeSlice } from './slices/nodeSlice';
 import { UISlice, createUISlice } from './slices/uiSlice';
 import { PluginSlice, createPluginSlice } from './slices/pluginSlice';
+import { PathCalculatorSlice, createPathCalculatorSlice } from './slices/pathCalculatorSlice';
 import { MapSlice, createMapSlice } from './slices/mapSlice';
 import { ProjectSlice, createProjectSlice } from './slices/projectSlice';
 import { HistorySlice, createHistorySlice } from './slices/historySlice';
 import { CustomUISlice, createCustomUISlice } from './slices/customUiSlice';
 import { WorkflowSlice, createWorkflowSlice } from './slices/workflowSlice';
 import { AnnotationSlice, createAnnotationSlice } from './slices/annotationSlice';
+import { InteractionSlice, createInteractionSlice } from './slices/interactionSlice';
+import { MeasureSlice, createMeasureSlice } from './slices/measureSlice';
+import { GeoMapSlice, createGeoMapSlice } from './slices/geoMapSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 
-export type AppState = NodeSlice & UISlice & PluginSlice & MapSlice & ProjectSlice & HistorySlice & CustomUISlice & WorkflowSlice & AnnotationSlice;
+export type AppState = NodeSlice &
+  UISlice &
+  PluginSlice &
+  PathCalculatorSlice &
+  MapSlice &
+  ProjectSlice &
+  HistorySlice &
+  CustomUISlice &
+  WorkflowSlice &
+  AnnotationSlice &
+  InteractionSlice &
+  MeasureSlice &
+  GeoMapSlice;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -20,12 +36,16 @@ export const useAppStore = create<AppState>()(
       ...createNodeSlice(set, get, api),
       ...createUISlice(set, get, api),
       ...createPluginSlice(set, get, api),
+      ...createPathCalculatorSlice(set, get, api),
       ...createMapSlice(set, get, api),
       ...createProjectSlice(set, get, api),
       ...createHistorySlice(set, get, api),
       ...createCustomUISlice(set, get, api),
       ...createWorkflowSlice(set, get, api),
       ...createAnnotationSlice(set, get, api),
+      ...createInteractionSlice(set, get, api),
+      ...createMeasureSlice(set, get, api),
+      ...createGeoMapSlice(set, get, api),
     }),
     {
       name: 'waypoint-tool-storage',
@@ -36,7 +56,7 @@ export const useAppStore = create<AppState>()(
         lastDirectory: state.lastDirectory,
         recentProjects: state.recentProjects,
         enableSnapping: state.enableSnapping,
-        exportTemplates: state.exportTemplates.filter(t => t.scope !== 'local'), // Treat undefined as global by default
+        exportTemplates: state.exportTemplates.filter((t) => t.scope !== 'local'), // Treat undefined as global by default
         defaultExportFormats: state.defaultExportFormats,
         indexStartIndex: state.indexStartIndex,
         showPaths: state.showPaths,
@@ -45,6 +65,8 @@ export const useAppStore = create<AppState>()(
         pluginSettings: state.pluginSettings,
         globalPythonPath: state.globalPythonPath,
         decimalPrecision: state.decimalPrecision,
+        themeMode: state.themeMode,
+        themePreset: state.themePreset,
         leftPanelViewMode: state.leftPanelViewMode,
         rightPanelViewMode: state.rightPanelViewMode,
         leftPanelWidth: state.leftPanelWidth,
@@ -53,11 +75,22 @@ export const useAppStore = create<AppState>()(
         mapEditFillValue: state.mapEditFillValue,
         mapEditBrushSize: state.mapEditBrushSize,
         mapEditSubTool: state.mapEditSubTool,
+        panelLayout: state.panelLayout,
+        leftPanelActiveTab: state.leftPanelActiveTab,
+        rightPanelActiveTab: state.rightPanelActiveTab,
       }),
-    }
-  )
+    },
+  ),
 );
 
 if (typeof window !== 'undefined') {
   (window as any).useAppStore = useAppStore;
 }
+
+// Backward-compatible facet selectors
+export const selectAppMode = (state: AppState) => state.appMode;
+export const selectActiveSelection = (state: AppState) => state.selection;
+export const selectActiveTool = (state: AppState) => state.activeTool;
+export const selectSelectedNodeIds = (state: AppState) => state.selectedNodeIds;
+export const selectIsMapEditMode = (state: AppState) => state.isMapEditMode;
+export const selectIsAnnotationEditMode = (state: AppState) => state.isAnnotationEditMode;

@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { quaternionToYaw, yawToQuaternion, applyElementPaste, calculateAnchorRelativeTransform } from './transformUtils';
+import {
+  quaternionToYaw,
+  yawToQuaternion,
+  applyElementPaste,
+  calculateAnchorRelativeTransform,
+} from './transformUtils';
 import { WaypointNode } from '../types/store';
-import { ElementCopyState } from '../stores/slices/uiSlice';
+import type { ElementCopyState } from '../types/ui';
 
 describe('transformUtils', () => {
   it('quaternionToYaw and yawToQuaternion convert correctly', () => {
@@ -118,10 +123,7 @@ describe('transformUtils', () => {
 
       // Pass null anchorNodeId
       applyElementPaste(targetNode, copyState, null, nodes, updateNode);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('anchorNode is missing'),
-        expect.anything()
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('anchorNode is missing'), expect.anything());
       expect(updateNode).not.toHaveBeenCalled();
       consoleSpy.mockRestore();
     });

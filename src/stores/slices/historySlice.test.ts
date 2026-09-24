@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
 
 describe('HistorySlice (Undo/Redo)', () => {
@@ -141,5 +141,21 @@ describe('HistorySlice (Undo/Redo)', () => {
     // Redo should restore insertionTarget after wp-2 was added
     useAppStore.getState().redo();
     expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
+  });
+
+  it('invokes abortCanvasGestures before executing undo and redo', () => {
+    const abortSpy = vi.fn().mockReturnValue(true);
+    const unregister = useAppStore.getState().registerCanvasAbortHandler(abortSpy);
+
+    useAppStore.getState().addNode({ id: 'wp-1', type: 'manual' });
+    expect(abortSpy).not.toHaveBeenCalled();
+
+    useAppStore.getState().undo();
+    expect(abortSpy).toHaveBeenCalledTimes(1);
+
+    useAppStore.getState().redo();
+    expect(abortSpy).toHaveBeenCalledTimes(2);
+
+    unregister();
   });
 });

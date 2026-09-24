@@ -68,17 +68,17 @@ describe('buildWaypointsFromImport', () => {
   });
 
   it('records an error and returns no nodes when itemsPath is not an array', () => {
-    const { nodes, errors } = buildWaypointsFromImport({ foo: 'bar' }, { ...DEFAULT_IMPORT_MAPPING, itemsPath: 'foo' }, null);
+    const { nodes, errors } = buildWaypointsFromImport(
+      { foo: 'bar' },
+      { ...DEFAULT_IMPORT_MAPPING, itemsPath: 'foo' },
+      null,
+    );
     expect(nodes).toHaveLength(0);
     expect(errors).toHaveLength(1);
   });
 
   it('skips an item missing x/y and continues with the rest', () => {
-    const raw = [
-      { id: 'wp1', x: 1, y: 2 },
-      { id: 'wp2' },
-      { id: 'wp3', x: 5, y: 6 },
-    ];
+    const raw = [{ id: 'wp1', x: 1, y: 2 }, { id: 'wp2' }, { id: 'wp3', x: 5, y: 6 }];
 
     const { nodes, errors } = buildWaypointsFromImport(raw, DEFAULT_IMPORT_MAPPING, null);
 

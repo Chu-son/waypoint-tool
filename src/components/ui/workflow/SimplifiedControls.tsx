@@ -1,16 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { WorkflowControl, WorkflowSimplifiedParam, WorkflowActionButton, WorkflowButtonsLayout, WorkflowPluginInputConfig } from '../../../types/customUi';
+import {
+  WorkflowControl,
+  WorkflowSimplifiedParam,
+  WorkflowActionButton,
+  WorkflowButtonsLayout,
+  WorkflowPluginInputConfig,
+} from '../../../types/customUi';
 import { useAppStore } from '../../../stores/appStore';
-import { executeWorkflowAction } from '../../../utils/workflowActions';
+import { executeWorkflowAction } from '../../../services/workflowActions';
 import { Button } from '../common/Button';
 import { FormField } from '../common/FormField';
 import { ToggleSwitch } from '../common/ToggleSwitch';
 import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
-import { NumericInput } from '../NumericInput';
+import { NumericInput } from '../common/NumericInput';
 import { DynamicIcon } from '../../common/DynamicIcon';
-import { PluginInputEditor } from '../PluginInputEditor';
+import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { Loader2 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 
@@ -42,7 +48,13 @@ export function SimplifiedControls({
   const [controlValues, setControlValues] = useState<Record<string, any>>(() => {
     const init: Record<string, any> = {};
     controls?.forEach((c) => {
-      init[c.label] = c.default ?? (c.type === 'slider' || c.type === 'number' ? c.min ?? 0 : c.type === 'toggle' ? false : c.options?.[0]?.value);
+      init[c.label] =
+        c.default ??
+        (c.type === 'slider' || c.type === 'number'
+          ? (c.min ?? 0)
+          : c.type === 'toggle'
+            ? false
+            : c.options?.[0]?.value);
     });
     return init;
   });
@@ -68,7 +80,13 @@ export function SimplifiedControls({
   // Apply default values for controls immediately on mount
   useEffect(() => {
     controls?.forEach((c) => {
-      const def = c.default ?? (c.type === 'slider' || c.type === 'number' ? c.min ?? 0 : c.type === 'toggle' ? false : c.options?.[0]?.value);
+      const def =
+        c.default ??
+        (c.type === 'slider' || c.type === 'number'
+          ? (c.min ?? 0)
+          : c.type === 'toggle'
+            ? false
+            : c.options?.[0]?.value);
       if (def !== undefined) {
         executeWorkflowAction(c.target.action, { value: def });
         setWorkflowVariable(c.label, def);
@@ -124,18 +142,17 @@ export function SimplifiedControls({
     setExecutingIndex(index);
     try {
       const hasExtra =
-        btn.saveToVariable !== undefined ||
-        btn.groupName !== undefined ||
-        btn.allowedAnnotationTools !== undefined;
+        btn.saveToVariable !== undefined || btn.groupName !== undefined || btn.allowedAnnotationTools !== undefined;
 
-      const args = hasExtra || btn.args
-        ? {
-            ...(btn.args || {}),
-            ...(btn.saveToVariable !== undefined && { saveToVariable: btn.saveToVariable }),
-            ...(btn.groupName !== undefined && { groupName: btn.groupName }),
-            ...(btn.allowedAnnotationTools !== undefined && { allowedTools: btn.allowedAnnotationTools }),
-          }
-        : undefined;
+      const args =
+        hasExtra || btn.args
+          ? {
+              ...(btn.args || {}),
+              ...(btn.saveToVariable !== undefined && { saveToVariable: btn.saveToVariable }),
+              ...(btn.groupName !== undefined && { groupName: btn.groupName }),
+              ...(btn.allowedAnnotationTools !== undefined && { allowedTools: btn.allowedAnnotationTools }),
+            }
+          : undefined;
 
       await executeWorkflowAction(btn.action, args);
     } finally {
@@ -144,11 +161,8 @@ export function SimplifiedControls({
   };
 
   // Resolve list of buttons
-  const buttons: WorkflowActionButton[] = actionButtons && actionButtons.length > 0
-    ? actionButtons
-    : actionButton
-    ? [actionButton]
-    : [];
+  const buttons: WorkflowActionButton[] =
+    actionButtons && actionButtons.length > 0 ? actionButtons : actionButton ? [actionButton] : [];
 
   return (
     <div className="space-y-4 pt-2">
@@ -175,11 +189,7 @@ export function SimplifiedControls({
             if (c.type === 'select') {
               return (
                 <FormField key={idx} label={c.label}>
-                  <Select
-                    value={val ?? c.default}
-                    onChange={(e) => handleControlChange(c, e.target.value)}
-                    className="h-10 text-sm"
-                  >
+                  <Select value={val ?? c.default} onChange={(e) => handleControlChange(c, e.target.value)}>
                     {c.options?.map((opt, oIdx) => (
                       <option key={oIdx} value={opt.value}>
                         {opt.label}
@@ -194,10 +204,7 @@ export function SimplifiedControls({
               return (
                 <div key={idx} className="flex items-center justify-between py-1">
                   <span className="text-xs font-medium text-text-base">{c.label}</span>
-                  <ToggleSwitch
-                    checked={!!val}
-                    onChange={(checked) => handleControlChange(c, checked)}
-                  />
+                  <ToggleSwitch checked={!!val} onChange={(checked) => handleControlChange(c, checked)} />
                 </div>
               );
             }
@@ -211,7 +218,7 @@ export function SimplifiedControls({
                     step={c.step ?? 1}
                     value={val ?? c.default ?? 0}
                     onChange={(newVal) => handleControlChange(c, newVal)}
-                    className="h-10 text-sm font-mono"
+                    className="font-mono"
                   />
                 </FormField>
               );
@@ -225,15 +232,15 @@ export function SimplifiedControls({
       {/* Plugin Inputs (e.g. sweep_rect, seed_points, annotation selection) */}
       {showPluginInputs && targetPlugin?.manifest?.inputs && targetPlugin.manifest.inputs.length > 0 && (
         <div className="space-y-3 bg-surface-panel/40 p-3 rounded-lg border border-border-base/40">
-          <FieldLabel>
-            {targetPlugin.manifest.name || targetPluginId} の領域・入力指定
-          </FieldLabel>
+          <FieldLabel>{targetPlugin.manifest.name || targetPluginId} の領域・入力指定</FieldLabel>
           <div className="space-y-2.5">
             {targetPlugin.manifest.inputs
               .filter((inp) => !pluginInputsFilter || pluginInputsFilter.includes(inp.id || inp.name || ''))
               .map((inp, idx) => {
                 const key = inp.name || inp.id;
-                const overrideConfig = pluginInputsConfig?.find((cfg) => cfg.id === key || cfg.id === inp.id || cfg.id === inp.name);
+                const overrideConfig = pluginInputsConfig?.find(
+                  (cfg) => cfg.id === key || cfg.id === inp.id || cfg.id === inp.name,
+                );
                 const effectiveInput = overrideConfig
                   ? {
                       ...inp,
@@ -265,9 +272,7 @@ export function SimplifiedControls({
       {/* Simplified Plugin Parameters */}
       {simplifiedParams && simplifiedParams.length > 0 && (
         <div className="space-y-3 bg-surface-panel/40 p-3 rounded-lg border border-border-base/40">
-          <FieldLabel>
-            {pluginTarget ? `パラメータ設定 (${pluginTarget})` : 'パラメータ設定'}
-          </FieldLabel>
+          <FieldLabel>{pluginTarget ? `パラメータ設定 (${pluginTarget})` : 'パラメータ設定'}</FieldLabel>
           {simplifiedParams.map((p, idx) => {
             const currentVal = pluginProperties[p.paramKey] ?? p.default ?? p.options?.[0]?.value;
 
@@ -316,10 +321,10 @@ export function SimplifiedControls({
       {buttons.length > 0 && (
         <div
           className={cn(
-            "pt-2",
-            buttonsLayout === 'grid' && "grid grid-cols-2 gap-2",
-            buttonsLayout === 'row' && "flex flex-row flex-wrap gap-2",
-            buttonsLayout === 'column' && "flex flex-col gap-2.5"
+            'pt-2',
+            buttonsLayout === 'grid' && 'grid grid-cols-2 gap-2',
+            buttonsLayout === 'row' && 'flex flex-row flex-wrap gap-2',
+            buttonsLayout === 'column' && 'flex flex-col gap-2.5',
           )}
         >
           {buttons.map((btn, idx) => {
@@ -328,12 +333,12 @@ export function SimplifiedControls({
             const variant = btn.variant || (actionButton && buttons.length === 1 ? 'primary' : 'secondary');
 
             return (
-              <div key={idx} className={cn("flex flex-col", btn.fullWidth !== false && "w-full")}>
+              <div key={idx} className={cn('flex flex-col', btn.fullWidth !== false && 'w-full')}>
                 <Button
                   variant={variant}
                   className={cn(
-                    "w-full justify-center shadow-sm py-2.5 font-bold gap-2 text-xs",
-                    variant === 'primary' && "shadow-md py-3 text-sm"
+                    'w-full justify-center shadow-sm py-2.5 font-bold gap-2 text-xs',
+                    variant === 'primary' && 'shadow-md py-3 text-sm',
                   )}
                   disabled={btn.disabled || isAnyExecuting}
                   onClick={() => handleButtonClick(btn, idx)}
@@ -351,9 +356,7 @@ export function SimplifiedControls({
                   )}
                 </Button>
                 {btn.description && (
-                  <span className="text-[11px] text-text-muted mt-1 px-1 leading-snug">
-                    {btn.description}
-                  </span>
+                  <span className="text-[11px] text-text-muted mt-1 px-1 leading-snug">{btn.description}</span>
                 )}
               </div>
             );

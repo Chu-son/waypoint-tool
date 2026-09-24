@@ -10,6 +10,14 @@ import {
   CircleAnnotation,
 } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
+import {
+  CANVAS_ACCENT_COLOR,
+  CANVAS_ANNOTATION_HIGHLIGHT_COLOR,
+  CANVAS_CONTRAST_COLOR,
+  CANVAS_HIT_AREA_COLOR,
+  CANVAS_LABEL_BG,
+} from '../canvasConstants';
+import { resolveAnnotationConditionalStyle, parseColorSafe } from '../../../utils/conditionalStyles';
 
 interface AnnotationLayerProps {
   scale: number;
@@ -17,9 +25,10 @@ interface AnnotationLayerProps {
   previewObject?: AnnotationObject | null;
   onAnnotationPointerDown?: (e: FederatedPointerEvent, id: string) => void;
   onAnnotationHandlePointerDown?: (e: FederatedPointerEvent, id: string, handleType: string) => void;
+  onAnnotationContextMenu?: (e: FederatedPointerEvent, id: string) => void;
 }
 
-export function parseHexColor(colorStr?: string, fallback = 0x3b82f6): number {
+export function parseHexColor(colorStr?: string, fallback = CANVAS_ACCENT_COLOR): number {
   if (!colorStr) return fallback;
   const cleaned = colorStr.replace('#', '');
   const parsed = parseInt(cleaned, 16);
@@ -31,6 +40,7 @@ export function AnnotationLayer({
   previewObject,
   onAnnotationPointerDown,
   onAnnotationHandlePointerDown,
+  onAnnotationContextMenu,
 }: AnnotationLayerProps) {
   const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
   const annotationGroups = useAppStore((state) => state.annotationGroups) || {};
@@ -40,6 +50,23 @@ export function AnnotationLayer({
   const showAnnotationLabels = useAppStore((state) => state.showAnnotationLabels);
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
+  const conditionalStyles = useAppStore((state) => state.conditionalStyles);
+  const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
+  const optionsSchema = useAppStore((state) => state.optionsSchema);
+
+  const handleShapePointerDown = (e: FederatedPointerEvent, id: string) => {
+    if (e.button === 2) {
+      e.stopPropagation();
+      onAnnotationContextMenu?.(e, id);
+    } else {
+      onAnnotationPointerDown?.(e, id);
+    }
+  };
+
+  const handleShapeContextMenu = (e: FederatedPointerEvent, id: string) => {
+    e.stopPropagation();
+    onAnnotationContextMenu?.(e, id);
+  };
 
   const safeScale = Math.max(scale, 0.001);
   const isPlacing = isAnnotationEditMode && activeAnnotationSubTool !== 'select';
@@ -54,7 +81,7 @@ export function AnnotationLayer({
         fontWeight: 'bold',
         stroke: { color: '#000000', width: 2.5 },
       }),
-    []
+    [],
   );
 
   const renderSingleAnnotation = (obj: AnnotationObject, isPreview = false) => {
@@ -68,9 +95,24 @@ export function AnnotationLayer({
       }
     }
 
+    // Evaluate conditional styles
+    const condStyle = !isPreview
+      ? resolveAnnotationConditionalStyle(obj, conditionalStyles, conditionalStylesEnabled, optionsSchema)
+      : null;
+
+    if (condStyle?.visible === false) {
+      return null;
+    }
+
     const isSelected = !isPreview && selectedAnnotationIds.includes(obj.id);
-    const baseColorHex = parseHexColor(obj.color, 0x3b82f6);
-    const strokeWidth = (isSelected ? 3.0 : 2.0) / safeScale;
+    const baseColorHex = parseHexColor(obj.color, CANVAS_ACCENT_COLOR);
+
+    const strokeColorHex = condStyle?.strokeColor ? parseColorSafe(condStyle.strokeColor, baseColorHex) : baseColorHex;
+    const fillColorHex = condStyle?.fillColor ? parseColorSafe(condStyle.fillColor, baseColorHex) : strokeColorHex;
+    const strokeWidth =
+      (condStyle?.strokeWidth !== undefined ? condStyle.strokeWidth : isSelected ? 3.0 : 2.0) / safeScale;
+    const opacity = condStyle?.opacity !== undefined ? condStyle.opacity : 1.0;
+
     const isInteractive = !isPreview;
     const cursor = isPlacing ? 'crosshair' : isInteractive ? 'pointer' : 'default';
 
@@ -83,22 +125,24 @@ export function AnnotationLayer({
             <pixiGraphics
               eventMode={isInteractive ? 'dynamic' : 'none'}
               cursor={cursor}
-              onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, point.id)}
+              onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, point.id)}
+              onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, point.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, point.id)}
               draw={(g) => {
                 g.clear();
                 // Outer glow / selection outline if selected
                 if (isSelected) {
-                  g.strokeStyle = { width: 2 / safeScale, color: 0x60a5fa, alpha: 0.9 };
+                  g.strokeStyle = { width: 2 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.9 };
                   g.circle(0, 0, radius + 3 / safeScale);
                   g.stroke();
                 }
-                g.fillStyle = { color: baseColorHex, alpha: 0.85 };
-                g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                g.fillStyle = { color: fillColorHex, alpha: 0.85 * opacity };
+                g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                 g.circle(0, 0, radius);
                 g.fill();
                 g.stroke();
                 // Center white dot
-                g.fillStyle = { color: 0xffffff, alpha: 0.9 };
+                g.fillStyle = { color: CANVAS_CONTRAST_COLOR, alpha: 0.9 * opacity };
                 g.circle(0, 0, 2 / safeScale);
                 g.fill();
               }}
@@ -109,7 +153,7 @@ export function AnnotationLayer({
                 y={0}
                 scale={scale}
                 type="circle"
-                colorHex={0x3b82f6}
+                colorHex={CANVAS_ACCENT_COLOR}
                 cursor="move"
                 onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, point.id, 'center')}
               />
@@ -138,16 +182,18 @@ export function AnnotationLayer({
               <pixiGraphics
                 eventMode={isInteractive ? 'dynamic' : 'none'}
                 cursor={cursor}
-                onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, op.id)}
+                onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, op.id)}
+                onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, op.id)}
+                onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, op.id)}
                 draw={(g) => {
                   g.clear();
                   if (isSelected) {
-                    g.strokeStyle = { width: 2 / safeScale, color: 0x60a5fa, alpha: 0.8 };
+                    g.strokeStyle = { width: 2 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.8 };
                     g.circle(0, 0, 16 / safeScale);
                     g.stroke();
                   }
-                  g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
-                  g.fillStyle = { color: baseColorHex, alpha: 0.85 };
+                  g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
+                  g.fillStyle = { color: fillColorHex, alpha: 0.85 * opacity };
                   // Triangle pointing forward (+X)
                   g.moveTo(12 / safeScale, 0);
                   g.lineTo(-6 / safeScale, 6 / safeScale);
@@ -166,7 +212,7 @@ export function AnnotationLayer({
                   y={0}
                   scale={scale}
                   type="circle"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="grab"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, op.id, 'yaw')}
                 />
@@ -196,31 +242,37 @@ export function AnnotationLayer({
             <pixiGraphics
               eventMode={isInteractive ? 'dynamic' : 'none'}
               cursor={cursor}
-              onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, line.id)}
+              onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, line.id)}
+              onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, line.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, line.id)}
               draw={(g) => {
                 g.clear();
                 // Broad invisible hit area for easy line selection
-                g.strokeStyle = { width: 14 / safeScale, color: 0xffffff, alpha: 0.001 };
+                g.strokeStyle = { width: 14 / safeScale, color: CANVAS_HIT_AREA_COLOR, alpha: 0.001 };
                 g.moveTo(line.x1, line.y1);
                 g.lineTo(line.x2, line.y2);
                 g.stroke();
 
                 // Selection glow if selected
                 if (isSelected) {
-                  g.strokeStyle = { width: strokeWidth + 3 / safeScale, color: 0x60a5fa, alpha: 0.6 };
+                  g.strokeStyle = {
+                    width: strokeWidth + 3 / safeScale,
+                    color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR,
+                    alpha: 0.6,
+                  };
                   g.moveTo(line.x1, line.y1);
                   g.lineTo(line.x2, line.y2);
                   g.stroke();
                 }
 
                 // Visible line in chosen color
-                g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                 g.moveTo(line.x1, line.y1);
                 g.lineTo(line.x2, line.y2);
                 g.stroke();
 
                 // End endpoints in chosen color
-                g.fillStyle = { color: baseColorHex, alpha: 1.0 };
+                g.fillStyle = { color: strokeColorHex, alpha: opacity };
                 g.circle(line.x1, line.y1, 4 / safeScale);
                 g.circle(line.x2, line.y2, 4 / safeScale);
                 g.fill();
@@ -233,7 +285,7 @@ export function AnnotationLayer({
                   y={line.y1}
                   scale={scale}
                   type="square"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="crosshair"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, line.id, 'start')}
                 />
@@ -242,7 +294,7 @@ export function AnnotationLayer({
                   y={line.y2}
                   scale={scale}
                   type="square"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="crosshair"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, line.id, 'end')}
                 />
@@ -251,17 +303,47 @@ export function AnnotationLayer({
                   y={midY}
                   scale={scale}
                   type="circle"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="move"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, line.id, 'midpoint')}
                 />
               </>
             )}
+            {line.showLength &&
+              (() => {
+                const dx = line.x2 - line.x1;
+                const dy = line.y2 - line.y1;
+                const len = Math.hypot(dx, dy);
+                const lenText = `${len.toFixed(2)} m`;
+                const textWidth = Math.max(50, lenText.length * 8 + 12);
+                const bw = textWidth / safeScale;
+                const bh = 18 / safeScale;
+                return (
+                  <pixiContainer x={midX} y={midY}>
+                    <pixiGraphics
+                      draw={(g) => {
+                        g.clear();
+                        g.fillStyle = { color: CANVAS_LABEL_BG, alpha: 0.85 };
+                        g.strokeStyle = { width: 1.5 / safeScale, color: strokeColorHex, alpha: 0.9 * opacity };
+                        g.roundRect(-bw / 2, -bh / 2, bw, bh, 4 / safeScale);
+                        g.fill();
+                        g.stroke();
+                      }}
+                    />
+                    <pixiText
+                      text={lenText}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                      style={labelStyle}
+                      scale={{ x: 1 / safeScale, y: -1 / safeScale }}
+                    />
+                  </pixiContainer>
+                );
+              })()}
             {showAnnotationLabels && line.labelVisible && line.name && (
               <pixiText
                 text={line.name}
                 x={midX + 6 / safeScale}
-                y={midY + 6 / safeScale}
+                y={midY + (line.showLength ? 14 : 6) / safeScale}
                 style={labelStyle}
                 scale={{ x: 1 / safeScale, y: -1 / safeScale }}
               />
@@ -289,23 +371,30 @@ export function AnnotationLayer({
               <pixiGraphics
                 eventMode={isInteractive ? 'dynamic' : 'none'}
                 cursor={cursor}
-                onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, rect.id)}
+                onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, rect.id)}
+                onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, rect.id)}
+                onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, rect.id)}
                 draw={(g) => {
                   g.clear();
                   // Selection outer ring
                   if (isSelected) {
-                    g.strokeStyle = { width: 1.5 / safeScale, color: 0x60a5fa, alpha: 0.8 };
-                    g.rect(-halfW - 3 / safeScale, -halfH - 3 / safeScale, rect.width + 6 / safeScale, rect.height + 6 / safeScale);
+                    g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.8 };
+                    g.rect(
+                      -halfW - 3 / safeScale,
+                      -halfH - 3 / safeScale,
+                      rect.width + 6 / safeScale,
+                      rect.height + 6 / safeScale,
+                    );
                     g.stroke();
                   }
 
                   // Fill in chosen color
-                  g.fillStyle = { color: baseColorHex, alpha: 0.15 };
+                  g.fillStyle = { color: fillColorHex, alpha: 0.15 * opacity };
                   g.rect(-halfW, -halfH, rect.width, rect.height);
                   g.fill();
 
                   // Stroke in chosen color
-                  g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                  g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                   g.rect(-halfW, -halfH, rect.width, rect.height);
                   g.stroke();
                 }}
@@ -319,7 +408,7 @@ export function AnnotationLayer({
                       y={c.y}
                       scale={scale}
                       type="square"
-                      colorHex={0x3b82f6}
+                      colorHex={CANVAS_ACCENT_COLOR}
                       cursor="pointer"
                       onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, rect.id, `corner_${c.name}`)}
                     />
@@ -329,7 +418,7 @@ export function AnnotationLayer({
                     y={0}
                     scale={scale}
                     type="circle"
-                    colorHex={0x3b82f6}
+                    colorHex={CANVAS_ACCENT_COLOR}
                     cursor="grab"
                     onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, rect.id, 'rotate')}
                   />
@@ -338,7 +427,7 @@ export function AnnotationLayer({
                     y={0}
                     scale={scale}
                     type="circle"
-                    colorHex={0x3b82f6}
+                    colorHex={CANVAS_ACCENT_COLOR}
                     cursor="move"
                     onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, rect.id, 'center')}
                   />
@@ -374,23 +463,25 @@ export function AnnotationLayer({
             <pixiGraphics
               eventMode={isInteractive ? 'dynamic' : 'none'}
               cursor={cursor}
-              onPointerDown={(e: FederatedPointerEvent) => onAnnotationPointerDown?.(e, circle.id)}
+              onPointerDown={(e: FederatedPointerEvent) => handleShapePointerDown(e, circle.id)}
+              onRightDown={(e: FederatedPointerEvent) => handleShapeContextMenu(e, circle.id)}
+              onRightClick={(e: FederatedPointerEvent) => handleShapeContextMenu(e, circle.id)}
               draw={(g) => {
                 g.clear();
                 // Selection outer ring
                 if (isSelected) {
-                  g.strokeStyle = { width: 1.5 / safeScale, color: 0x60a5fa, alpha: 0.8 };
+                  g.strokeStyle = { width: 1.5 / safeScale, color: CANVAS_ANNOTATION_HIGHLIGHT_COLOR, alpha: 0.8 };
                   g.circle(0, 0, circle.radius + 3 / safeScale);
                   g.stroke();
                 }
 
                 // Fill in chosen color
-                g.fillStyle = { color: baseColorHex, alpha: 0.15 };
+                g.fillStyle = { color: fillColorHex, alpha: 0.15 * opacity };
                 g.circle(0, 0, circle.radius);
                 g.fill();
 
                 // Stroke in chosen color
-                g.strokeStyle = { width: strokeWidth, color: baseColorHex, alpha: 1.0 };
+                g.strokeStyle = { width: strokeWidth, color: strokeColorHex, alpha: opacity };
                 g.circle(0, 0, circle.radius);
                 g.stroke();
               }}
@@ -404,7 +495,7 @@ export function AnnotationLayer({
                     y={rh.y}
                     scale={scale}
                     type="circle"
-                    colorHex={0x3b82f6}
+                    colorHex={CANVAS_ACCENT_COLOR}
                     cursor="ew-resize"
                     onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, circle.id, `radius_${rh.name}`)}
                   />
@@ -414,7 +505,7 @@ export function AnnotationLayer({
                   y={0}
                   scale={scale}
                   type="circle"
-                  colorHex={0x3b82f6}
+                  colorHex={CANVAS_ACCENT_COLOR}
                   cursor="move"
                   onPointerDown={(e) => onAnnotationHandlePointerDown?.(e, circle.id, 'center')}
                 />

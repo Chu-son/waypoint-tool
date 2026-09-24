@@ -2,12 +2,45 @@ import sys
 import json
 import math
 import traceback
+import os
+import tempfile
 from typing import Dict, Any, List, Optional, TypedDict, Sequence, Union
 
 from .geometry import Point, Rectangle, Line
 from .utils import normalize_yaw, quaternion_to_yaw, yaw_to_quaternion
 from .occupancy_grid import OccupancyGrid
 from .footprint import RobotFootprint
+
+PAYLOAD_FILE_REF_KEY = "__wpt_payload_ref__"
+PAYLOAD_OFFLOAD_THRESHOLD_BYTES = 256 * 1024  # 256 KB
+
+
+def load_context_from_stdin() -> Optional[Dict[str, Any]]:
+    """Read and deserialize context JSON from stdin, resolving temp file reference if present."""
+    input_data = sys.stdin.read()
+    if not input_data.strip():
+        return None
+    context = json.loads(input_data)
+    if isinstance(context, dict) and PAYLOAD_FILE_REF_KEY in context:
+        file_path = context[PAYLOAD_FILE_REF_KEY]
+        with open(file_path, "r", encoding="utf-8") as f:
+            context = json.load(f)
+    return context
+
+
+def emit_output_to_stdout(payload: Any, threshold_bytes: int = PAYLOAD_OFFLOAD_THRESHOLD_BYTES):
+    """Serialize and output payload to stdout, offloading to a temp file if payload exceeds threshold."""
+    output_json = json.dumps(payload)
+    # Check UTF-8 byte size
+    if len(output_json.encode("utf-8")) >= threshold_bytes:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json", prefix="wpt_out_", encoding="utf-8") as f:
+            f.write(output_json)
+            temp_path = f.name
+        ref_obj = {PAYLOAD_FILE_REF_KEY: temp_path}
+        print(json.dumps(ref_obj))
+    else:
+        print(output_json)
+
 
 class Transform(TypedDict, total=False):
     x: float
@@ -60,15 +93,17 @@ class PluginBase:
 
     def get_interaction_rect(self, context: Dict[str, Any], input_id: str) -> Optional[Rectangle]:
         data = self.get_interaction_data(context, input_id)
-        if not data:
+        if not data or not isinstance(data, dict):
             return None
         center_data = data.get("center", {})
-        center = Point(center_data.get("x", 0.0), center_data.get("y", 0.0))
+        if not isinstance(center_data, dict):
+            return None
+        center = Point(float(center_data.get("x", 0.0)), float(center_data.get("y", 0.0)))
         return Rectangle(
             center=center,
-            width=data.get("width", 1.0),
-            height=data.get("height", 1.0),
-            yaw=data.get("yaw", 0.0)
+            width=float(data.get("width", 1.0)),
+            height=float(data.get("height", 1.0)),
+            yaw=float(data.get("yaw", 0.0))
         )
 
     def get_annotation(self, context: Dict[str, Any], input_id: str) -> Optional[Dict[str, Any]]:
@@ -191,6 +226,43 @@ class PluginResult:
             self._waypoints["plugin_data"] = plugin_data
         return self
 
+    def add_columnar_waypoints(self,
+                               x: Sequence[float],
+                               y: Sequence[float],
+                               yaw: Optional[Sequence[float]] = None,
+                               z: Optional[Sequence[float]] = None,
+                               names: Optional[Sequence[str]] = None,
+                               options: Optional[Sequence[Optional[Dict[str, Any]]]] = None,
+                               name: Optional[str] = None,
+                               plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
+        """Add generated waypoints in compact columnar format.
+
+        This format significantly reduces memory allocation and payload size
+        when transmitting thousands or tens of thousands of waypoints.
+        """
+        count = len(x)
+        if len(y) != count:
+            raise ValueError(f"x and y sequences must have the same length: {len(x)} vs {len(y)}")
+
+        self._waypoints = {
+            "columnar": True,
+            "count": count,
+            "x": list(x),
+            "y": list(y),
+            "yaw": list(yaw) if yaw is not None else [0.0] * count,
+        }
+        if z is not None:
+            self._waypoints["z"] = list(z)
+        if names is not None:
+            self._waypoints["names"] = list(names)
+        if options is not None:
+            self._waypoints["options"] = list(options)
+        if name is not None:
+            self._waypoints["name"] = name
+        if plugin_data is not None:
+            self._waypoints["plugin_data"] = plugin_data
+        return self
+
     def add_custom_layer_dict(self,
                               layer_dict: Dict[str, Any],
                               plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
@@ -267,24 +339,23 @@ class PluginGenerator(PluginBase):
     def run_from_stdin(self):
         """Standard communication loop via stdin/stdout."""
         try:
-            input_data = sys.stdin.read()
-            if not input_data.strip():
-                print(json.dumps(self.empty_output))
+            context = load_context_from_stdin()
+            if context is None:
+                emit_output_to_stdout(self.empty_output)
                 return
 
-            context = json.loads(input_data)
             result = self.generate(context)
 
             if isinstance(result, PluginResult):
                 payload = result.to_dict()
-                print(json.dumps(payload))
+                emit_output_to_stdout(payload)
             elif isinstance(result, list):
                 # Legacy / direct waypoint list return
                 self._validate_waypoints(result)
-                print(json.dumps(result))
+                emit_output_to_stdout(result)
             elif isinstance(result, dict):
                 # Legacy / direct layer or unified dict return
-                print(json.dumps(result))
+                emit_output_to_stdout(result)
             else:
                 raise ValueError(f"Unexpected generator return type: {type(result)}")
 

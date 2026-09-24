@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { useAppStore } from "../../../stores/appStore";
-import { Button } from "../common/Button";
-import { Folder, Unlink, Edit2, BoxSelect } from "lucide-react";
-import { WaypointNode } from "../../../types/store";
+import { useState, useEffect } from 'react';
+import { useAppStore } from '../../../stores/appStore';
+import { Button } from '../common/Button';
+import { Folder, Unlink, Edit2, BoxSelect, Target, Layers } from 'lucide-react';
+import { WaypointNode } from '../../../types/store';
 
 interface GroupNodePanelProps {
   node: WaypointNode;
@@ -15,10 +15,10 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
   const nodes = useAppStore((state) => state.nodes);
 
   const [isEditingName, setIsEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState(node.name || "");
+  const [nameValue, setNameValue] = useState(node.name || '');
 
   useEffect(() => {
-    setNameValue(node.name || "");
+    setNameValue(node.name || '');
     setIsEditingName(false);
   }, [node.id, node.name]);
 
@@ -32,9 +32,9 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
     (node.children_ids || []).forEach((cid) => {
       const child = nodes[cid];
       if (!child) return;
-      if (child.type === "manual") waypoints++;
-      else if (child.type === "manual_group" || child.type === "group") groups++;
-      else if (child.type === "generator") generators++;
+      if (child.type === 'manual') waypoints++;
+      else if (child.type === 'manual_group' || child.type === 'group') groups++;
+      else if (child.type === 'generator') generators++;
     });
     return { waypoints, groups, generators };
   })();
@@ -60,17 +60,13 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
           <Folder size={16} />
           Group
         </h2>
-        <p className="text-[11px] text-text-muted font-mono break-all">
-          {node.id}
-        </p>
+        <p className="text-[11px] text-text-muted font-mono break-all">{node.id}</p>
       </div>
 
       <div className="space-y-4 flex-1">
         {/* グループ名編集 */}
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
-            グループ名
-          </label>
+          <label className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">グループ名</label>
           {isEditingName ? (
             <input
               type="text"
@@ -79,9 +75,9 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
               onChange={(e) => setNameValue(e.target.value)}
               onBlur={handleNameSubmit}
               onKeyDown={(e) => {
-                if (e.key === "Enter") handleNameSubmit();
-                if (e.key === "Escape") {
-                  setNameValue(node.name || "");
+                if (e.key === 'Enter') handleNameSubmit();
+                if (e.key === 'Escape') {
+                  setNameValue(node.name || '');
                   setIsEditingName(false);
                 }
               }}
@@ -92,9 +88,7 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
               className="flex items-center justify-between px-2 py-1 bg-surface-base/50 rounded border border-border-base/40 cursor-pointer hover:border-primary-base/50 transition-colors"
               onClick={() => setIsEditingName(true)}
             >
-              <span className="text-xs text-text-base font-medium">
-                {node.name || "Group"}
-              </span>
+              <span className="text-xs text-text-base font-medium">{node.name || 'Group'}</span>
               <Edit2 size={11} className="text-text-muted" />
             </div>
           )}
@@ -102,29 +96,36 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
 
         {/* 子ノード情報 */}
         <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
-            子要素
-          </label>
+          <label className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">子要素</label>
           <div className="bg-surface-base/50 rounded border border-border-base/40 p-2 space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-text-muted">合計</span>
               <span className="font-bold text-text-base">{childCount}</span>
             </div>
             {childBreakdown.waypoints > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">🎯 Waypoints</span>
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted flex items-center gap-1">
+                  <Target size={12} className="shrink-0" />
+                  Waypoints
+                </span>
                 <span className="text-text-base">{childBreakdown.waypoints}</span>
               </div>
             )}
             {childBreakdown.groups > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">📁 Sub-Groups</span>
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted flex items-center gap-1">
+                  <Folder size={12} className="shrink-0" />
+                  Sub-Groups
+                </span>
                 <span className="text-text-base">{childBreakdown.groups}</span>
               </div>
             )}
             {childBreakdown.generators > 0 && (
-              <div className="flex justify-between">
-                <span className="text-text-muted">⚙️ Generators</span>
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted flex items-center gap-1">
+                  <Layers size={12} className="shrink-0" />
+                  Generators
+                </span>
                 <span className="text-text-base">{childBreakdown.generators}</span>
               </div>
             )}
@@ -134,20 +135,12 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
         {/* アクション */}
         <div className="pt-4 mt-auto border-t border-border-base space-y-2">
           {childCount > 0 && (
-            <Button
-              variant="secondary"
-              onClick={handleSelectChildren}
-              className="w-full h-9 gap-2"
-            >
+            <Button variant="secondary" onClick={handleSelectChildren} className="w-full gap-2">
               <BoxSelect size={14} />
               子要素をすべて選択
             </Button>
           )}
-          <Button
-            variant="danger"
-            onClick={() => ungroupNode(node.id)}
-            className="w-full h-9 gap-2"
-          >
+          <Button variant="danger" onClick={() => ungroupNode(node.id)} className="w-full gap-2">
             <Unlink size={14} />
             グループ解除 (Ungroup)
           </Button>

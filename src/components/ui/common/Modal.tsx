@@ -1,47 +1,57 @@
-import * as React from "react";
-import { X } from "lucide-react";
-import { cn } from "../../../utils/cn";
-import { Panel } from "./Panel";
+import * as React from 'react';
+import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
+import { cn } from '../../../utils/cn';
+import { Panel } from './Panel';
 
 export interface ModalProps extends React.HTMLAttributes<HTMLDivElement> {
   isOpen: boolean;
   onClose: () => void;
-  size?: "sm" | "md" | "lg" | "xl" | "2xl" | "full";
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | 'full';
 }
 
 const sizeVariants = {
-  sm: "max-w-sm w-full",
-  md: "max-w-md w-full",
-  lg: "max-w-lg w-full",
-  xl: "max-w-2xl w-[90vw]",
-  "2xl": "max-w-4xl w-[90vw]",
-  full: "max-w-[95vw] w-full",
+  sm: 'max-w-sm w-full',
+  md: 'max-w-md w-full',
+  lg: 'max-w-lg w-full',
+  xl: 'max-w-2xl w-[90vw]',
+  '2xl': 'max-w-4xl w-[90vw]',
+  '3xl': 'max-w-6xl w-[94vw]',
+  '4xl': 'max-w-7xl w-[96vw]',
+  full: 'max-w-[95vw] w-full',
 };
 
-export function Modal({ 
-  isOpen, 
-  onClose, 
-  size = "md",
-  children, 
-  className, 
-  ...props 
-}: ModalProps) {
+export function Modal({ isOpen, onClose, size = 'md', children, className, ...props }: ModalProps) {
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-surface-base/80 backdrop-blur-sm animate-in fade-in duration-200" 
+      <div
+        className="absolute inset-0 bg-surface-base/80 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
-      
+
       {/* Content */}
       <Panel
         className={cn(
-          "relative w-full flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 shadow-2xl",
+          'relative w-full flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200 shadow-2xl rounded-xl border border-border-base',
           sizeVariants[size],
-          className
+          className,
         )}
         variant="overlay"
         {...props}
@@ -50,6 +60,12 @@ export function Modal({
       </Panel>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+
+  return modalContent;
 }
 
 export interface ModalHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -61,7 +77,10 @@ export interface ModalHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
 export function ModalHeader({ className, onClose, icon, title, children, ...props }: ModalHeaderProps) {
   return (
     <div
-      className={cn("px-4 sm:px-6 py-3 sm:py-4 border-b border-border-base flex items-center justify-between bg-surface-base/30 shrink-0", className)}
+      className={cn(
+        'px-4 sm:px-6 py-3 sm:py-4 border-b border-border-base flex items-center justify-between bg-surface-base/30 shrink-0',
+        className,
+      )}
       {...props}
     >
       <div className="text-base sm:text-lg font-bold text-text-base flex items-center gap-2 min-w-0">
@@ -82,18 +101,13 @@ export function ModalHeader({ className, onClose, icon, title, children, ...prop
 }
 
 export function ModalContent({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn("px-4 sm:px-6 py-3 sm:py-4 overflow-y-auto flex-1", className)}
-      {...props}
-    />
-  );
+  return <div className={cn('px-4 sm:px-6 py-3 sm:py-4 overflow-y-auto flex-1', className)} {...props} />;
 }
 
 export function ModalFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("px-6 py-4 border-t border-border-base flex justify-end gap-3 bg-surface-base/20", className)}
+      className={cn('px-6 py-4 border-t border-border-base flex justify-end gap-3 bg-surface-base/20', className)}
       {...props}
     />
   );

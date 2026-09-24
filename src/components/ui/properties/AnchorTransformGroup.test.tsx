@@ -30,7 +30,7 @@ describe('AnchorTransformGroup', () => {
         anchorNode={anchorNode}
         handleUpdate={handleUpdate}
         onContextMenuLabel={onContextMenuLabel}
-      />
+      />,
     );
 
     expect(screen.getByText(/Transform \(From Anchor\)/)).toBeInTheDocument();
@@ -46,7 +46,7 @@ describe('AnchorTransformGroup', () => {
         anchorNode={anchorNode}
         handleUpdate={handleUpdate}
         onContextMenuLabel={onContextMenuLabel}
-      />
+      />,
     );
 
     const labelX = screen.getByText('Local X (m)');

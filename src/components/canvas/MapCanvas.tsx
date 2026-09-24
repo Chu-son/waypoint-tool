@@ -1,10 +1,10 @@
+import { useMeasureAltSnap } from './hooks/useMeasureAltSnap';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
-import { BackendAPI } from '../../api';
 import { v4 as uuidv4 } from 'uuid';
-import { ProjectMapLayer, ManualCustomLayer, PluginCustomLayer, EditObject, WaypointNode } from '../../types/store';
+import { ManualCustomLayer, EditObject, WaypointNode } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
 import { PathLayer } from './layers/PathLayer';
 import { FootprintLayer } from './layers/FootprintLayer';
@@ -14,19 +14,35 @@ import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
 import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
 import { AnnotationLayer } from './layers/AnnotationLayer';
+import { MeasureLayer } from './layers/MeasureLayer';
+import { GeoTileLayer } from './layers/GeoTileLayer';
+import { GeoAlignMarkerLayer } from './layers/GeoAlignMarkerLayer';
+import { useGeoMapAlign } from './hooks/useGeoMapAlign';
+import { GeoAttribution } from '../ui/overlays/GeoAttribution';
+import { getAnnotationCenter } from '../../stores/slices/measureSlice';
 import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
 import { useMapEditCircle } from './hooks/useMapEditCircle';
 import { useMapEditFreehand } from './hooks/useMapEditFreehand';
 import { useMapEditLine } from './hooks/useMapEditLine';
 import { useAnnotationEdit } from './hooks/useAnnotationEdit';
-import { prepareLayersForExport } from '../../utils/mapRasterize';
+import { useBlendedPreview } from './hooks/useBlendedPreview';
+import { useCanvasTheme } from './hooks/useCanvasTheme';
 import { computePointsBoundingBox } from '../../utils/geometry';
-import { resolveThemeVariables } from '../../utils/themePresets';
-import { hexStringToNumber, hexStringToVec3 } from '../../utils/colorUtils';
-import { getPrecedingManualWaypoint } from '../../utils/treeUtils';
-
-import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
+import { getPrecedingManualWaypoint, findNodeParentId, getFlattenedNodeIds } from '../../utils/treeUtils';
+import {
+  contentBounds,
+  fitViewport,
+  screenToWorld as viewportScreenToWorld,
+  zoomAt,
+  type Viewport,
+} from './utils/viewport';
+import { quaternionToYaw } from '../../utils/transformUtils';
+import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
+import { MapLayerSprite } from './MapLayerSprite';
+import { getFallbackGridColors } from './utils/canvasTheme';
+import { findNearestObjectCenter, hitTestRectHandles } from './utils/hitTest';
+import { CANVAS_ACCENT_COLOR } from './canvasConstants';
 
 extend({
   Container,
@@ -35,341 +51,336 @@ extend({
   Text,
 });
 
-export function MapLayerSprite({ layer, scale, textStyle, overrideTexture }: { layer: ProjectMapLayer | PluginCustomLayer | any, scale: number, textStyle: TextStyle, overrideTexture?: Texture | null }) {
-  const [texture, setTexture] = useState<Texture | null>(overrideTexture || null);
-  const [imgSize, setImgSize] = useState({ w: overrideTexture ? overrideTexture.width : 0, h: overrideTexture ? overrideTexture.height : 0 });
-  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
-  const occupancyHighlightAlpha = useAppStore((state) => state.occupancyHighlightAlpha);
-  const customUiConfig = useAppStore((state) => state.customUiConfig);
-  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
-
-  const occThresh = layer.info?.occupied_thresh ?? 0.65;
-  const freeThresh = layer.info?.free_thresh ?? 0.25;
-  const negate = layer.info?.negate ?? 0;
-
-  const resolvedTheme = useMemo(() => {
-    return resolveThemeVariables(isCustomUiMode && customUiConfig ? customUiConfig.theme : undefined);
-  }, [isCustomUiMode, customUiConfig]);
-
-  const freeColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-free'], [0.0627, 0.7255, 0.5059]), [resolvedTheme]);
-  const obstacleColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-obstacle'], [0.9373, 0.2667, 0.2667]), [resolvedTheme]);
-  const unknownColorVec = useMemo(() => hexStringToVec3(resolvedTheme.variables['--color-occupancy-unknown'], [0.6588, 0.3333, 0.9686]), [resolvedTheme]);
-
-  const highlightFilter = useMemo(() => {
-    if (!showOccupancyHighlight) return null;
-    try {
-      return new OccupancyHighlightFilter({
-        occupiedThresh: occThresh,
-        freeThresh: freeThresh,
-        negate: negate,
-        alpha: occupancyHighlightAlpha,
-        freeColor: freeColorVec,
-        obstacleColor: obstacleColorVec,
-        unknownColor: unknownColorVec,
-      });
-    } catch {
-      return null;
-    }
-  }, [showOccupancyHighlight, freeColorVec, obstacleColorVec, unknownColorVec]);
-
-  useEffect(() => {
-    if (highlightFilter) {
-      highlightFilter.updateUniforms({
-        occupiedThresh: occThresh,
-        freeThresh: freeThresh,
-        negate: negate,
-        alpha: occupancyHighlightAlpha,
-        freeColor: freeColorVec,
-        obstacleColor: obstacleColorVec,
-        unknownColor: unknownColorVec,
-      });
-    }
-  }, [highlightFilter, occThresh, freeThresh, negate, occupancyHighlightAlpha, freeColorVec, obstacleColorVec, unknownColorVec]);
-
-  useEffect(() => {
-    return () => {
-      if (highlightFilter && !highlightFilter.destroyed) {
-        highlightFilter.destroy();
-      }
-    };
-  }, [highlightFilter]);
-
-  useEffect(() => {
-    if (overrideTexture) {
-      setTexture(overrideTexture);
-      setImgSize({ w: overrideTexture.width, h: overrideTexture.height });
-      return;
-    }
-    let cancelled = false;
-    if (layer.image_base64) {
-      const src = layer.image_base64.startsWith('data:')
-        ? layer.image_base64
-        : `data:image/png;base64,${layer.image_base64}`;
-      const img = new Image();
-      img.onload = () => {
-        if (cancelled) return;
-        const newTexture = Texture.from(img);
-        setTexture(newTexture);
-        setImgSize({ w: img.width, h: img.height });
-      };
-      img.onerror = (err) => {
-        console.error(`[MapLayerSprite] Failed to load image for layer "${layer.name}":`, err);
-      };
-      img.src = src;
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [layer.image_base64, layer.name, overrideTexture]);
-
-  // Clean up the previous texture safely without nulling shared TextureSource style
-  useEffect(() => {
-    return () => {
-      if (texture && !texture.destroyed && !overrideTexture) {
-        texture.destroy(false);
-      }
-    };
-  }, [texture, overrideTexture]);
-
-  if (
-    !texture ||
-    texture.destroyed ||
-    !texture.source ||
-    texture.source.destroyed ||
-    !texture.source.style ||
-    !layer.visible
-  ) {
-    return null;
-  }
-  
-  // Extract metadata (with safe fallbacks)
-  const { resolution = 0.05, origin = [0, 0, 0] } = layer.info || {};
-  const [ox, oy, oyaw] = origin;
-  const yaw = oyaw || 0;
-
-  // Render the map aligned to ROS origin
-  // Anchor [0, 1] means the bottom-left of the image maps to the exact (ox, oy).
-  // Y scale is inverted so that the image draws right-side up inside the Y-inverted Pixi Container.
-  // Top-left Y calculation: Origin is bottom-left, so we add height * resolution
-  // We must also account for the map's yaw rotation (yaw).
-  const h = imgSize.h || (texture ? texture.height : 0) || ('height' in layer ? layer.height : layer.info?.height) || 0;
-  const H = h * resolution;
-  const topLeftX = ox - H * Math.sin(yaw);
-  const topLeftY = oy + H * Math.cos(yaw);
-
-  return (
-    <pixiContainer>
-      <pixiSprite 
-        key={texture.uid || layer.id}
-        texture={texture} 
-        anchor={{ x: 0, y: 1 }} 
-        x={ox} 
-        y={oy} 
-        rotation={yaw}
-        scale={{ x: resolution, y: -resolution }}
-        alpha={layer.opacity} 
-        filters={highlightFilter ? [highlightFilter] : undefined}
-      />
-      {/* Top-Left Map Layer Name */}
-      <pixiContainer
-        x={topLeftX}
-        y={topLeftY}
-        scale={{ x: 1 / scale, y: -1 / scale }}
-      >
-        <pixiText
-          text={layer.name || 'Map Layer'}
-          style={textStyle}
-          anchor={{ x: 0, y: 1 }}
-          x={4}
-          y={-4}
-        />
-      </pixiContainer>
-    </pixiContainer>
-  );
-}
-
 export function MapCanvas() {
-  const activeTool = useAppStore(state => state.activeTool);
-  const addNode = useAppStore(state => state.addNode);
-  const selectNodes = useAppStore(state => state.selectNodes);
-  const nodes = useAppStore(state => state.nodes);
-  const rootNodeIds = useAppStore(state => state.rootNodeIds);
-  const insertionTarget = useAppStore(state => state.insertionTarget);
-  const selectedNodeIds = useAppStore(state => state.selectedNodeIds);
-  const updateNode = useAppStore(state => state.updateNode);
-  const updateNodes = useAppStore(state => state.updateNodes);
+  const isPixiHandledRef = useRef(false);
+  const lastWorldPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const activeTool = useAppStore((state) => state.activeTool);
+  const appMode = useAppStore((state) => state.appMode);
+  const registerCanvasAbortHandler = useAppStore((state) => state.registerCanvasAbortHandler);
+  const addNode = useAppStore((state) => state.addNode);
+  const removeNodes = useAppStore((state) => state.removeNodes);
+  const selectNodes = useAppStore((state) => state.selectNodes);
+  const nodes = useAppStore((state) => state.nodes);
+  const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
+  const rootNodeIds = useAppStore((state) => state.rootNodeIds);
+  const insertionTarget = useAppStore((state) => state.insertionTarget);
+  const updateNode = useAppStore((state) => state.updateNode);
+  const updateNodes = useAppStore((state) => state.updateNodes);
+  const removeExportRegion = useAppStore((state) => state.removeExportRegion);
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
 
-  const shouldFitToMaps = useAppStore(state => state.shouldFitToMaps);
+  const shouldFitToMaps = useAppStore((state) => state.shouldFitToMaps);
 
-  const activePluginId = useAppStore(state => state.activePluginId);
-  const triggerFitToMaps = useAppStore(state => state.triggerFitToMaps);
-  const plugins = useAppStore(state => state.plugins);
+  const activePluginId = useAppStore((state) => state.activePluginId);
+  const triggerFitToMaps = useAppStore((state) => state.triggerFitToMaps);
+  const plugins = useAppStore((state) => state.plugins);
 
-  const activeInputIndex = useAppStore(state => state.activeInputIndex);
-  const setCursorPosition = useAppStore(state => state.setCursorPosition);
-  const setMapScale = useAppStore(state => state.setMapScale);
-  
-  const mapLayers = useAppStore(state => state.mapLayers);
-  const customLayers = useAppStore(state => state.customLayers) || [];
-  const enableSnapping = useAppStore(state => state.enableSnapping);
-  const isExportPreview = useAppStore(state => state.isExportPreview);
+  const activeInputIndex = useAppStore((state) => state.activeInputIndex);
+  const activePipelineInputRef = useAppStore((state) => state.activePipelineInputRef);
+  const setCursorPosition = useAppStore((state) => state.setCursorPosition);
+  const setMapScale = useAppStore((state) => state.setMapScale);
 
-  const isMapEditMode = useAppStore(state => state.isMapEditMode);
-  const mapEditSubTool = useAppStore(state => state.mapEditSubTool);
-  const selectedEditObjectId = useAppStore(state => state.selectedEditObjectId);
-  const setSelectedEditObjectId = useAppStore(state => state.setSelectedEditObjectId);
-  const setActiveCustomLayerId = useAppStore(state => state.setActiveCustomLayerId);
-  const updateEditObject = useAppStore(state => state.updateEditObject);
+  const mapLayers = useAppStore((state) => state.mapLayers);
+  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const enableSnapping = useAppStore((state) => state.enableSnapping);
+  const isExportPreview = useAppStore((state) => state.isExportPreview);
 
-  const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
-  const [previewInfo, setPreviewInfo] = useState<any>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const isMapEditMode = useAppStore((state) => state.isMapEditMode);
+  const mapEditSubTool = useAppStore((state) => state.mapEditSubTool);
+  const selectedEditObjectId = useAppStore((state) => state.selectedEditObjectId);
+  const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
+  const setActiveCustomLayerId = useAppStore((state) => state.setActiveCustomLayerId);
+  const updateEditObject = useAppStore((state) => state.updateEditObject);
+  const commitMeasurePoint = useAppStore((state) => state.commitMeasurePoint);
+  const setMeasureHoverPoint = useAppStore((state) => state.setMeasureHoverPoint);
+  const resetMeasure = useAppStore((state) => state.resetMeasure);
+  const syncMeasureFromSelection = useAppStore((state) => state.syncMeasureFromSelection);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [scale, setScale] = useState(1);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{
+    x: number;
+    y: number;
+    target: CanvasContextMenuTarget;
+  } | null>(null);
+  const lastContextMenuTime = useRef(0);
 
-  const screenToWorld = useCallback((screenX: number, screenY: number) => {
-    let worldX = (screenX - (position.x + 400)) / scale;
-    let worldY = ((position.y + 400) - screenY) / scale;
-    return { x: worldX, y: worldY };
-  }, [position, scale]);
+  const screenToWorld = useCallback(
+    (screenX: number, screenY: number) => viewportScreenToWorld(screenX, screenY, { scale, position }),
+    [position, scale],
+  );
+
+  /** World coordinates under a pointer / mouse event on the viewport. */
+  const eventToWorld = (e: { clientX: number; clientY: number }) => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    return screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  const applyViewport = useCallback(
+    (viewport: Viewport) => {
+      setScale(viewport.scale);
+      setMapScale(viewport.scale);
+      setPosition(viewport.position);
+    },
+    [setMapScale],
+  );
 
   const occupancySettings = useAppStore((state) => state.occupancySettings);
-  const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
-  const shouldShowBlendedPreview = isExportPreview || showOccupancyHighlight;
+  const { shouldShowBlendedPreview, previewTexture, previewInfo, previewError } = useBlendedPreview();
+  const { resolvedTheme, hasExplicitCustomSurface, canvasBackgroundColor } = useCanvasTheme();
 
-  const customUiConfig = useAppStore((state) => state.customUiConfig);
-  const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
-
-  const resolvedTheme = useMemo(() => {
-    return resolveThemeVariables(isCustomUiMode && customUiConfig ? customUiConfig.theme : undefined);
-  }, [isCustomUiMode, customUiConfig]);
-
-  const canvasBackgroundColor = useMemo(() => {
-    const surfaceBaseHex = resolvedTheme.variables['--color-surface-base'] || '#0f172a';
-    return hexStringToNumber(surfaceBaseHex, 0x0f172a);
-  }, [resolvedTheme]);
-
-  // blend_mode, z_index, visible, image_base64, customLayers, occupancySettings の変更キーを生成
-  const previewSyncKey = useMemo(() => {
-    const mapKey = JSON.stringify(
-      mapLayers.map(l => ({
-        id: l.id,
-        blend_mode: l.blend_mode || 'overwrite',
-        z_index: l.z_index,
-        visible: l.visible,
-        hasImage: !!l.image_base64,
-        info: l.info,
-      }))
-    );
-    const customKey = JSON.stringify(
-      customLayers.map(l => ({
-        id: l.id,
-        type: l.type,
-        visible: l.visible,
-        is_reference: l.is_reference || false,
-        z_index: l.z_index,
-        blend_mode: l.blend_mode || 'overwrite',
-        objCount: l.type === 'manual' ? l.editObjects.length : 0,
-        editObjects: l.type === 'manual' ? l.editObjects : undefined,
-        hasImage: l.type === 'plugin' ? !!l.image_base64 : false,
-      }))
-    );
-    const occKey = JSON.stringify(occupancySettings);
-    return `${shouldShowBlendedPreview}::${mapKey}::${customKey}::${occKey}`;
-  }, [shouldShowBlendedPreview, mapLayers, customLayers, occupancySettings]);
-
-  const startLoading = useAppStore(state => state.startLoading);
-  const stopLoading = useAppStore(state => state.stopLoading);
-
-  useEffect(() => {
-    if (!shouldShowBlendedPreview) {
-      setPreviewTexture(null);
-      stopLoading('blended-preview');
-      setPreviewError(null);
-      return;
-    }
-
-    let cancelled = false;
-    startLoading({
-      id: 'blended-preview',
-      message: isExportPreview ? 'エクスポートプレビューを生成中...' : '占有状態プレビューを生成中...',
-      blocking: true,
-    });
-    setPreviewError(null);
-
-    prepareLayersForExport(mapLayers, customLayers).then(layerInputs => {
-      if (cancelled) return null;
-      if (!layerInputs || layerInputs.length === 0) return null;
-      return BackendAPI.blendMapPreview(layerInputs);
-    }).then(result => {
-      if (cancelled || !result) {
-        stopLoading('blended-preview');
-        return;
-      }
-      const img = new Image();
-      img.onload = () => {
-        if (cancelled) return;
-        const texture = Texture.from(img);
-        setPreviewTexture(texture);
-        setPreviewInfo({
-          resolution: result.resolution,
-          origin: result.origin,
-          occupied_thresh: occupancySettings.defaultOccupiedThresh,
-          free_thresh: occupancySettings.defaultFreeThresh,
-          negate: occupancySettings.defaultNegate,
-        });
-        stopLoading('blended-preview');
-      };
-      img.onerror = () => {
-        if (cancelled) return;
-        setPreviewError('Failed to load image texture from base64.');
-        stopLoading('blended-preview');
-      };
-      img.src = result.image_data_b64;
-    }).catch(err => {
-      if (cancelled) return;
-      console.error('[Blend Preview] Blend Preview failed:', err);
-      setPreviewError(String(err));
-      stopLoading('blended-preview');
-    });
-
-    return () => {
-      cancelled = true;
-      stopLoading('blended-preview');
-    };
-  }, [shouldShowBlendedPreview, previewSyncKey, mapLayers, customLayers, occupancySettings, isExportPreview, startLoading, stopLoading]);
-
-  useEffect(() => {
-    return () => {
-      if (previewTexture && !previewTexture.destroyed) {
-        previewTexture.destroy(false);
-      }
-    };
-  }, [previewTexture]);
-
-  const interactionMode = useRef<'none' | 'pan_map' | 'drag_node' | 'set_yaw' | 'set_yaw_plugin' | 'draw_rect' | 'drag_rect_corner' | 'set_rect_rotation' | 'draw_export_region' | 'move_export_region' | 'resize_export_region' | 'drag_points_item' | 'set_yaw_points_item'>('none');
+  const interactionMode = useRef<
+    | 'none'
+    | 'pan_map'
+    | 'drag_node'
+    | 'set_yaw'
+    | 'set_yaw_plugin'
+    | 'draw_rect'
+    | 'drag_rect_corner'
+    | 'set_rect_rotation'
+    | 'draw_export_region'
+    | 'move_export_region'
+    | 'resize_export_region'
+    | 'drag_points_item'
+    | 'set_yaw_points_item'
+    | 'marquee_select'
+    | 'geo_align_drag'
+  >('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
   const movingNodesState = useRef<{
     activeId: string;
     startWorldPos: { x: number; y: number };
-    initialTransforms: Record<string, { x: number; y: number; z?: number; qx: number; qy: number; qz: number; qw: number }>;
+    initialTransforms: Record<
+      string,
+      { x: number; y: number; z?: number; qx: number; qy: number; qz: number; qw: number }
+    >;
   } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const latestMousePos = useRef({ x: 0, y: 0 }); // Track screen mouse pos constantly
   const containerRef = useRef<HTMLDivElement>(null);
-  const rectInputKey = useRef<string>('');  // The input ID being drawn (e.g. 'sweep_rect')
-  const rectDragCorner = useRef<'min' | 'max' | 'topRight' | 'bottomLeft' | 'nw'|'ne'|'sw'|'se'|'n'|'s'|'e'|'w'>('max');
+  const rectInputKey = useRef<string>(''); // The input ID being drawn (e.g. 'sweep_rect')
+  const rectDragCorner = useRef<
+    'min' | 'max' | 'topRight' | 'bottomLeft' | 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w'
+  >('max');
   const pointsInputKey = useRef<string>('');
   const pointsItemIndex = useRef<number>(-1);
   const regionDragOffset = useRef({ x: 0, y: 0 });
+  const initialYawTransform = useRef<{
+    x: number;
+    y: number;
+    z?: number;
+    qx: number;
+    qy: number;
+    qz: number;
+    qw: number;
+  } | null>(null);
+  const isCreatingNewNodeOnYaw = useRef<boolean>(false);
+  const justAbortedRef = useRef<boolean>(false);
 
-  const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } = useSnapping({ scale, enableSnapping });
+  const [marqueeBox, setMarqueeBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const marqueeOrigin = useRef<{ x: number; y: number } | null>(null);
+
+  const drawMarquee = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      if (!marqueeBox) return;
+      const minX = Math.min(marqueeBox.x1, marqueeBox.x2);
+      const maxX = Math.max(marqueeBox.x1, marqueeBox.x2);
+      const minY = Math.min(marqueeBox.y1, marqueeBox.y2);
+      const maxY = Math.max(marqueeBox.y1, marqueeBox.y2);
+      const w = maxX - minX;
+      const h = maxY - minY;
+
+      g.fillStyle = { color: CANVAS_ACCENT_COLOR, alpha: 0.15 };
+      g.strokeStyle = { width: 1.5 / scale, color: CANVAS_ACCENT_COLOR, alpha: 0.8 };
+      g.rect(minX, minY, w, h);
+      g.fill();
+      g.stroke();
+    },
+    [marqueeBox, scale],
+  );
+
+  const { snapInput, snapState, setSnapState, applySnapping, useSnappingKeyboardEvents, getRenderableNodesList } =
+    useSnapping({ scale, enableSnapping });
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
+
+  const abortRef = useRef<() => boolean>(() => false);
+  const geoAlign = useGeoMapAlign();
+  const { isAltPressed, snappedMeasureTarget, setSnappedMeasureTarget } = useMeasureAltSnap({
+    lastWorldPosRef,
+    scaleRef,
+    abortRef,
+  });
+
+  const abort = useCallback((): boolean => {
+    // 1. Dragging node(s): rollback initial positions & cancel transaction
+    if (interactionMode.current === 'drag_node' && movingNodesState.current) {
+      const rollback: Record<string, Partial<WaypointNode>> = {};
+      Object.entries(movingNodesState.current.initialTransforms).forEach(([id, initTr]) => {
+        rollback[id] = { transform: { ...initTr } };
+      });
+      updateNodes(rollback, { skipRecalculate: true });
+      useAppStore.getState().endHistoryTransaction();
+      movingNodesState.current = null;
+      activeNodeId.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 2. Setting yaw: delete temporary created node if freshly added, or rollback orientation if rotating existing node
+    if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
+      if (isCreatingNewNodeOnYaw.current) {
+        removeNodes([activeNodeId.current]);
+      } else if (initialYawTransform.current) {
+        updateNodes(
+          {
+            [activeNodeId.current]: { transform: { ...initialYawTransform.current } },
+          },
+          { skipRecalculate: true },
+        );
+      }
+      useAppStore.getState().endHistoryTransaction();
+      activeNodeId.current = null;
+      initialYawTransform.current = null;
+      isCreatingNewNodeOnYaw.current = false;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 3. Marquee selection: cancel marquee
+    if (interactionMode.current === 'marquee_select') {
+      interactionMode.current = 'none';
+      setMarqueeBox(null);
+      marqueeOrigin.current = null;
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 4. Export region drawing / moving / resizing
+    if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
+      removeExportRegion?.(activeNodeId.current);
+      useAppStore.getState().endHistoryTransaction();
+      activeNodeId.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    if (interactionMode.current === 'move_export_region' || interactionMode.current === 'resize_export_region') {
+      regionDragOffset.current = { x: 0, y: 0 };
+      rectDragCorner.current = 'max';
+      activeNodeId.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 5. Plugin parameter gestures
+    if (
+      interactionMode.current === 'draw_rect' ||
+      interactionMode.current === 'drag_rect_corner' ||
+      interactionMode.current === 'set_rect_rotation' ||
+      interactionMode.current === 'drag_points_item' ||
+      interactionMode.current === 'set_yaw_points_item' ||
+      interactionMode.current === 'set_yaw_plugin'
+    ) {
+      interactionMode.current = 'none';
+      activeNodeId.current = null;
+      pointsInputKey.current = '';
+      pointsItemIndex.current = -1;
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 6. Annotation drawing
+    if (interactionMode.current === ('draw_annotation' as any)) {
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 7. Annotation move / transform
+    if (
+      interactionMode.current === ('move_annotation' as any) ||
+      interactionMode.current === ('transform_annotation' as any)
+    ) {
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 8. Map edit draw / move / resize
+    if (
+      interactionMode.current === ('edit_map_draw_rect' as any) ||
+      interactionMode.current === ('edit_map_draw_circle' as any) ||
+      interactionMode.current === ('edit_map_freehand' as any) ||
+      interactionMode.current === ('edit_map_draw_line' as any) ||
+      interactionMode.current === ('edit_map_move_object' as any) ||
+      interactionMode.current === ('edit_map_resize_object' as any) ||
+      interactionMode.current === ('edit_map_set_rect_rotation' as any)
+    ) {
+      if (
+        interactionMode.current === ('edit_map_move_object' as any) ||
+        interactionMode.current === ('edit_map_resize_object' as any)
+      ) {
+        useAppStore.getState().endHistoryTransaction();
+      }
+      movingEditObject.current = null;
+      resizingEditObject.current = null;
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 9. Pan map
+    if (interactionMode.current === 'pan_map') {
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 9b. Geo base map alignment drag: restore the position before the drag
+    if (interactionMode.current === 'geo_align_drag') {
+      geoAlign.abort();
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
+    // 10. Measure tool transient point abort
+    if (activeTool === 'measure') {
+      const state = useAppStore.getState();
+      if (state.measureStartPoint && !state.measureEndPoint) {
+        resetMeasure();
+        justAbortedRef.current = true;
+        return true;
+      }
+    }
+    return false;
+  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign]);
+
+  abortRef.current = abort;
+
+  useEffect(() => {
+    return registerCanvasAbortHandler(abort);
+  }, [registerCanvasAbortHandler, abort]);
+
+  useEffect(() => {
+    if (activeTool === 'measure') {
+      syncMeasureFromSelection();
+    } else {
+      setSnappedMeasureTarget(null);
+    }
+  }, [activeTool, syncMeasureFromSelection]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const preventContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+    el.addEventListener('contextmenu', preventContextMenu, true);
+    return () => {
+      el.removeEventListener('contextmenu', preventContextMenu, true);
+    };
+  }, []);
 
   // Map Edit hooks
   const {
@@ -382,12 +393,7 @@ export function MapCanvas() {
     handleRotateEnd,
   } = useMapEditRect();
 
-  const {
-    circlePreview,
-    handleCircleDrawStart,
-    handleCircleDrawMove,
-    handleCircleDrawEnd,
-  } = useMapEditCircle();
+  const { circlePreview, handleCircleDrawStart, handleCircleDrawMove, handleCircleDrawEnd } = useMapEditCircle();
 
   const {
     freehandPreview,
@@ -399,12 +405,7 @@ export function MapCanvas() {
     handleFreehandDrawEnd,
   } = useMapEditFreehand();
 
-  const {
-    linePreview,
-    handleLineDrawStart,
-    handleLineDrawMove,
-    handleLineDrawEnd,
-  } = useMapEditLine();
+  const { linePreview, handleLineDrawStart, handleLineDrawMove, handleLineDrawEnd } = useMapEditLine();
 
   // Annotation Edit hooks & state
   const isAnnotationEditMode = useAppStore((state) => state.isAnnotationEditMode);
@@ -428,6 +429,31 @@ export function MapCanvas() {
   const handleAnnotationPointerDown = useCallback(
     (e: import('pixi.js').FederatedPointerEvent, id: string) => {
       if (useAppStore.getState().isMapEditMode) return;
+      if (e.button === 2) return;
+      if (activeTool === 'measure') {
+        const isAlt = (e.nativeEvent as any)?.altKey;
+        if (isAlt) {
+          isPixiHandledRef.current = true;
+          if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+            (e.nativeEvent as any).stopPropagation();
+          }
+          e.stopPropagation();
+          const annot = useAppStore.getState().annotationObjects[id];
+          if (annot) {
+            const center = getAnnotationCenter(annot);
+            commitMeasurePoint({
+              x: center.x,
+              y: center.y,
+              objectId: id,
+              objectName: annot.name || id,
+              objectType: 'annotation',
+            });
+          }
+          return;
+        }
+        // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+        return;
+      }
       e.stopPropagation();
       selectAnnotationObjects([id], (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey);
       const rect = containerRef.current?.getBoundingClientRect();
@@ -440,7 +466,108 @@ export function MapCanvas() {
         containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [selectAnnotationObjects, screenToWorld, handleStartMoveAnnotation]
+    [selectAnnotationObjects, screenToWorld, handleStartMoveAnnotation],
+  );
+
+  const handleAnnotationContextMenu = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, id: string) => {
+      if (useAppStore.getState().isMapEditMode) return;
+      e.stopPropagation();
+      (e.nativeEvent as Event)?.stopPropagation?.();
+
+      const now = Date.now();
+      if (now - lastContextMenuTime.current < 100) return;
+      lastContextMenuTime.current = now;
+
+      const currentSelected = useAppStore.getState().selectedAnnotationIds;
+      if (!currentSelected.includes(id)) {
+        selectAnnotationObjects([id]);
+      }
+
+      const objects = useAppStore.getState().annotationObjects;
+      const groups = useAppStore.getState().annotationGroups;
+      const targetObj = objects[id];
+      const parentId = targetObj?.group_id ?? null;
+      const parentGroup = parentId ? groups[parentId] : null;
+
+      let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
+      let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
+      if (
+        (clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) &&
+        containerRef.current
+      ) {
+        const rect = containerRef.current.getBoundingClientRect();
+        clientX = rect.left + (e.global?.x ?? 0);
+        clientY = rect.top + (e.global?.y ?? 0);
+      }
+
+      setCanvasContextMenu({
+        x: clientX ?? 0,
+        y: clientY ?? 0,
+        target: {
+          type: 'annotation',
+          id,
+          name: targetObj?.name || undefined,
+          parentContainerId: parentId,
+          parentContainerKind: parentGroup ? 'group' : null,
+          parentContainerName: parentGroup?.name || 'Group',
+        },
+      });
+    },
+    [selectAnnotationObjects],
+  );
+
+  const handleNodeContextMenu = useCallback(
+    (e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+      if (isMapEditMode) return;
+      e.stopPropagation();
+      (e.nativeEvent as Event)?.stopPropagation?.();
+
+      const now = Date.now();
+      if (now - lastContextMenuTime.current < 100) return;
+      lastContextMenuTime.current = now;
+
+      const currentSelected = useAppStore.getState().selectedNodeIds;
+      if (!currentSelected.includes(nodeId)) {
+        selectNodes([nodeId]);
+      }
+
+      const allNodes = useAppStore.getState().nodes;
+      const targetNode = allNodes[nodeId];
+      const rootIds = useAppStore.getState().rootNodeIds;
+      const parentId = findNodeParentId(nodeId, rootIds, allNodes);
+      const parentNode = parentId ? allNodes[parentId] : null;
+
+      let parentContainerKind: 'generator' | 'group' | null = null;
+      if (parentNode) {
+        parentContainerKind = parentNode.type === 'generator' ? 'generator' : 'group';
+      }
+
+      let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
+      let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
+      if (
+        (clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) &&
+        containerRef.current
+      ) {
+        const rect = containerRef.current.getBoundingClientRect();
+        clientX = rect.left + (e.global?.x ?? 0);
+        clientY = rect.top + (e.global?.y ?? 0);
+      }
+
+      setCanvasContextMenu({
+        x: clientX ?? 0,
+        y: clientY ?? 0,
+        target: {
+          type: 'node',
+          id: nodeId,
+          name: targetNode?.name || undefined,
+          parentContainerId: parentId,
+          parentContainerKind,
+          parentContainerName: parentNode?.name || (parentContainerKind === 'generator' ? 'Generator' : 'Group'),
+        },
+      });
+    },
+    [isMapEditMode, selectNodes],
   );
 
   const handleAnnotationHandlePointerDown = useCallback(
@@ -457,7 +584,7 @@ export function MapCanvas() {
         containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [screenToWorld, handleStartTransformAnnotation]
+    [screenToWorld, handleStartTransformAnnotation],
   );
 
   const movingEditObject = useRef<{
@@ -482,7 +609,8 @@ export function MapCanvas() {
       setSelectedEditObjectId(objId);
       setActiveCustomLayerId(layerId);
 
-      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as ManualCustomLayer | undefined;
+      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as
+        ManualCustomLayer | undefined;
       const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
       if (!targetObj) return;
 
@@ -500,8 +628,8 @@ export function MapCanvas() {
           targetObj.type === 'freehand'
             ? targetObj.points
             : targetObj.type === 'line'
-            ? { x1: targetObj.x1, y1: targetObj.y1, x2: targetObj.x2, y2: targetObj.y2 }
-            : { cx: targetObj.cx, cy: targetObj.cy }
+              ? { x1: targetObj.x1, y1: targetObj.y1, x2: targetObj.x2, y2: targetObj.y2 }
+              : { cx: targetObj.cx, cy: targetObj.cy },
         ),
       };
 
@@ -511,14 +639,15 @@ export function MapCanvas() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [setSelectedEditObjectId, setActiveCustomLayerId, screenToWorld]
+    [setSelectedEditObjectId, setActiveCustomLayerId, screenToWorld],
   );
 
   const handleEditObjectHandlePointerDown = useCallback(
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
-      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as ManualCustomLayer | undefined;
+      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as
+        ManualCustomLayer | undefined;
       const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
       if (!targetObj || targetObj.type !== 'rect') return;
 
@@ -528,14 +657,15 @@ export function MapCanvas() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [handleRotateStart]
+    [handleRotateStart],
   );
 
   const handleEditObjectResizeHandlePointerDown = useCallback(
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string, handle: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
-      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as ManualCustomLayer | undefined;
+      const targetLayer = useAppStore.getState().customLayers.find((l) => l.id === layerId && l.type === 'manual') as
+        ManualCustomLayer | undefined;
       const targetObj = targetLayer?.editObjects.find((o) => o.id === objId);
       if (!targetObj) return;
 
@@ -559,7 +689,7 @@ export function MapCanvas() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [screenToWorld]
+    [screenToWorld],
   );
 
   // Fallback grid texture if no maps are loaded
@@ -569,96 +699,43 @@ export function MapCanvas() {
     canvas.height = 1000;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      const bg = resolvedTheme.variables['--color-surface-panel'] || '#1e293b';
-      const grid = resolvedTheme.variables['--color-border-base'] || '#334155';
-      const text = resolvedTheme.variables['--color-text-muted'] || '#94a3b8';
+      const { bg, grid, text } = getFallbackGridColors(resolvedTheme, hasExplicitCustomSurface);
 
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, 1000, 1000);
       ctx.strokeStyle = grid;
       for (let i = 0; i < 100; i += 50) {
-        ctx.beginPath(); ctx.moveTo(i * 10, 0); ctx.lineTo(i * 10, 1000); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, i * 10); ctx.lineTo(1000, i * 10); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(i * 10, 0);
+        ctx.lineTo(i * 10, 1000);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i * 10);
+        ctx.lineTo(1000, i * 10);
+        ctx.stroke();
       }
       ctx.fillStyle = text;
       ctx.font = '24px Arial';
       ctx.fillText('No Map Loaded. Use Load Map button.', 50, 50);
     }
     return Texture.from(canvas);
-  }, [resolvedTheme]);
+  }, [resolvedTheme, hasExplicitCustomSurface]);
 
   const fitToMaps = useCallback(() => {
     if (!containerRef.current) return;
-    
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    let hasContent = false;
-    
-    mapLayers.forEach(layer => {
-      // Fallback to width/height if info is not provided
-      const width = layer.info?.width || layer.width;
-      const height = layer.info?.height || layer.height;
-      const resolution = layer.info?.resolution || 0.05;
-      const originX = layer.info?.origin?.[0] || 0;
-      const originY = layer.info?.origin?.[1] || 0;
-      
-      const w = (width || 1000) * resolution;
-      const h = (height || 1000) * resolution;
-      
-      // Rough bounding box ignoring yaw for simplicity
-      minX = Math.min(minX, originX);
-      minY = Math.min(minY, originY);
-      maxX = Math.max(maxX, originX + w);
-      maxY = Math.max(maxY, originY + h);
-      hasContent = true;
-    });
+    // Read the latest waypoints at call time so waypoints added after the maps are framed too.
+    const { nodes: currentNodes, rootNodeIds: currentRoots } = useAppStore.getState();
+    const waypointPositions = getFlattenedNodeIds(currentRoots, currentNodes)
+      .map((id) => currentNodes[id]?.transform)
+      .filter((t): t is NonNullable<typeof t> => !!t);
 
-    // Also include waypoints to ensure they are never cut off
-    rootNodeIds.forEach(id => {
-      const node = nodes[id];
-      if (node && node.transform) {
-         minX = Math.min(minX, node.transform.x);
-         minY = Math.min(minY, node.transform.y);
-         maxX = Math.max(maxX, node.transform.x);
-         maxY = Math.max(maxY, node.transform.y);
-         hasContent = true;
-      }
-    });
-    
-    if (!hasContent || minX === Infinity || maxX === -Infinity) return;
-    
-    // Add 10% padding
-    const paddingX = Math.max((maxX - minX) * 0.1, 1.0);
-    const paddingY = Math.max((maxY - minY) * 0.1, 1.0);
-    minX -= paddingX;
-    maxX += paddingX;
-    minY -= paddingY;
-    maxY += paddingY;
-    
+    const bounds = contentBounds(mapLayers, waypointPositions);
+    if (!bounds) return;
+
     const rect = containerRef.current.getBoundingClientRect();
-    const screenW = rect.width || window.innerWidth;
-    const screenH = rect.height || window.innerHeight;
-    
-    const worldW = maxX - minX;
-    const worldH = maxY - minY;
-    
-    if (worldW <= 0 || worldH <= 0) return;
-    
-    const scaleX = (screenW * 0.9) / worldW;
-    const scaleY = (screenH * 0.9) / worldH;
-    const newScale = Math.min(scaleX, scaleY);
-    
-    const clampedScale = Math.max(0.01, Math.min(500, newScale));
-    
-    const worldCenterX = (minX + maxX) / 2;
-    const worldCenterY = (minY + maxY) / 2;
-    
-    const newPosX = (screenW / 2) - worldCenterX * clampedScale - 400;
-    const newPosY = (screenH / 2) + worldCenterY * clampedScale - 400;
-    
-    setScale(clampedScale);
-    setMapScale(clampedScale);
-    setPosition({ x: newPosX, y: newPosY });
-  }, [mapLayers]);
+    const viewport = fitViewport(bounds, rect.width || window.innerWidth, rect.height || window.innerHeight);
+    if (viewport) applyViewport(viewport);
+  }, [mapLayers, applyViewport]);
 
   const prevMapCount = useRef(0);
   useEffect(() => {
@@ -675,10 +752,27 @@ export function MapCanvas() {
     }
   }, [shouldFitToMaps, fitToMaps]);
 
-
-
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
+
+    if (isPixiHandledRef.current) {
+      isPixiHandledRef.current = false;
+      return;
+    }
+
+    // Geo base map alignment: left drag moves the map, Shift+left drag rotates it about its origin
+    if (appMode?.mode === 'geo_map_align') {
+      if (e.button === 1) {
+        interactionMode.current = 'pan_map';
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } else if (e.button === 0 && interactionMode.current === 'none') {
+        geoAlign.start(eventToWorld(e), e.shiftKey);
+        interactionMode.current = 'geo_align_drag';
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
 
     if (isMapEditMode) {
       if (e.button === 1) {
@@ -689,10 +783,7 @@ export function MapCanvas() {
         return;
       }
       if (e.button === 0 && interactionMode.current === 'none') {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const worldPos = screenToWorld(mouseX, mouseY);
+        const worldPos = eventToWorld(e);
 
         if (mapEditSubTool === 'rect') {
           handleRectDrawStart(worldPos);
@@ -721,10 +812,7 @@ export function MapCanvas() {
         return;
       }
       if (e.button === 0 && interactionMode.current === 'none') {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const worldPos = screenToWorld(mouseX, mouseY);
+        const worldPos = eventToWorld(e);
 
         if (activeAnnotationSubTool !== 'select') {
           handleAnnotationDrawStart(worldPos);
@@ -741,67 +829,20 @@ export function MapCanvas() {
       }
       return;
     }
-    
-    // Left click + Select Tool + Generator node selected -> Check rectangle handle hits FIRST (before pan_map)
-    if (e.button === 0 && activeTool === 'select' && selectedNodeIds.length === 1 && nodes[selectedNodeIds[0]]?.type === 'generator') {
-      const selectedNode = nodes[selectedNodeIds[0]];
-      const genPluginId = selectedNode.plugin_id || '';
-      const genPlugin = plugins[genPluginId];
-      const genInputs = genPlugin?.manifest?.inputs || [];
-      
-      if (genInputs.some((inp: any) => inp.type === 'rectangle')) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-        const hitRadius = 12 / scale;
-        
-        for (const inp of genInputs) {
-          if (inp.type !== 'rectangle') continue;
-          const rKey = inp.name || inp.id;
-          if (!rKey) continue;
-          const existing = useAppStore.getState().pluginInteractionData[rKey];
-          if (!existing?.center) continue;
-          
-          const { center, width, height, yaw = 0 } = existing;
-          const halfW = width / 2;
-          const halfH = height / 2;
-          
-          const dx = worldX - center.x;
-          const dy = worldY - center.y;
-          const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-          const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-          
-          // Check rotation handle
-          const rotHandleLocalY = halfH + 20 / scale;
-          const rotDx = localX;
-          const rotDy = localY - rotHandleLocalY;
-          if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
-            rectInputKey.current = rKey;
-            interactionMode.current = 'set_rect_rotation';
-            e.currentTarget.setPointerCapture(e.pointerId);
-            return;
-          }
-          
-          // Check corners
-          const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
-            { cx: -halfW, cy: halfH, corner: 'min' },
-            { cx: halfW, cy: -halfH, corner: 'max' },
-            { cx: halfW, cy: halfH, corner: 'topRight' },
-            { cx: -halfW, cy: -halfH, corner: 'bottomLeft' },
-          ];
-          for (const c of cornersMap) {
-            const cdx = localX - c.cx;
-            const cdy = localY - c.cy;
-            if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
-              rectInputKey.current = rKey;
-              rectDragCorner.current = c.corner;
-              interactionMode.current = 'drag_rect_corner';
-              e.currentTarget.setPointerCapture(e.pointerId);
-              return;
-            }
-          }
+
+    // Left click + (Select Tool OR Add Generator Tool) -> Check rectangle handle hits FIRST (before pan_map or point generation)
+    if (e.button === 0 && (activeTool === 'select' || activeTool === 'add_generator')) {
+      const hit = hitTestRectHandles(useAppStore.getState().pluginInteractionData, eventToWorld(e), scale);
+      if (hit) {
+        rectInputKey.current = hit.key;
+        if (hit.handle === 'corner') {
+          rectDragCorner.current = hit.corner;
+          interactionMode.current = 'drag_rect_corner';
+        } else {
+          interactionMode.current = 'set_rect_rotation';
         }
+        e.currentTarget.setPointerCapture(e.pointerId);
+        return;
       }
     }
 
@@ -816,45 +857,79 @@ export function MapCanvas() {
       lastMiddleClickTime.current = now;
     }
 
+    // Shift + Left Click on canvas background -> Start marquee selection
+    if (
+      e.button === 0 &&
+      e.shiftKey &&
+      (activeTool === 'select' || appMode?.mode === 'select') &&
+      interactionMode.current === 'none'
+    ) {
+      const worldPos = eventToWorld(e);
+
+      marqueeOrigin.current = worldPos;
+      setMarqueeBox({ x1: worldPos.x, y1: worldPos.y, x2: worldPos.x, y2: worldPos.y });
+      interactionMode.current = 'marquee_select';
+      e.currentTarget.setPointerCapture(e.pointerId);
+      return;
+    }
+
     // Middle click or (Left click + Select Mode + Not hovering over node) -> Pan Map
     if (e.button === 1 || (e.button === 0 && activeTool === 'select' && interactionMode.current === 'none')) {
       interactionMode.current = 'pan_map';
       lastMousePos.current = { x: e.clientX, y: e.clientY };
       e.currentTarget.setPointerCapture(e.pointerId);
-    } 
+    }
     // Left click + Add Point Tool -> Create Node and start setting Yaw
     else if (e.button === 0 && activeTool === 'add_point') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const id = uuidv4();
       useAppStore.getState().beginHistoryTransaction();
-      addNode({
-        id,
-        type: 'manual',
-        transform: { x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1 },
-        options: {}
-      }, undefined, { skipRecalculate: true });
+      isCreatingNewNodeOnYaw.current = true;
+      initialYawTransform.current = null;
+      addNode(
+        {
+          id,
+          type: 'manual',
+          transform: { x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1 },
+          options: {},
+        },
+        undefined,
+        { skipRecalculate: true },
+      );
       selectNodes([id]);
-      
+
       interactionMode.current = 'set_yaw';
       activeNodeId.current = id;
       e.currentTarget.setPointerCapture(e.pointerId);
     }
+    // Left click + Measure Tool -> Commit measure point (with Alt snap support)
+    else if (e.button === 0 && activeTool === 'measure') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
+      if (e.altKey || isAltPressed) {
+        const nearest = findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale);
+        if (nearest) {
+          commitMeasurePoint(nearest);
+          return;
+        }
+      }
+
+      commitMeasurePoint({
+        x: worldX,
+        y: worldY,
+        objectType: 'point',
+      });
+    }
     // Left click + Add Export Region Tool
     else if (e.button === 0 && activeTool === 'add_export_region' && interactionMode.current === 'none') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const id = uuidv4();
-      
+
       // Default select all visible map layers
       const layerVisibility: Record<string, boolean> = {};
-      useAppStore.getState().mapLayers.forEach(layer => {
+      useAppStore.getState().mapLayers.forEach((layer) => {
         if (layer.visible) {
           layerVisibility[layer.id] = true;
         }
@@ -865,7 +940,7 @@ export function MapCanvas() {
         name: `Region ${useAppStore.getState().exportRegions.length + 1}`,
         rect: { x: worldX, y: worldY, width: 0, height: 0 },
         visible: true,
-        layerVisibility
+        layerVisibility,
       });
 
       interactionMode.current = 'draw_export_region';
@@ -876,70 +951,31 @@ export function MapCanvas() {
     }
     // Click (Left or Right) + Add Generator Tool -> Define interaction input based on active plugin type
     else if ((e.button === 0 || e.button === 2) && activeTool === 'add_generator') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
-      const allInputs = activePlugin?.manifest?.inputs || [];
-      const hitRadius = 12 / scale;
-
-      // FIRST: Check ALL existing rectangles in pluginInteractionData for handle hits (Left-click only)
-      if (e.button === 0) {
-        for (const inp of allInputs) {
-          if (inp.type !== 'rectangle') continue;
-          const rKey = inp.name || inp.id;
-          if (!rKey) continue;
-          const existing = useAppStore.getState().pluginInteractionData[rKey];
-          if (!existing?.center) continue;
-
-          const { center, width, height, yaw = 0 } = existing;
-          const halfW = width / 2;
-          const halfH = height / 2;
-
-          // Convert mouse world coordinates to rectangle local space
-          const dx = worldX - center.x;
-          const dy = worldY - center.y;
-          
-          // Inverse rotation (by -yaw)
-          const localX = dx * Math.cos(-yaw) - dy * Math.sin(-yaw);
-          const localY = dx * Math.sin(-yaw) + dy * Math.cos(-yaw);
-
-          // Check rotation handle (above top of rect on screen = +halfH in Y-up world)
-          const rotHandleLocalY = halfH + 20 / scale;
-          const rotDx = localX - 0;
-          const rotDy = localY - rotHandleLocalY;
-          if (Math.sqrt(rotDx * rotDx + rotDy * rotDy) < hitRadius) {
-            rectInputKey.current = rKey;
-            interactionMode.current = 'set_rect_rotation';
-            e.currentTarget.setPointerCapture(e.pointerId);
-            return;
-          }
-
-          // Check corners in local space (Y-up: +Y = screen top)
-          const cornersMap: Array<{ cx: number; cy: number; corner: 'min' | 'max' | 'topRight' | 'bottomLeft' }> = [
-            { cx: -halfW, cy: halfH, corner: 'min' },         // top-left on screen
-            { cx: halfW, cy: -halfH, corner: 'max' },         // bottom-right on screen
-            { cx: halfW, cy: halfH, corner: 'topRight' },     // top-right on screen
-            { cx: -halfW, cy: -halfH, corner: 'bottomLeft' }, // bottom-left on screen
-          ];
-          
-          for (const c of cornersMap) {
-            const cdx = localX - c.cx;
-            const cdy = localY - c.cy;
-            if (Math.sqrt(cdx * cdx + cdy * cdy) < hitRadius) {
-              rectInputKey.current = rKey;
-              rectDragCorner.current = c.corner;
-              interactionMode.current = 'drag_rect_corner';
-              e.currentTarget.setPointerCapture(e.pointerId);
-              return;
+      let allInputs = activePlugin?.manifest?.inputs || [];
+      if (activePlugin?.manifest?.type === 'pipeline' && activePlugin.manifest?.pipeline?.steps) {
+        const pipelineInputs: any[] = [];
+        for (const step of activePlugin.manifest.pipeline.steps) {
+          const sp = plugins[step.plugin_id];
+          if (sp?.manifest?.inputs) {
+            for (const inp of sp.manifest.inputs) {
+              const k = inp.name || inp.id;
+              const isBound =
+                step.bindings && (step.bindings[k] !== undefined || step.bindings[`inputs.${k}`] !== undefined);
+              if (!isBound) {
+                pipelineInputs.push(inp);
+              }
             }
           }
         }
+        allInputs = pipelineInputs;
       }
+      // Rectangle handles were already hit-tested above for left clicks.
+      const hitRadius = 12 / scale;
 
-      // SECOND: Check ALL existing points in pluginInteractionData for point hits (Move on Left, Remove on Right)
+      // Check ALL existing points in pluginInteractionData for point hits (Move on Left, Remove on Right)
       for (const inp of allInputs) {
         if (inp.type !== 'points' && inp.type !== 'point_list') continue;
         const pKey = inp.name || inp.id;
@@ -977,7 +1013,39 @@ export function MapCanvas() {
       }
 
       // THEN: Process the current activeInputIndex input for new interactions (Left click only)
-      const currentInput = allInputs[activeInputIndex];
+      let currentInput = allInputs[activeInputIndex];
+      if (activePlugin?.manifest?.type === 'pipeline') {
+        const recipeSteps = activePlugin.manifest?.pipeline?.steps || [];
+        if (activePipelineInputRef) {
+          const step = recipeSteps.find((s) => s.step_id === activePipelineInputRef.stepId);
+          const stepPlugin = step ? plugins[step.plugin_id] : null;
+          const matching = stepPlugin?.manifest?.inputs?.find(
+            (i) => (i.name || i.id) === activePipelineInputRef.inputId,
+          );
+          if (matching) {
+            currentInput = matching;
+          }
+        } else {
+          // Fallback: search across pipeline steps for the first unbound input
+          for (const step of recipeSteps) {
+            const stepPlugin = plugins[step.plugin_id];
+            for (const inp of stepPlugin?.manifest?.inputs || []) {
+              const k = inp.name || inp.id;
+              if (!step.bindings || !Object.keys(step.bindings).some((b) => b === k || b === `inputs.${k}`)) {
+                currentInput = inp;
+                useAppStore.getState().setActivePipelineInputRef({ stepId: step.step_id, inputId: k });
+                break;
+              }
+            }
+            if (currentInput) break;
+          }
+        }
+      }
+
+      if (activePlugin?.manifest?.type === 'pipeline' && !currentInput) {
+        return;
+      }
+
       const inputKey = currentInput?.name || currentInput?.id || 'start_point';
       const inputType = currentInput?.type || 'point';
 
@@ -1020,16 +1088,18 @@ export function MapCanvas() {
       } else {
         // Single Point input (existing behavior)
         useAppStore.getState().updatePluginInteractionData(inputKey, {
-          x: worldX, y: worldY, qx: 0, qy: 0, qz: 0, qw: 1
+          x: worldX,
+          y: worldY,
+          qx: 0,
+          qy: 0,
+          qz: 0,
+          qw: 1,
         });
         interactionMode.current = 'set_yaw_plugin';
         e.currentTarget.setPointerCapture(e.pointerId);
       }
     }
-
   };
-
-
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
@@ -1040,20 +1110,20 @@ export function MapCanvas() {
     const mouseY = e.clientY - rect.top;
     latestMousePos.current = { x: mouseX, y: mouseY };
     let { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-    
+
     // Snapping logic
     const list = getRenderableNodesList();
     let currentLockedId = snapState.lockedWaypointId;
 
     if (activeTool === 'add_point' && !currentLockedId && interactionMode.current === 'none') {
-       const precedingNode = getPrecedingManualWaypoint(rootNodeIds, nodes, insertionTarget);
-       if (precedingNode) currentLockedId = precedingNode.id;
+      const precedingNode = getPrecedingManualWaypoint(rootNodeIds, nodes, insertionTarget);
+      if (precedingNode) currentLockedId = precedingNode.id;
     }
 
     const hoverRadius = 30 / scale;
     let closestId = currentLockedId;
     let minDist = Infinity;
-    
+
     for (const item of list) {
       if (!item.node.transform) continue;
       if (interactionMode.current === 'drag_node' && item.id === activeNodeId.current) continue;
@@ -1065,27 +1135,48 @@ export function MapCanvas() {
     }
 
     if (closestId !== currentLockedId) {
-       currentLockedId = closestId;
+      currentLockedId = closestId;
     }
 
-    const lockedNode = currentLockedId ? list.find(r => r.id === currentLockedId)?.node : null;
+    const lockedNode = currentLockedId ? list.find((r) => r.id === currentLockedId)?.node : null;
     const prev = lockedNode?.transform || null;
 
     if (activeTool === 'add_point' && interactionMode.current === 'none') {
-       const snapped = applySnapping(worldX, worldY, prev, currentLockedId);
-       worldX = snapped.x;
-       worldY = snapped.y;
+      const snapped = applySnapping(worldX, worldY, prev, currentLockedId);
+      worldX = snapped.x;
+      worldY = snapped.y;
     } else if (interactionMode.current === 'drag_node') {
-       const snapped = applySnapping(worldX, worldY, prev, currentLockedId);
-       worldX = snapped.x;
-       worldY = snapped.y;
+      const snapped = applySnapping(worldX, worldY, prev, currentLockedId);
+      worldX = snapped.x;
+      worldY = snapped.y;
     } else {
-       if (snapState.isSnapped) {
-          setSnapState(prev => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
-       }
+      if (snapState.isSnapped) {
+        setSnapState((prev) => ({ ...prev, isSnapped: false, axis: null, origin: null, snappedWorldPos: null }));
+      }
     }
 
     setCursorPosition({ x: worldX, y: worldY });
+    lastWorldPosRef.current = { x: worldX, y: worldY };
+
+    if (interactionMode.current === 'geo_align_drag') {
+      geoAlign.update({ x: worldX, y: worldY });
+      return;
+    }
+
+    if (activeTool === 'measure') {
+      const state = useAppStore.getState();
+      const isAlt = e.altKey || isAltPressed;
+      const nearest = isAlt ? findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale) : null;
+      setSnappedMeasureTarget(nearest ? { x: nearest.x, y: nearest.y, objectName: nearest.objectName } : null);
+
+      if (state.measureStartPoint && !state.measureEndPoint) {
+        if (nearest) {
+          setMeasureHoverPoint({ x: nearest.x, y: nearest.y });
+        } else {
+          setMeasureHoverPoint({ x: worldX, y: worldY });
+        }
+      }
+    }
 
     if (isMapEditMode) {
       setBrushPreviewPos({ x: worldX, y: worldY });
@@ -1215,37 +1306,37 @@ export function MapCanvas() {
     }
 
     if (interactionMode.current === ('draw_annotation' as any)) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const curWorldPos = screenToWorld(mouseX, mouseY);
+      const curWorldPos = eventToWorld(e);
       handleAnnotationDrawMove(curWorldPos);
       return;
     }
     if (interactionMode.current === ('move_annotation' as any)) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const curWorldPos = screenToWorld(mouseX, mouseY);
+      const curWorldPos = eventToWorld(e);
       handleMoveAnnotationMove(curWorldPos);
       return;
     }
     if (interactionMode.current === ('transform_annotation' as any)) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const curWorldPos = screenToWorld(mouseX, mouseY);
+      const curWorldPos = eventToWorld(e);
       handleTransformAnnotationMove(curWorldPos);
+      return;
+    }
+
+    if (interactionMode.current === 'marquee_select' && marqueeOrigin.current) {
+      setMarqueeBox({
+        x1: marqueeOrigin.current.x,
+        y1: marqueeOrigin.current.y,
+        x2: worldX,
+        y2: worldY,
+      });
       return;
     }
 
     if (interactionMode.current === 'pan_map') {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
-      setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setPosition((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
       lastMousePos.current = { x: e.clientX, y: e.clientY };
-    } 
-    else if (interactionMode.current === 'drag_node') {
+    } else if (interactionMode.current === 'drag_node') {
       if (movingNodesState.current) {
         const { activeId, startWorldPos, initialTransforms } = movingNodesState.current;
         const activeInitial = initialTransforms[activeId];
@@ -1267,26 +1358,26 @@ export function MapCanvas() {
       } else if (activeNodeId.current) {
         const node = useAppStore.getState().nodes[activeNodeId.current];
         if (node) {
-          updateNode(activeNodeId.current, {
-            transform: { 
-               x: worldX, 
-               y: worldY, 
-               z: node.transform?.z, 
-               qx: node.transform?.qx || 0, 
-               qy: node.transform?.qy || 0, 
-               qz: node.transform?.qz || 0, 
-               qw: node.transform?.qw ?? 1 
-            }
-          }, { skipRecalculate: true });
+          updateNode(
+            activeNodeId.current,
+            {
+              transform: {
+                x: worldX,
+                y: worldY,
+                z: node.transform?.z,
+                qx: node.transform?.qx || 0,
+                qy: node.transform?.qy || 0,
+                qz: node.transform?.qz || 0,
+                qw: node.transform?.qw ?? 1,
+              },
+            },
+            { skipRecalculate: true },
+          );
         }
       }
-    }
-    else if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
+    } else if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
       const node = useAppStore.getState().nodes[activeNodeId.current];
       if (node && node.transform) {
         // Calculate angle from node center to mouse cursor
@@ -1295,23 +1386,23 @@ export function MapCanvas() {
         if (Math.abs(dx) > 0.1 || Math.abs(dy) > 0.1) {
           const yaw = Math.atan2(dy, dx);
           const halfYaw = yaw / 2.0;
-          updateNode(activeNodeId.current, {
-            transform: { 
-              ...node.transform, 
-              qx: 0, 
-              qy: 0, 
-              qz: Math.sin(halfYaw), 
-              qw: Math.cos(halfYaw) 
-            }
-          }, { skipRecalculate: true });
+          updateNode(
+            activeNodeId.current,
+            {
+              transform: {
+                ...node.transform,
+                qx: 0,
+                qy: 0,
+                qz: Math.sin(halfYaw),
+                qw: Math.cos(halfYaw),
+              },
+            },
+            { skipRecalculate: true },
+          );
         }
       }
-    }
-    else if (interactionMode.current === 'drag_points_item') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+    } else if (interactionMode.current === 'drag_points_item') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = pointsInputKey.current;
       const idx = pointsItemIndex.current;
@@ -1321,12 +1412,8 @@ export function MapCanvas() {
         next[idx] = { ...next[idx], x: worldX, y: worldY };
         useAppStore.getState().updatePluginInteractionData(key, next);
       }
-    }
-    else if (interactionMode.current === 'set_yaw_points_item') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+    } else if (interactionMode.current === 'set_yaw_points_item') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
 
       const key = pointsInputKey.current;
       const idx = pointsItemIndex.current;
@@ -1349,18 +1436,34 @@ export function MapCanvas() {
           useAppStore.getState().updatePluginInteractionData(key, next);
         }
       }
-    }
-    else if (interactionMode.current === 'set_yaw_plugin') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
+    } else if (interactionMode.current === 'set_yaw_plugin') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
       // Find the active point input key
       const activePlugin = activePluginId ? plugins[activePluginId] : null;
-      const firstInput = activePlugin?.manifest?.inputs?.[activeInputIndex];
+      let firstInput = activePlugin?.manifest?.inputs?.[activeInputIndex];
+      if (activePlugin?.manifest?.type === 'pipeline') {
+        const recipeSteps = activePlugin.manifest?.pipeline?.steps || [];
+        if (activePipelineInputRef) {
+          const step = recipeSteps.find((s) => s.step_id === activePipelineInputRef.stepId);
+          const stepPlugin = step ? plugins[step.plugin_id] : null;
+          firstInput = stepPlugin?.manifest?.inputs?.find((i) => (i.name || i.id) === activePipelineInputRef.inputId);
+        } else {
+          for (const step of recipeSteps) {
+            const stepPlugin = plugins[step.plugin_id];
+            for (const inp of stepPlugin?.manifest?.inputs || []) {
+              const k = inp.name || inp.id;
+              if (!step.bindings || !Object.keys(step.bindings).some((b) => b === k || b === `inputs.${k}`)) {
+                firstInput = inp;
+                break;
+              }
+            }
+            if (firstInput) break;
+          }
+        }
+      }
       const inputKey = firstInput?.name || firstInput?.id || 'start_point';
-      
+
       const pData = useAppStore.getState().pluginInteractionData[inputKey];
       if (pData) {
         const dx = worldX - pData.x;
@@ -1369,18 +1472,17 @@ export function MapCanvas() {
           const yaw = Math.atan2(dy, dx);
           const halfYaw = yaw / 2.0;
           useAppStore.getState().updatePluginInteractionData(inputKey, {
-             ...pData,
-             qx: 0, qy: 0, qz: Math.sin(halfYaw), qw: Math.cos(halfYaw)
+            ...pData,
+            qx: 0,
+            qy: 0,
+            qz: Math.sin(halfYaw),
+            qw: Math.cos(halfYaw),
           });
         }
       }
-    }
-    else if (interactionMode.current === 'draw_rect') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
+    } else if (interactionMode.current === 'draw_rect') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
       const key = rectInputKey.current;
       const current = useAppStore.getState().pluginInteractionData[key];
       if (current && current.origin) {
@@ -1394,55 +1496,49 @@ export function MapCanvas() {
           // Yaw stays 0 during initial draw
         });
       }
-    }
-    else if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
+    } else if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
       const current = useAppStore.getState().pluginInteractionData['__export_region_origin'];
       if (current && current.x !== undefined) {
         const ox = current.x;
         const oy = current.y;
-        
+
         // Calculate min/max x and y to support drawing in any direction
         const minX = Math.min(ox, worldX);
         const minY = Math.min(oy, worldY);
         const maxX = Math.max(ox, worldX);
         const maxY = Math.max(oy, worldY);
-        
+
         useAppStore.getState().updateExportRegion(activeNodeId.current, {
           rect: {
             x: minX,
             y: minY,
             width: maxX - minX,
-            height: maxY - minY
-          }
+            height: maxY - minY,
+          },
         });
       }
-    }
-    else if (interactionMode.current === 'move_export_region' && activeNodeId.current) {
-      const region = useAppStore.getState().exportRegions.find(r => r.id === activeNodeId.current);
+    } else if (interactionMode.current === 'move_export_region' && activeNodeId.current) {
+      const region = useAppStore.getState().exportRegions.find((r) => r.id === activeNodeId.current);
       if (region) {
         useAppStore.getState().updateExportRegion(region.id, {
           rect: {
             ...region.rect,
             x: worldX - regionDragOffset.current.x,
-            y: worldY - regionDragOffset.current.y
-          }
+            y: worldY - regionDragOffset.current.y,
+          },
         });
       }
-    }
-    else if (interactionMode.current === 'resize_export_region' && activeNodeId.current) {
-      const region = useAppStore.getState().exportRegions.find(r => r.id === activeNodeId.current);
+    } else if (interactionMode.current === 'resize_export_region' && activeNodeId.current) {
+      const region = useAppStore.getState().exportRegions.find((r) => r.id === activeNodeId.current);
       if (region) {
         let { x, y, width, height } = region.rect;
         const handle = rectDragCorner.current;
-        
-        const originalOppositeX = (handle.includes('w')) ? x + width : x;
-        const originalOppositeY = (handle.includes('s')) ? y : y + height;
-        
+
+        const originalOppositeX = handle.includes('w') ? x + width : x;
+        const originalOppositeY = handle.includes('s') ? y : y + height;
+
         let newX = x;
         let newY = y;
         let newWidth = width;
@@ -1465,16 +1561,12 @@ export function MapCanvas() {
         }
 
         useAppStore.getState().updateExportRegion(region.id, {
-          rect: { x: newX, y: newY, width: newWidth, height: newHeight }
+          rect: { x: newX, y: newY, width: newWidth, height: newHeight },
         });
       }
-    }
-    else if (interactionMode.current === 'drag_rect_corner') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
+    } else if (interactionMode.current === 'drag_rect_corner') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
       const key = rectInputKey.current;
       const current = useAppStore.getState().pluginInteractionData[key];
       if (current && current.center) {
@@ -1484,11 +1576,21 @@ export function MapCanvas() {
         const halfH = height / 2;
 
         // Current corner coordinates in local space BEFORE drag
-        let origLocalCx = 0, origLocalCy = 0;
-        if (corner === 'min') { origLocalCx = -halfW; origLocalCy = halfH; }
-        else if (corner === 'max') { origLocalCx = halfW; origLocalCy = -halfH; }
-        else if (corner === 'topRight') { origLocalCx = halfW; origLocalCy = halfH; }
-        else if (corner === 'bottomLeft') { origLocalCx = -halfW; origLocalCy = -halfH; }
+        let origLocalCx = 0,
+          origLocalCy = 0;
+        if (corner === 'min') {
+          origLocalCx = -halfW;
+          origLocalCy = halfH;
+        } else if (corner === 'max') {
+          origLocalCx = halfW;
+          origLocalCy = -halfH;
+        } else if (corner === 'topRight') {
+          origLocalCx = halfW;
+          origLocalCy = halfH;
+        } else if (corner === 'bottomLeft') {
+          origLocalCx = -halfW;
+          origLocalCy = -halfH;
+        }
 
         // The *opposite* corner remains perfectly fixed during this drag.
         const oppLocalX = -origLocalCx;
@@ -1511,8 +1613,10 @@ export function MapCanvas() {
         const newCenterLocalFromOppY = mouseLocalFromOppY / 2;
 
         // Convert the new center back to world coordinates
-        const newWorldCx = oppWorldX + (newCenterLocalFromOppX * Math.cos(yaw) - newCenterLocalFromOppY * Math.sin(yaw));
-        const newWorldCy = oppWorldY + (newCenterLocalFromOppX * Math.sin(yaw) + newCenterLocalFromOppY * Math.cos(yaw));
+        const newWorldCx =
+          oppWorldX + (newCenterLocalFromOppX * Math.cos(yaw) - newCenterLocalFromOppY * Math.sin(yaw));
+        const newWorldCy =
+          oppWorldY + (newCenterLocalFromOppX * Math.sin(yaw) + newCenterLocalFromOppY * Math.cos(yaw));
 
         useAppStore.getState().updatePluginInteractionData(key, {
           ...current,
@@ -1521,13 +1625,9 @@ export function MapCanvas() {
           height: newHeight,
         });
       }
-    }
-    else if (interactionMode.current === 'set_rect_rotation') {
-      const rect = containerRef.current.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-      
+    } else if (interactionMode.current === 'set_rect_rotation') {
+      const { x: worldX, y: worldY } = eventToWorld(e);
+
       const key = rectInputKey.current;
       const current = useAppStore.getState().pluginInteractionData[key];
       if (current && current.center) {
@@ -1541,7 +1641,7 @@ export function MapCanvas() {
           // Dragging straight up: dy>0, dx=0 → atan2 = PI/2.
           // We want yaw=0 when handle points up, so offset by -PI/2.
           let yaw = Math.atan2(dy, dx) - Math.PI / 2;
-          
+
           useAppStore.getState().updatePluginInteractionData(key, {
             ...current,
             yaw,
@@ -1549,10 +1649,28 @@ export function MapCanvas() {
         }
       }
     }
-
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (justAbortedRef.current) {
+      justAbortedRef.current = false;
+      isCreatingNewNodeOnYaw.current = false;
+      initialYawTransform.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      return;
+    }
+
+    if (interactionMode.current === 'geo_align_drag') {
+      geoAlign.end();
+      interactionMode.current = 'none';
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      return;
+    }
+
     if (isMapEditMode) {
       if (interactionMode.current === ('edit_map_draw_rect' as any)) {
         handleRectDrawEnd();
@@ -1605,6 +1723,41 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === 'marquee_select') {
+      if (marqueeBox) {
+        const minX = Math.min(marqueeBox.x1, marqueeBox.x2);
+        const maxX = Math.max(marqueeBox.x1, marqueeBox.x2);
+        const minY = Math.min(marqueeBox.y1, marqueeBox.y2);
+        const maxY = Math.max(marqueeBox.y1, marqueeBox.y2);
+
+        const allNodes = useAppStore.getState().nodes;
+        const hitNodeIds: string[] = [];
+        Object.values(allNodes).forEach((node) => {
+          if (node.transform) {
+            const nx = node.transform.x;
+            const ny = node.transform.y;
+            if (nx >= minX && nx <= maxX && ny >= minY && ny <= maxY) {
+              hitNodeIds.push(node.id);
+            }
+          }
+        });
+
+        const isCumulative = e.shiftKey || e.metaKey || e.ctrlKey;
+        if (isCumulative) {
+          const currentSelected = useAppStore.getState().selectedNodeIds;
+          const merged = Array.from(new Set([...currentSelected, ...hitNodeIds]));
+          selectNodes(merged);
+        } else {
+          selectNodes(hitNodeIds);
+        }
+      }
+      setMarqueeBox(null);
+      marqueeOrigin.current = null;
+      interactionMode.current = 'none';
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      return;
+    }
+
     if (interactionMode.current !== 'none') {
       if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
         useAppStore.getState().endHistoryTransaction();
@@ -1615,10 +1768,9 @@ export function MapCanvas() {
       if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
         const node = useAppStore.getState().nodes[activeNodeId.current];
         if (node && node.transform) {
-          const { x, y, qx, qy, qz, qw } = node.transform;
-          let yaw = Math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz));
-          if (!isFinite(yaw)) yaw = 0;
-          setSnapState(prev => ({
+          const { x, y } = node.transform;
+          const yaw = quaternionToYaw(node.transform);
+          setSnapState((prev) => ({
             ...prev,
             isSnapped: false,
             axis: null,
@@ -1626,7 +1778,7 @@ export function MapCanvas() {
             snappedWorldPos: null,
             lockedWaypointId: activeNodeId.current,
             forcedAxis: null,
-            forcedSign: null
+            forcedSign: null,
           }));
         }
       }
@@ -1646,70 +1798,57 @@ export function MapCanvas() {
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (!containerRef.current) return;
-    
+
     // Determine cursor position in screen space
     const rect = containerRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    // Determine current world coordinates under the cursor
-    const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-
-    const zoomFactor = -e.deltaY * 0.001;
-    // Increase max zoom limit significantly (e.g. from 10 to 500)
-    const newScale = Math.max(0.01, Math.min(500, scale * (1 + zoomFactor)));
-
-    // Calculate new position so that the world coordinates stay at the same screen coordinates
-    // screenX = worldX * newScale + newPosition.x + 400
-    const newPosX = mouseX - worldX * newScale - 400;
-    
-    // container Y is inverted: screenY = -worldY * newScale + newPosition.y + 400
-    // newPosition.y = screenY + worldY * newScale - 400
-    const newPosY = mouseY + worldY * newScale - 400;
-
-    setScale(newScale);
-    setMapScale(newScale);
-    setPosition({ x: newPosX, y: newPosY });
+    const zoomFactor = 1 - e.deltaY * 0.001;
+    applyViewport(zoomAt({ scale, position }, e.clientX - rect.left, e.clientY - rect.top, zoomFactor));
   };
 
-
-
-  const textStyle = useMemo(() => new TextStyle({
-    fill: '#ffffff',
-    fontSize: 14,
-    fontFamily: 'Arial',
-    fontWeight: 'bold',
-    stroke: { color: '#000000', width: 3 },
-    dropShadow: {
-      color: '#000000',
-      blur: 2,
-      distance: 1,
-      angle: Math.PI / 4,
-      alpha: 1,
-    }
-  }), []);
+  const textStyle = useMemo(
+    () =>
+      new TextStyle({
+        fill: '#ffffff',
+        fontSize: 14,
+        fontFamily: 'Arial',
+        fontWeight: 'bold',
+        stroke: { color: '#000000', width: 3 },
+        dropShadow: {
+          color: '#000000',
+          blur: 2,
+          distance: 1,
+          angle: Math.PI / 4,
+          alpha: 1,
+        },
+      }),
+    [],
+  );
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`absolute inset-0 w-full h-full ${
-        (isAnnotationEditMode && activeAnnotationSubTool !== 'select') || isMapEditMode || activeTool !== 'select'
-          ? 'cursor-crosshair'
-          : 'cursor-grab active:cursor-grabbing'
+        appMode?.mode === 'geo_map_align'
+          ? 'cursor-move'
+          : (isAnnotationEditMode && activeAnnotationSubTool !== 'select') || isMapEditMode || activeTool !== 'select'
+            ? 'cursor-crosshair'
+            : 'cursor-grab active:cursor-grabbing'
       }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={() => { 
-        if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
-          useAppStore.getState().endHistoryTransaction();
-          if (useAppStore.getState().autoRecalculatePath && useAppStore.getState().activePathCalculatorPluginId) {
-            useAppStore.getState().recalculatePath({ immediate: true });
-          }
-        }
-        interactionMode.current = 'none';
-        activeNodeId.current = null;
-        movingNodesState.current = null;
+      onPointerCancel={(e) => {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch (_) {}
+        abortRef.current?.();
+        setCursorPosition(null);
+      }}
+      onLostPointerCapture={() => {
+        abortRef.current?.();
+        setCursorPosition(null);
+      }}
+      onPointerLeave={() => {
         setCursorPosition(null);
       }}
       onWheel={handleWheel}
@@ -1718,13 +1857,27 @@ export function MapCanvas() {
       <Application preserveDrawingBuffer={true} background={canvasBackgroundColor} resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
+          {/* 0. Geographic base map (OSM / satellite tiles) at the very back */}
+          <GeoTileLayer scale={scale} position={position} />
+
           {/* 1. Base Map Layers Group */}
           <pixiContainer label="map-layers-group">
             {shouldShowBlendedPreview ? (
               <>
                 {previewError && !previewTexture ? (
-                  <pixiText text={`Error: ${previewError}`} x={0} y={0} style={textStyle} anchor={0.5} scale={{ x: 1 / scale, y: -1 / scale }} />
-                ) : (previewTexture && !previewTexture.destroyed && previewTexture.source && !previewTexture.source.destroyed && previewTexture.source.style) ? (
+                  <pixiText
+                    text={`Error: ${previewError}`}
+                    x={0}
+                    y={0}
+                    style={textStyle}
+                    anchor={0.5}
+                    scale={{ x: 1 / scale, y: -1 / scale }}
+                  />
+                ) : previewTexture &&
+                  !previewTexture.destroyed &&
+                  previewTexture.source &&
+                  !previewTexture.source.destroyed &&
+                  previewTexture.source.style ? (
                   <MapLayerSprite
                     layer={{
                       id: '__blended_preview__',
@@ -1750,9 +1903,9 @@ export function MapCanvas() {
                 ) : null}
               </>
             ) : mapLayers.length > 0 ? (
-              [...mapLayers].reverse().map(layer => (
-                <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />
-              ))
+              [...mapLayers]
+                .reverse()
+                .map((layer) => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)
             ) : customLayers.length === 0 ? (
               <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
             ) : null}
@@ -1833,18 +1986,47 @@ export function MapCanvas() {
             previewObject={annotationPreview}
             onAnnotationPointerDown={handleAnnotationPointerDown}
             onAnnotationHandlePointerDown={handleAnnotationHandlePointerDown}
+            onAnnotationContextMenu={handleAnnotationContextMenu}
           />
 
           {/* Render Waypoints (manual root nodes and children of generator nodes) */}
-          <WaypointLayer 
-            scale={scale} 
-            textStyle={textStyle} 
+          <WaypointLayer
+            scale={scale}
+            textStyle={textStyle}
             lockedWaypointId={snapState.lockedWaypointId}
+            onNodeContextMenu={handleNodeContextMenu}
             onNodePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
               if (isMapEditMode) return;
+              if (e.button === 2) return;
+              if (activeTool === 'measure') {
+                const isAlt = (e.nativeEvent as any)?.altKey;
+                if (isAlt) {
+                  isPixiHandledRef.current = true;
+                  if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+                    (e.nativeEvent as any).stopPropagation();
+                  }
+                  e.stopPropagation();
+                  const node = useAppStore.getState().nodes[nodeId];
+                  if (node?.transform) {
+                    commitMeasurePoint({
+                      x: node.transform.x,
+                      y: node.transform.y,
+                      objectId: nodeId,
+                      objectName: node.name || nodeId,
+                      objectType: 'node',
+                    });
+                  }
+                  return;
+                }
+                // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+                return;
+              }
               if (activeTool === 'select') {
                 e.stopPropagation();
-                const isModifier = (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey || (e.nativeEvent as any)?.ctrlKey;
+                const isModifier =
+                  (e.nativeEvent as any)?.shiftKey ||
+                  (e.nativeEvent as any)?.metaKey ||
+                  (e.nativeEvent as any)?.ctrlKey;
                 const currentSelected = useAppStore.getState().selectedNodeIds;
                 let targetIds: string[];
 
@@ -1906,6 +2088,9 @@ export function MapCanvas() {
             onNodeHandlePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
               if (isMapEditMode) return;
               e.stopPropagation();
+              const existingNode = useAppStore.getState().nodes[nodeId];
+              initialYawTransform.current = existingNode?.transform ? { ...existingNode.transform } : null;
+              isCreatingNewNodeOnYaw.current = false;
               useAppStore.getState().beginHistoryTransaction();
               interactionMode.current = 'set_yaw';
               activeNodeId.current = nodeId;
@@ -1918,7 +2103,11 @@ export function MapCanvas() {
           {/* Render Active Plugin Interaction Previews (Points + Rectangles) */}
           <PluginLayer
             scale={scale}
-            onRectDragCornerDown={(e: import('pixi.js').FederatedPointerEvent, key: string, corner: 'min'|'max'|'topRight'|'bottomLeft') => {
+            onRectDragCornerDown={(
+              e: import('pixi.js').FederatedPointerEvent,
+              key: string,
+              corner: 'min' | 'max' | 'topRight' | 'bottomLeft',
+            ) => {
               e.stopPropagation();
               rectInputKey.current = key;
               rectDragCorner.current = corner;
@@ -1937,8 +2126,8 @@ export function MapCanvas() {
             }}
           />
 
-          <ExportRegionLayer 
-            scale={scale} 
+          <ExportRegionLayer
+            scale={scale}
             textStyle={textStyle}
             onRegionDragDown={(e, regionId) => {
               if (activeTool === 'add_export_region') {
@@ -1946,7 +2135,7 @@ export function MapCanvas() {
                 if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
                   (e.nativeEvent as any).stopPropagation();
                 }
-                const region = useAppStore.getState().exportRegions.find(r => r.id === regionId);
+                const region = useAppStore.getState().exportRegions.find((r) => r.id === regionId);
                 if (region) {
                   const rect = containerRef.current?.getBoundingClientRect();
                   if (rect && e.nativeEvent instanceof PointerEvent) {
@@ -1977,11 +2166,30 @@ export function MapCanvas() {
             }}
           />
 
+          {/* Render Measure Layer */}
+          <MeasureLayer scale={scale} snappedTarget={snappedMeasureTarget} isAltPressed={isAltPressed} />
+
+          {/* Origin marker of the geo base map while aligning it */}
+          <GeoAlignMarkerLayer scale={scale} />
+
           {/* Render Snapping Guide */}
           <SnappingGuideLayer scale={scale} snapState={snapState} snapInput={snapInput} />
 
+          {/* Marquee Selection Rectangle */}
+          {marqueeBox && <pixiGraphics draw={drawMarquee} zIndex={10000} />}
         </pixiContainer>
       </Application>
+
+      <GeoAttribution />
+
+      {canvasContextMenu && (
+        <CanvasContextMenu
+          x={canvasContextMenu.x}
+          y={canvasContextMenu.y}
+          target={canvasContextMenu.target}
+          onClose={() => setCanvasContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,9 +1,10 @@
 import { useAppStore } from '../../../stores/appStore';
 import { WaypointNode } from '../../../types/store';
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from '../../../utils/transformUtils';
-import { ElementCopyField } from '../../../stores/slices/uiSlice';
+import type { ElementCopyField } from '../../../types/ui';
 import { TransformField } from './TransformField';
 import { PropertySectionHeader } from './PropertySectionHeader';
+import { Anchor } from 'lucide-react';
 
 interface AnchorTransformGroupProps {
   node: WaypointNode;
@@ -31,20 +32,20 @@ export function AnchorTransformGroup({
 
   const { relX, relY, relZ: dz, relYaw } = calculateAnchorRelativeTransform(node.transform, anchorNode.transform);
 
-  const handleFieldChange = (field: "x" | "y" | "z", val: number) => {
-    if (field === "x") {
+  const handleFieldChange = (field: 'x' | 'y' | 'z', val: number) => {
+    if (field === 'x') {
       const newDx = val * Math.cos(aYaw) - relY * Math.sin(aYaw);
       const newDy = val * Math.sin(aYaw) + relY * Math.cos(aYaw);
       handleUpdate(node.id, {
         transform: { ...node.transform!, x: ax + newDx, y: ay + newDy },
       });
-    } else if (field === "y") {
+    } else if (field === 'y') {
       const newDx = relX * Math.cos(aYaw) - val * Math.sin(aYaw);
       const newDy = relX * Math.sin(aYaw) + val * Math.cos(aYaw);
       handleUpdate(node.id, {
         transform: { ...node.transform!, x: ax + newDx, y: ay + newDy },
       });
-    } else if (field === "z") {
+    } else if (field === 'z') {
       handleUpdate(node.id, {
         transform: { ...node.transform!, z: az + val },
       });
@@ -64,9 +65,10 @@ export function AnchorTransformGroup({
     <div className="space-y-2 pt-4 border-t border-accent-anchor/30 relative">
       <PropertySectionHeader
         title={
-          <>
-            <span>⚓</span> Transform (From Anchor)
-          </>
+          <span className="flex items-center gap-1">
+            <Anchor size={12} className="shrink-0" />
+            Transform (From Anchor)
+          </span>
         }
         className="text-accent-anchor"
       />
@@ -82,7 +84,7 @@ export function AnchorTransformGroup({
           onContextMenu={(e) => onContextMenuLabel?.('x', e)}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("x", val)}
+          onChange={(val) => handleFieldChange('x', val)}
         />
         <TransformField
           label="Local Y (m)"
@@ -94,7 +96,7 @@ export function AnchorTransformGroup({
           onContextMenu={(e) => onContextMenuLabel?.('y', e)}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("y", val)}
+          onChange={(val) => handleFieldChange('y', val)}
         />
         <TransformField
           label="Delta Z (m)"
@@ -106,7 +108,7 @@ export function AnchorTransformGroup({
           onContextMenu={(e) => onContextMenuLabel?.('z', e)}
           onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
           onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
-          onChange={(val) => handleFieldChange("z", val)}
+          onChange={(val) => handleFieldChange('z', val)}
         />
         <div className="col-span-3 grid grid-cols-2 gap-2">
           <TransformField
