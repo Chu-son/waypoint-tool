@@ -116,6 +116,12 @@ npm run tauri build
 ```
 生成されたバイナリ（deb, AppImage, exe, msi 等）は `src-tauri/target/release/` 以下に配置されます。
 
+### ビルド済みインストーラのダウンロード
+
+`v*` タグを push すると GitHub Actions が Windows（`.msi` / `.exe`）と Ubuntu（`.deb` / `.AppImage` / `.rpm`）向けにビルドし、[Releases](../../releases) に添付します。バージョン更新とリリースの手順は [DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md#バージョン管理とリリース) を参照してください。
+
+> コード署名は行っていないため、Windows では SmartScreen の警告が表示されます。
+
 ---
 
 ## ドキュメント一覧
