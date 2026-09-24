@@ -36,7 +36,8 @@ waypoint-tool/
 │       ├── io/                # ファイル読み書き (YAML/JSON エクスポート等)
 │       ├── map/               # Map / PGM データ処理
 │       ├── models/            # データ構造定義
-│       └── plugins/           # 外部プラグイン (Python/WASM) プロセス実行・通信
+│       ├── plugins/           # 外部プラグイン (Python/WASM) プロセス実行・通信
+│       └── tiles.rs           # 背景地図タイルの取得とディスクキャッシュ
 └── python_sdk/                # プラグイン用 Python SDK & 標準ジェネレータープラグイン
     └── wpt_plugin/            # 幾何計算・通信用 SDK パッケージ
 ```
@@ -144,8 +145,9 @@ graph TD
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
 - **`pathCalculatorSlice.ts`**: 経路計算プラグイン（障害物回避ルーティング等）の選択・パラメータ・計算結果、デバウンス付き再計算 (`recalculatePath`)。
 - **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
-- **`interactionSlice.ts`**: 状態機械および対話管理（8種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
+- **`interactionSlice.ts`**: 状態機械および対話管理（10種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、サイドバーパネルの自由ドッキング配置構造（`panelLayout`：左/右パネル所属タブ一覧・並び替え・相互移動・永続化）、アクティブタブ（`activateTab`）、モーダル表示状態、ズーム/パン位置。
+- **`geoMapSlice.ts`**: 背景地図（OSM / 衛星画像）の設定 `geoMap`（有効/無効、ベースマップ ID とカスタム URL、不透明度、ワールド原点の地理座標、位置合わせ `alignment`）と、ドラッグ／数値入力による位置合わせの編集セッション（`beginGeoAlignDrag` → `updateGeoAlignDrag` → `endGeoAlignDrag` / `cancelGeoAlignDrag`）。位置合わせは Undo 履歴に含まれ、1 セッションが Undo 1 回になる。プロジェクトファイルの `geo_map` に保存し、読込時は `migrations/geoMapNormalization.ts` で検証・補完する。
 - **`historySlice.ts`**: 履歴スタック管理（Undo / Redo、トランザクション、`pushHistorySnapshot` による原子的履歴記録）。
 - **`workflowSlice.ts`**: ワークフローステップ管理（動的UIでのステップ進行、ステップ実行状態・変数の追跡）。
 - **`customUiSlice.ts`**: 動的UI定義（プリセット検出、カスタムUI設定ロード、レイアウトオーバーライド）。
@@ -182,6 +184,12 @@ graph TD
 - ROS のマップ原点 `origin: [x, y, yaw]` に対し、世界座標 $(x_w, y_w)$ とピクセル座標 $(c, r)$ の相互変換は、必ず $Yaw$ 回転行列 $R(\theta)$ を含む 2D 剛体変換式を一貫適用する。
 - フロントエンドの描画・ラスタライズと、Rust バックエンド（`blending.rs` 等）の双方でこの数学的変換式を統一する。
 
+### 5.3.1 背景地図の座標変換規約 (Geo Base Map Transform)
+- 緯度経度 ⇔ ワールド座標の変換は `src/utils/geo/geoTransform.ts` に集約する。ワールド座標 = R(yaw)·(UTM − 原点のUTM) + (dx, dy)（X 右 / Y 上、m）。回転行列は 5.3 のマップ原点と同じ向き（反時計回りが正）。
+- UTM は必ず原点と同じゾーン・半球に固定して計算する（ゾーン境界をまたいでも連続に扱うため）。UTM の縮尺係数 (0.9996) は無視して m をそのままワールドの m とみなす。
+- タイルの配置は、タイル左上・右上・左下の 3 隅をワールド座標へ写して Sprite の位置・回転・スケールを求める（Web Mercator と UTM はどちらも等角なので、タイル 1 枚の範囲では相似変換として扱える）。
+- 背景地図は `MapCanvas` のワールドコンテナ内で最背面（`map-layers-group` より前）に描画する。タイルの取得は `BackendAPI.fetchMapTile` → Rust `tiles.rs` が担い、フロント側は `canvas/utils/tileCache.ts`（同時取得数の制限・LRU・失敗時の再試行間隔）で保持する。
+
 ### 5.4 ツリー変形時の挿入境界射影規約 (Adjacent Boundary Projection Standard)
 - ツリー変形（ノード削除、Group作成・解除、ノード移動、複製等）を行うすべての Store アクションは、直前ノードに基づく共通写像関数 `mapInsertionTarget`（`src/utils/treeUtils.ts`）を介して `insertionTarget` を安全に追従・更新しなければならない。
 - 複数ノードの追加はループによる個別 `addNode` 呼び出しを禁止し、単一トランザクション・単一履歴スナップショットで完結する `addNodes` 一括登録 API を使用すること。
@@ -206,7 +214,7 @@ graph TD
     end
 
     subgraph StateCore ["2. 状態機械コア (State Machine Core)"]
-        Axis_Mode["プライマリモード (AppModeState: 8種)<br>【入力解釈の前提ルール】"]
+        Axis_Mode["プライマリモード (AppModeState: 10種)<br>【入力解釈の前提ルール】"]
         Axis_Sel["選択権限 (ActiveSelection: 単一真実源)<br>【操作対象の排他的特定】"]
         Axis_Gest["キャンバス過渡ジェスチャー (Transient Gesture)<br>【PointerDown〜Upの短命状態】"]
         Axis_Hist["履歴トランザクション (HistorySnapshot)<br>【Undo/Redo & ロールバック】"]
@@ -262,7 +270,7 @@ graph TB
 1. **5つの直交状態軸**:
    - `Modal Stack`（最上位モーダル）
    - `DOM Text Focus`（文字入力専有）
-   - `Primary Tool Mode`（8種の完全排他モード `AppModeState`）
+   - `Primary Tool Mode`（10種の完全排他モード `AppModeState`）
    - `Canvas Transient Gestures`（短命ドラッグ・描画操作）
    - `Selection Authority`（単一真実源 `ActiveSelection`）
 2. **4フェーズ同期ライフサイクルパイプライン**:

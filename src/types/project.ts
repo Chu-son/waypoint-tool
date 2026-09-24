@@ -5,6 +5,7 @@ import type { CustomLayer, ExportRegion, OccupancySettings, ProjectMapLayer } fr
 import type { DefaultExportFormat, ExportProfile, ExportTemplate } from './export';
 import type { RobotFootprint } from './footprint';
 import type { ConditionalStyleRule } from './style';
+import type { GeoMapSettings } from './geo';
 
 export interface RecentProjectItem {
   path: string;
@@ -49,6 +50,8 @@ export interface ProjectData {
   custom_ui_data?: any;
   conditional_styles?: ConditionalStyleRule[];
   conditional_styles_enabled?: boolean;
+  /** 背景地図（OSM/衛星画像）の設定。形式は `geoMapNormalization.ts` で検証・補完する。 */
+  geo_map?: unknown;
 }
 
 /**
@@ -86,6 +89,7 @@ export interface StrictProjectData {
   conditional_styles_enabled: boolean;
   export_profiles: ExportProfile[];
   active_export_profile_id: string | null;
+  geo_map: GeoMapSettings;
   custom_ui_data: {
     workflow_state?: {
       current_step_index: number;

@@ -20,7 +20,8 @@ export interface LoadingTask {
 }
 
 export type UISlice = {
-  activeTool: 'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region' | 'measure';
+  activeTool:
+    'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region' | 'measure' | 'geo_align';
   isSidebarOpen: boolean;
   mouseCenteredZoom: boolean;
   visibleAttributes: string[];
@@ -351,6 +352,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
         state.transitionToMode({
           mode: 'measure',
         });
+      } else if (tool === 'geo_align') {
+        state.transitionToMode({ mode: 'geo_map_align' });
       } else {
         state.transitionToMode({ mode: 'select' });
       }

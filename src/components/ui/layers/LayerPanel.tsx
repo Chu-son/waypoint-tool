@@ -25,6 +25,7 @@ import { cn } from '../../../utils/cn';
 import { notifyError } from '../../../services/notify';
 import { CustomLayerCard } from './CustomLayerCard';
 import { MapLayerCard } from './MapLayerCard';
+import { GeoMapCard } from './GeoMapCard';
 import { RegionCard } from './RegionCard';
 
 export function LayerPanel() {
@@ -145,6 +146,8 @@ export function LayerPanel() {
 
       {/* Layer List Scroll Area */}
       <div className="flex-1 overflow-y-auto w-full p-4 space-y-4">
+        <GeoMapCard />
+
         {/* Global Composite Preview & Highlight Controls (Above Custom Layers) */}
         {(mapLayers.length > 0 || customLayers.length > 0) && (
           <div className="flex items-center justify-between px-2.5 py-1.5 bg-surface-panel/40 border border-border-base/40 rounded-xl shadow-sm">

@@ -11,6 +11,7 @@ import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
 import { makeGroup, makeMapLayer, makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
 import { useAppStore } from '../../stores/appStore';
+import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import type { AppState } from '../../stores/appStore';
 
@@ -155,6 +156,99 @@ describe('MapCanvas tools', () => {
       escape();
 
       expect(getAppState().exportRegions).toEqual([]);
+    });
+  });
+
+  describe('geo base map alignment', () => {
+    const aligning = () => ({
+      geoMap: { ...DEFAULT_GEO_MAP, enabled: true, alignment: { dx: 10, dy: 20, yawDeg: 0 } },
+      ...waypointTree([makeWaypoint('a', { transform: makeTransform(50, 50) })]),
+    });
+    const startAligning = () => selectTool('geo_align');
+
+    it('moves the map by the dragged distance', () => {
+      const { pointer } = renderCanvas(aligning());
+      startAligning();
+
+      pointer.down(100, 100);
+      pointer.move(130, 60);
+      pointer.up(130, 60);
+
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 40, dy: -20, yawDeg: 0 });
+    });
+
+    it('rotates the map about its origin with Shift+drag and leaves the origin in place', () => {
+      const { pointer } = renderCanvas(aligning());
+      startAligning();
+
+      // pointer circles the map origin (10, 20) from its east to its north
+      pointer.down(110, 20, { shiftKey: true });
+      pointer.move(10, 120, { shiftKey: true });
+      pointer.up(10, 120, { shiftKey: true });
+
+      const { alignment } = getAppState().geoMap;
+      expect(alignment.yawDeg).toBeCloseTo(90, 5);
+      expect(alignment.dx).toBe(10);
+      expect(alignment.dy).toBe(20);
+    });
+
+    it('does not select or move waypoints while aligning', () => {
+      const { pointer, container } = renderCanvas(aligning());
+      startAligning();
+
+      fireEvent.pointerDown(waypointAt(container, 50, 50), { button: 0, pointerId: 1, ...toScreen(50, 50) });
+      pointer.move(80, 80);
+      pointer.up(80, 80);
+
+      expect(getAppState().selectedNodeIds).toEqual([]);
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 50, y: 50 });
+    });
+
+    it('undoes a whole drag in one step', () => {
+      const { pointer } = renderCanvas(aligning());
+      startAligning();
+
+      pointer.down(100, 100);
+      pointer.move(120, 110);
+      pointer.move(160, 140);
+      pointer.up(160, 140);
+      act(() => getAppState().undo());
+
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 10, dy: 20, yawDeg: 0 });
+    });
+
+    it('puts the map back where it was when Escape is pressed mid-drag', () => {
+      const { pointer } = renderCanvas(aligning());
+      startAligning();
+
+      pointer.down(100, 100);
+      pointer.move(200, 200);
+      escape();
+      pointer.up(200, 200);
+
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 10, dy: 20, yawDeg: 0 });
+      expect(getAppState().historyPast).toHaveLength(0);
+    });
+
+    it('returns to the select tool on a second Escape', () => {
+      renderCanvas(aligning());
+      startAligning();
+      expect(getAppState().appMode.mode).toBe('geo_map_align');
+
+      escape();
+
+      expect(getAppState().appMode.mode).toBe('select');
+    });
+
+    it('a plain click without moving leaves the map and the undo history untouched', () => {
+      const { pointer } = renderCanvas(aligning());
+      startAligning();
+
+      pointer.down(100, 100);
+      pointer.up(100, 100);
+
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 10, dy: 20, yawDeg: 0 });
+      expect(getAppState().historyPast).toHaveLength(0);
     });
   });
 

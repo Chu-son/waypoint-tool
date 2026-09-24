@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { WaypointNode, CustomLayer, AnnotationObject, InsertionTarget } from '../../types/store';
 import { ActiveSelection } from '../../types/selection';
+import type { GeoAlignment } from '../../types/geo';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
 
 const MAX_HISTORY_LENGTH = 100;
@@ -16,6 +17,7 @@ export type HistorySnapshot = {
   annotationObjects: Record<string, AnnotationObject>;
   annotationOrder: string[];
   insertionTarget: InsertionTarget | null;
+  geoAlignment: GeoAlignment;
 };
 
 export type HistorySlice = {
@@ -59,6 +61,7 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
   annotationOrder: [...(state.annotationOrder ?? [])],
   insertionTarget: state.insertionTarget ? { ...state.insertionTarget } : null,
+  geoAlignment: state.geoMap.alignment,
 });
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => ({
@@ -132,6 +135,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         insertionTarget: restoredTarget,
+        geoMap: { ...state.geoMap, alignment: snapshot.geoAlignment ?? state.geoMap.alignment },
         isDirty: true,
       };
     });
@@ -168,6 +172,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         insertionTarget: restoredTarget,
+        geoMap: { ...state.geoMap, alignment: snapshot.geoAlignment ?? state.geoMap.alignment },
         isDirty: true,
       };
     });

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Input } from './Input';
 
 export interface NumericInputProps {
+  id?: string;
   value: number;
   onChange: (value: number) => void;
   step?: number | string;
@@ -23,6 +24,7 @@ export interface NumericInputProps {
  * Commits the parsed value on blur or Enter.
  */
 export function NumericInput({
+  id,
   value,
   onChange,
   step,
@@ -60,6 +62,7 @@ export function NumericInput({
 
   return (
     <Input
+      id={id}
       type="text"
       inputMode="decimal"
       value={text}

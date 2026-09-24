@@ -15,6 +15,10 @@ import { ExportRegionLayer } from './layers/ExportRegionLayer';
 import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
 import { AnnotationLayer } from './layers/AnnotationLayer';
 import { MeasureLayer } from './layers/MeasureLayer';
+import { GeoTileLayer } from './layers/GeoTileLayer';
+import { GeoAlignMarkerLayer } from './layers/GeoAlignMarkerLayer';
+import { useGeoMapAlign } from './hooks/useGeoMapAlign';
+import { GeoAttribution } from '../ui/overlays/GeoAttribution';
 import { getAnnotationCenter } from '../../stores/slices/measureSlice';
 import { useSnapping } from './hooks/useSnapping';
 import { useMapEditRect } from './hooks/useMapEditRect';
@@ -145,6 +149,7 @@ export function MapCanvas() {
     | 'drag_points_item'
     | 'set_yaw_points_item'
     | 'marquee_select'
+    | 'geo_align_drag'
   >('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
@@ -206,6 +211,7 @@ export function MapCanvas() {
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
 
   const abortRef = useRef<() => boolean>(() => false);
+  const geoAlign = useGeoMapAlign();
   const { isAltPressed, snappedMeasureTarget, setSnappedMeasureTarget } = useMeasureAltSnap({
     lastWorldPosRef,
     scaleRef,
@@ -331,6 +337,13 @@ export function MapCanvas() {
       justAbortedRef.current = true;
       return true;
     }
+    // 9b. Geo base map alignment drag: restore the position before the drag
+    if (interactionMode.current === 'geo_align_drag') {
+      geoAlign.abort();
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
     // 10. Measure tool transient point abort
     if (activeTool === 'measure') {
       const state = useAppStore.getState();
@@ -341,7 +354,7 @@ export function MapCanvas() {
       }
     }
     return false;
-  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure]);
+  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign]);
 
   abortRef.current = abort;
 
@@ -747,6 +760,20 @@ export function MapCanvas() {
       return;
     }
 
+    // Geo base map alignment: left drag moves the map, Shift+left drag rotates it about its origin
+    if (appMode?.mode === 'geo_map_align') {
+      if (e.button === 1) {
+        interactionMode.current = 'pan_map';
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } else if (e.button === 0 && interactionMode.current === 'none') {
+        geoAlign.start(eventToWorld(e), e.shiftKey);
+        interactionMode.current = 'geo_align_drag';
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+
     if (isMapEditMode) {
       if (e.button === 1) {
         // Middle click = Pan map
@@ -1130,6 +1157,11 @@ export function MapCanvas() {
 
     setCursorPosition({ x: worldX, y: worldY });
     lastWorldPosRef.current = { x: worldX, y: worldY };
+
+    if (interactionMode.current === 'geo_align_drag') {
+      geoAlign.update({ x: worldX, y: worldY });
+      return;
+    }
 
     if (activeTool === 'measure') {
       const state = useAppStore.getState();
@@ -1630,6 +1662,15 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === 'geo_align_drag') {
+      geoAlign.end();
+      interactionMode.current = 'none';
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      return;
+    }
+
     if (isMapEditMode) {
       if (interactionMode.current === ('edit_map_draw_rect' as any)) {
         handleRectDrawEnd();
@@ -1787,9 +1828,11 @@ export function MapCanvas() {
     <div
       ref={containerRef}
       className={`absolute inset-0 w-full h-full ${
-        (isAnnotationEditMode && activeAnnotationSubTool !== 'select') || isMapEditMode || activeTool !== 'select'
-          ? 'cursor-crosshair'
-          : 'cursor-grab active:cursor-grabbing'
+        appMode?.mode === 'geo_map_align'
+          ? 'cursor-move'
+          : (isAnnotationEditMode && activeAnnotationSubTool !== 'select') || isMapEditMode || activeTool !== 'select'
+            ? 'cursor-crosshair'
+            : 'cursor-grab active:cursor-grabbing'
       }`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -1814,6 +1857,9 @@ export function MapCanvas() {
       <Application preserveDrawingBuffer={true} background={canvasBackgroundColor} resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
+          {/* 0. Geographic base map (OSM / satellite tiles) at the very back */}
+          <GeoTileLayer scale={scale} position={position} />
+
           {/* 1. Base Map Layers Group */}
           <pixiContainer label="map-layers-group">
             {shouldShowBlendedPreview ? (
@@ -2123,6 +2169,9 @@ export function MapCanvas() {
           {/* Render Measure Layer */}
           <MeasureLayer scale={scale} snappedTarget={snappedMeasureTarget} isAltPressed={isAltPressed} />
 
+          {/* Origin marker of the geo base map while aligning it */}
+          <GeoAlignMarkerLayer scale={scale} />
+
           {/* Render Snapping Guide */}
           <SnappingGuideLayer scale={scale} snapState={snapState} snapInput={snapInput} />
 
@@ -2130,6 +2179,8 @@ export function MapCanvas() {
           {marqueeBox && <pixiGraphics draw={drawMarquee} zIndex={10000} />}
         </pixiContainer>
       </Application>
+
+      <GeoAttribution />
 
       {canvasContextMenu && (
         <CanvasContextMenu

@@ -98,6 +98,10 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('blend_map_preview', { layers });
   }
 
+  async fetchMapTile(url: string): Promise<string> {
+    return invoke('fetch_map_tile', { url });
+  }
+
   async loadCustomUiConfig(): Promise<any> {
     return invoke('load_custom_ui_config');
   }

@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { useAppStore } from '../../stores/appStore';
+import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
 
 // Mock PixiJS and @pixi/react
 vi.mock('@pixi/react', () => ({
@@ -41,6 +42,7 @@ describe('MapCanvas Layer Grouping and Hierarchy', () => {
       activePluginId: null,
       activeInputIndex: 0,
       pluginActiveProperties: {},
+      geoMap: DEFAULT_GEO_MAP,
     });
   });
 
@@ -84,5 +86,42 @@ describe('MapCanvas Layer Grouping and Hierarchy', () => {
     const state = useAppStore.getState();
     expect(state.mapLayers).toHaveLength(1);
     expect(state.customLayers).toHaveLength(1);
+  });
+
+  it('draws the geographic base map behind every other map layer', () => {
+    useAppStore.setState({
+      mapLayers: [
+        {
+          id: 'map-1',
+          name: 'Map 1',
+          visible: true,
+          opacity: 1,
+          z_index: 0,
+          image_base64: 'data:image/png;base64,map1',
+          info: { resolution: 0.05, origin: [0, 0, 0] },
+          width: 100,
+          height: 100,
+        },
+      ],
+      geoMap: { ...useAppStore.getState().geoMap, enabled: true },
+    });
+
+    const { container } = render(<MapCanvas />);
+
+    const geo = container.querySelector('[label="geo-tile-layer"]');
+    const maps = container.querySelector('[label="map-layers-group"]');
+    expect(geo).not.toBeNull();
+    expect(maps).not.toBeNull();
+    expect(geo!.compareDocumentPosition(maps!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('shows the base map attribution only while the base map is on', () => {
+    const { rerender } = render(<MapCanvas />);
+    expect(screen.queryByText(/OpenStreetMap contributors/)).toBeNull();
+
+    act(() => useAppStore.setState({ geoMap: { ...useAppStore.getState().geoMap, enabled: true } }));
+    rerender(<MapCanvas />);
+
+    expect(screen.getByText(/OpenStreetMap contributors/)).toBeInTheDocument();
   });
 });

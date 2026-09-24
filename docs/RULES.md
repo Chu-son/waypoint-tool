@@ -141,7 +141,7 @@
   モードの切り替えは、必ず `useAppStore.getState().transitionToMode(...)` を経由して行わなければならない。
 - **独立ブール値によるモード管理の禁止**:
   コンポーネント内で独立したフラグ（`isEditing`, `isMapEditMode` 等）を直接 `setState` して独自のモード状態を作り出してはならない。
-  すべての主要ツールモード（8種）は `AppModeState`（Discriminated Union）として単一化され、多重起動は型レベルで排除されなければならない。
+  すべての主要ツールモード（10種）は `AppModeState`（Discriminated Union）として単一化され、多重起動は型レベルで排除されなければならない。
 
 ### 5.2 選択ドメイン排他律 (Selection Domain Exclusivity Rule)
 - **`setSelection` 経由の義務**:

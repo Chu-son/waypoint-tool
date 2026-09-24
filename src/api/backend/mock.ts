@@ -179,6 +179,11 @@ export class MockBackendAPI implements IBackendAPI {
     console.log('[Mock Backend] exportMaps called with options:', options);
   }
 
+  async fetchMapTile(url: string): Promise<string> {
+    console.log('[Mock Backend] fetchMapTile called for:', url);
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  }
+
   async blendMapPreview(_layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
     console.log('[Mock Backend] blendMapPreview called');
     return {

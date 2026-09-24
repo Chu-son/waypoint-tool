@@ -84,6 +84,8 @@ export interface IBackendAPI {
   installPipPackages(pythonPath: string, packages: string[]): Promise<string>;
   checkExportConflicts(files: string[]): Promise<string[]>;
   executeExportPackage(options: ExecuteExportPackageOptions): Promise<ExportResultSummary>;
+  /** 背景地図タイルを取得（ディスクキャッシュ優先）し、`data:` URL で返す。 */
+  fetchMapTile(url: string): Promise<string>;
 }
 
 export type PackageExportWaypointItem = {

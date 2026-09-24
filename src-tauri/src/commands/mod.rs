@@ -1,7 +1,7 @@
 use crate::{io, map};
 use base64::{engine::general_purpose, Engine as _};
 use std::fs;
-use tauri::{command, AppHandle};
+use tauri::{command, AppHandle, Manager};
 
 pub mod export_pipeline;
 
@@ -109,6 +109,18 @@ pub use custom_ui::*;
 pub mod venv;
 pub use venv::*;
 
+/// 背景地図タイルを取得（キャッシュ優先）し、`data:` URL として返す。
+#[command]
+pub async fn fetch_map_tile(app: AppHandle, url: String) -> Result<String, String> {
+    let cache_root = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = crate::tiles::fetch_cached(&cache_root, &url, crate::tiles::http_get)?;
+        crate::tiles::to_data_url(&bytes)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[command]
 pub fn force_exit(app: AppHandle) {
     app.exit(0);
@@ -134,6 +146,7 @@ pub fn get_handlers() -> impl Fn(tauri::ipc::Invoke) -> bool {
         read_text_file,
         write_text_file,
         force_exit,
+        fetch_map_tile,
         plugins::fetch_installed_plugins,
         plugins::run_plugin,
         plugins::scan_custom_plugin,

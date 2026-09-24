@@ -147,7 +147,10 @@
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
   - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
-  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：姿勢・不透明度・閾値）, `CustomLayerCard`, `RegionCard`
+  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：姿勢・不透明度・閾値）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）
+- **`GeoAttribution`** ([`src/components/ui/overlays/GeoAttribution.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/GeoAttribution.tsx))
+  - **概要**: 背景地図の表示中に、選択中のベースマップの帰属表示（例: © OpenStreetMap contributors）をキャンバス右下へ表示する。
+  - **主要Props**: なし
 - **ツリー部品** (`ui/trees/`): `WaypointTree` / `AnnotationTree` 本体と、行コンポーネント `WaypointTreeRow` / `AnnotationTreeRow`、挿入位置バー `InsertionBarItem`
 - **プラグイン入力フォーム** (`ui/plugins/`): `PluginInputEditor` が入力種別ごとに `PointInputForm` / `PointsListInputForm` / `RectangleInputForm` / `WaypointSelectInputForm` / `AnnotationSelectInputForm` / `CustomLayerSelectInputForm` を切り替える
 - **条件付き書式** (`ui/settings/`): `ConditionalStylesTab` が `ConditionEditor`（ネスト可能な条件グループ）と `StyleOverrideEditor`（要素別スタイル上書き）を組み合わせる
@@ -239,8 +242,9 @@
   - **概要**: マップ未読み込み時にキャンバス上に表示されるウェルカム・ドロップエリアガイド UI。
   - **主要Props**: `onOpenMap`
 
-### Canvas 10層描画スタック順序 (Render & Event Priority Hierarchy)
-`MapCanvas.tsx` における WebGL コンテナの重なり順（背面から前面）およびポインターイベント優先順位は以下の通り厳格に規定されています：
+### Canvas 描画スタック順序 (Render & Event Priority Hierarchy)
+`MapCanvas.tsx` における WebGL コンテナの重なり順（背面から前面）およびポインターイベント優先順位は以下の通り厳格に規定されています（0 と 11 は機能が有効なときだけ描画）：
+0. **`GeoTileLayer` (Geo Base Map)**: OSM / 衛星画像などの背景地図タイル（最背面）
 1. **`MapLayerSprite` (Base Map)**: 背景ROSマップ画像の表示
 2. **`Custom Layers` (Raster / Manual Vector)**: 手動ベクター描画およびプラグイン生成カスタムレイヤー
 3. **`GridLayer`**: 1m メッシュ等のワールドグリッド線
@@ -251,15 +255,22 @@
 8. **`PluginLayer`**: プラグイン自動生成プレビューおよび Interaction Hints 視覚補助
 9. **`ExportRegionLayer`**: マップ切り出しエクスポート枠
 10. **`SnappingGuideLayer`**: 直交スナップガイド線および数値入力 HUD（最前面）
+11. **`GeoAlignMarkerLayer`**: 背景地図の位置合わせ中だけ、地図の原点位置と東方向のマーカーを描画
 
 ### Canvas 補助モジュール (`src/components/canvas/`)
 - **`MapLayerSprite`** (`MapLayerSprite.tsx`): 占有格子画像 1 枚を ROS 原点に合わせて描画し、占有ハイライトフィルタを適用。
-- **Hooks** (`canvas/hooks/`): `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
-- **純粋関数** (`canvas/utils/`): `viewport`（screen⇔world 変換・フィット・ズーム）, `hitTest`（矩形入力ハンドル判定・計測スナップ）, `canvasTheme`（フォールバックグリッド配色）, `labelLayout`（ラベル配置）
+- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
+- **純粋関数** (`canvas/utils/`): `viewport`（screen⇔world 変換・フィット・ズーム）, `hitTest`（矩形入力ハンドル判定・計測スナップ）, `canvasTheme`（フォールバックグリッド配色）, `labelLayout`（ラベル配置）, `tileCache`（タイルの同時取得数制限・LRU・失敗時の再試行間隔）
 
 ### Canvas レイヤー & フィルター群 (`src/components/canvas/`)
 - **`OccupancyHighlightFilter`** ([`src/components/canvas/filters/OccupancyHighlightFilter.ts`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/filters/OccupancyHighlightFilter.ts))
   - **概要**: マップ画像を 2D Occupancy Grid の 3 領域（Obstacle: 赤, Free: 緑, Unknown: 紫）にリアルタイム色分けする PixiJS GPU GLSL シェーダーフィルター。
+- **`GeoTileLayer`** ([`src/components/canvas/layers/GeoTileLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/GeoTileLayer.tsx))
+  - **概要**: 背景地図（OSM / 衛星画像 / カスタム URL）のタイルを、原点・位置合わせ（オフセット/回転）を反映したワールド座標へ配置して最背面に描画。表示範囲と画面解像度からズームを選び、未取得タイルは取得済みの親タイルで代用する。
+  - **主要Props**: `scale`, `position`
+- **`GeoAlignMarkerLayer`** ([`src/components/canvas/layers/GeoAlignMarkerLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/GeoAlignMarkerLayer.tsx))
+  - **概要**: `geo_map_align` モード中に、背景地図の原点位置（回転の軸）と地図の東方向を示すマーカーを描画。
+  - **主要Props**: `scale`
 - **`AnnotationLayer`** ([`src/components/canvas/layers/AnnotationLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/AnnotationLayer.tsx))
   - **概要**: Point (円), OrientedPoint (矢印), Line (線分), Rect (矩形), Circle (円形) のアノテーション図形、色枠線、半透明塗りつぶし、変形操作ハンドル、テキストラベルの高速 WebGL 描画およびインタラクション。
 - **`MapEditLayer`** / **`MapEditSingleLayer`** ([`src/components/canvas/layers/MapEditLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/MapEditLayer.tsx))
@@ -297,6 +308,7 @@
   - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `mapRasterize`（レイヤーのラスタライズ）, `workflowActions`（カスタム UI ワークフロー）
 - **API アダプタ** (`src/api/`): `BackendAPI`（Tauri IPC）, `DialogAPI`（ファイル／確認／メッセージダイアログ）, `AppAPI`（バージョン・終了・ウィンドウ操作）。いずれも jsdom / ブラウザでは Mock 実装に自動切替。
 - **プラグイン出力・設定の純粋関数** (`src/utils/`): `pluginResult`（出力の正規化）, `pluginBindings`（パイプラインのバインディング解決）, `pluginRegistry`（カスタムプラグイン登録）, `pythonPath`（インタプリタ解決）, `exportPackage`（エクスポート要求の構築）, `footprint`（フットプリント幅）
+- **背景地図の純粋関数** (`src/utils/geo/`): `utm`（WGS84 ⇔ UTM）, `webMercator`（XYZ タイル座標・ズーム選択）, `geoTransform`（緯度経度 ⇔ ワールド座標・タイル配置・表示タイル列挙）, `basemapPresets`（OSM / Esri 衛星 / 地理院 / カスタムのプリセットとタイル URL 生成）, `alignDrag`（ドラッグによる移動・回転量の算出）
 - **`transformUtils`** ([`src/utils/transformUtils.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/transformUtils.ts))
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
   - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`

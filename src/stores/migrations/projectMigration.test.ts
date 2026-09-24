@@ -265,6 +265,7 @@ describe('projectMigration', () => {
       'conditional_styles_enabled',
       'export_profiles',
       'active_export_profile_id',
+      'geo_map',
       'custom_ui_data',
     ];
 
