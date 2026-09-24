@@ -8,28 +8,28 @@ export interface BasemapPreset extends BasemapSource {
 export const BASEMAP_PRESETS: Record<Exclude<BasemapId, 'custom'>, BasemapPreset> = {
   osm: {
     id: 'osm',
-    label: '地図 (OpenStreetMap)',
+    label: 'Map (OpenStreetMap)',
     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     maxZoom: 19,
     attribution: '© OpenStreetMap contributors',
   },
   esri_imagery: {
     id: 'esri_imagery',
-    label: '衛星画像 (Esri)',
+    label: 'Satellite (Esri)',
     urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     maxZoom: 19,
     attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
   },
   gsi_photo: {
     id: 'gsi_photo',
-    label: '空中写真 (地理院)',
+    label: 'Aerial Photo (GSI Japan)',
     urlTemplate: 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg',
     maxZoom: 18,
     attribution: '出典: 国土地理院',
   },
   gsi_std: {
     id: 'gsi_std',
-    label: '標準地図 (地理院)',
+    label: 'Standard Map (GSI Japan)',
     urlTemplate: 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',
     maxZoom: 18,
     attribution: '出典: 国土地理院',
@@ -44,7 +44,7 @@ export const DEFAULT_CUSTOM_BASEMAP: BasemapSource = {
 
 export const BASEMAP_CHOICES: { id: BasemapId; label: string }[] = [
   ...Object.values(BASEMAP_PRESETS).map(({ id, label }) => ({ id, label })),
-  { id: 'custom', label: 'カスタム' },
+  { id: 'custom', label: 'Custom URL' },
 ];
 
 export function resolveBasemap(id: BasemapId, custom: BasemapSource): BasemapSource {

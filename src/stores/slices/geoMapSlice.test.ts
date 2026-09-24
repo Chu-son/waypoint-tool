@@ -134,6 +134,30 @@ describe('geo map alignment drag', () => {
     expect(getAppState().historyPast).toHaveLength(0);
   });
 
+  it('a drag that changes nothing does not throw away the redo history', () => {
+    getAppState().setGeoAlignment({ dx: 3, dy: 0, yawDeg: 0 });
+    getAppState().undo();
+    expect(getAppState().historyFuture).toHaveLength(1);
+
+    getAppState().beginGeoAlignDrag();
+    getAppState().endGeoAlignDrag();
+
+    getAppState().redo();
+    expect(getAppState().geoMap.alignment.dx).toBe(3);
+  });
+
+  it('cancelling a drag does not throw away the redo history either', () => {
+    getAppState().setGeoAlignment({ dx: 3, dy: 0, yawDeg: 0 });
+    getAppState().undo();
+
+    getAppState().beginGeoAlignDrag();
+    getAppState().updateGeoAlignDrag({ dx: 99, dy: 0, yawDeg: 0 });
+    getAppState().cancelGeoAlignDrag();
+
+    getAppState().redo();
+    expect(getAppState().geoMap.alignment.dx).toBe(3);
+  });
+
   it('drag updates outside of a drag are ignored', () => {
     getAppState().updateGeoAlignDrag({ dx: 9, dy: 9, yawDeg: 9 });
     expect(getAppState().geoMap.alignment).toEqual({ dx: 0, dy: 0, yawDeg: 0 });

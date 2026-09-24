@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
+import type { HistorySnapshot } from './historySlice';
 import type { BasemapId, BasemapSource, GeoAlignment, GeoMapSettings, GeoOrigin } from '../../types/geo';
 import { convertOrigin } from '../../utils/geo/geoTransform';
 import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
@@ -7,7 +8,7 @@ import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 export type GeoMapSlice = {
   geoMap: GeoMapSettings;
   /** キャンバス上のドラッグ調整中の状態（開始時の位置合わせ）。ドラッグ中でなければ null。 */
-  geoAlignDrag: { initial: GeoAlignment; snapshotPushed: boolean } | null;
+  geoAlignDrag: { initial: GeoAlignment; snapshotPushed: boolean; redoStack: HistorySnapshot[] } | null;
 
   setGeoMapEnabled: (enabled: boolean) => void;
   setGeoMapOpacity: (opacity: number) => void;
@@ -62,11 +63,13 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
     beginGeoAlignDrag: () => {
       if (get().geoAlignDrag) return;
       const before = get().historyPast.length;
+      const redoStack = get().historyFuture;
       get().pushHistorySnapshot();
       set((state) => ({
         geoAlignDrag: {
           initial: state.geoMap.alignment,
           snapshotPushed: state.historyPast.length > before,
+          redoStack,
         },
       }));
     },
@@ -79,12 +82,13 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
     endGeoAlignDrag: () => {
       const drag = get().geoAlignDrag;
       if (!drag) return;
-      // 動いていなければ、開始時に積んだ履歴を取り除く
+      // 動いていなければ、開始時に積んだ履歴を取り除き、消えたやり直し履歴も戻す
       const unchanged = sameAlignment(drag.initial, get().geoMap.alignment);
-      set((state) => ({
-        geoAlignDrag: null,
-        historyPast: unchanged && drag.snapshotPushed ? state.historyPast.slice(0, -1) : state.historyPast,
-      }));
+      set((state) =>
+        unchanged && drag.snapshotPushed
+          ? { geoAlignDrag: null, historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack }
+          : { geoAlignDrag: null },
+      );
     },
 
     cancelGeoAlignDrag: () => {
@@ -93,7 +97,7 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
       set((state) => ({
         geoAlignDrag: null,
         geoMap: { ...state.geoMap, alignment: drag.initial },
-        historyPast: drag.snapshotPushed ? state.historyPast.slice(0, -1) : state.historyPast,
+        ...(drag.snapshotPushed ? { historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack } : {}),
       }));
     },
   };

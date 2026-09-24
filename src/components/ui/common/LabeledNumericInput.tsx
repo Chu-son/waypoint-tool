@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { NumericInput } from './NumericInput';
 import { FieldLabel } from './FieldLabel';
 import { cn } from '../../../utils/cn';
@@ -31,10 +32,14 @@ export function LabeledNumericInput({
   onEditStart,
   onEditEnd,
 }: LabeledNumericInputProps) {
+  const id = useId();
   return (
     <div className={cn('space-y-0.5', className)}>
-      <FieldLabel className="mb-0.5">{label}</FieldLabel>
+      <FieldLabel htmlFor={id} className="mb-0.5">
+        {label}
+      </FieldLabel>
       <NumericInput
+        id={id}
         value={value}
         onChange={onChange}
         precision={precision}
