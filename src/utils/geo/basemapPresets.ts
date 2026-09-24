@@ -53,7 +53,7 @@ export function resolveBasemap(id: BasemapId, custom: BasemapSource): BasemapSou
 
 /** `{z}` `{x}` `{y}` を名前で置換する（`{y}/{x}` の順で並ぶテンプレートも扱える）。 */
 export function buildTileUrl(template: string, { z, x, y }: TileCoord): string {
-  return template.replaceAll('{z}', String(z)).replaceAll('{x}', String(x)).replaceAll('{y}', String(y));
+  return template.replace(/\{z\}/g, String(z)).replace(/\{x\}/g, String(x)).replace(/\{y\}/g, String(y));
 }
 
 /** http/https でタイル座標のプレースホルダをすべて含むテンプレートだけを有効とする。 */
