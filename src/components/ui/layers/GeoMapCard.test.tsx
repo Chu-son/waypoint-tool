@@ -27,6 +27,23 @@ describe('GeoMapCard', () => {
     expect(screen.getByLabelText('Base map')).toBeInTheDocument();
   });
 
+  it('collapses and expands the settings while the base map stays on', async () => {
+    const { user } = renderWithStore(<GeoMapCard />, enabled());
+    expect(screen.getByLabelText('Base map')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Collapse settings' }));
+    expect(screen.queryByLabelText('Base map')).not.toBeInTheDocument();
+    expect(getAppState().geoMap.enabled).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: 'Expand settings' }));
+    expect(screen.getByLabelText('Base map')).toBeInTheDocument();
+  });
+
+  it('offers no collapse control while the base map is off', () => {
+    renderWithStore(<GeoMapCard />);
+    expect(screen.queryByRole('button', { name: /collapse settings/i })).not.toBeInTheDocument();
+  });
+
   describe('base map source', () => {
     it('switches between the road map and satellite imagery', async () => {
       const { user } = renderWithStore(<GeoMapCard />, enabled());

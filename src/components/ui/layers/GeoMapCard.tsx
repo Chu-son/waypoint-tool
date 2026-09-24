@@ -1,5 +1,5 @@
-import { useId } from 'react';
-import { Globe, Move, RotateCcw } from 'lucide-react';
+import { useId, useState } from 'react';
+import { ChevronDown, ChevronUp, Globe, Move, RotateCcw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/appStore';
 import type { BasemapId, GeoAlignment } from '../../../types/geo';
@@ -31,6 +31,7 @@ export function GeoMapCard() {
   const endGeoAlignDrag = useAppStore((state) => state.endGeoAlignDrag);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
 
+  const [isOpen, setIsOpen] = useState(true);
   const basemapId = useId();
   const urlId = useId();
   const attributionId = useId();
@@ -58,10 +59,24 @@ export function GeoMapCard() {
           <Globe size={14} className="text-accent-reference" />
           Geo Base Map
         </span>
-        <ToggleSwitch checked={enabled} onChange={setGeoMapEnabled} title="Show geo base map" />
+        <div className="flex items-center gap-1.5">
+          {enabled && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-text-muted hover:text-text-base"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-expanded={isOpen}
+              title={isOpen ? 'Collapse settings' : 'Expand settings'}
+            >
+              {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </Button>
+          )}
+          <ToggleSwitch checked={enabled} onChange={setGeoMapEnabled} title="Show geo base map" />
+        </div>
       </div>
 
-      {enabled && (
+      {enabled && isOpen && (
         <div className="relative z-10 mt-2.5 pt-2.5 border-t border-border-base/40 space-y-3">
           <div className="space-y-2">
             <div className="flex flex-col gap-1">
