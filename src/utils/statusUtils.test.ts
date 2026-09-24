@@ -175,6 +175,17 @@ describe('statusUtils', () => {
       expect(res.escActionLabel).toBe('コピー解除');
     });
 
+    it('Tier 6: tells the user how to align the geo base map and that Esc returns to select', () => {
+      const state = createBaseState();
+      state.appMode = { mode: 'geo_map_align' };
+
+      const res = computeStatusInteraction(state);
+      expect(res.escTier).toBe(6);
+      expect(res.modeBadgeText).toBe('背景地図の位置合わせ');
+      expect(res.escActionLabel).toBe('選択モードへ復帰');
+      expect(res.hintText).toContain('Shift');
+    });
+
     it('Tier 7: returns idle status for clean select mode', () => {
       const state = createBaseState();
       const res = computeStatusInteraction(state);

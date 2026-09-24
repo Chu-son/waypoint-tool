@@ -38,7 +38,8 @@ export type AppModeState =
       coordSystem: ElementCopyCoordSystem;
       previewNodeId: string | null;
     }
-  | { mode: 'measure' };
+  | { mode: 'measure' }
+  | { mode: 'geo_map_align' };
 
 export type AppModeTransition =
   | { mode: 'select' }
@@ -78,4 +79,5 @@ export type AppModeTransition =
       coordSystem: ElementCopyCoordSystem;
       previewNodeId?: string | null;
     }
-  | { mode: 'measure' };
+  | { mode: 'measure' }
+  | { mode: 'geo_map_align' };

@@ -142,6 +142,9 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
         case 'measure':
           normalizedMode = { mode: 'measure' };
           break;
+        case 'geo_map_align':
+          normalizedMode = { mode: 'geo_map_align' };
+          break;
       }
 
       // Phase 2: OnExit (現在のモードの終了処理)
@@ -291,6 +294,21 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activePluginId = null;
             updates.pluginInteractionData = {};
             updates.elementCopyState = null;
+            break;
+          case 'geo_map_align':
+            // 背景地図の位置合わせ中は、ウェイポイント等の選択・編集操作を受け付けない
+            updates.activeTool = 'geo_align';
+            updates.isMapEditMode = false;
+            updates.isAnnotationEditMode = false;
+            updates.activePluginId = null;
+            updates.pluginInteractionData = {};
+            updates.elementCopyState = null;
+            updates.selectedAnnotationIds = [];
+            updates.activeCustomLayerId = null;
+            updates.selectedEditObjectId = null;
+            if (state.selection?.type === 'custom_layer' || state.selection?.type === 'annotations') {
+              updates.selection = { type: 'none' };
+            }
             break;
         }
 

@@ -253,6 +253,17 @@ export function computeStatusInteraction(
     };
   }
 
+  if (modeState?.mode === 'geo_map_align') {
+    return {
+      modeBadgeText: '背景地図の位置合わせ',
+      modeIcon: 'layer',
+      modeVariant: 'reference',
+      escActionLabel: '選択モードへ復帰',
+      escTier: 6,
+      hintText: 'ドラッグで地図を移動 / Shift+ドラッグで原点まわりに回転',
+    };
+  }
+
   // Tier 7: Idle
   return {
     modeBadgeText: '選択ツール',
