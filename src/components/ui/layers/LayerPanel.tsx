@@ -66,6 +66,7 @@ export function LayerPanel() {
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
   const [isExportRegionsOpen, setIsExportRegionsOpen] = useState(true);
+  const [renamingMapLayerId, setRenamingMapLayerId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     type: 'custom' | 'map';
     id: string;
@@ -320,6 +321,13 @@ export function LayerPanel() {
                     }
                   }}
                   onUpdateLayer={(updates) => updateMapLayer(layer.id, updates)}
+                  isRenaming={renamingMapLayerId === layer.id}
+                  onStartRename={() => setRenamingMapLayerId(layer.id)}
+                  onRename={(name) => {
+                    updateMapLayer(layer.id, { name });
+                    setRenamingMapLayerId(null);
+                  }}
+                  onCancelRename={() => setRenamingMapLayerId(null)}
                 />
               );
             })}
@@ -495,6 +503,12 @@ export function LayerPanel() {
                     onSelect={() => setActiveMapLayerId(layer.id)}
                   >
                     編集対象マップに設定
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Pencil size={13} className="text-text-muted" />}
+                    onSelect={() => setRenamingMapLayerId(layer.id)}
+                  >
+                    名前を変更
                   </ContextMenuItem>
                   <ContextMenuItem
                     icon={

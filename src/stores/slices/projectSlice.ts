@@ -86,6 +86,7 @@ export type ProjectSlice = {
   removeExportProfile: (id: string) => void;
   setActiveExportProfileId: (id: string | null) => void;
   duplicateExportProfile: (id: string) => void;
+  replaceExportProfiles: (profiles: ExportProfile[], activeId: string | null) => void;
   setProjectData: (data: any) => void;
 
   loadProject: () => Promise<boolean>;
@@ -256,6 +257,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         isDirty: true,
       }));
     },
+
+    replaceExportProfiles: (profiles: ExportProfile[], activeId: string | null) =>
+      set({ exportProfiles: profiles, activeExportProfileId: activeId, isDirty: true }),
 
     setProjectData: (rawData: any) => {
       get().abortCanvasGestures?.();

@@ -38,9 +38,11 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     handleDeleteItem,
     handleDeleteProfile,
     handleDuplicateProfile,
-    handleExecuteExport,
     handleInsertVariable,
+    handlePatternSelect,
     handleRootDirChange,
+    handleSaveAndExport,
+    handleSaveOnly,
     handleToggleItemEnabled,
     handleUpdateItem,
     inputRef,
@@ -312,6 +314,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                   </Label>
                   <Input
                     ref={inputRef}
+                    onSelect={handlePatternSelect}
                     value={selectedItem.relativePathPattern}
                     onChange={(e) =>
                       handleUpdateItem(selectedItem.id, {
@@ -469,13 +472,16 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           <Button variant="ghost" onClick={onClose} className="px-5 text-text-muted font-bold text-xs">
             キャンセル
           </Button>
+          <Button variant="outline" onClick={handleSaveOnly} className="px-4 text-xs font-bold">
+            保存のみ
+          </Button>
           <Button
-            onClick={handleExecuteExport}
+            onClick={handleSaveAndExport}
             disabled={activeProfile.items.filter((i) => i.enabled).length === 0}
             className="min-w-36 bg-primary-base hover:bg-primary-hover shadow-lg text-xs font-bold"
           >
             <Save size={14} className="mr-1.5" />
-            エクスポート実行 ({activeProfile.items.filter((i) => i.enabled).length}件)
+            保存してエクスポート ({activeProfile.items.filter((i) => i.enabled).length}件)
           </Button>
         </div>
       </ModalFooter>

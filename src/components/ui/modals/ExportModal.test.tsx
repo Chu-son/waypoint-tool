@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExportModal } from './ExportModal';
 import { BackendAPI, DialogAPI } from '../../../api';
 import { resetAppStore } from '../../../test/store';
+import { useAppStore } from '../../../stores/appStore';
 
 describe('ExportModal UI', () => {
   beforeEach(() => {
@@ -92,7 +93,7 @@ describe('ExportModal UI', () => {
 
     render(<ExportModal isOpen={true} onClose={mockOnClose} />);
 
-    const exportBtn = screen.getByRole('button', { name: /エクスポート実行/ });
+    const exportBtn = screen.getByRole('button', { name: /保存してエクスポート/ });
     expect(exportBtn).not.toBeDisabled();
 
     fireEvent.click(exportBtn);
@@ -116,5 +117,82 @@ describe('ExportModal UI', () => {
       ],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
+  });
+
+  describe('path pattern editing', () => {
+    const PATTERN = 'waypoints/{{yyyymmdd}}_waypoints.yaml';
+    const storedPattern = () => useAppStore.getState().exportProfiles[0].items[0].relativePathPattern;
+
+    it.each([
+      ['the start', 0, `{{name}}${PATTERN}`],
+      ['the middle', 10, `${PATTERN.slice(0, 10)}{{name}}${PATTERN.slice(10)}`],
+      ['the end', PATTERN.length, `${PATTERN}{{name}}`],
+    ])('inserts a variable chip at the caret placed at %s', (_label, caret, expected) => {
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+      const input = screen.getByDisplayValue(PATTERN) as HTMLInputElement;
+
+      input.setSelectionRange(caret, caret);
+      fireEvent.select(input);
+      fireEvent.click(screen.getByText('{{name}}'));
+
+      expect(input).toHaveValue(expected);
+    });
+
+    it('replaces the selected text when a chip is inserted over a selection', () => {
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+      const input = screen.getByDisplayValue(PATTERN) as HTMLInputElement;
+
+      input.setSelectionRange(0, 10);
+      fireEvent.select(input);
+      fireEvent.click(screen.getByText('{{name}}'));
+
+      expect(input).toHaveValue(`{{name}}${PATTERN.slice(10)}`);
+    });
+
+    it('does not change the project until saved, and discards edits on cancel', () => {
+      const onClose = vi.fn();
+      const { rerender } = render(<ExportModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.change(screen.getByDisplayValue(PATTERN), { target: { value: 'edited.yaml' } });
+      expect(storedPattern()).toBe(PATTERN);
+
+      fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }));
+      expect(onClose).toHaveBeenCalled();
+      expect(storedPattern()).toBe(PATTERN);
+
+      // Reopening starts again from the saved state
+      rerender(<ExportModal isOpen={false} onClose={onClose} />);
+      rerender(<ExportModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByDisplayValue(PATTERN)).toBeInTheDocument();
+    });
+
+    it('saves edits without exporting when clicking 保存のみ', () => {
+      const onClose = vi.fn();
+      render(<ExportModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.change(screen.getByDisplayValue(PATTERN), { target: { value: 'edited.yaml' } });
+      fireEvent.click(screen.getByRole('button', { name: '保存のみ' }));
+
+      expect(storedPattern()).toBe('edited.yaml');
+      expect(useAppStore.getState().isDirty).toBe(true);
+      expect(onClose).toHaveBeenCalled();
+      expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
+    });
+
+    it('saves edits and exports when clicking 保存してエクスポート', async () => {
+      const onClose = vi.fn();
+      render(<ExportModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.change(screen.getByDisplayValue(PATTERN), { target: { value: 'edited.yaml' } });
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(storedPattern()).toBe('edited.yaml');
+      expect(BackendAPI.executeExportPackage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          waypoint_items: [expect.objectContaining({ path: '/mock/export/dir/edited.yaml' })],
+        }),
+      );
+    });
   });
 });

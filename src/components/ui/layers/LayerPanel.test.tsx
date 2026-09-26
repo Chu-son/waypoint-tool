@@ -188,5 +188,64 @@ describe('LayerPanel', () => {
 
       expect(getAppState().mapLayers[0].info).toMatchObject({ origin: [10, 20, 0], initial_origin: [10, 20, 0] });
     });
+
+    it('nudges the pose with the adjuster buttons and arrow keys', () => {
+      renderWithStore(<LayerPanel />, rotatedMap([10, 20, 0]));
+      fireEvent.click(screen.getByTitle(EDIT_MAP_LAYER));
+
+      fireEvent.click(screen.getByRole('button', { name: /Move right/ }));
+      fireEvent.click(screen.getByRole('button', { name: /Move up/ }));
+      expect(getAppState().mapLayers[0].info.origin).toEqual([10.1, 20.1, 0]);
+
+      fireEvent.keyDown(screen.getByRole('group', { name: 'Pose adjuster' }), { key: 'ArrowLeft', shiftKey: true });
+      expect(getAppState().mapLayers[0].info.origin[0]).toBeCloseTo(9.1);
+
+      fireEvent.click(screen.getByRole('button', { name: /counter-clockwise/ }));
+      expect(getAppState().mapLayers[0].info.origin[2]).toBeCloseTo(Math.PI / 180);
+    });
+  });
+
+  describe('renaming a map layer', () => {
+    const oneMap = () => renderWithStore(<LayerPanel />, { mapLayers: [makeMapLayer('l1', { name: 'Map 1' })] });
+
+    it('renames by double-clicking the name and pressing Enter', () => {
+      oneMap();
+
+      fireEvent.doubleClick(screen.getByText('Map 1'));
+      const input = screen.getByDisplayValue('Map 1');
+      fireEvent.change(input, { target: { value: 'Warehouse 1F' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(getAppState().mapLayers[0].name).toBe('Warehouse 1F');
+      expect(screen.getByText('Warehouse 1F')).toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Warehouse 1F')).not.toBeInTheDocument();
+    });
+
+    it('keeps the old name when renaming is cancelled with Escape or left empty', () => {
+      oneMap();
+
+      fireEvent.doubleClick(screen.getByText('Map 1'));
+      fireEvent.change(screen.getByDisplayValue('Map 1'), { target: { value: 'Other' } });
+      fireEvent.keyDown(screen.getByDisplayValue('Other'), { key: 'Escape' });
+      expect(getAppState().mapLayers[0].name).toBe('Map 1');
+
+      fireEvent.doubleClick(screen.getByText('Map 1'));
+      const input = screen.getByDisplayValue('Map 1');
+      fireEvent.change(input, { target: { value: '   ' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      expect(getAppState().mapLayers[0].name).toBe('Map 1');
+    });
+
+    it('renames from the context menu', () => {
+      oneMap();
+
+      fireEvent.contextMenu(screen.getByText('Map 1'));
+      fireEvent.click(screen.getByText('名前を変更'));
+      const input = screen.getByDisplayValue('Map 1');
+      fireEvent.change(input, { target: { value: 'Annex' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(getAppState().mapLayers[0].name).toBe('Annex');
+    });
   });
 });
