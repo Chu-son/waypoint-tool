@@ -101,4 +101,55 @@ describe('NumericInput', () => {
     expect(handleChange).toHaveBeenCalledWith(0.8);
     expect(input.value).toBe('0.8');
   });
+
+  describe('arrow key stepping', () => {
+    function Stepper({ min, max }: { min?: number; max?: number }) {
+      const [val, setVal] = useState(1);
+      return <NumericInput value={val} onChange={setVal} step={0.5} min={min} max={max} precision={3} />;
+    }
+
+    it('increments and decrements by step with ArrowUp / ArrowDown', () => {
+      render(<Stepper />);
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+
+      fireEvent.focus(input);
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(input.value).toBe('1.5');
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      expect(input.value).toBe('0.5');
+    });
+
+    it('steps ten times larger with Shift and ten times smaller with Alt', () => {
+      render(<Stepper />);
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+
+      fireEvent.focus(input);
+      fireEvent.keyDown(input, { key: 'ArrowUp', shiftKey: true });
+      expect(input.value).toBe('6');
+      fireEvent.keyDown(input, { key: 'ArrowDown', altKey: true });
+      expect(input.value).toBe('5.95');
+    });
+
+    it('does not step beyond min and max', () => {
+      render(<Stepper min={0} max={1.2} />);
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+
+      fireEvent.focus(input);
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(input.value).toBe('1.2');
+      fireEvent.keyDown(input, { key: 'ArrowDown', shiftKey: true });
+      expect(input.value).toBe('0');
+    });
+
+    it('steps from the number being typed', () => {
+      render(<Stepper />);
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '10' } });
+      fireEvent.keyDown(input, { key: 'ArrowUp' });
+      expect(input.value).toBe('10.5');
+    });
+  });
 });

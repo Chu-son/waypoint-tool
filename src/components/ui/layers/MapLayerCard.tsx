@@ -6,6 +6,8 @@ import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { FieldLabel } from '../common/FieldLabel';
+import { InlineNameInput } from '../common/InlineNameInput';
+import { PoseAdjuster } from '../common/PoseAdjuster';
 import { ProjectMapLayer } from '../../../types/store';
 import { LayerCardShell } from './LayerCardShell';
 
@@ -23,6 +25,10 @@ interface MapLayerCardProps {
   onToggleVisible: () => void;
   onRemove: () => void;
   onUpdateLayer: (updates: Partial<ProjectMapLayer>) => void;
+  isRenaming: boolean;
+  onStartRename: () => void;
+  onRename: (name: string) => void;
+  onCancelRename: () => void;
 }
 
 /** Card for one ROS map layer: pose adjustment, opacity, blend mode and occupancy thresholds. */
@@ -40,6 +46,10 @@ export function MapLayerCard({
   onToggleVisible,
   onRemove,
   onUpdateLayer,
+  isRenaming,
+  onStartRename,
+  onRename,
+  onCancelRename,
 }: MapLayerCardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const occupancySettings = useAppStore((state) => state.occupancySettings);
@@ -136,9 +146,20 @@ export function MapLayerCard({
       isFirst={isFirst}
       isLast={isLast}
       title={
-        <span className="text-sm font-bold text-text-base truncate block max-w-[140px]" title={layer.name}>
-          {layer.name}
-        </span>
+        isRenaming ? (
+          <InlineNameInput name={layer.name} onRename={onRename} onCancel={onCancelRename} className="max-w-[140px]" />
+        ) : (
+          <span
+            className="text-sm font-bold text-text-base truncate block max-w-[140px]"
+            title={`${layer.name} (double-click to rename)`}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              onStartRename();
+            }}
+          >
+            {layer.name}
+          </span>
+        )
       }
       subBadges={
         <>
@@ -238,6 +259,12 @@ export function MapLayerCard({
             onChange={(val) => handleUpdateDelta({ deltaYawDeg: val })}
           />
         </div>
+
+        <PoseAdjuster
+          onNudge={({ dx, dy, dyawDeg }) =>
+            handleUpdateDelta({ deltaX: deltaX + dx, deltaY: deltaY + dy, deltaYawDeg: deltaYawDeg + dyawDeg })
+          }
+        />
 
         {/* Subtext with original YAML origin */}
         <div

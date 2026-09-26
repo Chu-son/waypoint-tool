@@ -8,6 +8,7 @@ import { Button } from '../common/Button';
 import { FieldLabel } from '../common/FieldLabel';
 import { Input } from '../common/Input';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
+import { PoseAdjuster } from '../common/PoseAdjuster';
 import { Select } from '../common/Select';
 import { Slider } from '../common/Slider';
 import { ToggleSwitch } from '../common/ToggleSwitch';
@@ -180,6 +181,18 @@ export function GeoMapCard() {
               {numberField('Offset Y (m)', 'dy', 3, 0.1)}
               {numberField('Rotation (°)', 'yawDeg', 2, 1)}
             </div>
+            <PoseAdjuster
+              onEditStart={beginGeoAlignDrag}
+              onNudge={({ dx, dy, dyawDeg }) =>
+                updateGeoAlignDrag({
+                  ...alignment,
+                  dx: alignment.dx + dx,
+                  dy: alignment.dy + dy,
+                  yawDeg: alignment.yawDeg + dyawDeg,
+                })
+              }
+              onEditEnd={endGeoAlignDrag}
+            />
             <Button
               type="button"
               variant={isAligning ? 'primary' : 'secondary'}
