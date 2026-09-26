@@ -194,6 +194,21 @@ describe('GeoMapCard', () => {
       expect(getAppState().geoMap.alignment.dx).toBe(0);
     });
 
+    it('nudges the alignment with the pose adjuster and undoes a held key as one step', () => {
+      renderWithStore(<GeoMapCard />, enabled());
+      const pad = screen.getByRole('group', { name: 'Pose adjuster' });
+
+      fireEvent.keyDown(pad, { key: 'ArrowRight' });
+      fireEvent.keyDown(pad, { key: 'ArrowRight', repeat: true });
+      fireEvent.keyDown(pad, { key: 'ArrowUp', repeat: true });
+      fireEvent.keyUp(pad, { key: 'ArrowUp' });
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 0.2, dy: 0.1, yawDeg: 0 });
+
+      act(() => getAppState().undo());
+
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 0, dy: 0, yawDeg: 0 });
+    });
+
     it('does not leave an undo step behind when a field is only focused', async () => {
       const { user } = renderWithStore(<GeoMapCard />, enabled());
 

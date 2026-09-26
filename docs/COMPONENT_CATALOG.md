@@ -14,8 +14,11 @@
   - **概要**: 左右サイドパネルを格納し、タブ切り替え、上下分割、タブ右クリックによる反対パネルへの移動（左右ドッキング）・順序並び替え、レイアウト初期化を制御するコンテナ。
   - **主要Props**: `panels`, `activeTabId`, `onTabChange`, `viewMode`, `onViewModeChange`, `side`, `onMoveTabToPanel`, `onReorderTab`, `onResetLayout`, `onClose`, `closeIcon`
 - **`NumericInput`** ([`src/components/ui/common/NumericInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/NumericInput.tsx))
-  - **概要**: 数値編集用インプット。ドラッグによる値変更やステップ増減、フォーカス外確定をサポート。
-  - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`
+  - **概要**: 数値編集用インプット。入力中の中間状態を許容し、フォーカス外/Enter で確定。`step` 指定時は ↑/↓ キーで増減（Shift ×10、Alt ×0.1）。
+  - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`, `onEditStart`, `onEditEnd`
+- **`PoseAdjuster`** ([`src/components/ui/common/PoseAdjuster.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/PoseAdjuster.tsx))
+  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`MapLayerCard` と `GeoMapCard` で共用。
+  - **主要Props**: `onNudge`, `onEditStart`, `onEditEnd`（押下/キー保持の一連操作を Undo 1 エントリにまとめるために使う）
 - **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
   - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。
   - **主要Props**: `className`
@@ -82,7 +85,7 @@
 ### 共通 Hooks (`src/hooks/`)
 - **`useClickOutside(ref, onOutside, enabled?)`**: 要素の外側でマウスが押されたときにコールバック（ドロップダウン・メニューのクローズ）。
 - **`useTreeInteractionState()`**: WaypointTree / AnnotationTree 共通の DnD センサー、展開集合、インライン編集 ID、ドラッグ中 ID、コンテキストメニュー状態。
-- **`useExportPlan({ isOpen, onClose })`** (`ui/modals/useExportPlan.ts`): ExportModal のプロファイル/項目編集、ファイルプレビュー、衝突チェック、エクスポート実行。
+- **`useExportPlan({ isOpen, onClose })`** (`ui/modals/useExportPlan.ts`): ExportModal のプロファイル/項目編集（ドラフト。保存操作でストアへ反映）、ファイルプレビュー、衝突チェック、エクスポート実行。
 - **`PluginCard`** (`ui/settings/PluginCard.tsx`): PluginsTab の 1 プラグイン分（有効化・並び替え・アイコン・インタプリタ上書き・SDK/依存状態）。**`ManualLayerTools`** (`ui/properties/ManualLayerTools.tsx`): 手動ベクターレイヤーの描画ツール・塗り種別・描画オブジェクト一覧。
 - **`useTreeItemSelection`** / **`useTreeReveal`**: ツリーのクリック・Shift 範囲選択、および選択要素までの自動展開・スクロール。
 - **`useResponsiveContainer`**: コンテナ幅に応じたレスポンシブ表示切り替え。
@@ -147,7 +150,7 @@
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
   - **概要**: ロード中のマップレイヤー (`MapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
-  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：姿勢・不透明度・閾値）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）
+  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：名前（ダブルクリック/右クリックで変更）・姿勢・不透明度・閾値）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）
 - **`GeoAttribution`** ([`src/components/ui/overlays/GeoAttribution.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/GeoAttribution.tsx))
   - **概要**: 背景地図の表示中に、選択中のベースマップの帰属表示（例: © OpenStreetMap contributors）をキャンバス右下へ表示する。
   - **主要Props**: なし
@@ -183,7 +186,7 @@
   - **概要**: プラグインが必要とする入力（座標 `point`、点群 `points`、領域 `rectangle`、参照 `waypoint`、アノテーション `annotation`、カスタムレイヤー `custom_layer`）の定義・編集エディタ。
   - **主要Props**: `inputDef`, `value`, `onChange`
 - **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/modals/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/ExportModal.tsx))
-  - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。
+  - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/modals/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/SettingsModal.tsx))
   - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` の7タブを保持。

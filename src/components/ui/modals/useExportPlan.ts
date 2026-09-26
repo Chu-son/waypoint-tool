@@ -20,8 +20,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const rawExportProfiles = useAppStore((state) => state.exportProfiles);
   const storeProfiles =
     Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0 ? rawExportProfiles : DEFAULT_EXPORT_PROFILES;
-  const storeActiveProfileId =
-    useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
+  const storeActiveProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
   const replaceExportProfiles = useAppStore((state) => state.replaceExportProfiles);
 
   // Edits are kept in a draft and only reach the store on save; cancelling discards them.
