@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, type SyntheticEvent } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,14 +18,45 @@ interface UseExportPlanOptions {
 /** State and actions behind the export dialog: profile/item editing, file preview, conflict check and execution. */
 export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const rawExportProfiles = useAppStore((state) => state.exportProfiles);
-  const exportProfiles =
+  const storeProfiles =
     Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0 ? rawExportProfiles : DEFAULT_EXPORT_PROFILES;
-  const activeExportProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
-  const addExportProfile = useAppStore((state) => state.addExportProfile);
-  const updateExportProfile = useAppStore((state) => state.updateExportProfile);
-  const removeExportProfile = useAppStore((state) => state.removeExportProfile);
-  const setActiveExportProfileId = useAppStore((state) => state.setActiveExportProfileId);
-  const duplicateExportProfile = useAppStore((state) => state.duplicateExportProfile);
+  const storeActiveProfileId =
+    useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
+  const replaceExportProfiles = useAppStore((state) => state.replaceExportProfiles);
+
+  // Edits are kept in a draft and only reach the store on save; cancelling discards them.
+  const [draft, setDraft] = useState<{ profiles: ExportProfile[]; activeId: string } | null>(null);
+  useEffect(() => {
+    setDraft(isOpen ? { profiles: storeProfiles, activeId: storeActiveProfileId } : null);
+    // Re-seed only when the dialog is opened or closed, not on every store change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+  const exportProfiles = draft?.profiles ?? storeProfiles;
+  const activeExportProfileId = draft?.activeId ?? storeActiveProfileId;
+
+  const updateExportProfile = (id: string, updates: Partial<ExportProfile>) =>
+    setDraft((d) => d && { ...d, profiles: d.profiles.map((p) => (p.id === id ? { ...p, ...updates } : p)) });
+  const setActiveExportProfileId = (id: string) => setDraft((d) => d && { ...d, activeId: id });
+  const addExportProfile = (profile: ExportProfile) =>
+    setDraft((d) => d && { profiles: [...d.profiles, profile], activeId: profile.id });
+  const removeExportProfile = (id: string) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const profiles = d.profiles.filter((p) => p.id !== id);
+      return { profiles, activeId: d.activeId === id ? (profiles[0]?.id ?? d.activeId) : d.activeId };
+    });
+  const duplicateExportProfile = (id: string) =>
+    setDraft((d) => {
+      const source = d?.profiles.find((p) => p.id === id);
+      if (!d || !source) return d;
+      const copy: ExportProfile = {
+        ...source,
+        id: uuidv4(),
+        name: `${source.name} (Copy)`,
+        items: source.items.map((item) => ({ ...item, id: uuidv4() })),
+      };
+      return { profiles: [...d.profiles, copy], activeId: copy.id };
+    });
 
   const exportTemplates = useAppStore((state) => state.exportTemplates) || [];
   const defaultExportFormats = useAppStore((state) => state.defaultExportFormats) || [];
@@ -43,6 +74,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
 
   // Variable chip inserter input ref (must be called unconditionally before early returns)
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
 
   // Active profile fallback
   const activeProfile = useMemo(() => {
@@ -222,20 +254,37 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     if (!selectedItem) return;
     const currentPattern = selectedItem.relativePathPattern;
     const input = inputRef.current;
-    if (input) {
-      const start = input.selectionStart || currentPattern.length;
-      const end = input.selectionEnd || currentPattern.length;
-      const newPattern = currentPattern.substring(0, start) + varName + currentPattern.substring(end);
-      handleUpdateItem(selectedItem.id, { relativePathPattern: newPattern });
-      setTimeout(() => {
-        input.focus();
-        input.setSelectionRange(start + varName.length, start + varName.length);
-      }, 0);
-    } else {
-      handleUpdateItem(selectedItem.id, {
-        relativePathPattern: currentPattern + varName,
-      });
+    const remembered = selectionRef.current;
+    const start = Math.min(remembered?.start ?? currentPattern.length, currentPattern.length);
+    const end = Math.min(remembered?.end ?? start, currentPattern.length);
+    const newPattern = currentPattern.substring(0, start) + varName + currentPattern.substring(end);
+    handleUpdateItem(selectedItem.id, { relativePathPattern: newPattern });
+    const caret = start + varName.length;
+    selectionRef.current = { start: caret, end: caret };
+    setTimeout(() => {
+      input?.focus();
+      input?.setSelectionRange(caret, caret);
+    }, 0);
+  };
+
+  // Remember the caret so chip clicks (which blur the input) still insert where the user left off
+  const handlePatternSelect = (e: SyntheticEvent<HTMLInputElement>) => {
+    const { selectionStart, selectionEnd } = e.currentTarget;
+    if (selectionStart !== null && selectionEnd !== null) {
+      selectionRef.current = { start: selectionStart, end: selectionEnd };
     }
+  };
+
+  const commitDraft = () => replaceExportProfiles(exportProfiles, activeProfile.id);
+
+  const handleSaveOnly = () => {
+    commitDraft();
+    onClose();
+  };
+
+  const handleSaveAndExport = async () => {
+    commitDraft();
+    await handleExecuteExport();
   };
 
   // Execute export
@@ -342,9 +391,11 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     handleDeleteItem,
     handleDeleteProfile,
     handleDuplicateProfile,
-    handleExecuteExport,
     handleInsertVariable,
+    handlePatternSelect,
     handleRootDirChange,
+    handleSaveAndExport,
+    handleSaveOnly,
     handleToggleItemEnabled,
     handleUpdateItem,
     inputRef,
