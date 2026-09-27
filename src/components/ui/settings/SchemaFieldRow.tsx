@@ -4,16 +4,11 @@ import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
 import { cn } from '../../../utils/cn';
-import { isOptionValueValid } from '../../../utils/optionValues';
+import { isValueValid } from '../../../utils/optionValues';
+import type { FieldDef } from '../../../types/options';
 
 /** Fields shared by a waypoint option definition and a global field definition. */
-export type SchemaFieldDef = {
-  name: string;
-  label: string;
-  type: string;
-  item_type?: string;
-  enum_values?: string[];
-};
+export type SchemaFieldDef = FieldDef;
 
 interface SchemaFieldRowProps {
   def: SchemaFieldDef;
@@ -72,12 +67,13 @@ export function SchemaFieldRow({
       .split(',')
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
+    const itemType = def.item?.type;
     let parsedArr: any[] = rawArr;
-    if (def.item_type === 'float') {
+    if (itemType === 'float') {
       parsedArr = rawArr.map((s) => parseFloat(s)).filter((n) => !isNaN(n));
-    } else if (def.item_type === 'integer') {
+    } else if (itemType === 'integer') {
       parsedArr = rawArr.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
-    } else if (def.item_type === 'boolean') {
+    } else if (itemType === 'boolean') {
       parsedArr = rawArr.map((s) => s === 'true' || s === '1');
     }
     onChangeValue(parsedArr);
@@ -119,7 +115,7 @@ export function SchemaFieldRow({
             <Select
               aria-label={`${def.name} type`}
               value={def.type}
-              onChange={(e) => onChangeDef({ type: e.target.value })}
+              onChange={(e) => onChangeDef({ type: e.target.value as FieldDef['type'] })}
               className="h-8 text-[13px]"
             >
               <option value="string">String</option>
@@ -137,9 +133,7 @@ export function SchemaFieldRow({
               onChange={(e) => handleValueInput(e.target.value)}
               className={cn(
                 'h-8 text-[13px] font-mono',
-                !isOptionValueValid(def.type, value)
-                  ? 'border-danger-base focus:border-danger-base ring-danger-base/20'
-                  : '',
+                !isValueValid(def, value) ? 'border-danger-base focus:border-danger-base ring-danger-base/20' : '',
               )}
               placeholder={def.type === 'list' ? 'csv' : def.type === 'boolean' ? 'true/false' : '0'}
             />
@@ -150,8 +144,8 @@ export function SchemaFieldRow({
             <SchemaFieldCell label="List Item Type" className="w-48">
               <Select
                 aria-label={`${def.name} list item type`}
-                value={def.item_type || 'string'}
-                onChange={(e) => onChangeDef({ item_type: e.target.value })}
+                value={def.item?.type || 'string'}
+                onChange={(e) => onChangeDef({ item: { type: e.target.value as FieldDef['type'] } })}
                 className="h-8 text-[13px]"
               >
                 <option value="string">String</option>

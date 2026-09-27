@@ -9,7 +9,7 @@ describe('extractGlobalsForExport', () => {
       globals: [
         { name: 'default_speed', label: 'Default Speed', type: 'float', value: 0.5 },
         { name: 'frame_id', label: 'Frame', type: 'string', value: 'map' },
-        { name: 'tags', label: 'Tags', type: 'list', item_type: 'string', value: ['a', 'b'] },
+        { name: 'tags', label: 'Tags', type: 'list', item: { type: 'string' }, value: ['a', 'b'] },
         { name: 'unset', label: 'Unset', type: 'string' },
       ],
     };
@@ -60,7 +60,7 @@ describe('exportWaypointUtils', () => {
     };
 
     const schema: OptionsSchema = {
-      options: [{ name: 'speed', label: 'Speed', type: 'number', default: 1.5 }],
+      options: [{ name: 'speed', label: 'Speed', type: 'float', default: 1.5 }],
       globals: [],
     };
 

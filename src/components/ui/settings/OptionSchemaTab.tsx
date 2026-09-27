@@ -7,7 +7,8 @@ import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { SchemaFieldRow } from './SchemaFieldRow';
 import { notify } from '../../../services/notify';
-import { isOptionValueValid, toStoredOptionValue } from '../../../utils/optionValues';
+import { isValueValid, toStoredValue } from '../../../utils/optionValues';
+import { normalizeOptionsSchema } from '../../../utils/optionSchema';
 
 const hasDuplicates = (names: string[]) => new Set(names).size !== names.length;
 
@@ -39,8 +40,8 @@ export function OptionSchemaTab() {
     const hasEmptyName = [...localOptions, ...localGlobals].some((f) => f.name.trim() === '');
     const hasDuplicateOptions = hasDuplicates(localOptions.map((opt) => opt.name));
     const hasDuplicateGlobals = hasDuplicates(localGlobals.map((g) => g.name));
-    const hasInvalidDefaults = localOptions.some((opt) => !isOptionValueValid(opt.type, opt.default));
-    const hasInvalidGlobalValues = localGlobals.some((g) => !isOptionValueValid(g.type, g.value));
+    const hasInvalidDefaults = localOptions.some((opt) => !isValueValid(opt, opt.default));
+    const hasInvalidGlobalValues = localGlobals.some((g) => !isValueValid(g, g.value));
 
     if (hasEmptyName) {
       void notify('Key Name cannot be empty.');
@@ -61,7 +62,7 @@ export function OptionSchemaTab() {
 
     setGlobalOptionsSchema({
       options: localOptions,
-      globals: localGlobals.map((g) => ({ ...g, value: toStoredOptionValue(g.value, g.type) })),
+      globals: localGlobals.map((g) => ({ ...g, value: toStoredValue(g, g.value) })),
     });
     useAppStore.setState({ isDirty: true });
     void notify('オプションスキーマを保存しました。');
@@ -100,7 +101,7 @@ export function OptionSchemaTab() {
 
       const dataToExport = {
         options: localOptions,
-        globals: localGlobals.map((g) => ({ ...g, value: toStoredOptionValue(g.value, g.type) })),
+        globals: localGlobals.map((g) => ({ ...g, value: toStoredValue(g, g.value) })),
       };
 
       await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
@@ -133,10 +134,10 @@ export function OptionSchemaTab() {
       const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
       useAppStore.getState().setLastDirectory(dir);
 
-      let schema: OptionsSchema;
+      let rawSchema: any;
 
       if (pathStr.endsWith('.yaml') || pathStr.endsWith('.yml')) {
-        schema = await BackendAPI.loadOptionsSchema(pathStr);
+        rawSchema = await BackendAPI.loadOptionsSchema(pathStr);
       } else {
         const fileContent = await BackendAPI.readTextFile(pathStr);
         let parsed: any;
@@ -150,12 +151,13 @@ export function OptionSchemaTab() {
           void notify('有効な Options Schema ファイルではありません。');
           return;
         }
-        schema = parsed as OptionsSchema;
+        rawSchema = parsed;
       }
 
-      setLocalOptions(schema.options || []);
-      // 外部ファイルの globals は任意項目。無ければ空として扱う。
-      setLocalGlobals(Array.isArray(schema.globals) ? schema.globals : []);
+      // 旧形式（item_type がフラットに置かれた list 等）を含む可能性があるため、必ず正規化を通す。
+      const schema: OptionsSchema = normalizeOptionsSchema(rawSchema);
+      setLocalOptions(schema.options);
+      setLocalGlobals(schema.globals);
       void notify('オプションスキーマをインポートしました。');
     } catch (err) {
       console.error('Failed to import options schema:', err);
@@ -197,7 +199,7 @@ export function OptionSchemaTab() {
             value={opt.default}
             isDuplicateName={localOptions.filter((o) => o.name === opt.name).length > 1}
             onChangeDef={(updates) => handleUpdateOption(i, updates)}
-            onChangeValue={(value) => handleUpdateOption(i, { default: value })}
+            onChangeValue={(value) => handleUpdateOption(i, { default: value as OptionDef['default'] })}
             onRemove={() => setLocalOptions(localOptions.filter((_, idx) => idx !== i))}
           />
         ))}

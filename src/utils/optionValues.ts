@@ -1,40 +1,253 @@
-import type { OptionValue } from '../types/store';
+import type { FieldDef, OptionValue, TypeSpec } from '../types/options';
 
-/** オプション型（string/float/integer/boolean/list）に応じて値を型変換する。変換できない数値は `fallback` を返す。 */
-export function coerceOptionValue(v: any, type: string, fallback?: any): any {
-  switch (type) {
+const isPlainObject = (v: unknown): v is Record<string, OptionValue> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** union 値から判別キーの値を取り出す。 */
+function getVariantValue(spec: TypeSpec, value: unknown): string | undefined {
+  if (!isPlainObject(value)) return undefined;
+  const discriminator = spec.discriminator || 'type';
+  const v = value[discriminator];
+  return typeof v === 'string' ? v : undefined;
+}
+
+function findVariant(spec: TypeSpec, variantValue: string | undefined) {
+  return (spec.variants ?? []).find((v) => v.value === variantValue);
+}
+
+/**
+ * 入力値を型仕様に従って変換する（インポートやフォーム入力の型変換に使う）。
+ * 変換できない場合は `fallback` を返す。list/object/map/union は再帰的に変換する。
+ */
+export function coerceValue(spec: TypeSpec, raw: any, fallback?: OptionValue): OptionValue | undefined {
+  switch (spec.type) {
     case 'integer': {
-      const n = parseInt(v, 10);
+      const n = parseInt(raw, 10);
       return Number.isNaN(n) ? fallback : n;
     }
     case 'float': {
-      const n = parseFloat(v);
+      const n = parseFloat(raw);
       return Number.isNaN(n) ? fallback : n;
     }
     case 'boolean':
-      return typeof v === 'boolean' ? v : String(v).toLowerCase() === 'true';
-    case 'list':
-      return Array.isArray(v) ? v : [v];
-    default:
-      return v; // string / enum
+      return typeof raw === 'boolean' ? raw : String(raw).toLowerCase() === 'true';
+    case 'list': {
+      const arr = Array.isArray(raw) ? raw : raw === undefined || raw === null ? [] : [raw];
+      const itemSpec: TypeSpec = spec.item ?? { type: 'string' };
+      // 個々の要素の変換結果は基本的に fallback (元の値) が効くため undefined にはならない。
+      return arr.map((v) => coerceValue(itemSpec, v, v)) as OptionValue[];
+    }
+    case 'object': {
+      const obj = isPlainObject(raw) ? raw : {};
+      const result: Record<string, OptionValue> = {};
+      (spec.fields ?? []).forEach((f) => {
+        if (obj[f.name] !== undefined) result[f.name] = coerceValue(f, obj[f.name], f.default) as OptionValue;
+      });
+      return result;
+    }
+    case 'map': {
+      const obj = isPlainObject(raw) ? raw : {};
+      const valueSpec: TypeSpec = spec.value_type ?? { type: 'any' };
+      const result: Record<string, OptionValue> = {};
+      Object.keys(obj).forEach((k) => {
+        result[k] = coerceValue(valueSpec, obj[k], obj[k]) as OptionValue;
+      });
+      return result;
+    }
+    case 'union': {
+      if (!isPlainObject(raw)) return fallback;
+      const discriminator = spec.discriminator || 'type';
+      const variantValue = getVariantValue(spec, raw);
+      const variant = findVariant(spec, variantValue);
+      if (!variant) return { ...raw }; // 未知のバリアントはそのまま素通しする
+      const result: Record<string, OptionValue> = { [discriminator]: variantValue as string };
+      variant.fields.forEach((f) => {
+        if (raw[f.name] !== undefined) result[f.name] = coerceValue(f, raw[f.name], f.default) as OptionValue;
+      });
+      return result;
+    }
+    case 'any':
+      return raw;
+    default: // string
+      return raw;
   }
 }
 
-/** 入力値が型に合っているか。未入力（undefined / 空文字）は「未設定」として有効扱い。 */
-export function isOptionValueValid(type: string, value: unknown): boolean {
-  if (value === undefined || value === '') return true;
-  if (type === 'integer') return !isNaN(Number(value)) && Number.isInteger(Number(value));
-  if (type === 'float') return !isNaN(Number(value));
-  if (type === 'boolean') {
-    const str = String(value).toLowerCase();
-    return str === 'true' || str === 'false';
-  }
-  return true;
-}
-
-/** 入力欄の値を保存用の型付き値へ変換する。未入力は `undefined`（未設定）。 */
-export function toStoredOptionValue(raw: unknown, type: string): OptionValue | undefined {
+/** 未入力（`undefined` / 空文字 / 空配列）は「未設定」として保存しない。 */
+export function toStoredValue(spec: TypeSpec, raw: unknown): OptionValue | undefined {
   if (raw === undefined || raw === '') return undefined;
-  if (Array.isArray(raw)) return raw.length > 0 ? raw : undefined;
-  return coerceOptionValue(raw, type);
+  if (Array.isArray(raw) && raw.length === 0) return undefined;
+  return coerceValue(spec, raw);
+}
+
+export interface ValueValidationError {
+  path: string;
+  message: string;
+}
+
+/** 値が型仕様に合っているかを再帰的に検証する。未入力（`undefined` / 空文字）は常に有効。 */
+export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueValidationError[] {
+  if (value === undefined || value === '') return [];
+
+  switch (spec.type) {
+    case 'integer':
+      return isNaN(Number(value)) || !Number.isInteger(Number(value))
+        ? [{ path, message: '整数を入力してください。' }]
+        : [];
+    case 'float':
+      return isNaN(Number(value)) ? [{ path, message: '数値を入力してください。' }] : [];
+    case 'boolean': {
+      const str = String(value).toLowerCase();
+      return str === 'true' || str === 'false' ? [] : [{ path, message: 'true/false を入力してください。' }];
+    }
+    case 'list': {
+      if (!Array.isArray(value)) return [{ path, message: 'リストを入力してください。' }];
+      const itemSpec: TypeSpec = spec.item ?? { type: 'string' };
+      return value.flatMap((v, i) => validateValue(itemSpec, v, `${path}[${i}]`));
+    }
+    case 'object': {
+      if (!isPlainObject(value)) return [{ path, message: 'オブジェクトを入力してください。' }];
+      return (spec.fields ?? []).flatMap((f) => validateValue(f, value[f.name], `${path}.${f.name}`));
+    }
+    case 'map': {
+      if (!isPlainObject(value)) return [{ path, message: 'オブジェクトを入力してください。' }];
+      const valueSpec: TypeSpec = spec.value_type ?? { type: 'any' };
+      return Object.keys(value).flatMap((k) => validateValue(valueSpec, value[k], `${path}.${k}`));
+    }
+    case 'union': {
+      if (!isPlainObject(value)) return [{ path, message: 'オブジェクトを入力してください。' }];
+      const variantValue = getVariantValue(spec, value);
+      const variant = findVariant(spec, variantValue);
+      if (!variant) return [{ path, message: `未知のバリアントです: ${String(variantValue)}` }];
+      return variant.fields.flatMap((f) => validateValue(f, value[f.name], `${path}.${f.name}`));
+    }
+    default:
+      return [];
+  }
+}
+
+/** `validateValue` のエラー有無だけを見る簡易版（フォームの枠線ハイライト等に使う）。 */
+export function isValueValid(spec: TypeSpec, value: unknown): boolean {
+  return validateValue(spec, value).length === 0;
+}
+
+/**
+ * 明示的に入力された値（`value`）に、スキーマの既定値を再帰的に補って実効値を返す。
+ * `value` が `undefined` ならフィールドの `default` をそのまま返す。
+ */
+export function resolveWithDefaults(field: FieldDef, value: OptionValue | undefined): OptionValue | undefined {
+  if (value === undefined) return field.default;
+  return resolveNestedDefaults(field, value);
+}
+
+function resolveNestedDefaults(spec: TypeSpec, value: OptionValue): OptionValue {
+  if (spec.type === 'list' && Array.isArray(value) && spec.item) {
+    const itemSpec = spec.item;
+    return value.map((v) =>
+      itemSpec.type === 'object' || itemSpec.type === 'union' ? resolveNestedDefaults(itemSpec, v) : v,
+    );
+  }
+  if (spec.type === 'object' && isPlainObject(value)) {
+    const result: Record<string, OptionValue> = { ...value };
+    (spec.fields ?? []).forEach((f) => {
+      const resolved = resolveWithDefaults(f, value[f.name]);
+      if (resolved !== undefined) result[f.name] = resolved;
+    });
+    return result;
+  }
+  if (spec.type === 'union' && isPlainObject(value)) {
+    const variant = findVariant(spec, getVariantValue(spec, value));
+    if (!variant) return value;
+    const result: Record<string, OptionValue> = { ...value };
+    variant.fields.forEach((f) => {
+      const resolved = resolveWithDefaults(f, value[f.name]);
+      if (resolved !== undefined) result[f.name] = resolved;
+    });
+    return result;
+  }
+  return value;
+}
+
+/** union の判別キーだけを持つ、まっさらな値を作る（フィールドは未設定のまま）。 */
+export function createUnionVariantValue(spec: TypeSpec, variantValue: string): OptionValue {
+  const discriminator = spec.discriminator || 'type';
+  return { [discriminator]: variantValue };
+}
+
+/** 型仕様に応じた、値未設定な状態からの初期値を作る（list への新規アイテム追加等に使う）。 */
+export function createValue(spec: TypeSpec): OptionValue {
+  switch (spec.type) {
+    case 'string':
+      return '';
+    case 'float':
+    case 'integer':
+      return 0;
+    case 'boolean':
+      return false;
+    case 'list':
+    case 'object':
+    case 'map':
+      return spec.type === 'list' ? [] : {};
+    case 'union':
+      return createUnionVariantValue(spec, (spec.variants ?? [])[0]?.value ?? '');
+    default: // any
+      return null;
+  }
+}
+
+/**
+ * 同名のフィールドは値を引き継ぎ、新しいバリアントに存在しないフィールドは捨てて、
+ * union 値のバリアントを切り替える。
+ */
+export function switchUnionVariant(spec: TypeSpec, value: OptionValue, newVariantValue: string): OptionValue {
+  const discriminator = spec.discriminator || 'type';
+  const newVariant = findVariant(spec, newVariantValue);
+  const oldObj = isPlainObject(value) ? value : {};
+  const allowedNames = new Set((newVariant?.fields ?? []).map((f) => f.name));
+  const result: Record<string, OptionValue> = { [discriminator]: newVariantValue };
+  Object.keys(oldObj).forEach((k) => {
+    if (k !== discriminator && allowedNames.has(k)) result[k] = oldObj[k];
+  });
+  return result;
+}
+
+/** キャンバスのラベル表示用に、値を短い文字列へ要約する。 */
+export function summarizeValue(spec: TypeSpec, value: OptionValue | undefined): string {
+  if (value === undefined || value === null) return '';
+  switch (spec.type) {
+    case 'list': {
+      if (!Array.isArray(value)) return '';
+      const itemSpec = spec.item;
+      return `[${value.map((v) => (itemSpec ? summarizeValue(itemSpec, v) : String(v))).join(', ')}]`;
+    }
+    case 'union': {
+      const variantValue = getVariantValue(spec, value);
+      return variantValue ?? '{...}';
+    }
+    case 'object':
+      return '{...}';
+    case 'map':
+      return isPlainObject(value) ? `{${Object.keys(value).length} keys}` : '{...}';
+    case 'any':
+      return typeof value === 'object' ? JSON.stringify(value) : String(value);
+    default:
+      return String(value);
+  }
+}
+
+/** 配列・オブジェクトも含めた再帰的な値の等価比較。オプション値の差分検出に使う。 */
+export function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  if (isPlainObject(a) || isPlainObject(b)) {
+    if (!isPlainObject(a) || !isPlainObject(b)) return false;
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    if (keysA.length !== keysB.length) return false;
+    return keysA.every((k) => deepEqual(a[k], b[k]));
+  }
+  return false;
 }

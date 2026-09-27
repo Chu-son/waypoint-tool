@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { OptionsSchema, PluginInstance, ImportFieldMapping } from '../../types/store';
+import { PluginInstance, ImportFieldMapping } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -15,7 +15,7 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('load_project', { path });
   }
 
-  async loadOptionsSchema(yamlPath: string): Promise<OptionsSchema> {
+  async loadOptionsSchema(yamlPath: string): Promise<unknown> {
     return invoke('load_options_schema', { yamlPath });
   }
 

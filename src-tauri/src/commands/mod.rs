@@ -43,7 +43,7 @@ pub fn load_project(path: String) -> Result<serde_json::Value, String> {
 }
 
 #[command]
-pub fn load_options_schema(yaml_path: String) -> Result<crate::models::options::OptionsSchema, String> {
+pub fn load_options_schema(yaml_path: String) -> Result<serde_json::Value, String> {
     crate::models::options::load_options_schema(&yaml_path)
 }
 

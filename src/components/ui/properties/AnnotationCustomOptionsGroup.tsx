@@ -59,12 +59,13 @@ export function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject })
                       .split(',')
                       .map((s) => s.trim())
                       .filter((s) => s.length > 0);
+                    const itemType = opt.item?.type;
                     let parsedArr: any[] = rawArr;
-                    if (opt.item_type === 'float') {
+                    if (itemType === 'float') {
                       parsedArr = rawArr.map((s) => parseFloat(s)).filter((n) => !isNaN(n));
-                    } else if (opt.item_type === 'integer') {
+                    } else if (itemType === 'integer') {
                       parsedArr = rawArr.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
-                    } else if (opt.item_type === 'boolean') {
+                    } else if (itemType === 'boolean') {
                       parsedArr = rawArr.map((s) => s === 'true' || s === '1');
                     }
                     handleChange(parsedArr);

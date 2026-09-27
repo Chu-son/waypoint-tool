@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { coerceOptionValue } from './optionValues';
+import { coerceValue } from './optionValues';
 import { ImportFieldMapping, OptionDef, OptionsSchema, WaypointNode, WaypointOptions } from '../types/store';
 
 // デフォルトYAML/JSON形式（export_waypointsがラップなしのルート配列として出力する形式）に対応する既定マッピング。
@@ -30,8 +30,8 @@ function toNumber(v: any): number | undefined {
   return Number.isNaN(n) ? undefined : n;
 }
 
-// OptionDef.type に応じた型変換（ExportModalのfullOptions構築ロジックの逆変換）。
-const coerceValue = (v: any, opt: OptionDef) => coerceOptionValue(v, opt.type, opt.default);
+// OptionDef（FieldDef を継承）の型仕様に応じた再帰的な型変換（ExportModalのfullOptions構築ロジックの逆変換）。
+const coerceOptionValue = (v: any, opt: OptionDef) => coerceValue(opt, v, opt.default);
 
 function coerceOptions(raw: Record<string, any>, schema: OptionsSchema | null): WaypointOptions {
   if (!schema) return { ...raw };
@@ -39,7 +39,7 @@ function coerceOptions(raw: Record<string, any>, schema: OptionsSchema | null): 
   const result: WaypointOptions = {};
   schema.options.forEach((opt) => {
     const v = raw[opt.name];
-    result[opt.name] = v !== undefined ? coerceValue(v, opt) : opt.default;
+    result[opt.name] = v !== undefined ? coerceOptionValue(v, opt) : opt.default;
   });
   // スキーマに無い未知キーはそのまま引き継ぐ
   Object.keys(raw).forEach((k) => {
