@@ -8,9 +8,7 @@ import { EmptyState } from '../common/EmptyState';
 import { SchemaFieldRow } from './SchemaFieldRow';
 import { notify } from '../../../services/notify';
 import { isValueValid, toStoredValue } from '../../../utils/optionValues';
-import { normalizeOptionsSchema } from '../../../utils/optionSchema';
-
-const hasDuplicates = (names: string[]) => new Set(names).size !== names.length;
+import { normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
 
 /** Returns a `base`, `base_1`, `base_2`... key that no field in `fields` uses yet. */
 function uniqueFieldName(base: string, fields: { name: string }[]) {
@@ -37,18 +35,14 @@ export function OptionSchemaTab() {
   }, [globalOptionsSchema]);
 
   const handleSaveOptions = () => {
-    const hasEmptyName = [...localOptions, ...localGlobals].some((f) => f.name.trim() === '');
-    const hasDuplicateOptions = hasDuplicates(localOptions.map((opt) => opt.name));
-    const hasDuplicateGlobals = hasDuplicates(localGlobals.map((g) => g.name));
+    // トップレベルのキー重複・空欄だけでなく、union のバリアント重複や判別キーとの
+    // 名前衝突など、入れ子構造の妥当性も再帰的に検証する。
+    const schemaErrors = validateSchema({ options: localOptions, globals: localGlobals });
     const hasInvalidDefaults = localOptions.some((opt) => !isValueValid(opt, opt.default));
     const hasInvalidGlobalValues = localGlobals.some((g) => !isValueValid(g, g.value));
 
-    if (hasEmptyName) {
-      void notify('Key Name cannot be empty.');
-      return;
-    }
-    if (hasDuplicateOptions || hasDuplicateGlobals) {
-      void notify('Key Names must be unique. Duplicate keys found.');
+    if (schemaErrors.length > 0) {
+      void notify(`スキーマの定義に誤りがあります。\n${schemaErrors[0].message} (${schemaErrors[0].path})`);
       return;
     }
     if (hasInvalidDefaults) {
@@ -60,10 +54,13 @@ export function OptionSchemaTab() {
       return;
     }
 
-    setGlobalOptionsSchema({
-      options: localOptions,
-      globals: localGlobals.map((g) => ({ ...g, value: toStoredValue(g, g.value) })),
-    });
+    // 構造を常に正規形（discriminator の既定値補完、item の既定 {type: 'string'} 補完等）で保存する。
+    setGlobalOptionsSchema(
+      normalizeOptionsSchema({
+        options: localOptions,
+        globals: localGlobals.map((g) => ({ ...g, value: toStoredValue(g, g.value) })),
+      }),
+    );
     useAppStore.setState({ isDirty: true });
     void notify('オプションスキーマを保存しました。');
   };

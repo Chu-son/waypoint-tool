@@ -5,7 +5,44 @@ import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
 import { cn } from '../../../utils/cn';
 import { isValueValid } from '../../../utils/optionValues';
-import type { FieldDef } from '../../../types/options';
+import { FieldListEditor } from './FieldListEditor';
+import { VariantListEditor } from './VariantListEditor';
+import type { FieldDef, TypeSpec, ValueType } from '../../../types/options';
+
+/** 値が意味を持たない複合型（保存値は常に createValue() の空の初期値から始まる）。 */
+const COMPLEX_TYPES: ReadonlySet<ValueType> = new Set(['object', 'map', 'union']);
+
+/**
+ * 型仕様に対する更新を適用する。型そのものを変更した場合は、旧い型の付随データ
+ * （fields/variants/item 等）を引き継がない（例: list → union に変えたら item は捨てる）。
+ */
+function mergeTypeSpec(current: TypeSpec | undefined, updates: Partial<TypeSpec>): TypeSpec {
+  const base: TypeSpec = current ?? { type: 'string' };
+  if (updates.type && updates.type !== base.type) {
+    return { type: updates.type };
+  }
+  return { ...base, ...updates };
+}
+
+/** list の item、または union そのものの入れ子構造（discriminator + variants）を編集する。 */
+function NestedTypeSpecEditor({ spec, onChange }: { spec: TypeSpec; onChange: (spec: TypeSpec) => void }) {
+  if (spec.type !== 'union') return null;
+  return (
+    <div className="pl-3 border-l-2 border-accent-automation/30 space-y-2">
+      <SchemaFieldCell label="Discriminator Key" className="w-48">
+        <Input
+          type="text"
+          aria-label="Union discriminator key"
+          value={spec.discriminator || 'type'}
+          onChange={(e) => onChange({ ...spec, discriminator: e.target.value.trim() || 'type' })}
+          className="h-8 text-[13px] font-mono"
+          placeholder="type"
+        />
+      </SchemaFieldCell>
+      <VariantListEditor variants={spec.variants ?? []} onChange={(variants) => onChange({ ...spec, variants })} />
+    </div>
+  );
+}
 
 /** Fields shared by a waypoint option definition and a global field definition. */
 export type SchemaFieldDef = FieldDef;
@@ -123,20 +160,30 @@ export function SchemaFieldRow({
               <option value="integer">Integer</option>
               <option value="boolean">Boolean</option>
               <option value="list">List (Array)</option>
+              <option value="object">Object (fixed fields)</option>
+              <option value="map">Map (free keys)</option>
+              <option value="union">Union (type-dependent fields)</option>
+              <option value="any">Any (JSON)</option>
             </Select>
           </SchemaFieldCell>
           <SchemaFieldCell label={valueLabel} className="col-span-3">
-            <Input
-              type="text"
-              aria-label={`${def.name} ${valueLabel.toLowerCase()}`}
-              value={formatValue(value)}
-              onChange={(e) => handleValueInput(e.target.value)}
-              className={cn(
-                'h-8 text-[13px] font-mono',
-                !isValueValid(def, value) ? 'border-danger-base focus:border-danger-base ring-danger-base/20' : '',
-              )}
-              placeholder={def.type === 'list' ? 'csv' : def.type === 'boolean' ? 'true/false' : '0'}
-            />
+            {COMPLEX_TYPES.has(def.type) ? (
+              <p className="h-8 flex items-center text-[11px] text-text-muted italic px-1">
+                Starts empty (edited per waypoint)
+              </p>
+            ) : (
+              <Input
+                type="text"
+                aria-label={`${def.name} ${valueLabel.toLowerCase()}`}
+                value={formatValue(value)}
+                onChange={(e) => handleValueInput(e.target.value)}
+                className={cn(
+                  'h-8 text-[13px] font-mono',
+                  !isValueValid(def, value) ? 'border-danger-base focus:border-danger-base ring-danger-base/20' : '',
+                )}
+                placeholder={def.type === 'list' ? 'csv' : def.type === 'boolean' ? 'true/false' : '0'}
+              />
+            )}
           </SchemaFieldCell>
         </div>
         {def.type === 'list' && (
@@ -145,16 +192,51 @@ export function SchemaFieldRow({
               <Select
                 aria-label={`${def.name} list item type`}
                 value={def.item?.type || 'string'}
-                onChange={(e) => onChangeDef({ item: { type: e.target.value as FieldDef['type'] } })}
+                onChange={(e) => onChangeDef({ item: mergeTypeSpec(def.item, { type: e.target.value as ValueType }) })}
                 className="h-8 text-[13px]"
               >
                 <option value="string">String</option>
                 <option value="float">Float</option>
                 <option value="integer">Integer</option>
                 <option value="boolean">Boolean</option>
+                <option value="object">Object (fixed fields)</option>
+                <option value="union">Union (type-dependent fields)</option>
               </Select>
             </SchemaFieldCell>
           </div>
+        )}
+        {def.type === 'list' && def.item?.type === 'object' && (
+          <div className="pl-3 border-l-2 border-border-base/30">
+            <FieldListEditor
+              fields={def.item.fields ?? []}
+              onChange={(fields) => onChangeDef({ item: { ...def.item, type: 'object', fields } })}
+            />
+          </div>
+        )}
+        {def.type === 'list' && def.item?.type === 'union' && (
+          <NestedTypeSpecEditor spec={def.item} onChange={(item) => onChangeDef({ item })} />
+        )}
+        {def.type === 'object' && (
+          <div className="pl-1 border-l-2 border-border-base/30">
+            <FieldListEditor fields={def.fields ?? []} onChange={(fields) => onChangeDef({ fields })} />
+          </div>
+        )}
+        {def.type === 'union' && <NestedTypeSpecEditor spec={def} onChange={(updates) => onChangeDef(updates)} />}
+        {def.type === 'map' && (
+          <SchemaFieldCell label="Map Value Type" className="w-48">
+            <Select
+              aria-label={`${def.name} map value type`}
+              value={def.value_type?.type || 'any'}
+              onChange={(e) => onChangeDef({ value_type: { type: e.target.value as ValueType } })}
+              className="h-8 text-[13px]"
+            >
+              <option value="string">String</option>
+              <option value="float">Float</option>
+              <option value="integer">Integer</option>
+              <option value="boolean">Boolean</option>
+              <option value="any">Any (JSON)</option>
+            </Select>
+          </SchemaFieldCell>
         )}
         {def.type === 'string' && (
           <div className="flex gap-2 mt-1">

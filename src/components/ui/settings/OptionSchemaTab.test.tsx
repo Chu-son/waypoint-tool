@@ -83,7 +83,97 @@ describe('OptionSchemaTab global fields', () => {
     await user.type(keys[1], 'a');
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
-    expect(message).toHaveBeenCalledWith(expect.stringContaining('unique'), undefined);
+    expect(message).toHaveBeenCalledWith(expect.stringContaining('globals'), undefined);
     expect(getAppState().optionsSchema?.globals.map((g) => g.name)).toEqual(['a', 'b']);
+  });
+});
+
+describe('OptionSchemaTab recursive types (object / union)', () => {
+  it('defines a list<union> option (mg_robot on_reached_actions-style tagged union) via the GUI', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />);
+
+    await user.click(screen.getByRole('button', { name: 'Add Field' }));
+    const key = screen.getByLabelText('Option key name');
+    await user.clear(key);
+    await user.type(key, 'on_reached_actions');
+
+    await user.selectOptions(screen.getByLabelText('on_reached_actions type'), 'list');
+    await user.selectOptions(screen.getByLabelText('on_reached_actions list item type'), 'union');
+
+    await user.click(screen.getByRole('button', { name: 'Add Variant' }));
+    await user.clear(screen.getByLabelText('Variant value'));
+    await user.type(screen.getByLabelText('Variant value'), 'wait');
+
+    await user.click(screen.getByRole('button', { name: 'Add Field to Variant' }));
+    const nestedKey = screen.getByLabelText('Field key name');
+    await user.clear(nestedKey);
+    await user.type(nestedKey, 'countdown_ms');
+    await user.selectOptions(screen.getByLabelText('countdown_ms type'), 'integer');
+
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    const saved = getAppState().optionsSchema?.options[0];
+    expect(saved?.name).toBe('on_reached_actions');
+    expect(saved?.type).toBe('list');
+    expect(saved?.item).toEqual({
+      type: 'union',
+      discriminator: 'type',
+      variants: [{ value: 'wait', fields: [{ name: 'countdown_ms', label: 'New Field', type: 'integer' }] }],
+    });
+  });
+
+  it('defines an object option with fixed fields via the GUI', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />);
+
+    await user.click(screen.getByRole('button', { name: 'Add Field' }));
+    const key = screen.getByLabelText('Option key name');
+    await user.clear(key);
+    await user.type(key, 'navigation');
+    await user.selectOptions(screen.getByLabelText('navigation type'), 'object');
+
+    await user.click(screen.getByRole('button', { name: 'Add Nested Field' }));
+    const nestedKey = screen.getByLabelText('Field key name');
+    await user.clear(nestedKey);
+    await user.type(nestedKey, 'is_through_point');
+    await user.selectOptions(screen.getByLabelText('is_through_point type'), 'boolean');
+
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    const saved = getAppState().optionsSchema?.options[0];
+    expect(saved?.type).toBe('object');
+    expect(saved?.fields).toEqual([{ name: 'is_through_point', label: 'New Field', type: 'boolean' }]);
+  });
+
+  it('refuses to save two union variants with the same value', async () => {
+    const message = vi.spyOn(DialogAPI, 'message').mockResolvedValue();
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: {
+        options: [
+          {
+            name: 'actions',
+            label: 'Actions',
+            type: 'list',
+            item: {
+              type: 'union',
+              discriminator: 'type',
+              variants: [
+                { value: 'wait', fields: [] },
+                { value: 'amcl_reset', fields: [] },
+              ],
+            },
+          },
+        ],
+        globals: [],
+      },
+    });
+
+    const variantValues = screen.getAllByLabelText('Variant value');
+    await user.clear(variantValues[1]);
+    await user.type(variantValues[1], 'wait');
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(message).toHaveBeenCalledWith(expect.stringContaining('wait'), undefined);
+    // 保存はブロックされ、既存のスキーマは変わらない。
+    expect(getAppState().optionsSchema?.options[0].item?.variants?.map((v) => v.value)).toEqual(['wait', 'amcl_reset']);
   });
 });
