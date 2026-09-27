@@ -8,6 +8,7 @@ import {
   CircularFootprint,
   ConditionalStyleRule,
   ExportProfile,
+  OptionsSchema,
 } from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { normalizeGeoMap } from './geoMapNormalization';
@@ -305,7 +306,14 @@ export function normalizeV1(raw: any): StrictProjectData {
   const exportRegions = Array.isArray(rawExportRegions) ? rawExportRegions : [];
 
   const rawOptionsSchema = data.options_schema ?? data.optionsSchema;
-  const optionsSchema = rawOptionsSchema && typeof rawOptionsSchema === 'object' ? rawOptionsSchema : null;
+  const optionsSchema: OptionsSchema | null =
+    rawOptionsSchema && typeof rawOptionsSchema === 'object'
+      ? {
+          ...rawOptionsSchema,
+          options: Array.isArray(rawOptionsSchema.options) ? rawOptionsSchema.options : [],
+          globals: Array.isArray(rawOptionsSchema.globals) ? rawOptionsSchema.globals : [],
+        }
+      : null;
 
   const rawExportTemplates = data.export_templates ?? data.exportTemplates;
   const exportTemplates = Array.isArray(rawExportTemplates) ? rawExportTemplates : [];

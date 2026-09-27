@@ -631,6 +631,32 @@ describe('projectMigration', () => {
     });
   });
 
+  describe('option schema globals', () => {
+    const globals = [{ name: 'default_speed', label: 'Default Speed', type: 'float', value: 0.5 }];
+
+    it('adds an empty globals list to a project saved before global fields existed', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        version: 1,
+        options_schema: { options: [{ name: 'speed', label: 'Speed', type: 'float' }] },
+      });
+
+      expect(normalized.options_schema?.options).toHaveLength(1);
+      expect(normalized.options_schema?.globals).toEqual([]);
+    });
+
+    it('keeps the global fields and their values of a current project', () => {
+      const normalized = migrateAndNormalizeProjectData({ version: 1, options_schema: { options: [], globals } });
+
+      expect(normalized.options_schema?.globals).toEqual(globals);
+    });
+
+    it('reads the schema from a camelCase optionsSchema key too', () => {
+      const normalized = migrateAndNormalizeProjectData({ version: 1, optionsSchema: { options: [], globals } });
+
+      expect(normalized.options_schema?.globals).toEqual(globals);
+    });
+  });
+
   it('preserves conditional_styles and normalizes annotation options', () => {
     const rawData = {
       conditional_styles: [

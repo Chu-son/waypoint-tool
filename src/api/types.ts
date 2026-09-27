@@ -121,6 +121,8 @@ export type ExecuteExportPackageOptions = {
   root_dir: string;
   conflict_resolution: 'overwrite' | 'backup_file';
   session_timestamp: string;
+  /** Project-wide values exposed to waypoint templates as `globals`. */
+  globals: Record<string, any>;
   waypoint_items: PackageExportWaypointItem[];
   map_items: PackageExportMapItem[];
 };

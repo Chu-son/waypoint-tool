@@ -30,7 +30,7 @@ export class MockBackendAPI implements IBackendAPI {
 
   async loadOptionsSchema(yamlPath: string): Promise<OptionsSchema> {
     console.log('[Mock Backend] loadOptionsSchema called with path:', yamlPath);
-    return { options: [] };
+    return { options: [], globals: [] };
   }
 
   async exportWaypoints(

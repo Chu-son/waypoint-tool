@@ -97,6 +97,7 @@ describe('AnnotationInspector', () => {
       annotationObjects: { 'pt-2': point },
       optionsSchema: {
         options: [{ name: 'type', label: 'Type', type: 'string', default: 'normal' }],
+        globals: [],
       },
     });
 

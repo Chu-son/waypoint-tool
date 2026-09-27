@@ -27,7 +27,7 @@ describe('AppStore Zustand Store', () => {
   it('should set options schema and mark as dirty', () => {
     const { setOptionsSchema } = useAppStore.getState();
 
-    setOptionsSchema({ options: [{ name: 'speed', label: 'Speed', type: 'float' }] });
+    setOptionsSchema({ options: [{ name: 'speed', label: 'Speed', type: 'float' }], globals: [] });
 
     const state = useAppStore.getState();
     expect(state.optionsSchema?.options[0].name).toBe('speed');

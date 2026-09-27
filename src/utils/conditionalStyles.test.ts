@@ -52,6 +52,7 @@ describe('conditionalStyles utility', () => {
         { name: 'speed', label: 'Speed', type: 'float', default: 1.0 },
         { name: 'mode', label: 'Mode', type: 'string', default: 'normal' },
       ],
+      globals: [],
     };
 
     const node: WaypointNode = {

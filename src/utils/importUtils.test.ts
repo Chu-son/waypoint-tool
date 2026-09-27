@@ -94,6 +94,7 @@ describe('buildWaypointsFromImport', () => {
         { name: 'wait', label: 'Wait', type: 'integer', default: 0 },
         { name: 'dock', label: 'Dock', type: 'boolean', default: false },
       ],
+      globals: [],
     };
 
     const raw = [

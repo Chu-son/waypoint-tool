@@ -558,6 +558,20 @@ export function ExportTemplatesTab() {
                     </button>
                   ))}
                 </div>
+                {globalOptionsSchema && globalOptionsSchema.globals.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
+                    <FieldLabel className="mr-2">Global Fields</FieldLabel>
+                    {globalOptionsSchema.globals.map((g) => (
+                      <button
+                        key={g.name}
+                        onClick={() => insertTemplateVar(template.id, `{{@root.globals.${g.name}}}`)}
+                        className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
+                      >
+                        {`{{@root.globals.${g.name}}}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {globalOptionsSchema?.options && globalOptionsSchema.options.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
                     <FieldLabel className="mr-2">Custom Options</FieldLabel>

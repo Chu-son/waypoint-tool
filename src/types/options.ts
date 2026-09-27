@@ -11,8 +11,21 @@ export type OptionDef = {
   };
 };
 
-export type OptionsSchema = {
-  options: OptionDef[];
+export type OptionValue = string | number | boolean | Array<string | number | boolean>;
+
+/** プロジェクト全体で1つの値を持つ変数。ウェイポイントには付随せず、エクスポートテンプレートから参照する。 */
+export type GlobalFieldDef = {
+  name: string;
+  label: string;
+  type: string;
+  item_type?: string;
+  enum_values?: string[];
+  value?: OptionValue;
 };
 
-export type WaypointOptions = Record<string, string | number | boolean | Array<string | number | boolean>>;
+export type OptionsSchema = {
+  options: OptionDef[];
+  globals: GlobalFieldDef[];
+};
+
+export type WaypointOptions = Record<string, OptionValue>;

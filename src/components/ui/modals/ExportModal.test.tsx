@@ -103,6 +103,7 @@ describe('ExportModal UI', () => {
       root_dir: '/mock/export/dir',
       conflict_resolution: 'backup_file',
       session_timestamp: expect.stringMatching(/^\d{8}_\d{6}$/),
+      globals: {},
       waypoint_items: [
         expect.objectContaining({
           path: expect.stringMatching(/^\/mock\/export\/dir\/waypoints\/\d{8}_waypoints\.yaml$/),
@@ -117,6 +118,27 @@ describe('ExportModal UI', () => {
       ],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
+  });
+
+  it('hands the project global fields to the backend so templates can use them', async () => {
+    useAppStore.setState({
+      optionsSchema: {
+        options: [],
+        globals: [
+          { name: 'default_speed', label: 'Default Speed', type: 'float', value: 0.5 },
+          { name: 'unset', label: 'Unset', type: 'string' },
+        ],
+      },
+    });
+    const mockOnClose = vi.fn();
+    render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+    expect(BackendAPI.executeExportPackage).toHaveBeenCalledWith(
+      expect.objectContaining({ globals: { default_speed: 0.5 } }),
+    );
   });
 
   describe('path pattern editing', () => {
