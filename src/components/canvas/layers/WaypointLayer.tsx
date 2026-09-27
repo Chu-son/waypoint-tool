@@ -4,6 +4,7 @@ import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { quaternionToYaw } from '../../../utils/transformUtils';
+import { resolveWithDefaults, summarizeValue } from '../../../utils/optionValues';
 import {
   CANVAS_ACCENT_COLOR,
   CANVAS_ACCENT_HOVER_COLOR,
@@ -184,13 +185,11 @@ export function WaypointLayer({
       optionKeys.forEach((attr) => {
         const key = attr.split('.')[1];
         const optDef = optionsSchema?.options?.find((o) => o.name === key);
-        let val = node.options?.[key];
-        if (val === undefined && optDef && optDef.default !== undefined) {
-          val = optDef.default;
-        }
+        const val = optDef ? resolveWithDefaults(optDef, node.options?.[key]) : node.options?.[key];
         if (val !== undefined && val !== '') {
           const displayLabel = optDef?.label || key;
-          lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
+          const summary = optDef ? summarizeValue(optDef, val) : String(val);
+          lines.push(`${displayLabel}: ${summary}`);
         }
       });
     }

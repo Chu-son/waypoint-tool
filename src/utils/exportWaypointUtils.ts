@@ -1,6 +1,7 @@
 import type { WaypointNode, OptionsSchema, OptionValue } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
 import { quaternionToYaw } from './transformUtils';
+import { resolveWithDefaults } from './optionValues';
 
 export interface ExportedWaypointItem {
   index: number;
@@ -14,7 +15,14 @@ export interface ExportedWaypointItem {
   qy: number;
   qz: number;
   qw: number;
+  /** スキーマの既定値を補完した実効値。後方互換のため、テンプレートからは従来どおり `options.*` で参照できる。 */
   options: Record<string, any>;
+  /**
+   * ウェイポイントに明示的に入力された値だけ（未入力のフィールドは含まない）。
+   * 受け側フォーマットの defaults に処理を委ねたい場合（mg_robot の `on_reached_actions` 等）に
+   * `raw_options.*` から参照する。
+   */
+  raw_options: Record<string, any>;
 }
 
 /** グローバルフィールドをテンプレートの `globals` 変数へ渡す形にする。値が未設定のフィールドは含めない。 */
@@ -39,20 +47,14 @@ export function extractWaypointsForExport(
       const node = nodes[id];
       if (!node) return null;
 
-      const fullOptions: Record<string, any> = {};
-      if (optionsSchema && optionsSchema.options) {
-        optionsSchema.options.forEach((opt: any) => {
-          fullOptions[opt.name] =
-            node.options && node.options[opt.name] !== undefined ? node.options[opt.name] : opt.default;
-        });
-      }
-      if (node.options) {
-        Object.keys(node.options).forEach((k) => {
-          if (fullOptions[k] === undefined) {
-            fullOptions[k] = node.options![k];
-          }
-        });
-      }
+      // raw_options: 明示的に入力された値だけ（スキーマに無い未知キーも含めてそのまま引き継ぐ）。
+      const rawOptions: Record<string, any> = { ...(node.options ?? {}) };
+      // options: raw_options にスキーマの既定値を再帰的に補完した実効値。
+      const resolvedOptions: Record<string, any> = { ...rawOptions };
+      optionsSchema?.options.forEach((opt) => {
+        const resolved = resolveWithDefaults(opt, rawOptions[opt.name]);
+        if (resolved !== undefined) resolvedOptions[opt.name] = resolved;
+      });
 
       const qx = node.transform?.qx || 0;
       const qy = node.transform?.qy || 0;
@@ -72,7 +74,8 @@ export function extractWaypointsForExport(
         qy,
         qz,
         qw,
-        options: fullOptions,
+        options: resolvedOptions,
+        raw_options: rawOptions,
       };
     })
     .filter((n): n is ExportedWaypointItem => n !== null);

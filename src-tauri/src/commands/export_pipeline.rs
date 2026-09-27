@@ -46,6 +46,17 @@ pub fn check_export_conflicts(files: Vec<String>) -> Vec<String> {
     files.into_iter().filter(|f| Path::new(f).exists()).collect()
 }
 
+/// `raw_options` はテンプレートから明示的に参照するためだけのフィールドであり、
+/// 既定（テンプレート未指定）の YAML/JSON 出力形式には含めない
+/// （globals をテンプレート出力のみの対象とするのと同じ方針）。
+fn strip_raw_options(value: &serde_json::Value) -> serde_json::Value {
+    let mut v = value.clone();
+    if let Some(obj) = v.as_object_mut() {
+        obj.remove("raw_options");
+    }
+    v
+}
+
 fn backup_file_if_exists(path_str: &str, timestamp: &str, backed_up: &mut Vec<String>) -> Result<(), String> {
     let path = Path::new(path_str);
     if !path.exists() {
@@ -93,10 +104,12 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             )
             .map_err(|e| format!("Template render error for {}: {}", wp_item.path, e))?
         } else if wp_item.path.to_lowercase().ends_with(".yaml") || wp_item.path.to_lowercase().ends_with(".yml") {
-            serde_yaml::to_string(&wp_item.waypoints)
+            let plain_waypoints: Vec<serde_json::Value> = wp_item.waypoints.iter().map(strip_raw_options).collect();
+            serde_yaml::to_string(&plain_waypoints)
                 .map_err(|e| format!("YAML serialization error for {}: {}", wp_item.path, e))?
         } else {
-            serde_json::to_string_pretty(&wp_item.waypoints)
+            let plain_waypoints: Vec<serde_json::Value> = wp_item.waypoints.iter().map(strip_raw_options).collect();
+            serde_json::to_string_pretty(&plain_waypoints)
                 .map_err(|e| format!("JSON serialization error for {}: {}", wp_item.path, e))?
         };
 
@@ -321,5 +334,67 @@ mod tests {
         execute_export_package(options).unwrap();
 
         assert_eq!(fs::read_to_string(&wp_path).unwrap(), "speed=0.5\nwp1:0.5\nwp2:0.5\n");
+    }
+
+    #[test]
+    fn test_execute_export_package_default_format_omits_raw_options() {
+        // raw_options はテンプレートから明示的に参照するためのフィールドであり、
+        // テンプレート未指定の既定出力（YAML/JSON そのままの直列化）には含めない。
+        let tmp = TempDir::new().unwrap();
+        let wp_path = tmp.path().join("wp.json");
+
+        let options = ExportPackageOptions {
+            root_dir: tmp.path().to_string_lossy().to_string(),
+            conflict_resolution: "overwrite".to_string(),
+            session_timestamp: "20260912_110000".to_string(),
+            globals: serde_json::Map::new(),
+            waypoint_items: vec![PackageWaypointItem {
+                path: wp_path.to_string_lossy().to_string(),
+                waypoints: vec![serde_json::json!({ "id": "wp1", "options": {"speed": 1.5}, "raw_options": {} })],
+                template: None,
+                image_data_b64: None,
+            }],
+            map_items: vec![],
+        };
+
+        execute_export_package(options).unwrap();
+
+        let content = fs::read_to_string(&wp_path).unwrap();
+        assert!(content.contains("\"options\""));
+        assert!(!content.contains("raw_options"));
+    }
+
+    #[test]
+    fn test_execute_export_package_template_can_reference_raw_options() {
+        let tmp = TempDir::new().unwrap();
+        let wp_path = tmp.path().join("wp.txt");
+
+        let options = ExportPackageOptions {
+            root_dir: tmp.path().to_string_lossy().to_string(),
+            conflict_resolution: "overwrite".to_string(),
+            session_timestamp: "20260912_110000".to_string(),
+            globals: serde_json::Map::new(),
+            waypoint_items: vec![PackageWaypointItem {
+                path: wp_path.to_string_lossy().to_string(),
+                // options は既定値が補完された実効値、raw_options は明示的に入力された値だけを持つ、
+                // という2つの見え方の違いをテンプレートから確認する。
+                waypoints: vec![serde_json::json!({
+                    "id": "wp1",
+                    "options": {"through_tolerance": 3.0},
+                    "raw_options": {}
+                })],
+                template: Some(
+                    "{{#each waypoints}}{{id}}: options={{options.through_tolerance}} raw={{raw_options.through_tolerance}}\n{{/each}}"
+                        .to_string(),
+                ),
+                image_data_b64: None,
+            }],
+            map_items: vec![],
+        };
+
+        execute_export_package(options).unwrap();
+        let content = fs::read_to_string(&wp_path).unwrap();
+        // raw_options 側は未入力のため空欄になり、options 側は補完済みの値がそのまま出力される。
+        assert_eq!(content, "wp1: options=3.0 raw=\n");
     }
 }

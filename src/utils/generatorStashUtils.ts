@@ -7,6 +7,7 @@ import {
   Transform,
 } from '../types/store';
 import { quaternionToYaw, yawToQuaternion } from './transformUtils';
+import { deepEqual } from './optionValues';
 
 export function normalizeAngle(angle: number): number {
   let a = angle;
@@ -15,30 +16,14 @@ export function normalizeAngle(angle: number): number {
   return a;
 }
 
+// object_list/union のような入れ子のオプション値も正しく差分検出できるよう、深い等価比較に委ねる。
 export function areOptionsEqual(optA?: WaypointOptions, optB?: WaypointOptions): boolean {
   if (!optA && !optB) return true;
   if (!optA || !optB) {
     const nonNull = optA || optB;
     return Object.keys(nonNull || {}).length === 0;
   }
-
-  const keysA = Object.keys(optA);
-  const keysB = Object.keys(optB);
-  if (keysA.length !== keysB.length) return false;
-
-  for (const key of keysA) {
-    const valA = optA[key];
-    const valB = optB[key];
-    if (Array.isArray(valA) && Array.isArray(valB)) {
-      if (valA.length !== valB.length) return false;
-      for (let i = 0; i < valA.length; i++) {
-        if (valA[i] !== valB[i]) return false;
-      }
-    } else if (valA !== valB) {
-      return false;
-    }
-  }
-  return true;
+  return deepEqual(optA, optB);
 }
 
 /**

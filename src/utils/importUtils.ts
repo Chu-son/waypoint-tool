@@ -33,17 +33,21 @@ function toNumber(v: any): number | undefined {
 // OptionDef（FieldDef を継承）の型仕様に応じた再帰的な型変換（ExportModalのfullOptions構築ロジックの逆変換）。
 const coerceOptionValue = (v: any, opt: OptionDef) => coerceValue(opt, v, opt.default);
 
+// インポートされたデータに明示的に存在するキーだけを型変換する。未入力のフィールドに既定値を
+// 補完すると、「省略時は受け側の defaults が適用される」形式（mg_robot の on_reached_actions 等）を
+// re-export した際に、本来省略すべきフィールドまで書き出してしまうため、ここでは補完しない。
 function coerceOptions(raw: Record<string, any>, schema: OptionsSchema | null): WaypointOptions {
   if (!schema) return { ...raw };
 
   const result: WaypointOptions = {};
   schema.options.forEach((opt) => {
-    const v = raw[opt.name];
-    result[opt.name] = v !== undefined ? coerceOptionValue(v, opt) : opt.default;
+    if (raw[opt.name] === undefined) return;
+    const coerced = coerceOptionValue(raw[opt.name], opt);
+    if (coerced !== undefined) result[opt.name] = coerced;
   });
   // スキーマに無い未知キーはそのまま引き継ぐ
   Object.keys(raw).forEach((k) => {
-    if (result[k] === undefined) result[k] = raw[k];
+    if (result[k] === undefined && raw[k] !== undefined) result[k] = raw[k];
   });
   return result;
 }

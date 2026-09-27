@@ -13,6 +13,7 @@ import { cn } from '../../../utils/cn';
 import { notify } from '../../../services/notify';
 import { ConditionGroupEditor } from './ConditionEditor';
 import { StyleOverrideEditor } from './StyleOverrideEditor';
+import { listScalarPaths } from '../../../utils/optionSchema';
 
 export function ConditionalStylesTab() {
   const conditionalStyles = useAppStore((state) => state.conditionalStyles) || [];
@@ -34,8 +35,16 @@ export function ConditionalStylesTab() {
     return conditionalStyles.find((r) => r.id === selectedRuleId) || null;
   }, [conditionalStyles, selectedRuleId]);
 
+  // StyleOverrideEditor（パス幅・フットプリント寸法をオプション値から直接参照する箇所）は
+  // スカラー値の直接参照のみを想定しているため、こちらはトップレベルのキー名一覧のままにする。
   const optionsList = useMemo(() => {
     return optionsSchema?.options.map((o) => o.name) || [];
+  }, [optionsSchema]);
+
+  // 条件式の対象プロパティは object フィールドまで入れ子で指定できるようにするため、
+  // スキーマ上でアドレス可能なパス一覧（例: "options.navigation.is_through_point"）を使う。
+  const conditionPropertyPaths = useMemo(() => {
+    return optionsSchema ? listScalarPaths(optionsSchema) : [];
   }, [optionsSchema]);
 
   const handleAddRule = (target: TargetElementType = 'waypoint') => {
@@ -52,7 +61,7 @@ export function ConditionalStylesTab() {
           {
             id: `rule_${Date.now()}_child`,
             type: 'rule',
-            property: optionsList.length > 0 ? `options.${optionsList[0]}` : 'options.type',
+            property: conditionPropertyPaths.length > 0 ? conditionPropertyPaths[0] : 'options.type',
             operator: 'equals',
             value: '',
           },
@@ -120,8 +129,8 @@ export function ConditionalStylesTab() {
         <option value="transform.x" />
         <option value="transform.y" />
         <option value="transform.yaw" />
-        {optionsList.map((opt) => (
-          <option key={opt} value={`options.${opt}`} />
+        {conditionPropertyPaths.map((path) => (
+          <option key={path} value={path} />
         ))}
       </datalist>
 
@@ -419,7 +428,7 @@ export function ConditionalStylesTab() {
                 <ConditionGroupEditor
                   group={selectedRule.condition}
                   onChange={(updatedGroup) => updateConditionalStyleRule(selectedRule.id, { condition: updatedGroup })}
-                  optionsList={optionsList}
+                  optionsList={conditionPropertyPaths}
                 />
               </div>
 

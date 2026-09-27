@@ -75,6 +75,8 @@ describe('exportWaypointUtils', () => {
     expect(result[0].yaw).toBeCloseTo(0);
     expect(result[0].options.speed).toBe(1.5); // schema default applied
     expect(result[0].options.custom_val).toBe(42);
+    // raw_options には未入力の speed を補完しない。
+    expect(result[0].raw_options).toEqual({ custom_val: 42 });
 
     expect(result[1].index).toBe(2);
     expect(result[1].id).toBe('node-2');
@@ -82,5 +84,43 @@ describe('exportWaypointUtils', () => {
     expect(result[1].y).toBe(4.0);
     expect(result[1].yaw).toBeCloseTo(Math.PI / 2);
     expect(result[1].options.speed).toBe(1.5);
+    expect(result[1].raw_options).toEqual({});
+  });
+
+  it('resolves defaults inside nested union fields for options, while raw_options keeps only explicit input', () => {
+    const nodes: Record<string, WaypointNode> = {
+      'node-1': {
+        id: 'node-1',
+        type: 'manual',
+        transform: { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+        options: { on_reached_actions: [{ type: 'wait' }] },
+        children_ids: [],
+      },
+    };
+    const schema: OptionsSchema = {
+      options: [
+        {
+          name: 'on_reached_actions',
+          label: 'Actions',
+          type: 'list',
+          item: {
+            type: 'union',
+            discriminator: 'type',
+            variants: [
+              {
+                value: 'wait',
+                fields: [{ name: 'countdown_ms', label: 'Countdown', type: 'integer', default: 3000 }],
+              },
+            ],
+          },
+        },
+      ],
+      globals: [],
+    };
+
+    const [result] = extractWaypointsForExport(['node-1'], nodes, schema);
+
+    expect(result.options.on_reached_actions).toEqual([{ type: 'wait', countdown_ms: 3000 }]);
+    expect(result.raw_options.on_reached_actions).toEqual([{ type: 'wait' }]);
   });
 });

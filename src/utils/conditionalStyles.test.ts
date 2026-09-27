@@ -81,6 +81,32 @@ describe('conditionalStyles utility', () => {
       expect(resolvePropertyValue(node, 'transform.y', schema)).toBe(20);
       expect(resolvePropertyValue(node, 'transform.yaw', schema)).toBe(0);
     });
+
+    it('walks a dot path into an object option field, resolving that field default too', () => {
+      const objectSchema: OptionsSchema = {
+        options: [
+          {
+            name: 'navigation',
+            label: 'Navigation',
+            type: 'object',
+            fields: [
+              { name: 'is_through_point', label: 'Through', type: 'boolean', default: true },
+              { name: 'through_tolerance', label: 'Tolerance', type: 'float', default: 3.0 },
+            ],
+          },
+        ],
+        globals: [],
+      };
+      const objNode: WaypointNode = {
+        id: 'wp-2',
+        type: 'manual',
+        options: { navigation: { is_through_point: false } },
+      };
+
+      expect(resolvePropertyValue(objNode, 'options.navigation.is_through_point', objectSchema)).toBe(false);
+      // 明示的な値が無いフィールドはスキーマの既定値まで補われる。
+      expect(resolvePropertyValue(objNode, 'options.navigation.through_tolerance', objectSchema)).toBe(3.0);
+    });
   });
 
   describe('evaluateRule', () => {
@@ -146,6 +172,58 @@ describe('conditionalStyles utility', () => {
       ).toBe(true);
       expect(
         evaluateRule({ id: 'r9', type: 'rule', property: 'options.missing', operator: 'is_empty', value: null }, node),
+      ).toBe(true);
+    });
+
+    it('matches "contains" against a union discriminator inside a list of objects', () => {
+      const actionsNode: WaypointNode = {
+        id: 'wp-2',
+        type: 'manual',
+        options: { on_reached_actions: [{ type: 'wait', countdown_ms: 3000 }, { type: 'amcl_reset' }] },
+      };
+      expect(
+        evaluateRule(
+          {
+            id: 'r10',
+            type: 'rule',
+            property: 'options.on_reached_actions',
+            operator: 'contains',
+            value: 'amcl_reset',
+          },
+          actionsNode,
+        ),
+      ).toBe(true);
+      expect(
+        evaluateRule(
+          {
+            id: 'r11',
+            type: 'rule',
+            property: 'options.on_reached_actions',
+            operator: 'contains',
+            value: 'wait_trigger',
+          },
+          actionsNode,
+        ),
+      ).toBe(false);
+    });
+
+    it('treats an empty object/array option value as empty', () => {
+      const emptyNode: WaypointNode = {
+        id: 'wp-3',
+        type: 'manual',
+        options: { navigation: {}, on_reached_actions: [] },
+      };
+      expect(
+        evaluateRule(
+          { id: 'r12', type: 'rule', property: 'options.navigation', operator: 'is_empty', value: null },
+          emptyNode,
+        ),
+      ).toBe(true);
+      expect(
+        evaluateRule(
+          { id: 'r13', type: 'rule', property: 'options.on_reached_actions', operator: 'is_empty', value: null },
+          emptyNode,
+        ),
       ).toBe(true);
     });
   });
