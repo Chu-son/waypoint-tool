@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { LayerPanel } from './LayerPanel';
 import { BackendAPI, DialogAPI } from '../../../api';
@@ -295,6 +295,47 @@ describe('LayerPanel', () => {
 
       fireEvent.click(screen.getByRole('switch', { name: 'Use only part of this map' }));
 
+      expect(getAppState().mapLayers[0].clip).toBeNull();
+    });
+
+    it('undoes a preset and typed changes to the area, each in one step', () => {
+      openClipSettings();
+      fireEvent.click(screen.getByRole('switch', { name: 'Use only part of this map' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Left half' }));
+
+      const area = within(screen.getByRole('group', { name: 'Area 1' }));
+      const width = area.getByLabelText('W');
+      fireEvent.focus(width);
+      fireEvent.change(width, { target: { value: '1' } });
+      fireEvent.blur(width);
+      expect(getAppState().mapLayers[0].clip?.rects[0].width).toBe(1);
+
+      getAppState().undo();
+      expect(getAppState().mapLayers[0].clip?.rects[0].width).toBe(2.5);
+
+      getAppState().undo();
+      expect(getAppState().mapLayers[0].clip).toEqual({ rects: [{ x: 0, y: 0, width: 5, height: 5 }] });
+    });
+
+    it('switches to drawing the area on the canvas and back', () => {
+      openClipSettings();
+      fireEvent.click(screen.getByRole('switch', { name: 'Use only part of this map' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Draw on canvas' }));
+      expect(getAppState().appMode).toEqual({ mode: 'map_clip_edit', layerId: 'l1' });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Done drawing' }));
+      expect(getAppState().appMode.mode).toBe('select');
+    });
+
+    it('stops drawing when the area is switched off', () => {
+      openClipSettings();
+      fireEvent.click(screen.getByRole('switch', { name: 'Use only part of this map' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Draw on canvas' }));
+
+      fireEvent.click(screen.getByRole('switch', { name: 'Use only part of this map' }));
+
+      expect(getAppState().appMode.mode).toBe('select');
       expect(getAppState().mapLayers[0].clip).toBeNull();
     });
   });

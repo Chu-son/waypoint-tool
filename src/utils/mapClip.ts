@@ -57,6 +57,67 @@ export function halfOfBounds(bounds: WorldBounds, side: ClipSide): ClipRect {
   }
 }
 
+/**
+ * Which edges a resize handle moves: `-1` the minimum edge of that axis, `+1` the maximum edge, `0`
+ * leaves the axis alone. Corners move one edge on each axis. World Y points up, so `hy: +1` is the top.
+ */
+export type ClipHandle = { hx: -1 | 0 | 1; hy: -1 | 0 | 1 };
+
+/** The eight resize handles of a rectangle. */
+export const CLIP_HANDLES: readonly ClipHandle[] = [
+  { hx: -1, hy: 1 },
+  { hx: 0, hy: 1 },
+  { hx: 1, hy: 1 },
+  { hx: 1, hy: 0 },
+  { hx: 1, hy: -1 },
+  { hx: 0, hy: -1 },
+  { hx: -1, hy: -1 },
+  { hx: -1, hy: 0 },
+];
+
+/** The rectangle spanned by two opposite corners, whichever direction the drag went. */
+export function rectFromCorners(a: { x: number; y: number }, b: { x: number; y: number }): ClipRect {
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    width: Math.abs(a.x - b.x),
+    height: Math.abs(a.y - b.y),
+  };
+}
+
+/** Position of a handle on its rectangle. */
+export function handlePosition(rect: ClipRect, handle: ClipHandle): { x: number; y: number } {
+  return {
+    x: rect.x + ((handle.hx + 1) / 2) * rect.width,
+    y: rect.y + ((handle.hy + 1) / 2) * rect.height,
+  };
+}
+
+/**
+ * The rectangle after dragging `handle` to `point`. Edges the handle does not touch stay put, and
+ * dragging past the opposite edge flips the rectangle instead of producing a negative size.
+ */
+export function resizeRect(rect: ClipRect, handle: ClipHandle, point: { x: number; y: number }): ClipRect {
+  const minX = rect.x;
+  const maxX = rect.x + rect.width;
+  const minY = rect.y;
+  const maxY = rect.y + rect.height;
+  const [x0, x1] = handle.hx === 0 ? [minX, maxX] : handle.hx < 0 ? [point.x, maxX] : [minX, point.x];
+  const [y0, y1] = handle.hy === 0 ? [minY, maxY] : handle.hy < 0 ? [point.y, maxY] : [minY, point.y];
+  return rectFromCorners({ x: x0, y: y0 }, { x: x1, y: y1 });
+}
+
+export function sameClip(a: MapLayerClip | null, b: MapLayerClip | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.rects.length === b.rects.length &&
+    a.rects.every((r, i) => {
+      const o = b.rects[i];
+      return r.x === o.x && r.y === o.y && r.width === o.width && r.height === o.height;
+    })
+  );
+}
+
 export function rectContains(rect: ClipRect, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
 }

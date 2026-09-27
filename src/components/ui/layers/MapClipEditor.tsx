@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Crop, Plus, Trash2 } from 'lucide-react';
+import { Crop, Plus, SquareDashedMousePointer, Trash2 } from 'lucide-react';
+import { useAppStore } from '../../../stores/appStore';
 import { Button } from '../common/Button';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { ToggleSwitch } from '../common/ToggleSwitch';
@@ -27,9 +28,26 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
   const bounds = useMemo(() => mapWorldBounds(layer), [layer]);
   const rects = layer.clip?.rects ?? [];
 
-  const setRects = (next: ClipRect[]) => onChange({ rects: next });
+  const isDrawing = useAppStore(
+    (state) => state.appMode.mode === 'map_clip_edit' && state.appMode.layerId === layer.id,
+  );
+  const toggleDrawing = () =>
+    useAppStore
+      .getState()
+      .transitionToMode(isDrawing ? { mode: 'select' } : { mode: 'map_clip_edit', layerId: layer.id });
+
+  // A button press is one undo step; typing in a number field is one step from focus to blur.
+  const commit = (clip: MapLayerClip | null) => {
+    useAppStore.getState().pushHistorySnapshot();
+    onChange(clip);
+  };
+  const setRects = (next: ClipRect[]) => commit({ rects: next });
   const updateRect = (index: number, updates: Partial<ClipRect>) =>
-    setRects(rects.map((r, i) => (i === index ? { ...r, ...updates } : r)));
+    onChange({ rects: rects.map((r, i) => (i === index ? { ...r, ...updates } : r)) });
+  const numberEditing = {
+    onEditStart: () => useAppStore.getState().beginMapClipDrag(layer.id),
+    onEditEnd: () => useAppStore.getState().endMapClipDrag(),
+  };
 
   return (
     <div className="space-y-2">
@@ -40,13 +58,29 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
         </span>
         <ToggleSwitch
           checked={layer.clip !== null}
-          onChange={(enabled) => onChange(enabled ? { rects: [boundsToRect(bounds)] } : null)}
+          onChange={(enabled) => {
+            if (!enabled && isDrawing) useAppStore.getState().transitionToMode({ mode: 'select' });
+            commit(enabled ? { rects: [boundsToRect(bounds)] } : null);
+          }}
           title="Use only part of this map"
         />
       </div>
 
       {layer.clip !== null && (
         <>
+          <Button
+            type="button"
+            variant={isDrawing ? 'primary' : 'secondary'}
+            size="sm"
+            className="w-full gap-1.5"
+            aria-pressed={isDrawing}
+            onClick={toggleDrawing}
+            title="Drag on the canvas to draw the area (Shift+drag adds another area). Drag the handles to resize."
+          >
+            <SquareDashedMousePointer size={13} />
+            <span>{isDrawing ? 'Done drawing' : 'Draw on canvas'}</span>
+          </Button>
+
           <div className="grid grid-cols-2 gap-1.5">
             {HALVES.map(({ side, label }) => (
               <Button
@@ -84,14 +118,27 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
                 </Button>
               </div>
               <div className="grid grid-cols-4 gap-1">
-                <LabeledNumericInput label="X" value={rect.x} step={0.1} onChange={(x) => updateRect(index, { x })} />
-                <LabeledNumericInput label="Y" value={rect.y} step={0.1} onChange={(y) => updateRect(index, { y })} />
+                <LabeledNumericInput
+                  label="X"
+                  value={rect.x}
+                  step={0.1}
+                  onChange={(x) => updateRect(index, { x })}
+                  {...numberEditing}
+                />
+                <LabeledNumericInput
+                  label="Y"
+                  value={rect.y}
+                  step={0.1}
+                  onChange={(y) => updateRect(index, { y })}
+                  {...numberEditing}
+                />
                 <LabeledNumericInput
                   label="W"
                   value={rect.width}
                   step={0.1}
                   min={0}
                   onChange={(width) => updateRect(index, { width })}
+                  {...numberEditing}
                 />
                 <LabeledNumericInput
                   label="H"
@@ -99,6 +146,7 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
                   step={0.1}
                   min={0}
                   onChange={(height) => updateRect(index, { height })}
+                  {...numberEditing}
                 />
               </div>
             </div>

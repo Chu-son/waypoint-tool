@@ -264,6 +264,17 @@ export function computeStatusInteraction(
     };
   }
 
+  if (modeState?.mode === 'map_clip_edit') {
+    return {
+      modeBadgeText: 'マップの使用領域を編集',
+      modeIcon: 'layer',
+      modeVariant: 'reference',
+      escActionLabel: '選択モードへ復帰',
+      escTier: 6,
+      hintText: 'ドラッグで使用領域を描画 / Shift+ドラッグで領域を追加 / ハンドルで大きさを変更',
+    };
+  }
+
   // Tier 7: Idle
   return {
     modeBadgeText: '選択ツール',

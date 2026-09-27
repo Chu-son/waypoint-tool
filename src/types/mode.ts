@@ -39,7 +39,8 @@ export type AppModeState =
       previewNodeId: string | null;
     }
   | { mode: 'measure' }
-  | { mode: 'geo_map_align' };
+  | { mode: 'geo_map_align' }
+  | { mode: 'map_clip_edit'; layerId: string };
 
 export type AppModeTransition =
   | { mode: 'select' }
@@ -80,4 +81,5 @@ export type AppModeTransition =
       previewNodeId?: string | null;
     }
   | { mode: 'measure' }
-  | { mode: 'geo_map_align' };
+  | { mode: 'geo_map_align' }
+  | { mode: 'map_clip_edit'; layerId: string };

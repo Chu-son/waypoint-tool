@@ -20,6 +20,8 @@ import { MeasureLayer } from './layers/MeasureLayer';
 import { GeoTileLayer } from './layers/GeoTileLayer';
 import { GeoAlignMarkerLayer } from './layers/GeoAlignMarkerLayer';
 import { useGeoMapAlign } from './hooks/useGeoMapAlign';
+import { useMapClipEdit } from './hooks/useMapClipEdit';
+import { MapClipEditLayer } from './layers/MapClipEditLayer';
 import { GeoAttribution } from '../ui/overlays/GeoAttribution';
 import { getAnnotationCenter } from '../../stores/slices/measureSlice';
 import { useSnapping } from './hooks/useSnapping';
@@ -150,6 +152,7 @@ export function MapCanvas() {
     | 'set_yaw_points_item'
     | 'marquee_select'
     | 'geo_align_drag'
+    | 'map_clip_drag'
   >('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
@@ -212,6 +215,7 @@ export function MapCanvas() {
 
   const abortRef = useRef<() => boolean>(() => false);
   const geoAlign = useGeoMapAlign();
+  const mapClipEdit = useMapClipEdit();
   const { isAltPressed, snappedMeasureTarget, setSnappedMeasureTarget } = useMeasureAltSnap({
     lastWorldPosRef,
     scaleRef,
@@ -344,6 +348,13 @@ export function MapCanvas() {
       justAbortedRef.current = true;
       return true;
     }
+    // 9c. Map use-area drag: restore the area from before the drag
+    if (interactionMode.current === 'map_clip_drag') {
+      mapClipEdit.abort();
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
     // 10. Measure tool transient point abort
     if (activeTool === 'measure') {
       const state = useAppStore.getState();
@@ -354,7 +365,7 @@ export function MapCanvas() {
       }
     }
     return false;
-  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign]);
+  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign, mapClipEdit]);
 
   abortRef.current = abort;
 
@@ -774,6 +785,20 @@ export function MapCanvas() {
       return;
     }
 
+    // Map use area: a drag on the empty canvas draws a new area (Shift adds it to the existing ones)
+    if (appMode?.mode === 'map_clip_edit') {
+      if (e.button === 1) {
+        interactionMode.current = 'pan_map';
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } else if (e.button === 0 && interactionMode.current === 'none') {
+        mapClipEdit.startDraw(appMode.layerId, eventToWorld(e), e.shiftKey);
+        interactionMode.current = 'map_clip_drag';
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+
     if (isMapEditMode) {
       if (e.button === 1) {
         // Middle click = Pan map
@@ -1160,6 +1185,11 @@ export function MapCanvas() {
 
     if (interactionMode.current === 'geo_align_drag') {
       geoAlign.update({ x: worldX, y: worldY });
+      return;
+    }
+
+    if (interactionMode.current === 'map_clip_drag') {
+      mapClipEdit.update({ x: worldX, y: worldY });
       return;
     }
 
@@ -1671,6 +1701,15 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === 'map_clip_drag') {
+      mapClipEdit.end();
+      interactionMode.current = 'none';
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      return;
+    }
+
     if (isMapEditMode) {
       if (interactionMode.current === ('edit_map_draw_rect' as any)) {
         handleRectDrawEnd();
@@ -2095,6 +2134,23 @@ export function MapCanvas() {
                 if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
                   containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
                 }
+              }
+            }}
+          />
+
+          {/* Use area of the map layer being edited, with resize handles */}
+          <MapClipEditLayer
+            scale={scale}
+            onHandleDown={(e, layerId, index, handle) => {
+              e.stopPropagation();
+              if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+                (e.nativeEvent as any).stopPropagation();
+              }
+              if (interactionMode.current !== 'none') return;
+              mapClipEdit.startResize(layerId, index, handle);
+              interactionMode.current = 'map_clip_drag';
+              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
               }
             }}
           />

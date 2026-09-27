@@ -41,6 +41,8 @@ export const CANVAS_EXPORT_REGION_COLOR = 0x10b981;
 export const CANVAS_MEASURE_COLOR = 0x10b981;
 /** Origin marker of the geographic base map while it is being aligned. */
 export const CANVAS_GEO_ANCHOR_COLOR = 0xf59e0b;
+/** Outline and handles of the use area of a map layer while it is being edited. */
+export const CANVAS_CLIP_EDIT_COLOR = 0x38bdf8;
 export const CANVAS_MEASURE_LIGHT_COLOR = 0x34d399;
 /** Selection / hover outline of annotations. */
 export const CANVAS_ANNOTATION_HIGHLIGHT_COLOR = 0x60a5fa;

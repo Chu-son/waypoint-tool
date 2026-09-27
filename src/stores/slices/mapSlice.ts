@@ -1,7 +1,9 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
+import type { HistorySnapshot } from './historySlice';
 import {
   MapSource,
+  MapLayerClip,
   ProjectMapLayer,
   CustomLayer,
   ManualCustomLayer,
@@ -11,6 +13,7 @@ import {
 } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 import { insertAbove, moveInOrder } from '../../utils/layerStack';
+import { sameClip } from '../../utils/mapClip';
 
 export type MapSlice = {
   /** Loaded map files (image + metadata). Shared by every instance in `mapLayers` that references it. */
@@ -20,6 +23,13 @@ export type MapSlice = {
   customLayers: CustomLayer[];
   /** Ids of every map instance and custom layer, from the top of the stack to the bottom. */
   layerOrder: string[];
+  /** Canvas drag that is reshaping a layer's use area (its clip before the drag); null when not dragging. */
+  mapClipDrag: {
+    layerId: string;
+    initial: MapLayerClip | null;
+    snapshotPushed: boolean;
+    redoStack: HistorySnapshot[];
+  } | null;
   activeCustomLayerId: string | null;
   defaultMapOpacity: number;
   setDefaultMapOpacity: (opacity: number) => void;
@@ -40,6 +50,13 @@ export type MapSlice = {
   updateMapLayer: (id: string, updates: Partial<Omit<ProjectMapLayer, 'id' | 'sourceId'>>) => void;
   /** Edits map data shared by all instances: pose (`info.origin`) and occupancy thresholds. */
   updateMapSource: (id: string, updates: Partial<Omit<MapSource, 'id'>>) => void;
+  /** Starts reshaping a layer's use area on the canvas. The whole drag is one undo step. */
+  beginMapClipDrag: (layerId: string) => void;
+  updateMapClipDrag: (clip: MapLayerClip) => void;
+  /** Commits the drag; a drag that changed nothing leaves no undo step. */
+  endMapClipDrag: () => void;
+  /** Abandons the drag and restores the use area from before it. */
+  cancelMapClipDrag: () => void;
   removeMapLayer: (id: string) => void;
   /** Moves a layer of any kind within the single stack (`fromIndex` / `toIndex` index `layerOrder`). */
   reorderLayers: (fromIndex: number, toIndex: number) => void;
@@ -76,6 +93,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   mapLayers: [],
   customLayers: [],
   layerOrder: [],
+  mapClipDrag: null,
   activeCustomLayerId: null,
   defaultMapOpacity: 0.5,
   setDefaultMapOpacity: (opacity: number) => set({ defaultMapOpacity: opacity, isDirty: true }),
@@ -291,6 +309,46 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       mapSources: state.mapSources.map((s) => (s.id === id ? { ...s, ...updates } : s)),
       isDirty: true,
     })),
+
+  beginMapClipDrag: (layerId) => {
+    const layer = get().mapLayers.find((l) => l.id === layerId);
+    if (!layer || get().mapClipDrag) return;
+    const before = get().historyPast.length;
+    const redoStack = get().historyFuture;
+    get().pushHistorySnapshot();
+    set((state) => ({
+      mapClipDrag: { layerId, initial: layer.clip, snapshotPushed: state.historyPast.length > before, redoStack },
+    }));
+  },
+
+  updateMapClipDrag: (clip) => {
+    const drag = get().mapClipDrag;
+    if (!drag) return;
+    get().updateMapLayer(drag.layerId, { clip });
+  },
+
+  endMapClipDrag: () => {
+    const drag = get().mapClipDrag;
+    if (!drag) return;
+    const current = get().mapLayers.find((l) => l.id === drag.layerId)?.clip ?? null;
+    // 変わっていなければ、開始時に積んだ履歴を取り除き、消えたやり直し履歴も戻す
+    const unchanged = sameClip(drag.initial, current);
+    set((state) =>
+      unchanged && drag.snapshotPushed
+        ? { mapClipDrag: null, historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack }
+        : { mapClipDrag: null },
+    );
+  },
+
+  cancelMapClipDrag: () => {
+    const drag = get().mapClipDrag;
+    if (!drag) return;
+    set((state) => ({
+      mapClipDrag: null,
+      mapLayers: state.mapLayers.map((l) => (l.id === drag.layerId ? { ...l, clip: drag.initial } : l)),
+      ...(drag.snapshotPushed ? { historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack } : {}),
+    }));
+  },
 
   removeMapLayer: (id: string) =>
     set((state) => {

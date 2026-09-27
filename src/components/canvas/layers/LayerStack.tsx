@@ -53,7 +53,14 @@ export function LayerStack({
     () => stackEntries({ mapLayers, customLayers, layerOrder }).reverse(),
     [mapLayers, customLayers, layerOrder],
   );
-  const resolvedById = useMemo(() => new Map(resolvedMapLayers.map((l) => [l.id, l])), [resolvedMapLayers]);
+  // While its use area is being drawn, the map is shown whole so the part being left out stays visible.
+  const clipEditLayerId = useAppStore((state) =>
+    state.appMode.mode === 'map_clip_edit' ? state.appMode.layerId : null,
+  );
+  const resolvedById = useMemo(
+    () => new Map(resolvedMapLayers.map((l) => [l.id, l.id === clipEditLayerId ? { ...l, clip: null } : l])),
+    [resolvedMapLayers, clipEditLayerId],
+  );
 
   const renderCustomLayer = (layer: CustomLayer, isExportPreview: boolean) =>
     layer.type === 'plugin' ? (
