@@ -193,7 +193,7 @@ graph TD
 ### 5.3.2 レイヤースタックの規約 (Layer Stack)
 - **ソースとインスタンスの分離**: マップの画像・メタデータは `MapSource` に 1 つだけ持ち、`ProjectMapLayer`（インスタンス）は `sourceId` で参照する。複製は同じ `sourceId` を指す新インスタンスを作るだけで、画像は複製しない。姿勢（`info.origin`）と占有閾値は source の属性なので、どのインスタンスから編集しても全複製に反映される。インスタンスを消して参照が 0 になった source は同時に削除する。
 - **積み順の単一情報源は `layerOrder`**: マップインスタンスとカスタムレイヤーの全 id を、最上位を先頭に並べる。レイヤーに `z_index` は持たせない。合成用の z は `stackZIndexes` が導出し（下が 0）、描画は `LayerStack`、エクスポート／プレビュー／プラグインへの入力は `prepareLayersForExport` が同じ順序で処理する。`layerOrder` は「存在するレイヤーをちょうど 1 回ずつ含む」ことを不変条件とし、Undo/Redo 復元時と読込時は `reconcileLayerOrder` で整える。
-- **使用領域 (clip)**: インスタンスは任意でワールド座標 (m) の矩形の和集合を持つ（半開区間 [x, x+w) × [y, y+h)。辺を共有する 2 矩形は重ならず隙間も生じない）。領域外のピクセルは合成に参加しない。フロントエンドは Pixi マスク（`clipMask.ts`）、Rust は `blending.rs` の `LayerClip::contains` で同じ判定を行い、`blend_layers_to_image`（プレビュー・統合エクスポート）と `occupancy.rs`（プラグインへ渡す占有格子）の両方に適用する。
+- **使用領域 (clip)**: インスタンスは任意でワールド座標 (m) の矩形の和集合を持つ（半開区間 [x, x+w) × [y, y+h)。辺を共有する 2 矩形は重ならず隙間も生じない）。領域外のピクセルは合成に参加しない。フロントエンドは Pixi マスク（`clipMask.ts`）、Rust は `blending.rs` の `LayerClip::contains` で同じ判定を行い、`blend_layers_to_image`（プレビュー・統合エクスポート）と `occupancy.rs`（プラグインへ渡す占有格子）の両方に適用する。キャンバス上での編集は専用モード `map_clip_edit`（`useMapClipEdit` + `MapClipEditLayer`）が担い、`mapSlice` の `beginMapClipDrag` / `updateMapClipDrag` / `endMapClipDrag` / `cancelMapClipDrag` でドラッグ全体を Undo 1 回にまとめる（`geoMapSlice` の位置合わせドラッグと同じ方式）。履歴スナップショットはマップごとの clip（`mapClips`）を保持し、Undo/Redo 後に追加されたマップは影響を受けない。
 - **プロジェクトファイル**: `map_sources` / `map_layers`（インスタンス）/ `layer_order` を保存する。`map_sources` を持たない旧形式は `stores/migrations/mapStackNormalization.ts` が、旧マップ 1 枚 = source 1 + インスタンス 1（旧レイヤー id を引き継ぐ）に変換し、積み順は「カスタムレイヤー（上）→ マップ」とする。
 
 ### 5.4 ツリー変形時の挿入境界射影規約 (Adjacent Boundary Projection Standard)

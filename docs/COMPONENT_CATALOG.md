@@ -150,7 +150,7 @@
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
   - **概要**: マップレイヤー (`ProjectMapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。マップとカスタムレイヤーは `layerOrder` に従う 1 本の「Layers」リストに並び、上下ボタンで種類をまたいで並べ替えできる。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
-  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：名前（ダブルクリック/右クリックで変更）・複製・姿勢/閾値（同じマップの全複製で共有）・不透明度・ブレンド・使用領域）, `MapClipEditor`（使用領域：オン/オフ、左右上下の半分プリセット、矩形の X/Y/W/H 入力と追加/削除）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）
+  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：名前（ダブルクリック/右クリックで変更）・複製・姿勢/閾値（同じマップの全複製で共有）・不透明度・ブレンド・使用領域）, `MapClipEditor`（使用領域：オン/オフ、キャンバス上でのドラッグ描画（Draw on canvas）、左右上下の半分プリセット、矩形の X/Y/W/H 入力と追加/削除）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）
 - **`GeoAttribution`** ([`src/components/ui/overlays/GeoAttribution.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/GeoAttribution.tsx))
   - **概要**: 背景地図の表示中に、選択中のベースマップの帰属表示（例: © OpenStreetMap contributors）をキャンバス右下へ表示する。
   - **主要Props**: なし
@@ -258,10 +258,11 @@
 8. **`ExportRegionLayer`**: マップ切り出しエクスポート枠
 9. **`SnappingGuideLayer`**: 直交スナップガイド線および数値入力 HUD（最前面）
 10. **`GeoAlignMarkerLayer`**: 背景地図の位置合わせ中だけ、地図の原点位置と東方向のマーカーを描画
+11. **`MapClipEditLayer`**: マップの使用領域を編集中（`map_clip_edit`）だけ、対象レイヤーの領域を半透明の枠で描画し、各矩形の 8 つのリサイズハンドルを置く
 
 ### Canvas 補助モジュール (`src/components/canvas/`)
 - **`MapLayerSprite`** (`MapLayerSprite.tsx`): 占有格子画像 1 枚を ROS 原点に合わせて描画し、占有ハイライトフィルタを適用。マップインスタンスに使用領域（`clip`）があるときは、ワールド座標の矩形和集合を Pixi マスク（`utils/clipMask.ts`）として適用する。
-- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
+- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useMapClipEdit`（マップの使用領域のドラッグ描画・ハンドルでのリサイズ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
 - **純粋関数** (`canvas/utils/`): `viewport`（screen⇔world 変換・フィット・ズーム）, `hitTest`（矩形入力ハンドル判定・計測スナップ）, `canvasTheme`（フォールバックグリッド配色）, `labelLayout`（ラベル配置）, `tileCache`（タイルの同時取得数制限・LRU・失敗時の再試行間隔）
 
 ### Canvas レイヤー & フィルター群 (`src/components/canvas/`)
