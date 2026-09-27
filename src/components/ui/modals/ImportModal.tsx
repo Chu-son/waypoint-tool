@@ -67,7 +67,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
     setMappingError(null);
     try {
       setIsBusy(true);
-      const detected = await BackendAPI.inferImportMapping(t.content);
+      const detected = await BackendAPI.inferImportMapping(t.content, t.engine);
       setMapping(detected);
     } catch (err) {
       setMappingError(String(err));

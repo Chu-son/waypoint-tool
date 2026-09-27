@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { PluginInstance, ImportFieldMapping } from '../../types/store';
+import { PluginInstance, ImportFieldMapping, TemplateEngine } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -32,8 +32,8 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('import_waypoints', { path });
   }
 
-  async inferImportMapping(templateContent: string): Promise<ImportFieldMapping> {
-    return invoke('infer_import_mapping', { template: templateContent });
+  async inferImportMapping(templateContent: string, engine?: TemplateEngine): Promise<ImportFieldMapping> {
+    return invoke('infer_import_mapping', { template: templateContent, engine });
   }
 
   async fetchInstalledPlugins(): Promise<PluginInstance[]> {

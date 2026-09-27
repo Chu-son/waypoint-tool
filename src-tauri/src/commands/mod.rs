@@ -63,8 +63,11 @@ pub fn import_waypoints(path: String) -> Result<serde_json::Value, String> {
 }
 
 #[command]
-pub fn infer_import_mapping(template: String) -> Result<serde_json::Value, String> {
-    io::infer_import_mapping(&template)
+pub fn infer_import_mapping(
+    template: String,
+    engine: Option<crate::templating::TemplateEngine>,
+) -> Result<serde_json::Value, String> {
+    io::infer_import_mapping(&template, engine.unwrap_or_default())
 }
 
 #[command]

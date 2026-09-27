@@ -1,7 +1,7 @@
 use crate::map::blending::{blend_layers_to_image, LayerInput, RectRegion};
 use crate::map::export_maps::{ExportLayer, ExportRegion};
+use crate::templating::{self, TemplateEngine};
 use base64::{engine::general_purpose, Engine as _};
-use handlebars::Handlebars;
 use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -24,6 +24,9 @@ pub struct PackageWaypointItem {
     pub path: String, // Absolute target path
     pub waypoints: Vec<serde_json::Value>,
     pub template: Option<String>,
+    /// テンプレートのレンダリングエンジン。省略時は後方互換のため Handlebars。
+    #[serde(default)]
+    pub engine: TemplateEngine,
     pub image_data_b64: Option<String>,
 }
 
@@ -95,10 +98,10 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             backup_file_if_exists(&wp_item.path, &options.session_timestamp, &mut backed_up_files)?;
         }
 
-        // Handlebars or YAML/JSON serialization
+        // Handlebars/Jinja テンプレート、またはテンプレート未指定時は YAML/JSON への素の直列化。
         let content = if let Some(tmpl) = wp_item.template {
-            let reg = Handlebars::new();
-            reg.render_template(
+            templating::render(
+                wp_item.engine,
                 &tmpl,
                 &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": options.globals }),
             )
@@ -289,6 +292,7 @@ mod tests {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
                 template: None,
+                engine: TemplateEngine::Handlebars,
                 image_data_b64: None,
             }],
             map_items: vec![],
@@ -326,6 +330,7 @@ mod tests {
                     "speed={{globals.default_speed}}\n{{#each waypoints}}{{id}}:{{@root.globals.default_speed}}\n{{/each}}"
                         .to_string(),
                 ),
+                engine: TemplateEngine::Handlebars,
                 image_data_b64: None,
             }],
             map_items: vec![],
@@ -352,6 +357,7 @@ mod tests {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({ "id": "wp1", "options": {"speed": 1.5}, "raw_options": {} })],
                 template: None,
+                engine: TemplateEngine::Handlebars,
                 image_data_b64: None,
             }],
             map_items: vec![],
@@ -387,6 +393,7 @@ mod tests {
                     "{{#each waypoints}}{{id}}: options={{options.through_tolerance}} raw={{raw_options.through_tolerance}}\n{{/each}}"
                         .to_string(),
                 ),
+                engine: TemplateEngine::Handlebars,
                 image_data_b64: None,
             }],
             map_items: vec![],
@@ -396,5 +403,64 @@ mod tests {
         let content = fs::read_to_string(&wp_path).unwrap();
         // raw_options 側は未入力のため空欄になり、options 側は補完済みの値がそのまま出力される。
         assert_eq!(content, "wp1: options=3.0 raw=\n");
+    }
+
+    #[test]
+    fn test_execute_export_package_jinja_template_mg_robot_style_yaml() {
+        // mg_robot の on_reached_actions（type によってフィールドが変わるタグ付きユニオンのリスト）
+        // を、Jinja エンジン + toyaml フィルタで意図した YAML に書き出せることを確認する。
+        let tmp = TempDir::new().unwrap();
+        let wp_path = tmp.path().join("wp.yaml");
+
+        let options = ExportPackageOptions {
+            root_dir: tmp.path().to_string_lossy().to_string(),
+            conflict_resolution: "overwrite".to_string(),
+            session_timestamp: "20260912_110000".to_string(),
+            globals: serde_json::Map::new(),
+            waypoint_items: vec![PackageWaypointItem {
+                path: wp_path.to_string_lossy().to_string(),
+                waypoints: vec![serde_json::json!({
+                    "index": 0,
+                    "x": 1.0, "y": 2.0, "z": 0.0,
+                    "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0,
+                    "options": {"is_through_point": false},
+                    "raw_options": {
+                        "on_reached_actions": [
+                            {"type": "wait", "countdown_ms": 3000},
+                            {"type": "amcl_reset"}
+                        ]
+                    }
+                })],
+                template: Some(
+                    concat!(
+                        "waypoints:\n",
+                        "{% for wp in waypoints %}",
+                        "  - index: {{ wp.index }}\n",
+                        "    pose:\n",
+                        "      position: {x: {{ wp.x }}, y: {{ wp.y }}, z: {{ wp.z }}}\n",
+                        "      orientation: {x: {{ wp.qx }}, y: {{ wp.qy }}, z: {{ wp.qz }}, w: {{ wp.qw }}}\n",
+                        "    navigation:\n",
+                        "      is_through_point: {{ wp.options.is_through_point | tojson }}\n",
+                        "{% if wp.raw_options.on_reached_actions is defined %}",
+                        "    on_reached_actions:\n{{ wp.raw_options.on_reached_actions | toyaml(6) }}\n",
+                        "{% endif %}",
+                        "{% endfor %}"
+                    )
+                    .to_string(),
+                ),
+                engine: TemplateEngine::Jinja,
+                image_data_b64: None,
+            }],
+            map_items: vec![],
+        };
+
+        execute_export_package(options).unwrap();
+        let content = fs::read_to_string(&wp_path).unwrap();
+
+        let parsed: serde_json::Value = serde_yaml::from_str(&content).expect("rendered output must be valid YAML");
+        assert_eq!(parsed["waypoints"][0]["navigation"]["is_through_point"], false);
+        assert_eq!(parsed["waypoints"][0]["on_reached_actions"][0]["type"], "wait");
+        assert_eq!(parsed["waypoints"][0]["on_reached_actions"][0]["countdown_ms"], 3000);
+        assert_eq!(parsed["waypoints"][0]["on_reached_actions"][1]["type"], "amcl_reset");
     }
 }

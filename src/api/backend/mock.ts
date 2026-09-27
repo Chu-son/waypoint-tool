@@ -1,4 +1,4 @@
-import { PluginInstance } from '../../types/store';
+import { PluginInstance, TemplateEngine } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class MockBackendAPI implements IBackendAPI {
@@ -47,7 +47,7 @@ export class MockBackendAPI implements IBackendAPI {
     return [];
   }
 
-  async inferImportMapping(templateContent: string): Promise<any> {
+  async inferImportMapping(templateContent: string, _engine?: TemplateEngine): Promise<any> {
     console.log('[Mock Backend] inferImportMapping called, template length:', templateContent.length);
     return { itemsPath: '', x: 'x', y: 'y', z: 'z', yaw: 'yaw', optionsPath: 'options' };
   }
