@@ -78,9 +78,13 @@ describe('PropertiesPanel', () => {
 
     expect(screen.getByText('Target Speed')).toBeInTheDocument();
 
-    // The field ignores non-numeric intermediate values (an emptied field snaps back), so set the
-    // final value directly rather than simulating clear-then-type.
-    fireEvent.change(screen.getByDisplayValue('0.5'), { target: { value: '1.2' } });
+    // 未入力のフィールドはスキーマの既定値と区別され、値としては空のまま
+    // プレースホルダとして既定値を示す（実際の値として "0.5" が入っているわけではない）。
+    const field = screen.getByLabelText('speed');
+    expect(field).toHaveValue(null);
+    expect(field).toHaveAttribute('placeholder', '既定: 0.5');
+
+    fireEvent.change(field, { target: { value: '1.2' } });
 
     expect(getAppState().nodes['node-1'].options?.speed).toBe(1.2);
   });

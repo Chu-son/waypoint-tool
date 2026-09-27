@@ -6,6 +6,7 @@ import { ExportProfile, ExportTargetItem, ExportTargetType } from '../../../type
 import { resolveExportFiles, buildExportTreePreview } from '../../../utils/exportTemplateEngine';
 import { extractGlobalsForExport, extractWaypointsForExport } from '../../../utils/exportWaypointUtils';
 import { buildExportPackageItems, formatSessionTimestamp } from '../../../utils/exportPackage';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
 import { confirmAction, notify } from '../../../services/notify';
@@ -62,7 +63,9 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const exportRegions = useAppStore((state) => state.exportRegions) || [];
   const rootNodeIds = useAppStore((state) => state.rootNodeIds) || [];
   const nodes = useAppStore((state) => state.nodes) || {};
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  // エクスポート内容の構築（既定値の補完・globals の抽出）は ref を解決した実効スキーマで行う。
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const lastDirectory = useAppStore((state) => state.lastDirectory);

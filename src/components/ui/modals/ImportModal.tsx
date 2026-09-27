@@ -13,6 +13,7 @@ import { BrowseInput } from '../common/BrowseInput';
 import { AlertBox } from '../common/AlertBox';
 import { ExportTemplate, ImportFieldMapping } from '../../../types/store';
 import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from '../../../utils/importUtils';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { notify } from '../../../services/notify';
 
 interface ImportModalProps {
@@ -46,7 +47,8 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
   const exportTemplates = useAppStore((state) => state.exportTemplates);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const addNode = useAppStore((state) => state.addNode);
   const runWithLoading = useAppStore((state) => state.runWithLoading);
 

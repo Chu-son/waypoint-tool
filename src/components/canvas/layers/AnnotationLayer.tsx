@@ -18,6 +18,7 @@ import {
   CANVAS_LABEL_BG,
 } from '../canvasConstants';
 import { resolveAnnotationConditionalStyle, parseColorSafe } from '../../../utils/conditionalStyles';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 
 interface AnnotationLayerProps {
   scale: number;
@@ -52,7 +53,8 @@ export function AnnotationLayer({
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
   const conditionalStyles = useAppStore((state) => state.conditionalStyles);
   const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
 
   const handleShapePointerDown = (e: FederatedPointerEvent, id: string) => {
     if (e.button === 2) {
