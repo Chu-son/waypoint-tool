@@ -1,4 +1,4 @@
-import type { FieldDef, OptionValue, TypeSpec } from '../types/options';
+import type { FieldDef, OptionValue, ScalarType, TypeSpec } from '../types/options';
 
 const isPlainObject = (v: unknown): v is Record<string, OptionValue> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -13,6 +13,21 @@ function getVariantValue(spec: TypeSpec, value: unknown): string | undefined {
 
 function findVariant(spec: TypeSpec, variantValue: string | undefined) {
   return (spec.variants ?? []).find((v) => v.value === variantValue);
+}
+
+/**
+ * カンマ区切りのテキストを、指定したスカラー型の配列へ変換する。空要素は無視し、
+ * 数値/真偽値へ変換できない要素は除外する。list<scalar> の「カンマ区切りで貼り付け」入力で使う。
+ */
+export function parseCsvList(text: string, itemType: ScalarType): OptionValue[] {
+  const raw = text
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  if (itemType === 'float') return raw.map((s) => parseFloat(s)).filter((n) => !isNaN(n));
+  if (itemType === 'integer') return raw.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
+  if (itemType === 'boolean') return raw.map((s) => s === 'true' || s === '1');
+  return raw;
 }
 
 /**
@@ -100,6 +115,12 @@ export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueV
       const str = String(value).toLowerCase();
       return str === 'true' || str === 'false' ? [] : [{ path, message: 'true/false を入力してください。' }];
     }
+    case 'string': {
+      if (spec.enum_values && spec.enum_values.length > 0 && !spec.enum_values.includes(String(value))) {
+        return [{ path, message: `次のいずれかを指定してください: ${spec.enum_values.join(', ')}` }];
+      }
+      return [];
+    }
     case 'list': {
       if (!Array.isArray(value)) return [{ path, message: 'リストを入力してください。' }];
       const itemSpec: TypeSpec = spec.item ?? { type: 'string' };
@@ -107,7 +128,7 @@ export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueV
     }
     case 'object': {
       if (!isPlainObject(value)) return [{ path, message: 'オブジェクトを入力してください。' }];
-      return (spec.fields ?? []).flatMap((f) => validateValue(f, value[f.name], `${path}.${f.name}`));
+      return (spec.fields ?? []).flatMap((f) => validateField(f, value[f.name], `${path}.${f.name}`));
     }
     case 'map': {
       if (!isPlainObject(value)) return [{ path, message: 'オブジェクトを入力してください。' }];
@@ -119,7 +140,7 @@ export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueV
       const variantValue = getVariantValue(spec, value);
       const variant = findVariant(spec, variantValue);
       if (!variant) return [{ path, message: `未知のバリアントです: ${String(variantValue)}` }];
-      return variant.fields.flatMap((f) => validateValue(f, value[f.name], `${path}.${f.name}`));
+      return variant.fields.flatMap((f) => validateField(f, value[f.name], `${path}.${f.name}`));
     }
     default:
       return [];
@@ -129,6 +150,18 @@ export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueV
 /** `validateValue` のエラー有無だけを見る簡易版（フォームの枠線ハイライト等に使う）。 */
 export function isValueValid(spec: TypeSpec, value: unknown): boolean {
   return validateValue(spec, value).length === 0;
+}
+
+/**
+ * フィールド単位の検証。型の妥当性（`validateValue`）に加えて、`required` なフィールドが
+ * 値・既定値のどちらも持たない場合をエラーにする。Inspector の必須マーク表示や、
+ * エクスポート前チェックで使う。
+ */
+export function validateField(field: FieldDef, value: OptionValue | undefined, path = ''): ValueValidationError[] {
+  if (field.required && value === undefined && field.default === undefined) {
+    return [{ path, message: `${field.label || field.name} は必須です。` }];
+  }
+  return validateValue(field, value, path);
 }
 
 /**

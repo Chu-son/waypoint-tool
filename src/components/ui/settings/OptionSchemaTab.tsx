@@ -7,7 +7,7 @@ import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { SchemaFieldRow } from './SchemaFieldRow';
 import { notify } from '../../../services/notify';
-import { isValueValid, toStoredValue } from '../../../utils/optionValues';
+import { toStoredValue } from '../../../utils/optionValues';
 import { normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
 
 /** Returns a `base`, `base_1`, `base_2`... key that no field in `fields` uses yet. */
@@ -35,22 +35,12 @@ export function OptionSchemaTab() {
   }, [globalOptionsSchema]);
 
   const handleSaveOptions = () => {
-    // トップレベルのキー重複・空欄だけでなく、union のバリアント重複や判別キーとの
-    // 名前衝突など、入れ子構造の妥当性も再帰的に検証する。
+    // トップレベルのキー重複・空欄、既定値・グローバル値の型不一致、union のバリアント重複や
+    // 判別キーとの名前衝突、ref の未定義・循環参照まで、すべて validateSchema が再帰的に検証する。
     const schemaErrors = validateSchema({ options: localOptions, globals: localGlobals });
-    const hasInvalidDefaults = localOptions.some((opt) => !isValueValid(opt, opt.default));
-    const hasInvalidGlobalValues = localGlobals.some((g) => !isValueValid(g, g.value));
 
     if (schemaErrors.length > 0) {
       void notify(`スキーマの定義に誤りがあります。\n${schemaErrors[0].message} (${schemaErrors[0].path})`);
-      return;
-    }
-    if (hasInvalidDefaults) {
-      void notify('Some options have default values that do not match their type.');
-      return;
-    }
-    if (hasInvalidGlobalValues) {
-      void notify('Some global fields have values that do not match their type.');
       return;
     }
 

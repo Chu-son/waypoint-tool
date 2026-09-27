@@ -4,6 +4,8 @@ import {
   toStoredValue,
   isValueValid,
   validateValue,
+  validateField,
+  parseCsvList,
   resolveWithDefaults,
   createValue,
   createUnionVariantValue,
@@ -120,6 +122,66 @@ describe('validateValue / isValueValid', () => {
   it('reports an error for an unknown union variant', () => {
     const spec: TypeSpec = { type: 'union', variants: [{ value: 'known', fields: [] }] };
     expect(validateValue(spec, { type: 'nope' })).toHaveLength(1);
+  });
+
+  it('rejects a string value outside the declared choices', () => {
+    const spec: TypeSpec = { type: 'string', enum_values: ['normal', 'queue_wait'] };
+    expect(isValueValid(spec, 'normal')).toBe(true);
+    expect(isValueValid(spec, 'bogus')).toBe(false);
+  });
+
+  it('accepts any string when no choices are declared', () => {
+    expect(isValueValid({ type: 'string' }, 'anything')).toBe(true);
+  });
+});
+
+describe('validateField', () => {
+  it('flags a required field with neither a value nor a default', () => {
+    const field: FieldDef = { name: 'service', label: 'Service', type: 'string', required: true };
+    expect(validateField(field, undefined)).toEqual([{ path: '', message: expect.stringContaining('必須') }]);
+  });
+
+  it('does not flag a required field that has a default, even when unset', () => {
+    const field: FieldDef = { name: 'mode', label: 'Mode', type: 'string', required: true, default: 'normal' };
+    expect(validateField(field, undefined)).toEqual([]);
+  });
+
+  it('does not flag a required field once it has an explicit value', () => {
+    const field: FieldDef = { name: 'service', label: 'Service', type: 'string', required: true };
+    expect(validateField(field, '/foo')).toEqual([]);
+  });
+
+  it('still runs type validation for a non-required field', () => {
+    const field: FieldDef = { name: 'speed', label: 'Speed', type: 'float' };
+    expect(validateField(field, 'abc')).toHaveLength(1);
+  });
+
+  it('cascades required-ness into nested object/union fields via validateValue', () => {
+    const spec: TypeSpec = {
+      type: 'union',
+      discriminator: 'type',
+      variants: [{ value: 'service', fields: [{ name: 'service', label: 'Service', type: 'string', required: true }] }],
+    };
+    const errors = validateValue(spec, { type: 'service' }, 'options.actions[0]');
+    expect(errors.some((e) => e.path === 'options.actions[0].service')).toBe(true);
+  });
+});
+
+describe('parseCsvList', () => {
+  it('trims and drops empty entries', () => {
+    expect(parseCsvList(' a, , b ,', 'string')).toEqual(['a', 'b']);
+  });
+
+  it.each([
+    ['float', '1.5, 2, abc', [1.5, 2]],
+    ['integer', '1, 2.5, abc', [1, 2]], // parseInt truncates "2.5" to 2 instead of failing
+    ['boolean', 'true, 1, false, x', [true, true, false, false]],
+  ] as const)('parses %s items, dropping ones that do not convert', (itemType, text, expected) => {
+    expect(parseCsvList(text, itemType)).toEqual(expected);
+  });
+
+  it('returns an empty array for blank input', () => {
+    expect(parseCsvList('', 'string')).toEqual([]);
   });
 });
 

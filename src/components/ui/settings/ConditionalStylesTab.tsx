@@ -13,7 +13,7 @@ import { cn } from '../../../utils/cn';
 import { notify } from '../../../services/notify';
 import { ConditionGroupEditor } from './ConditionEditor';
 import { StyleOverrideEditor } from './StyleOverrideEditor';
-import { listScalarPaths } from '../../../utils/optionSchema';
+import { listPropertyPaths } from '../../../utils/optionSchema';
 
 export function ConditionalStylesTab() {
   const conditionalStyles = useAppStore((state) => state.conditionalStyles) || [];
@@ -44,7 +44,7 @@ export function ConditionalStylesTab() {
   // 条件式の対象プロパティは object フィールドまで入れ子で指定できるようにするため、
   // スキーマ上でアドレス可能なパス一覧（例: "options.navigation.is_through_point"）を使う。
   const conditionPropertyPaths = useMemo(() => {
-    return optionsSchema ? listScalarPaths(optionsSchema) : [];
+    return optionsSchema ? listPropertyPaths(optionsSchema) : [];
   }, [optionsSchema]);
 
   const handleAddRule = (target: TargetElementType = 'waypoint') => {

@@ -24,6 +24,22 @@ fn validate_field_like(value: &JsonValue, path: &str) -> Result<(), String> {
     validate_recursive_shape(obj, path)
 }
 
+/// `definitions` の1件。`name`/`type` は必須だが、`label` は省略可能（`FieldDef` と異なる）。
+fn validate_definition_like(value: &JsonValue, path: &str) -> Result<(), String> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| format!("{}: expected an object", path))?;
+
+    for key in ["name", "type"] {
+        match obj.get(key) {
+            Some(JsonValue::String(_)) => {}
+            _ => return Err(format!("{}: missing required string field `{}`", path, key)),
+        }
+    }
+
+    validate_recursive_shape(obj, path)
+}
+
 /// `name`/`label` を持たない型仕様ノード（list の item, map の value）の構造チェック。
 fn validate_type_spec(value: &JsonValue, path: &str) -> Result<(), String> {
     let obj = value
@@ -58,6 +74,10 @@ fn validate_recursive_shape(obj: &serde_json::Map<String, JsonValue>, path: &str
                 validate_type_spec(v, &format!("{}.value_type", path))?;
             }
         }
+        "ref" => match obj.get("ref") {
+            Some(JsonValue::String(s)) if !s.is_empty() => {}
+            _ => return Err(format!("{}: missing required non-empty string field `ref`", path)),
+        },
         "union" => {
             if let Some(JsonValue::Array(variants)) = obj.get("variants") {
                 for (i, variant) in variants.iter().enumerate() {
@@ -107,6 +127,12 @@ pub fn load_options_schema(yaml_path: &str) -> Result<JsonValue, String> {
     if let Some(JsonValue::Array(globals)) = obj.get("globals") {
         for (i, g) in globals.iter().enumerate() {
             validate_field_like(g, &format!("globals[{}]", i))?;
+        }
+    }
+
+    if let Some(JsonValue::Array(definitions)) = obj.get("definitions") {
+        for (i, d) in definitions.iter().enumerate() {
+            validate_definition_like(d, &format!("definitions[{}]", i))?;
         }
     }
 
@@ -231,6 +257,74 @@ options:
         );
         let result = load_options_schema(file.path().to_str().unwrap());
         assert!(result.is_err(), "Should error when a variant is missing `value`");
+    }
+
+    #[test]
+    fn test_load_schema_with_definitions_and_ref() {
+        let file = write_temp_yaml(
+            r#"
+options:
+  - name: on_reached_actions
+    label: "Actions"
+    type: list
+    item:
+      type: ref
+      ref: action
+definitions:
+  - name: action
+    type: union
+    discriminator: type
+    variants:
+      - value: wait
+        fields:
+          - {name: countdown_ms, label: Countdown, type: integer, default: 3000}
+"#,
+        );
+        let result = load_options_schema(file.path().to_str().unwrap()).expect("schema with ref should parse");
+        let definitions = result.get("definitions").unwrap().as_array().unwrap();
+        assert_eq!(definitions.len(), 1);
+        assert_eq!(definitions[0].get("name").unwrap().as_str(), Some("action"));
+    }
+
+    #[test]
+    fn test_load_schema_definition_without_label_is_valid() {
+        // definitions は label が無くても構造上は有効（FieldDef と違い label は必須ではない）。
+        let file = write_temp_yaml(
+            r#"
+options: []
+definitions:
+  - name: action
+    type: string
+"#,
+        );
+        load_options_schema(file.path().to_str().unwrap()).expect("definition without label should parse");
+    }
+
+    #[test]
+    fn test_load_schema_ref_missing_ref_field_is_invalid() {
+        let file = write_temp_yaml(
+            r#"
+options:
+  - name: a
+    label: A
+    type: ref
+"#,
+        );
+        let result = load_options_schema(file.path().to_str().unwrap());
+        assert!(result.is_err(), "Should error when a ref field has no `ref`");
+    }
+
+    #[test]
+    fn test_load_schema_definition_missing_name_is_invalid() {
+        let file = write_temp_yaml(
+            r#"
+options: []
+definitions:
+  - type: string
+"#,
+        );
+        let result = load_options_schema(file.path().to_str().unwrap());
+        assert!(result.is_err(), "Should error when a definition has no `name`");
     }
 
     #[test]

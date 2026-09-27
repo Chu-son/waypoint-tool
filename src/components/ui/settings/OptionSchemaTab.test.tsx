@@ -62,7 +62,7 @@ describe('OptionSchemaTab global fields', () => {
     await user.type(value, 'fast');
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
-    expect(message).toHaveBeenCalledWith(expect.stringContaining('global fields'), undefined);
+    expect(message).toHaveBeenCalledWith(expect.stringContaining('globals[0].value'), undefined);
     expect(getAppState().optionsSchema?.globals[0].value).toBe(0.5);
   });
 

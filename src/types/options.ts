@@ -4,8 +4,9 @@ export type ScalarType = 'string' | 'float' | 'integer' | 'boolean';
 /**
  * フィールドが取りうる値の種別。
  * `list` / `object` / `map` / `union` は、それぞれの中に任意の型を再帰的に入れ子にできる。
+ * `ref` は `OptionsSchema.definitions` で定義した名前付きの型を参照する（JSON Schema の `$ref` 相当）。
  */
-export type ValueType = ScalarType | 'list' | 'object' | 'map' | 'union' | 'any';
+export type ValueType = ScalarType | 'list' | 'object' | 'map' | 'union' | 'any' | 'ref';
 
 /**
  * 値の型仕様。JSON Schema のサブセットと 1:1 対応するように設計しており、
@@ -25,6 +26,8 @@ export interface TypeSpec {
   discriminator?: string;
   /** `union`: 判別値ごとのフィールド定義。 */
   variants?: VariantDef[];
+  /** `ref`: 参照先の `OptionsSchema.definitions[].name`。 */
+  ref?: string;
 }
 
 /** 名前とラベルを持つ、名前付きフィールド定義。 */
@@ -33,6 +36,18 @@ export interface FieldDef extends TypeSpec {
   label: string;
   description?: string;
   default?: OptionValue;
+  /** true の場合、値も既定値も未設定だと Inspector とエクスポート前チェックで警告する。 */
+  required?: boolean;
+}
+
+/**
+ * `OptionsSchema.definitions` の1件。複数のフィールドから `{ type: 'ref', ref: name }` で
+ * 参照でき、同じ構造（例: mg_robot の「到達時アクション」union）を複数箇所で使い回せる。
+ */
+export interface DefinitionDef extends TypeSpec {
+  name: string;
+  label?: string;
+  description?: string;
 }
 
 /** `union` の1バリアント（判別値ごとのフィールド集合）。 */
@@ -60,6 +75,11 @@ export type GlobalFieldDef = FieldDef & {
 export type OptionsSchema = {
   options: OptionDef[];
   globals: GlobalFieldDef[];
+  /**
+   * 名前付き型定義（`ref` から参照される）。省略可能（正規化後は常に配列で埋まる）にして、
+   * 既存のテスト・フィクスチャで `{ options, globals }` だけを書けるようにしている。
+   */
+  definitions?: DefinitionDef[];
 };
 
 /**
