@@ -189,7 +189,7 @@
   - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/modals/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/SettingsModal.tsx))
-  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` の7タブを保持。
+  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`（Waypoint Options と Global Fields の2リスト。行 UI は `SchemaFieldRow` を共用）, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` の7タブを保持。
   - **主要Props**: `isOpen`, `onClose`
 - **`AppearanceTab`** ([`src/components/ui/settings/AppearanceTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/AppearanceTab.tsx))
   - **概要**: 外観・表示設定タブ。テーマモード（Light/Dark）、アクセントカラープリセット、マップ透過度、パス外観（色・透過度・幅同期）、ROS占有グリッド閾値（障害物・フリー・ネゲート）の設定を提供。
