@@ -7,17 +7,21 @@ import type {
   CircleAnnotation,
   LineAnnotation,
   ManualCustomLayer,
+  MapSource,
   OrientedPointAnnotation,
+  PluginCustomLayer,
   PluginInstance,
   PluginManifest,
   PointAnnotation,
   ProjectMapLayer,
   RectAnnotation,
+  ResolvedMapLayer,
   Transform,
   WaypointNode,
 } from '../types/store';
 import type { AppState } from '../stores/appStore';
 import { yawToQuaternion } from '../utils/transformUtils';
+import { resolveMapLayers } from '../utils/layerStack';
 
 export function makeTransform(x = 0, y = 0, yaw = 0, z = 0): Transform {
   return { x, y, z, ...yawToQuaternion(yaw) };
@@ -79,12 +83,20 @@ export function makeAnnotationGroup(
 }
 
 export function makeManualCustomLayer(id: string, overrides: Partial<ManualCustomLayer> = {}): ManualCustomLayer {
-  return { id, name: id, type: 'manual', visible: true, opacity: 1, z_index: 0, editObjects: [], ...overrides };
+  return { id, name: id, type: 'manual', visible: true, opacity: 1, editObjects: [], ...overrides };
 }
 
-export function makeMapLayer(id: string, overrides: Partial<ProjectMapLayer> = {}): ProjectMapLayer {
-  return {
-    id,
+/** One loaded map: its source (image + metadata) and a map instance that draws it. */
+export type MapFixture = { source: MapSource; layer: ProjectMapLayer };
+
+/**
+ * A map instance together with its source. Overrides may set instance fields (`opacity`, `clip`, ...)
+ * and source fields (`info`, `image_base64`, `width`, `height`); `info` is merged over the defaults.
+ */
+export function makeMap(id: string, overrides: Partial<ResolvedMapLayer> = {}): MapFixture {
+  const { info, image_base64, width, height, ...instance } = overrides;
+  const source: MapSource = {
+    id: `${id}-source`,
     name: id,
     info: {
       image: `${id}.pgm`,
@@ -94,16 +106,51 @@ export function makeMapLayer(id: string, overrides: Partial<ProjectMapLayer> = {
       negate: 0,
       occupied_thresh: 0.65,
       free_thresh: 0.196,
+      ...info,
     },
-    image_base64: '',
-    width: 100,
-    height: 100,
+    image_base64: image_base64 ?? '',
+    width: width ?? 100,
+    height: height ?? 100,
+  };
+  const layer: ProjectMapLayer = {
+    id,
+    sourceId: source.id,
+    name: id,
     visible: true,
     opacity: 1,
-    z_index: 0,
     blend_mode: 'overwrite',
-    ...overrides,
+    clip: null,
+    ...instance,
   };
+  return { source, layer };
+}
+
+/** A map instance already joined with its source, as views and export code consume it. */
+export function makeResolvedMapLayer(id: string, overrides: Partial<ResolvedMapLayer> = {}): ResolvedMapLayer {
+  const { source, layer } = makeMap(id, overrides);
+  return resolveMapLayers([source], [layer])[0];
+}
+
+/**
+ * Store state for a layer stack. Items are listed from the top of the stack to the bottom, maps
+ * (from `makeMap`) and custom layers alike. Maps that share a source pass the same `source`.
+ */
+export function layerStackState(
+  ...items: Array<MapFixture | ManualCustomLayer | PluginCustomLayer>
+): Pick<AppState, 'mapSources' | 'mapLayers' | 'customLayers' | 'layerOrder'> {
+  const mapSources: MapSource[] = [];
+  const mapLayers: ProjectMapLayer[] = [];
+  const customLayers: Array<ManualCustomLayer | PluginCustomLayer> = [];
+  for (const item of items) {
+    if ('source' in item) {
+      if (!mapSources.some((s) => s.id === item.source.id)) mapSources.push(item.source);
+      mapLayers.push(item.layer);
+    } else {
+      customLayers.push(item);
+    }
+  }
+  const layerOrder = items.map((item) => ('source' in item ? item.layer.id : item.id));
+  return { mapSources, mapLayers, customLayers, layerOrder };
 }
 
 export function makePluginManifest(overrides: Partial<PluginManifest> = {}): PluginManifest {

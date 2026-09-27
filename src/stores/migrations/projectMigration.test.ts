@@ -58,13 +58,13 @@ describe('projectMigration', () => {
     const normalized = migrateAndNormalizeProjectData(v0Data);
     expect(normalized.version).toBe(1);
     expect(normalized.custom_layers).toHaveLength(2);
-    // Should be sorted by original z_index and reindexed to 0, 1
+    // Should be ordered by the original z_index, and the stacking order now lives in layer_order
     expect(normalized.custom_layers[0].id).toBe('gen-1');
     expect(normalized.custom_layers[0].type).toBe('plugin');
-    expect(normalized.custom_layers[0].z_index).toBe(0);
     expect(normalized.custom_layers[1].id).toBe('manual-1');
     expect(normalized.custom_layers[1].type).toBe('manual');
-    expect(normalized.custom_layers[1].z_index).toBe(1);
+    expect(normalized.layer_order).toEqual(['gen-1', 'manual-1']);
+    expect(normalized.custom_layers[0]).not.toHaveProperty('z_index');
     expect((normalized.custom_layers[1] as any).editObjects).toHaveLength(1);
   });
 
@@ -159,7 +159,7 @@ describe('projectMigration', () => {
 
     const normalized = migrateAndNormalizeProjectData(camelData);
     expect(normalized.root_node_ids).toEqual(['n1']);
-    expect(normalized.map_layers[0].image_base64).toBe('b64string');
+    expect(normalized.map_sources[0].image_base64).toBe('b64string');
     expect(normalized.annotation_objects[0].id).toBe('ann-1');
     expect(normalized.left_panel_view_mode).toBe('split');
     expect(normalized.right_panel_view_mode).toBe('tabs');
@@ -227,7 +227,7 @@ describe('projectMigration', () => {
     expect(normalized.root_annotation_ids).toEqual(['ann-1', 'ann-2']);
   });
 
-  it('fully populates all 29 StrictProjectData fields when input is { version: 1 } without crashing', () => {
+  it('fully populates all 32 StrictProjectData fields when input is { version: 1 } without crashing', () => {
     const incompleteV1 = { version: 1 };
     let normalized: any;
     expect(() => {
@@ -238,7 +238,9 @@ describe('projectMigration', () => {
       'version',
       'root_node_ids',
       'nodes',
+      'map_sources',
       'map_layers',
+      'layer_order',
       'custom_layers',
       'annotation_objects',
       'annotation_groups',
@@ -478,18 +480,155 @@ describe('projectMigration', () => {
 
     const normalized = migrateAndNormalizeProjectData(rawData);
     expect(normalized.map_layers).toHaveLength(3);
+    expect(normalized.map_sources).toHaveLength(3);
 
     // Map 1: initial_origin should be copied from origin if missing
-    expect(normalized.map_layers[0].info.origin).toEqual([1.5, 2.5, 0.1]);
-    expect(normalized.map_layers[0].info.initial_origin).toEqual([1.5, 2.5, 0.1]);
+    expect(normalized.map_sources[0].info.origin).toEqual([1.5, 2.5, 0.1]);
+    expect(normalized.map_sources[0].info.initial_origin).toEqual([1.5, 2.5, 0.1]);
 
     // Map 2: initial_origin should be preserved if already present
-    expect(normalized.map_layers[1].info.origin).toEqual([5.0, 5.0, 0.0]);
-    expect(normalized.map_layers[1].info.initial_origin).toEqual([0.0, 0.0, 0.0]);
+    expect(normalized.map_sources[1].info.origin).toEqual([5.0, 5.0, 0.0]);
+    expect(normalized.map_sources[1].info.initial_origin).toEqual([0.0, 0.0, 0.0]);
 
     // Map 3: fallback to [0, 0, 0]
-    expect(normalized.map_layers[2].info.origin).toEqual([0, 0, 0]);
-    expect(normalized.map_layers[2].info.initial_origin).toEqual([0, 0, 0]);
+    expect(normalized.map_sources[2].info.origin).toEqual([0, 0, 0]);
+    expect(normalized.map_sources[2].info.initial_origin).toEqual([0, 0, 0]);
+  });
+
+  describe('map layer stack', () => {
+    const legacyMap = (id: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      name: id,
+      info: { resolution: 0.05, origin: [1, 2, 0] },
+      image_base64: `img-${id}`,
+      width: 10,
+      height: 20,
+      visible: true,
+      opacity: 0.7,
+      ...extra,
+    });
+
+    it('splits each map of an older project into a source and one instance that keeps the old layer id', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_layers: [legacyMap('m1', { blend_mode: 'merge_free' }), legacyMap('m2', { visible: false })],
+      });
+
+      expect(normalized.map_sources.map((s) => s.image_base64)).toEqual(['img-m1', 'img-m2']);
+      expect(normalized.map_layers.map((l) => l.id)).toEqual(['m1', 'm2']);
+      expect(normalized.map_layers[0]).toMatchObject({
+        sourceId: normalized.map_sources[0].id,
+        opacity: 0.7,
+        blend_mode: 'merge_free',
+        clip: null,
+      });
+      expect(normalized.map_layers[1].visible).toBe(false);
+      expect(normalized.map_layers[0]).not.toHaveProperty('z_index');
+    });
+
+    it('keeps custom layers above every map when reading an older project', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_layers: [legacyMap('m1'), legacyMap('m2')],
+        custom_layers: [
+          { id: 'c-low', type: 'manual', name: 'low', visible: true, opacity: 1, z_index: 1, editObjects: [] },
+          { id: 'c-high', type: 'manual', name: 'high', visible: true, opacity: 1, z_index: 0, editObjects: [] },
+        ],
+      });
+
+      expect(normalized.layer_order).toEqual(['c-high', 'c-low', 'm1', 'm2']);
+    });
+
+    it('reads instances, their clips and the stacking order back from a current project', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_sources: [
+          {
+            id: 's1',
+            name: 'Warehouse',
+            info: { resolution: 0.05, origin: [0, 0, 0] },
+            image_base64: 'img',
+            width: 10,
+            height: 10,
+          },
+        ],
+        map_layers: [
+          {
+            id: 'left',
+            sourceId: 's1',
+            name: 'Left',
+            visible: true,
+            opacity: 1,
+            blend_mode: 'overwrite',
+            clip: { rects: [{ x: 0, y: 0, width: 2, height: 4 }] },
+          },
+          {
+            id: 'right',
+            sourceId: 's1',
+            name: 'Right',
+            visible: true,
+            opacity: 1,
+            blend_mode: 'overwrite',
+            clip: null,
+          },
+        ],
+        custom_layers: [{ id: 'wall', type: 'manual', name: 'Wall', visible: true, opacity: 1, editObjects: [] }],
+        layer_order: ['left', 'wall', 'right'],
+      });
+
+      expect(normalized.map_sources).toHaveLength(1);
+      expect(normalized.map_layers.map((l) => l.sourceId)).toEqual(['s1', 's1']);
+      expect(normalized.map_layers[0].clip).toEqual({ rects: [{ x: 0, y: 0, width: 2, height: 4 }] });
+      expect(normalized.layer_order).toEqual(['left', 'wall', 'right']);
+    });
+
+    it('repairs a stacking order that lists unknown layers or forgets existing ones', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_sources: [{ id: 's1', name: 'M', info: {}, image_base64: '', width: 1, height: 1 }],
+        map_layers: [
+          { id: 'a', sourceId: 's1' },
+          { id: 'b', sourceId: 's1' },
+        ],
+        layer_order: ['b', 'ghost'],
+      });
+
+      expect(normalized.layer_order).toEqual(['a', 'b']);
+    });
+
+    it('drops instances of a missing source and sources nobody uses', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_sources: [
+          { id: 's1', name: 'Used', info: {}, image_base64: '', width: 1, height: 1 },
+          { id: 's2', name: 'Unused', info: {}, image_base64: '', width: 1, height: 1 },
+        ],
+        map_layers: [
+          { id: 'ok', sourceId: 's1' },
+          { id: 'orphan', sourceId: 'missing' },
+        ],
+      });
+
+      expect(normalized.map_layers.map((l) => l.id)).toEqual(['ok']);
+      expect(normalized.map_sources.map((s) => s.id)).toEqual(['s1']);
+    });
+
+    it('ignores malformed clip rectangles and treats a clip without any valid one as no clip', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_sources: [{ id: 's1', name: 'M', info: {}, image_base64: '', width: 1, height: 1 }],
+        map_layers: [
+          {
+            id: 'a',
+            sourceId: 's1',
+            clip: {
+              rects: [
+                { x: 0, y: 0, width: 1, height: 1 },
+                { x: 'bad', y: 0, width: 1, height: 1 },
+              ],
+            },
+          },
+          { id: 'b', sourceId: 's1', clip: { rects: [{ x: 0, y: 0, width: -1, height: 1 }] } },
+        ],
+      });
+
+      expect(normalized.map_layers[0].clip).toEqual({ rects: [{ x: 0, y: 0, width: 1, height: 1 }] });
+      expect(normalized.map_layers[1].clip).toBeNull();
+    });
   });
 
   it('preserves conditional_styles and normalizes annotation options', () => {

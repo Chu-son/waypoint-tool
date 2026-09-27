@@ -16,6 +16,7 @@ import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '.
 import { applyGeneratorStash, computeGeneratorStash } from '../../utils/generatorStashUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';
+import { baseMapResolution, insertBelowCustomLayers } from '../../utils/layerStack';
 import { cloneSelection } from './historySlice';
 import { resolvePythonPath } from '../../utils/pythonPath';
 import { resolveBindingExpression } from '../../utils/pluginBindings';
@@ -190,7 +191,6 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     const {
       globalPythonPath,
       pluginSettings,
-      mapLayers,
       customLayers,
       nodes,
       selectedNodeIds,
@@ -232,9 +232,9 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
     );
 
-    const layersToPass = needsOccupancyGrid ? await prepareLayersForExport(mapLayers, customLayers) : undefined;
+    const layersToPass = needsOccupancyGrid ? await prepareLayersForExport(get()) : undefined;
 
-    const baseRes = mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+    const baseRes = baseMapResolution(get());
     const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
       plugin.manifest.inputs,
       contextData.interaction_data || {},
@@ -395,7 +395,6 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             info: layerItem.info,
             visible: true,
             opacity: layerItem.opacity ?? 0.7,
-            z_index: store.customLayers.length,
             blend_mode: layerItem.blend_mode || 'overwrite',
             is_reference: false,
           };
@@ -528,6 +527,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     const initialSelectedNodeIds = [...get().selectedNodeIds];
     const initialSelection = cloneSelection(get().selection);
     const initialCustomLayers = structuredClone(get().customLayers ?? []);
+    const initialLayerOrder = [...get().layerOrder];
     const initialAnnotationGroups = { ...get().annotationGroups };
     const initialAnnotationObjects = structuredClone(get().annotationObjects ?? {});
     const initialAnnotationOrder = [...(get().annotationOrder ?? [])];
@@ -716,10 +716,14 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
         );
         const layersToPass = needsOccupancyGrid
-          ? await prepareLayersForExport(get().mapLayers, allAvailableCustomLayers)
+          ? await prepareLayersForExport({
+              ...get(),
+              customLayers: allAvailableCustomLayers,
+              layerOrder: insertBelowCustomLayers(get().layerOrder, get().customLayers, intermediateLayers),
+            })
           : undefined;
 
-        const baseRes = get().mapLayers.find((l) => l.visible)?.info?.resolution || 0.05;
+        const baseRes = baseMapResolution(get());
         const enrichedInteractionData = await enrichInteractionDataWithCustomLayers(
           targetPlugin.manifest?.inputs,
           contextData.interaction_data || {},
@@ -850,7 +854,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
 
           // 8. Process outputs
           // Custom Layers output
-          constructedLayers = extractCustomLayerItems(rawResult).map((layerItem, idx) => {
+          constructedLayers = extractCustomLayerItems(rawResult).map((layerItem) => {
             return {
               id: layerItem.id || uuidv4(),
               name: layerItem.name || `${stepName || targetPlugin.manifest.name} Layer`,
@@ -864,7 +868,6 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
               info: layerItem.info,
               visible: true,
               opacity: layerItem.opacity ?? 0.7,
-              z_index: get().customLayers.length + idx,
               blend_mode: layerItem.blend_mode || 'overwrite',
               is_reference: false,
               pipeline_metadata: pipelineMetadata,
@@ -1118,6 +1121,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         selectedNodeIds: initialSelectedNodeIds,
         selection: initialSelection,
         customLayers: initialCustomLayers,
+        layerOrder: initialLayerOrder,
         annotationGroups: initialAnnotationGroups,
         annotationObjects: initialAnnotationObjects,
         annotationOrder: initialAnnotationOrder,

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
+import { useResolvedMapLayers } from '../../hooks/useResolvedMapLayers';
 import { v4 as uuidv4 } from 'uuid';
 import { ManualCustomLayer, EditObject, WaypointNode } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
@@ -12,12 +13,15 @@ import { WaypointLayer } from './layers/WaypointLayer';
 import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
-import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
+import { MapEditToolOverlay } from './layers/MapEditLayer';
+import { LayerStack } from './layers/LayerStack';
 import { AnnotationLayer } from './layers/AnnotationLayer';
 import { MeasureLayer } from './layers/MeasureLayer';
 import { GeoTileLayer } from './layers/GeoTileLayer';
 import { GeoAlignMarkerLayer } from './layers/GeoAlignMarkerLayer';
 import { useGeoMapAlign } from './hooks/useGeoMapAlign';
+import { useMapClipEdit } from './hooks/useMapClipEdit';
+import { MapClipEditLayer } from './layers/MapClipEditLayer';
 import { GeoAttribution } from '../ui/overlays/GeoAttribution';
 import { getAnnotationCenter } from '../../stores/slices/measureSlice';
 import { useSnapping } from './hooks/useSnapping';
@@ -39,7 +43,6 @@ import {
 } from './utils/viewport';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
-import { MapLayerSprite } from './MapLayerSprite';
 import { getFallbackGridColors } from './utils/canvasTheme';
 import { findNearestObjectCenter, hitTestRectHandles } from './utils/hitTest';
 import { CANVAS_ACCENT_COLOR } from './canvasConstants';
@@ -83,8 +86,7 @@ export function MapCanvas() {
   const setCursorPosition = useAppStore((state) => state.setCursorPosition);
   const setMapScale = useAppStore((state) => state.setMapScale);
 
-  const mapLayers = useAppStore((state) => state.mapLayers);
-  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const mapLayers = useResolvedMapLayers();
   const enableSnapping = useAppStore((state) => state.enableSnapping);
   const isExportPreview = useAppStore((state) => state.isExportPreview);
 
@@ -150,6 +152,7 @@ export function MapCanvas() {
     | 'set_yaw_points_item'
     | 'marquee_select'
     | 'geo_align_drag'
+    | 'map_clip_drag'
   >('none');
   const lastMiddleClickTime = useRef<number>(0);
   const activeNodeId = useRef<string | null>(null);
@@ -212,6 +215,7 @@ export function MapCanvas() {
 
   const abortRef = useRef<() => boolean>(() => false);
   const geoAlign = useGeoMapAlign();
+  const mapClipEdit = useMapClipEdit();
   const { isAltPressed, snappedMeasureTarget, setSnappedMeasureTarget } = useMeasureAltSnap({
     lastWorldPosRef,
     scaleRef,
@@ -344,6 +348,13 @@ export function MapCanvas() {
       justAbortedRef.current = true;
       return true;
     }
+    // 9c. Map use-area drag: restore the area from before the drag
+    if (interactionMode.current === 'map_clip_drag') {
+      mapClipEdit.abort();
+      interactionMode.current = 'none';
+      justAbortedRef.current = true;
+      return true;
+    }
     // 10. Measure tool transient point abort
     if (activeTool === 'measure') {
       const state = useAppStore.getState();
@@ -354,7 +365,7 @@ export function MapCanvas() {
       }
     }
     return false;
-  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign]);
+  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign, mapClipEdit]);
 
   abortRef.current = abort;
 
@@ -774,6 +785,20 @@ export function MapCanvas() {
       return;
     }
 
+    // Map use area: a drag on the empty canvas draws a new area (Shift adds it to the existing ones)
+    if (appMode?.mode === 'map_clip_edit') {
+      if (e.button === 1) {
+        interactionMode.current = 'pan_map';
+        lastMousePos.current = { x: e.clientX, y: e.clientY };
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } else if (e.button === 0 && interactionMode.current === 'none') {
+        mapClipEdit.startDraw(appMode.layerId, eventToWorld(e), e.shiftKey);
+        interactionMode.current = 'map_clip_drag';
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      return;
+    }
+
     if (isMapEditMode) {
       if (e.button === 1) {
         // Middle click = Pan map
@@ -1160,6 +1185,11 @@ export function MapCanvas() {
 
     if (interactionMode.current === 'geo_align_drag') {
       geoAlign.update({ x: worldX, y: worldY });
+      return;
+    }
+
+    if (interactionMode.current === 'map_clip_drag') {
+      mapClipEdit.update({ x: worldX, y: worldY });
       return;
     }
 
@@ -1671,6 +1701,15 @@ export function MapCanvas() {
       return;
     }
 
+    if (interactionMode.current === 'map_clip_drag') {
+      mapClipEdit.end();
+      interactionMode.current = 'none';
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      return;
+    }
+
     if (isMapEditMode) {
       if (interactionMode.current === ('edit_map_draw_rect' as any)) {
         handleRectDrawEnd();
@@ -1860,26 +1899,17 @@ export function MapCanvas() {
           {/* 0. Geographic base map (OSM / satellite tiles) at the very back */}
           <GeoTileLayer scale={scale} position={position} />
 
-          {/* 1. Base Map Layers Group */}
-          <pixiContainer label="map-layers-group">
-            {shouldShowBlendedPreview ? (
-              <>
-                {previewError && !previewTexture ? (
-                  <pixiText
-                    text={`Error: ${previewError}`}
-                    x={0}
-                    y={0}
-                    style={textStyle}
-                    anchor={0.5}
-                    scale={{ x: 1 / scale, y: -1 / scale }}
-                  />
-                ) : previewTexture &&
-                  !previewTexture.destroyed &&
-                  previewTexture.source &&
-                  !previewTexture.source.destroyed &&
-                  previewTexture.source.style ? (
-                  <MapLayerSprite
-                    layer={{
+          {/* 1. Layer stack: map instances and custom layers in the user's order, bottom to top */}
+          <LayerStack
+            scale={scale}
+            textStyle={textStyle}
+            fallbackTexture={fallbackTexture}
+            blendedPreview={
+              shouldShowBlendedPreview
+                ? {
+                    texture: previewTexture,
+                    error: previewError,
+                    layer: {
                       id: '__blended_preview__',
                       name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
                       visible: true,
@@ -1891,77 +1921,19 @@ export function MapCanvas() {
                         free_thresh: occupancySettings.defaultFreeThresh,
                         negate: occupancySettings.defaultNegate,
                       },
-                      width: previewTexture.width,
-                      height: previewTexture.height,
-                      z_index: 0,
-                      blend_mode: 'overwrite',
-                    }}
-                    overrideTexture={previewTexture}
-                    scale={scale}
-                    textStyle={textStyle}
-                  />
-                ) : null}
-              </>
-            ) : mapLayers.length > 0 ? (
-              [...mapLayers]
-                .reverse()
-                .map((layer) => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)
-            ) : customLayers.length === 0 ? (
-              <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
-            ) : null}
-          </pixiContainer>
-
-          {/* 2. Custom Layers Group (Always rendered on top of Map Layers) */}
-          <pixiContainer label="custom-layers-group">
-            {shouldShowBlendedPreview ? (
-              /* Overlay reference custom layers during blended preview */
-              <>
-                {customLayers
-                  .filter((l) => l.visible && !!l.is_reference)
-                  .slice()
-                  .reverse()
-                  .map((layer) => {
-                    if (layer.type === 'plugin') {
-                      return <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />;
-                    } else {
-                      return (
-                        <MapEditSingleLayer
-                          key={layer.id}
-                          scale={scale}
-                          layer={layer}
-                          selectedEditObjectId={selectedEditObjectId}
-                          isExportPreview={true}
-                          onObjectPointerDown={handleEditObjectPointerDown}
-                          onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
-                          onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
-                        />
-                      );
-                    }
-                  })}
-              </>
-            ) : (
-              /* Normal rendering: all custom layers in order from bottom (back) to top (front) */
-              <>
-                {[...customLayers].reverse().map((layer) => {
-                  if (layer.type === 'plugin') {
-                    return <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />;
-                  } else {
-                    return (
-                      <MapEditSingleLayer
-                        key={layer.id}
-                        scale={scale}
-                        layer={layer}
-                        selectedEditObjectId={selectedEditObjectId}
-                        isExportPreview={false}
-                        onObjectPointerDown={handleEditObjectPointerDown}
-                        onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
-                        onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
-                      />
-                    );
+                      width: previewTexture?.width ?? 0,
+                      height: previewTexture?.height ?? 0,
+                    },
                   }
-                })}
-              </>
-            )}
+                : null
+            }
+            editHandlers={{
+              selectedEditObjectId,
+              onObjectPointerDown: handleEditObjectPointerDown,
+              onObjectHandlePointerDown: handleEditObjectHandlePointerDown,
+              onObjectResizeHandlePointerDown: handleEditObjectResizeHandlePointerDown,
+            }}
+          >
             {/* Transient editing tool previews and brush cursor overlay */}
             <MapEditToolOverlay
               scale={scale}
@@ -1970,7 +1942,7 @@ export function MapCanvas() {
               brushPreviewRadius={brushRadiusWorld}
               isExportPreview={shouldShowBlendedPreview}
             />
-          </pixiContainer>
+          </LayerStack>
           {showGrid && <GridLayer scale={scale} />}
 
           {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}
@@ -2162,6 +2134,23 @@ export function MapCanvas() {
                 if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
                   containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
                 }
+              }
+            }}
+          />
+
+          {/* Use area of the map layer being edited, with resize handles */}
+          <MapClipEditLayer
+            scale={scale}
+            onHandleDown={(e, layerId, index, handle) => {
+              e.stopPropagation();
+              if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+                (e.nativeEvent as any).stopPropagation();
+              }
+              if (interactionMode.current !== 'none') return;
+              mapClipEdit.startResize(layerId, index, handle);
+              interactionMode.current = 'map_clip_drag';
+              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
               }
             }}
           />

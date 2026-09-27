@@ -165,6 +165,7 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
                 origin: info.origin,
                 blend_mode: &layer.blend_mode,
                 z_index: layer.z_index,
+                clip: layer.clip.as_ref(),
             });
         }
 

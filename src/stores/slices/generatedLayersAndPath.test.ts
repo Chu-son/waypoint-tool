@@ -43,7 +43,6 @@ describe('customLayers and pathCalculator in appStore', () => {
       info: { resolution: 0.05, origin: [0, 0, 0], width: 100, height: 100 },
       visible: true,
       opacity: 0.8,
-      z_index: 0,
       blend_mode: 'overwrite',
     };
 
@@ -51,17 +50,18 @@ describe('customLayers and pathCalculator in appStore', () => {
     expect(useAppStore.getState().customLayers).toHaveLength(2);
     expect(useAppStore.getState().customLayers[0].id).toBe('plugin-layer-1');
     expect(useAppStore.getState().customLayers[1].id).toBe(manualLayer.id);
+    expect(useAppStore.getState().layerOrder).toEqual(['plugin-layer-1', manualLayer.id]);
 
     useAppStore.getState().updateCustomLayer('plugin-layer-1', { opacity: 0.9 });
     expect(useAppStore.getState().customLayers[0].opacity).toBe(0.9);
 
-    useAppStore.getState().reorderCustomLayers(0, 1);
-    expect(useAppStore.getState().customLayers[0].id).toBe(manualLayer.id);
-    expect(useAppStore.getState().customLayers[1].id).toBe('plugin-layer-1');
+    useAppStore.getState().reorderLayers(0, 1);
+    expect(useAppStore.getState().layerOrder).toEqual([manualLayer.id, 'plugin-layer-1']);
 
     useAppStore.getState().removeCustomLayer('plugin-layer-1');
     expect(useAppStore.getState().customLayers).toHaveLength(1);
     expect(useAppStore.getState().customLayers[0].id).toBe(manualLayer.id);
+    expect(useAppStore.getState().layerOrder).toEqual([manualLayer.id]);
   });
 
   it('migrates legacy edit_layers and generated_layers on ingress', () => {

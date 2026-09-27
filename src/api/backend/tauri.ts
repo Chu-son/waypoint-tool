@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { OptionsSchema, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../../types/store';
+import { OptionsSchema, PluginInstance, ImportFieldMapping } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -52,7 +52,7 @@ export class TauriBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
-    mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
+    mapLayers?: BlendPreviewLayerInput[],
   ): Promise<any> {
     return invoke('run_plugin', {
       pluginInstance,

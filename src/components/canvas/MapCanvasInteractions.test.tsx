@@ -9,10 +9,19 @@ import { describe, it, expect, vi } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
-import { makeGroup, makeMapLayer, makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
+import {
+  layerStackState,
+  makeGroup,
+  makeMap,
+  makePlugin,
+  makeTransform,
+  makeWaypoint,
+  waypointTree,
+} from '../../test/fixtures';
 import { useAppStore } from '../../stores/appStore';
 import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
 import { quaternionToYaw } from '../../utils/transformUtils';
+import { CLIP_HANDLES } from '../../utils/mapClip';
 import type { AppState } from '../../stores/appStore';
 
 vi.mock('@pixi/react', () => import('../../test/mocks/pixi').then((m) => m.pixiReactMock));
@@ -252,6 +261,111 @@ describe('MapCanvas tools', () => {
     });
   });
 
+  describe('drawing the use area of a map', () => {
+    const initialArea = { x: 0, y: 0, width: 50, height: 50 };
+    const withArea = () => layerStackState(makeMap('a', { clip: { rects: [initialArea] } }));
+    const startDrawing = () => act(() => getAppState().transitionToMode({ mode: 'map_clip_edit', layerId: 'a' }));
+    const rectsOf = () => getAppState().mapLayers[0].clip?.rects;
+
+    it('replaces the area with the rectangle dragged out, in any direction', () => {
+      const { pointer } = renderCanvas(withArea());
+      startDrawing();
+
+      pointer.down(200, 150);
+      pointer.move(120, 90);
+      pointer.up(120, 90);
+
+      expect(rectsOf()).toEqual([{ x: 120, y: 90, width: 80, height: 60 }]);
+    });
+
+    it('adds another area to the existing ones with Shift+drag, e.g. for an L shape', () => {
+      const { pointer } = renderCanvas(withArea());
+      startDrawing();
+
+      pointer.down(50, 0, { shiftKey: true });
+      pointer.move(90, 20, { shiftKey: true });
+      pointer.up(90, 20, { shiftKey: true });
+
+      expect(rectsOf()).toEqual([initialArea, { x: 50, y: 0, width: 40, height: 20 }]);
+    });
+
+    it('undoes a whole drag in one step', () => {
+      const { pointer } = renderCanvas(withArea());
+      startDrawing();
+
+      pointer.down(100, 100);
+      pointer.move(150, 130);
+      pointer.move(200, 180);
+      pointer.up(200, 180);
+      act(() => getAppState().undo());
+
+      expect(rectsOf()).toEqual([initialArea]);
+    });
+
+    it('puts the area back when Escape is pressed mid-drag', () => {
+      const { pointer } = renderCanvas(withArea());
+      startDrawing();
+
+      pointer.down(100, 100);
+      pointer.move(200, 200);
+      escape();
+      pointer.up(200, 200);
+
+      expect(rectsOf()).toEqual([initialArea]);
+      expect(getAppState().historyPast).toHaveLength(0);
+    });
+
+    it('ignores a plain click, leaving the area and the undo history untouched', () => {
+      const { pointer } = renderCanvas(withArea());
+      startDrawing();
+
+      pointer.down(100, 100);
+      pointer.up(100, 100);
+
+      expect(rectsOf()).toEqual([initialArea]);
+      expect(getAppState().historyPast).toHaveLength(0);
+    });
+
+    it('resizes an area by dragging a handle, moving only that edge', () => {
+      const { pointer, container } = renderCanvas(withArea());
+      startDrawing();
+      const rightEdge = CLIP_HANDLES.findIndex((h) => h.hx === 1 && h.hy === 0);
+      const handles = container.querySelectorAll(
+        'pixicontainer[label="map-clip-edit-layer"] > pixigraphics[eventmode="dynamic"]',
+      );
+
+      fireEvent.pointerDown(handles[rightEdge], { button: 0, pointerId: 1, ...toScreen(50, 25) });
+      pointer.move(80, 40);
+      pointer.up(80, 40);
+
+      expect(rectsOf()).toEqual([{ x: 0, y: 0, width: 80, height: 50 }]);
+    });
+
+    it('does not select or move waypoints while drawing', () => {
+      const { pointer, container } = renderCanvas({
+        ...withArea(),
+        ...waypointTree([makeWaypoint('w', { transform: makeTransform(50, 50) })]),
+      });
+      startDrawing();
+
+      fireEvent.pointerDown(waypointAt(container, 50, 50), { button: 0, pointerId: 1, ...toScreen(50, 50) });
+      pointer.move(80, 80);
+      pointer.up(80, 80);
+
+      expect(getAppState().selectedNodeIds).toEqual([]);
+      expect(getAppState().nodes.w.transform).toMatchObject({ x: 50, y: 50 });
+    });
+
+    it('returns to the select tool on a second Escape', () => {
+      renderCanvas(withArea());
+      startDrawing();
+
+      escape();
+
+      expect(getAppState().appMode.mode).toBe('select');
+    });
+  });
+
   describe('marquee selection', () => {
     it('selects the waypoints inside a Shift+drag rectangle', () => {
       const { pointer } = renderCanvas(
@@ -341,9 +455,9 @@ describe('MapCanvas tools', () => {
 
   describe('fit to maps', () => {
     it('frames both the maps and every waypoint, including ones added after the map', () => {
-      const { viewport } = renderCanvas({
-        mapLayers: [makeMapLayer('m', { width: 100, height: 100, info: { resolution: 0.1, origin: [0, 0, 0] } })],
-      });
+      const { viewport } = renderCanvas(
+        layerStackState(makeMap('m', { width: 100, height: 100, info: { resolution: 0.1, origin: [0, 0, 0] } })),
+      );
       // A waypoint far outside the map, nested in a group, added after the map was loaded.
       act(() =>
         useAppStore.setState(

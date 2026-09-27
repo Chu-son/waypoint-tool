@@ -12,7 +12,6 @@ describe('useMapEditLine', () => {
       type: 'manual',
       visible: true,
       opacity: 1.0,
-      z_index: 0,
       editObjects: [],
     };
 

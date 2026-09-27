@@ -60,8 +60,6 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const exportTemplates = useAppStore((state) => state.exportTemplates) || [];
   const defaultExportFormats = useAppStore((state) => state.defaultExportFormats) || [];
   const exportRegions = useAppStore((state) => state.exportRegions) || [];
-  const mapLayers = useAppStore((state) => state.mapLayers) || [];
-  const customLayers = useAppStore((state) => state.customLayers) || [];
   const rootNodeIds = useAppStore((state) => state.rootNodeIds) || [];
   const nodes = useAppStore((state) => state.nodes) || {};
   const optionsSchema = useAppStore((state) => state.optionsSchema);
@@ -313,7 +311,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           // 1. Prepare map raster layers if map export is required
           let preparedLayers: any[] = [];
           if (hasMapItems) {
-            preparedLayers = await prepareLayersForExport(mapLayers, customLayers);
+            preparedLayers = await prepareLayersForExport(useAppStore.getState());
           }
 
           // 2. Extract map shot canvas if requested

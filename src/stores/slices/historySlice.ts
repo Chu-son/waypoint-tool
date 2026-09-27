@@ -1,9 +1,17 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
-import { WaypointNode, CustomLayer, AnnotationObject, InsertionTarget } from '../../types/store';
+import {
+  WaypointNode,
+  CustomLayer,
+  AnnotationObject,
+  InsertionTarget,
+  MapLayerClip,
+  ProjectMapLayer,
+} from '../../types/store';
 import { ActiveSelection } from '../../types/selection';
 import type { GeoAlignment } from '../../types/geo';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
+import { reconcileLayerOrder } from '../../utils/layerStack';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -14,11 +22,28 @@ export type HistorySnapshot = {
   selection: ActiveSelection;
   anchorNodeId: string | null;
   customLayers: CustomLayer[];
+  /** Use area of every map layer at capture time; layers added afterwards keep their own. */
+  mapClips: Record<string, MapLayerClip | null>;
+  /** Stack order at capture time; reconciled against the layers that exist when restored. */
+  layerOrder: string[];
   annotationObjects: Record<string, AnnotationObject>;
   annotationOrder: string[];
   insertionTarget: InsertionTarget | null;
   geoAlignment: GeoAlignment;
 };
+
+/** Restores the stack order saved in `snapshot` for the layers that exist after restoring its custom layers. */
+const restoredLayerOrder = (state: AppState, snapshot: HistorySnapshot): string[] =>
+  reconcileLayerOrder(snapshot.layerOrder, [
+    ...state.mapLayers.map((l) => l.id),
+    ...snapshot.customLayers.map((l) => l.id),
+  ]);
+
+/** Map layers with the use areas saved in `snapshot`; layers the snapshot does not know keep theirs. */
+const restoredMapLayers = (state: AppState, snapshot: HistorySnapshot): ProjectMapLayer[] =>
+  state.mapLayers.map((layer) =>
+    layer.id in snapshot.mapClips ? { ...layer, clip: snapshot.mapClips[layer.id] } : layer,
+  );
 
 export type HistorySlice = {
   historyPast: HistorySnapshot[];
@@ -58,6 +83,8 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   ),
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
+  mapClips: Object.fromEntries(state.mapLayers.map((l) => [l.id, l.clip ? structuredClone(l.clip) : null])),
+  layerOrder: [...state.layerOrder],
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
   annotationOrder: [...(state.annotationOrder ?? [])],
   insertionTarget: state.insertionTarget ? { ...state.insertionTarget } : null,
@@ -132,6 +159,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selection: restoredSelection,
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
+        mapLayers: restoredMapLayers(state, snapshot),
+        layerOrder: restoredLayerOrder(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         insertionTarget: restoredTarget,
@@ -169,6 +198,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selection: restoredSelection,
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
+        mapLayers: restoredMapLayers(state, snapshot),
+        layerOrder: restoredLayerOrder(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         insertionTarget: restoredTarget,

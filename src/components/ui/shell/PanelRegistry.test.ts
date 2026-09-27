@@ -127,7 +127,6 @@ describe('PanelRegistry', () => {
             editObjects: [],
             visible: true,
             opacity: 1,
-            z_index: 0,
           },
         ],
       });
@@ -153,7 +152,6 @@ describe('PanelRegistry', () => {
             info: { resolution: 0.05, origin: [0, 0, 0], width: 10, height: 10 },
             visible: true,
             opacity: 0.7,
-            z_index: 0,
             pipeline_metadata: {
               pipeline_id: 'test_pipeline',
               pipeline_execution_id: 'exec-1',

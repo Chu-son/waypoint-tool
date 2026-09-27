@@ -145,6 +145,9 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
         case 'geo_map_align':
           normalizedMode = { mode: 'geo_map_align' };
           break;
+        case 'map_clip_edit':
+          normalizedMode = { mode: 'map_clip_edit', layerId: mode.layerId };
+          break;
       }
 
       // Phase 2: OnExit (現在のモードの終了処理)
@@ -295,9 +298,10 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.pluginInteractionData = {};
             updates.elementCopyState = null;
             break;
+          case 'map_clip_edit':
           case 'geo_map_align':
-            // 背景地図の位置合わせ中は、ウェイポイント等の選択・編集操作を受け付けない
-            updates.activeTool = 'geo_align';
+            // 背景地図の位置合わせ・マップの使用領域の編集中は、ウェイポイント等の選択・編集操作を受け付けない
+            updates.activeTool = normalizedMode.mode === 'map_clip_edit' ? 'map_clip' : 'geo_align';
             updates.isMapEditMode = false;
             updates.isAnnotationEditMode = false;
             updates.activePluginId = null;

@@ -34,7 +34,7 @@ graph TD
     end
 
     subgraph StateCore ["2. 状態機械コア (State Machine Core)"]
-        Axis_Mode["プライマリモード (AppModeState: 10種)<br>【入力解釈の前提ルール】"]
+        Axis_Mode["プライマリモード (AppModeState: 11種)<br>【入力解釈の前提ルール】"]
         Axis_Sel["選択権限 (ActiveSelection: 単一真実源)<br>【操作対象の排他的特定】"]
         Axis_Gest["キャンバス過渡ジェスチャー (Transient Gesture)<br>【PointerDown〜Upの短命状態】"]
         Axis_Hist["履歴トランザクション (HistorySnapshot)<br>【Undo/Redo & ロールバック】"]
@@ -84,7 +84,7 @@ graph TD
 │                               (入力要素へのDOMフォーカス / キー専有)           │
 │                                                                             │
 │  [Axis 3: Primary Tool Mode]  Select | WaypointAdd | GeneratorAdd | ...     │
-│                               (10の排他的な第一級ツールモード: AppModeState)    │
+│                               (11の排他的な第一級ツールモード: AppModeState)    │
 │                                                                             │
 │  [Axis 4: Transient Gesture]  Idle | Panning | Dragging | Rotating | ...    │
 │                               (PointerDown〜Up/Abort の物理的短命状態)        │
@@ -108,7 +108,7 @@ graph TD
 
 #### Axis 3: プライマリ対話モード (Primary Tool Mode: 完全排他)
 - **管理スライス**: `interactionSlice.ts` (`appMode: AppModeState`)
-- **性質**: アプリケーションの「現在の主たる操作意図」を決定する**10の排他的な第一級状態**です。Discriminated Union（判別共用体）として定義され、複数のモードが同時に存在することは型レベルおよびランタイムで不可能です。
+- **性質**: アプリケーションの「現在の主たる操作意図」を決定する**11の排他的な第一級状態**です。Discriminated Union（判別共用体）として定義され、複数のモードが同時に存在することは型レベルおよびランタイムで不可能です。
 
 #### Axis 4: キャンバス過渡ジェスチャー (Canvas Transient Gestures: 短命状態)
 - **管理コンポーネント**: `src/components/canvas/MapCanvas.tsx`
@@ -130,9 +130,9 @@ graph TD
 
 ---
 
-## 3. 10のプライマリ対話モード仕様 (10 Primary Tool Modes)
+## 3. 11のプライマリ対話モード仕様 (11 Primary Tool Modes)
 
-`src/types/mode.ts` にて定義される `AppModeState` は以下の10のバリアントを持ちます。
+`src/types/mode.ts` にて定義される `AppModeState` は以下の11のバリアントを持ちます。
 
 ```typescript
 export type AppModeState =
@@ -174,7 +174,8 @@ export type AppModeState =
       previewNodeId: string | null;
     }
   | { mode: 'measure' }
-  | { mode: 'geo_map_align' };
+  | { mode: 'geo_map_align' }
+  | { mode: 'map_clip_edit'; layerId: string };
 ```
 
 ### 3.1 各モードの詳細仕様
@@ -191,6 +192,7 @@ export type AppModeState =
 | **`element_paste`** | `field`: コピー対象 (`x`\|`y`\|`z`\|`yaw`)<br>`value`: コピー値<br>`coordSystem`: 座標系<br>`previewNodeId`: ホバー中ノードID | Inspector で要素コピーボタン押下 | ノードホバーで適用プレビュー表示、クリックで個別適用 | 貼り付け対象ノードの Inspector | 完了 / クリア操作 / Esc (Tier 6) |
 | **`measure`** | なし | `M` キー / TOOLS メジャーアイコンクリック | 2点クリックまたは2オブジェクトクリックで実寸距離[m]を計測、リアルタイム距離バッジ描画、アノテーション保存フラグ | 現在の選択に応じた表示 / 上部バナー | `V` キー / 完了 / Esc (Tier 6) |
 | **`geo_map_align`** | なし（`activeTool` は `geo_align`） | レイヤーパネルの Geo Base Map カードの「Align on canvas」 | 左ドラッグで背景地図を平行移動、Shift+左ドラッグで地図の原点まわりに回転（ドラッグ全体が Undo 1 回）。ウェイポイント等の選択・編集は受け付けない。地図の原点位置にマーカーを描画 | 現在の選択に応じた表示 | 「Done aligning」 / `V` キー / 他ツール切替 / Esc（ドラッグ中は Tier 3 で開始前の位置へ復元、その後 Tier 6） |
+| **`map_clip_edit`** | `layerId`: 使用領域を編集するマップレイヤーID（`activeTool` は `map_clip`） | レイヤーパネルのマップカード「Use Area」の「Draw on canvas」 | 空いた所を左ドラッグで使用領域を矩形で描画（既存の領域は置き換え）、Shift+左ドラッグで領域を追加、領域の 8 つのハンドルで大きさを変更（ドラッグ全体が Undo 1 回。クリックのみは何もしない）。対象マップは領域で切り抜かず全体を表示し、領域を半透明の枠で示す。ウェイポイント等の選択・編集は受け付けない | 現在の選択に応じた表示 | 「Done drawing」 / Use Area をオフ / `V` キー / 他ツール切替 / Esc（ドラッグ中は Tier 3 で開始前の領域へ復元、その後 Tier 6） |
 
 ### 3.2 モード遷移の 4フェーズ同期ライフサイクルパイプライン
 
@@ -354,7 +356,7 @@ flowchart TD
 
 ### 6.1 8大プライマリ対話モードの遷移と相互関係図 (Primary Tool Modes)
 
-アプリケーションに存在する10の排他的な第一級ツールモードと、その切り替えトリガー・脱出条件です。
+アプリケーションに存在する11の排他的な第一級ツールモードと、その切り替えトリガー・脱出条件です。
 
 ```mermaid
 stateDiagram-v2
@@ -534,7 +536,7 @@ stateDiagram-v2
 システム全体の整合性・信頼性を保つため、以下の5大不変条件がアーキテクチャ全体に義務付けられています。
 
 ### 7.1 モード完全排他不変条件 (Mode Mutual Exclusivity Invariant)
-- **定義**: いかなる瞬間においても、`AppModeState` に定義された10のプライマリモードのうち2つ以上が同時にアクティブになってはならない。
+- **定義**: いかなる瞬間においても、`AppModeState` に定義された11のプライマリモードのうち2つ以上が同時にアクティブになってはならない。
 - **強制手法**: Discriminated Union 型による型レベル保証、および `transitionToMode` による原子的切替。旧ブール値フラグ（`isMapEditMode`, `isAnnotationEditMode` 等）を直接変更してモードを並立させることは禁止。
 
 ### 7.2 選択単一真実源不変条件 (Selection Single Authority Invariant)
@@ -761,7 +763,7 @@ flowchart TD
 1. **新しいモードを追加する場合**:
    - `src/types/mode.ts` の `AppModeState` および `AppModeTransition` に新しいバリアントを追加する。
    - `src/stores/slices/interactionSlice.ts` の `transitionToMode` に正規化ロジックを追加する。
-   - 本ドキュメントの「3. 10のプライマリ対話モード仕様」、「6. 状態遷移マトリクス」、および「9. UI表示対応マトリクス」を更新する。
+   - 本ドキュメントの「3. 11のプライマリ対話モード仕様」、「6. 状態遷移マトリクス」、および「9. UI表示対応マトリクス」を更新する。
 
 2. **キャンバス対話 Hook を作成する場合**:
    - マウスドラッグ等の過渡操作を開始する際は、必ず開始直前の状態（初期座標など）を変数に保持する。

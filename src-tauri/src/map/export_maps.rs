@@ -1,4 +1,4 @@
-use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
+use super::blending::{blend_layers_to_image, LayerClip, LayerInput, RectRegion};
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
 use serde::Deserialize;
@@ -42,6 +42,8 @@ pub struct ExportLayer {
     pub opacity: f64,
     pub blend_mode: String,
     pub z_index: i32,
+    #[serde(default)]
+    pub clip: Option<LayerClip>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,6 +120,7 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
                 origin: info.origin,
                 blend_mode: &layer.blend_mode,
                 z_index: layer.z_index,
+                clip: layer.clip.as_ref(),
             });
         }
 
@@ -215,5 +218,29 @@ mod tests {
 
         assert_eq!(info.resolution, 0.05);
         assert_eq!(info.origin, [1.0, 2.0, 0.0]);
+        assert!(options.layers[0].clip.is_none());
+    }
+
+    #[test]
+    fn deserialize_layer_clip_from_frontend_payload() {
+        let json = r#"
+        {
+            "id": "map-1",
+            "name": "Map 1",
+            "image_base64": null,
+            "info": null,
+            "opacity": 1.0,
+            "blend_mode": "overwrite",
+            "z_index": 0,
+            "clip": { "rects": [{ "x": 0.0, "y": -1.0, "width": 2.5, "height": 4.0 }] }
+        }
+        "#;
+
+        let layer: ExportLayer = serde_json::from_str(json).unwrap();
+        let clip = layer.clip.unwrap();
+
+        assert!(clip.contains(1.0, 0.0));
+        assert!(!clip.contains(2.5, 0.0), "right edge is exclusive");
+        assert!(!clip.contains(1.0, -1.5));
     }
 }

@@ -4,7 +4,7 @@ import { StatusBar } from './StatusBar';
 import { BackendAPI, DialogAPI } from '../../../api';
 import { renderWithStore } from '../../../test/render';
 import { getAppState, PAST_WELCOME } from '../../../test/store';
-import { makeMapLayer, makeTransform, makeWaypoint, waypointTree } from '../../../test/fixtures';
+import { layerStackState, makeMap, makeTransform, makeWaypoint, waypointTree } from '../../../test/fixtures';
 import type { AppState } from '../../../stores/appStore';
 
 const renderStatusBar = (state: Partial<AppState> = {}) =>
@@ -16,7 +16,7 @@ const renderStatusBar = (state: Partial<AppState> = {}) =>
     ]),
     cursorPosition: { x: 1.234, y: 5.678 },
     mapScale: 1.5,
-    mapLayers: [makeMapLayer('map-1')],
+    ...layerStackState(makeMap('map-1')),
     enableSnapping: true,
     ...state,
   });

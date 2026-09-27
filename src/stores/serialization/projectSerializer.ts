@@ -21,26 +21,15 @@ export function normalizeProjectData(data: any) {
 }
 
 export function buildProjectData(state: AppState): StrictProjectData {
-  const mapLayersToSave = state.mapLayers.map((layer) => ({
-    id: layer.id,
-    name: layer.name,
-    info: layer.info,
-    image_base64: layer.image_base64,
-    width: layer.width,
-    height: layer.height,
-    visible: layer.visible,
-    opacity: layer.opacity,
-    z_index: layer.z_index,
-    blend_mode: layer.blend_mode,
-  }));
-
   const annotationObjectsToSave = Object.values(state.annotationObjects || {});
 
   return {
     version: 1,
     root_node_ids: state.rootNodeIds,
     nodes: state.nodes,
-    map_layers: mapLayersToSave,
+    map_sources: state.mapSources,
+    map_layers: state.mapLayers,
+    layer_order: state.layerOrder,
     custom_layers: state.customLayers,
     annotation_objects: annotationObjectsToSave,
     annotation_groups: state.annotationGroups || {},

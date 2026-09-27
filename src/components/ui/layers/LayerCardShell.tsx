@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Trash2, ChevronUp, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Eye, EyeOff, Trash2, ChevronUp, ChevronDown, SlidersHorizontal, Copy } from 'lucide-react';
 import { Button } from '../common/Button';
 import { cn } from '../../../utils/cn';
 
@@ -54,6 +54,9 @@ interface LayerCardShellProps {
   onToggleVisible: () => void;
   onRemove: () => void;
   removeTooltip?: string;
+  /** Shows a duplicate button when given. */
+  onDuplicate?: () => void;
+  duplicateTooltip?: string;
   children?: React.ReactNode;
 }
 
@@ -76,6 +79,8 @@ export function LayerCardShell({
   onToggleVisible,
   onRemove,
   removeTooltip = 'Remove',
+  onDuplicate,
+  duplicateTooltip = 'Duplicate',
   children,
 }: LayerCardShellProps) {
   const hasReorder = !!onMoveUp && !!onMoveDown;
@@ -126,6 +131,21 @@ export function LayerCardShell({
 
         <div className="flex items-center gap-1 shrink-0">
           {headerActions}
+
+          {onDuplicate && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-text-muted hover:text-text-base"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate();
+              }}
+              title={duplicateTooltip}
+            >
+              <Copy size={14} />
+            </Button>
+          )}
 
           <Button
             variant={showSettings ? 'secondary' : 'ghost'}

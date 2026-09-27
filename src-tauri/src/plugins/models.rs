@@ -56,6 +56,9 @@ pub struct PluginMapLayer {
     pub blend_mode: String,
     #[serde(default)]
     pub z_index: i32,
+    /// 合成に参加する範囲。省略時はレイヤー全体。
+    #[serde(default)]
+    pub clip: Option<crate::map::blending::LayerClip>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

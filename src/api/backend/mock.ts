@@ -1,4 +1,4 @@
-import { OptionsSchema, PluginInstance, ProjectMapLayer } from '../../types/store';
+import { OptionsSchema, PluginInstance } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class MockBackendAPI implements IBackendAPI {
@@ -124,7 +124,7 @@ export class MockBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     _contextData: any,
     _pythonPath?: string,
-    _mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
+    _mapLayers?: BlendPreviewLayerInput[],
   ): Promise<any> {
     console.log('[Mock Backend] runPlugin called for:', pluginInstance.manifest.name);
     return [];
