@@ -139,7 +139,7 @@ graph TD
 
 `src/stores/appStore.ts` は以下のスライスを統合して構築されています。
 
-- **`mapSlice.ts`**: ロード済みマップレイヤー情報、解像度、原点座標、不透明度、アクティブマップ設定、フットプリント全体表示トグル (`showFootprints`)。
+- **`mapSlice.ts`**: レイヤースタック。ロード済みマップ `mapSources`（画像・解像度・原点/姿勢・占有閾値。同じマップの全インスタンスで共有）、マップインスタンス `mapLayers`（`sourceId`・名前・表示・不透明度・ブレンド・使用領域 `clip`）、カスタムレイヤー `customLayers`、そして両者を通した積み順 `layerOrder`（最上位が先頭の id 列）。`duplicateMapLayer`（同じマップの別インスタンスを直上に追加）、`updateMapSource`（姿勢・閾値の編集）、`reorderLayers`（種類をまたぐ並べ替え）を持つ。アクティブマップ設定、フットプリント全体表示トグル (`showFootprints`) も含む。
 - **`nodeSlice.ts`**: Waypoint ノードおよびジェネレーターノードの追加・削除・編集・一括操作・Undo/Redo。
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
@@ -188,7 +188,13 @@ graph TD
 - 緯度経度 ⇔ ワールド座標の変換は `src/utils/geo/geoTransform.ts` に集約する。ワールド座標 = R(yaw)·(UTM − 原点のUTM) + (dx, dy)（X 右 / Y 上、m）。回転行列は 5.3 のマップ原点と同じ向き（反時計回りが正）。
 - UTM は必ず原点と同じゾーン・半球に固定して計算する（ゾーン境界をまたいでも連続に扱うため）。UTM の縮尺係数 (0.9996) は無視して m をそのままワールドの m とみなす。
 - タイルの配置は、タイル左上・右上・左下の 3 隅をワールド座標へ写して Sprite の位置・回転・スケールを求める（Web Mercator と UTM はどちらも等角なので、タイル 1 枚の範囲では相似変換として扱える）。
-- 背景地図は `MapCanvas` のワールドコンテナ内で最背面（`map-layers-group` より前）に描画する。タイルの取得は `BackendAPI.fetchMapTile` → Rust `tiles.rs` が担い、フロント側は `canvas/utils/tileCache.ts`（同時取得数の制限・LRU・失敗時の再試行間隔）で保持する。
+- 背景地図は `MapCanvas` のワールドコンテナ内で最背面（`layer-stack-group` より前）に描画する。タイルの取得は `BackendAPI.fetchMapTile` → Rust `tiles.rs` が担い、フロント側は `canvas/utils/tileCache.ts`（同時取得数の制限・LRU・失敗時の再試行間隔）で保持する。
+
+### 5.3.2 レイヤースタックの規約 (Layer Stack)
+- **ソースとインスタンスの分離**: マップの画像・メタデータは `MapSource` に 1 つだけ持ち、`ProjectMapLayer`（インスタンス）は `sourceId` で参照する。複製は同じ `sourceId` を指す新インスタンスを作るだけで、画像は複製しない。姿勢（`info.origin`）と占有閾値は source の属性なので、どのインスタンスから編集しても全複製に反映される。インスタンスを消して参照が 0 になった source は同時に削除する。
+- **積み順の単一情報源は `layerOrder`**: マップインスタンスとカスタムレイヤーの全 id を、最上位を先頭に並べる。レイヤーに `z_index` は持たせない。合成用の z は `stackZIndexes` が導出し（下が 0）、描画は `LayerStack`、エクスポート／プレビュー／プラグインへの入力は `prepareLayersForExport` が同じ順序で処理する。`layerOrder` は「存在するレイヤーをちょうど 1 回ずつ含む」ことを不変条件とし、Undo/Redo 復元時と読込時は `reconcileLayerOrder` で整える。
+- **使用領域 (clip)**: インスタンスは任意でワールド座標 (m) の矩形の和集合を持つ（半開区間 [x, x+w) × [y, y+h)。辺を共有する 2 矩形は重ならず隙間も生じない）。領域外のピクセルは合成に参加しない。フロントエンドは Pixi マスク（`clipMask.ts`）、Rust は `blending.rs` の `LayerClip::contains` で同じ判定を行い、`blend_layers_to_image`（プレビュー・統合エクスポート）と `occupancy.rs`（プラグインへ渡す占有格子）の両方に適用する。
+- **プロジェクトファイル**: `map_sources` / `map_layers`（インスタンス）/ `layer_order` を保存する。`map_sources` を持たない旧形式は `stores/migrations/mapStackNormalization.ts` が、旧マップ 1 枚 = source 1 + インスタンス 1（旧レイヤー id を引き継ぐ）に変換し、積み順は「カスタムレイヤー（上）→ マップ」とする。
 
 ### 5.4 ツリー変形時の挿入境界射影規約 (Adjacent Boundary Projection Standard)
 - ツリー変形（ノード削除、Group作成・解除、ノード移動、複製等）を行うすべての Store アクションは、直前ノードに基づく共通写像関数 `mapInsertionTarget`（`src/utils/treeUtils.ts`）を介して `insertionTarget` を安全に追従・更新しなければならない。
