@@ -129,8 +129,9 @@ graph TD
    - ノード／アノテーション共通の子リスト操作（削除・挿入）は純粋関数 `src/utils/treeOps.ts`（`detachFromTree` / `insertIntoTree`）に集約されています。
 
 5. **バックエンド (Tauri / Rust Core)**:
-   - ファイルシステムの直接アクセス、Handlebars テンプレートによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
-   - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。
+   - ファイルシステムの直接アクセス、テンプレートエンジンによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
+   - テンプレートのレンダリングは `src-tauri/src/templating.rs` に集約されており、`TemplateEngine`（`handlebars` / `jinja`）に応じて Handlebars（後方互換）または MiniJinja（`{% for %}`/`{% if %}`、四則演算、`toyaml`/`deg`/`rad` 等のカスタムフィルタを追加した Jinja2 互換エンジン）でレンダリングする。`io::export_waypoints` / `io::infer_import_mapping` / `commands::export_pipeline::execute_export_package` の3箇所が共通してこれを呼ぶ。
+   - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。Option Schema の YAML 読み込み（`load_options_schema`）も同様に、型の正規化・検証はフロントエンド（`src/utils/optionSchema.ts`）を Single Source of Truth とし、Rust 側は「壊れた YAML を早期に弾く」構造チェックのみを行い、検証済みの生 JSON を返す。
    - 外部 Python プラグインプロセスを標準入出力 (`stdin` / `stdout`) で起動・同期通信します。
 
 ---
@@ -144,7 +145,7 @@ graph TD
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
 - **`pathCalculatorSlice.ts`**: 経路計算プラグイン（障害物回避ルーティング等）の選択・パラメータ・計算結果、デバウンス付き再計算 (`recalculatePath`)。
-- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema（ウェイポイント属性 `options` とプロジェクト全体変数 `globals`）、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
+- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema（ウェイポイント属性 `options` とプロジェクト全体変数 `globals`。いずれも `src/utils/optionSchema.ts` の再帰的な `TypeSpec`（scalar / `list` / `object` / `map` / `union` / `any`）で型定義される）、エクスポートテンプレート設定（テンプレートごとに `engine: 'handlebars' | 'jinja'` を持つ）、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。`node.options` には明示的に入力された値だけを保持し（スキーマの `default` とは区別する）、既定値の補完は `src/utils/optionValues.ts` の `resolveWithDefaults` が表示・エクスポート時に行う。
 - **`interactionSlice.ts`**: 状態機械および対話管理（10種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、サイドバーパネルの自由ドッキング配置構造（`panelLayout`：左/右パネル所属タブ一覧・並び替え・相互移動・永続化）、アクティブタブ（`activateTab`）、モーダル表示状態、ズーム/パン位置。
 - **`geoMapSlice.ts`**: 背景地図（OSM / 衛星画像）の設定 `geoMap`（有効/無効、ベースマップ ID とカスタム URL、不透明度、ワールド原点の地理座標、位置合わせ `alignment`）と、ドラッグ／数値入力による位置合わせの編集セッション（`beginGeoAlignDrag` → `updateGeoAlignDrag` → `endGeoAlignDrag` / `cancelGeoAlignDrag`）。位置合わせは Undo 履歴に含まれ、1 セッションが Undo 1 回になる。プロジェクトファイルの `geo_map` に保存し、読込時は `migrations/geoMapNormalization.ts` で検証・補完する。

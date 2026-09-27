@@ -242,27 +242,66 @@ Waypoint やパス、フットプリント、アノテーションの属性値�
 Waypoint にロボット独自のカスタム属性を付加できます。
 
 1. `Settings > Option Schema` タブを開きます。
-2. **「Add Field」** をクリックし、フィールド名、表示ラベル、型（`string`, `float`, `integer`, `boolean`, `list`）、デフォルト値を設定します。
-3. 「Apply Schema」を押すと、全 Waypoint の Inspector 内に専用の入力フォーム（スライダー、セレクトボックス、トグルスイッチ等）が動的に生成されます。
+2. **「Add Field」** をクリックし、フィールド名、表示ラベル、型を設定します。
+3. 「Apply」を押すと、全 Waypoint の Inspector 内の「Custom Options」セクションに専用の入力フォームが動的に生成されます。
+
+### サポートする型
+
+| 型        | 説明                                                   | Inspector での編集                       |
+| --------- | ------------------------------------------------------ | ----------------------------------------- |
+| `string`  | 文字列。`Dropdown Enums` を設定するとプルダウンになる。 | テキスト入力 / プルダウン                 |
+| `float` / `integer` | 数値。                                        | 数値入力                                  |
+| `boolean` | 真偽値。                                                | トグルスイッチ                            |
+| `list`    | 配列。要素の型 (`List Item Type`) を選べる。            | 要素がスカラーなら CSV 入力、`object`/`union` 等の構造体なら追加・削除・並べ替えできるカード一覧 |
+| `object`  | 固定フィールドを持つ入れ子オブジェクト。                | フィールドごとの入力欄                    |
+| `map`     | 自由なキーと、共通の値の型 (`Map Value Type`) を持つ辞書。 | キーの追加・リネーム・削除 + 値の入力  |
+| `union`   | 判別キー (`Discriminator Key`) の値ごとにフィールド構成が変わるタグ付きバリアント。 | バリアント選択 + 選択中バリアントのフィールド入力（バリアントを切り替えると、同名のフィールドは値を引き継ぎ、新しいバリアントに無いフィールドは破棄される） |
+| `any`     | 構造を規定しない自由な JSON 値。                        | JSON テキスト入力                         |
+
+`list`/`object`/`map`/`union` は組み合わせて入れ子にできます。例えば「`type` によってフィールド構成が変わるアクションのリスト」は、`list` の要素を `union` にし、`union` の各バリアントに固定フィールド（`string`/`float`/`integer`/`boolean`/`map`/`any`）を定義することで表現できます。設定画面のスキーマ編集では、この入れ子は `union` の各バリアントのフィールドまで（object のフィールドや map の値まで）GUI から組み立てられます。それより深い入れ子が必要な場合は、後述の YAML/JSON インポートを使ってください。
+
+**例: 到達時に実行するアクションの一覧**（`type` によって必要なフィールドが変わる）
+
+```yaml
+options:
+  - name: on_reached_actions
+    label: "到達時アクション"
+    type: list
+    item:
+      type: union
+      discriminator: type
+      variants:
+        - value: wait
+          label: "待機"
+          fields:
+            - { name: countdown_ms, label: "待機時間(ms)", type: integer, default: 3000 }
+        - value: service
+          label: "サービス呼び出し"
+          fields:
+            - { name: service, label: "サービス名", type: string }
+            - { name: request, label: "リクエスト", type: map }
+        - value: amcl_reset
+          label: "AMCLリセット"
+          fields: []
+```
+
+この YAML を `Settings > Option Schema` の **Import** から読み込むと、`on_reached_actions` オプションが定義され、各 Waypoint の Inspector でアクションを1件ずつ追加し、種類（`wait` / `service` / `amcl_reset`）を選んでフィールドを入力できるようになります。
+
+### 未設定の値とスキーマ既定値の違い
+
+フィールドに何も入力しなければ、その値は「未設定」としてプロジェクトファイルに保存されません（`default` を書いても、それはあくまで Inspector の表示や、エクスポート時の補完に使われるだけです）。この区別は、「フィールドを省略すると受け側のデフォルトが使われる」形式の外部フォーマットへ書き出す際に重要です。エクスポートテンプレートからは、次の2種類の値を参照できます。
+
+- `options.*`: スキーマの既定値を補った実効値（既存のテンプレートと同じ、これまでどおりの参照方法）
+- `raw_options.*`: 明示的に入力された値だけ（未入力のフィールドは含まれない）
 
 ### グローバルフィールド（プロジェクト全体の変数）
 
-Waypoint ごとではなく、プロジェクト全体で1つの値を持つ変数を定義できます。エクスポートするファイルに「デフォルト速度」のような全体設定の項目がある場合に使います。
+Waypoint ごとではなく、プロジェクト全体で1つの値を持つ変数を定義できます。エクスポートするファイルに「デフォルト速度」のような全体設定の項目がある場合に使います。ウェイポイント属性と同じ型（`object`/`union` 等も含む）を利用できます。
 
 1. `Settings > Option Schema` タブの **「Global Fields」** で **「Add Global」** をクリックし、フィールド名、表示ラベル、型、**値（Value）** を設定して「Apply」を押します。値はプロジェクト（`.wptroj`）に保存されます。
-2. `Settings > Export Templates` のテンプレート編集欄に **Global Fields** のチップが表示されます。クリックすると `{{@root.globals.フィールド名}}` が挿入されます。
+2. `Settings > Export Templates` のテンプレート編集欄に **Global Fields** のチップが表示されます。クリックすると、選択中のテンプレートエンジンに応じた参照式（Handlebars なら `{{@root.globals.フィールド名}}`、Jinja なら `{{ globals.フィールド名 }}`）が挿入されます。
 3. エクスポート時、テンプレート内でグローバルフィールドの値に置き換わります。
 
-```handlebars
-default_speed: {{globals.default_speed}}
-{{#each waypoints}}
-- id: {{id}}
-  speed: {{options.speed}}
-  frame: {{@root.globals.frame_id}}
-{{/each}}
-```
-
-- `{{#each waypoints}}` の内側からは `{{@root.globals.名前}}` で参照します。
 - 値が未入力のフィールドは出力に含まれず、テンプレート上では空になります。
 - 既定のYAML/JSON出力（テンプレートを使わない形式）にはグローバルフィールドは含まれません。
 
@@ -299,9 +338,44 @@ default_speed: {{globals.default_speed}}
 
 ## 12. インポート・エクスポート & プロファイル
 
-### Handlebars テンプレートによる自由出力
+### カスタムテンプレートによる自由出力
 `File > Export Waypoints...`（または `Ctrl + E`）から実行します。
-`Settings > Export Templates` で定義した Handlebars テンプレートにより、標準の YAML だけでなく、JSON、CSV、ROS2 Nav2 XML 形式など任意のフォーマットで出力可能です。
+`Settings > Export Templates` で定義したテンプレートにより、標準の YAML だけでなく、JSON、CSV、ROS2 Nav2 XML 形式など任意のフォーマットで出力可能です。テンプレートごとに **Engine**（`Jinja` または `Handlebars`）を選べます。
+
+- **Jinja**（新規テンプレートの既定）: MiniJinja による Jinja2 互換のテンプレートエンジン。`{% for %}`/`{% if %}` による反復・分岐、四則演算・比較・論理演算、`tojson`（コンパクトな JSON 断片）、`toyaml`（ブロック形式の YAML 断片。`toyaml(2)` のように字下げ幅を指定できる）、`round`/`default`/`length` 等の標準フィルタが使えます。未定義の変数を出力・反復・属性アクセスしようとするとエラーになり typo を早期に検出できますが、`is defined` による存在チェックはエラーになりません。
+- **Handlebars**: 既存プロジェクトとの後方互換のために残しています。`{{#each waypoints}}...{{/each}}` で反復し、ループの外の値は `{{@root.変数名}}` で参照します。
+
+いずれのエンジンでも、各ウェイポイントについて次の値を参照できます。
+
+| 変数 | 内容 |
+| --- | --- |
+| `index`, `id`, `type` | 連番インデックス、ノードID、種別 |
+| `x`, `y`, `z`, `yaw`, `qx`, `qy`, `qz`, `qw` | 座標・姿勢 |
+| `options.*` | カスタム属性（スキーマの既定値を補った実効値） |
+| `raw_options.*` | カスタム属性（明示的に入力された値だけ） |
+
+**例: mg_robot 形式の `on_reached_actions` を Jinja + `toyaml` で出力する**
+
+```jinja
+version: "2.0"
+defaults:
+  is_through_point: true
+waypoints:
+{% for wp in waypoints %}
+  - index: {{ wp.index }}
+    pose:
+      position: {x: {{ wp.x }}, y: {{ wp.y }}, z: {{ wp.z }}}
+      orientation: {x: {{ wp.qx }}, y: {{ wp.qy }}, z: {{ wp.qz }}, w: {{ wp.qw }}}
+    navigation:
+      is_through_point: {{ wp.options.is_through_point | tojson }}
+{% if wp.raw_options.on_reached_actions is defined %}
+    on_reached_actions:
+{{ wp.raw_options.on_reached_actions | toyaml(6) }}
+{% endif %}
+{% endfor %}
+```
+
+`raw_options.on_reached_actions` を使っているのは、アクションを設定していないウェイポイントでは `on_reached_actions` フィールド自体を出力しないためです（`options.on_reached_actions` を使うと、スキーマの既定値まで書き出されてしまいます）。実際に動く完全なサンプルは `docs/sample/option_schemas/` にあります。
 
 ### テンプレートインポート
 `File > Import Waypoints...` から、外部ファイルを読み込めます。テンプレート内容からカラムマッピングが自動推論（`infer_import_mapping`）されるため、CSV 等のデータも手軽に取り込めます。

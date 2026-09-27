@@ -1,0 +1,103 @@
+{
+  "options": [
+    {
+      "name": "is_through_point",
+      "label": "通過点として扱う (is_through_point)",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "through_tolerance",
+      "label": "通過判定半径 [m] (through_tolerance)",
+      "type": "float",
+      "default": 3.0
+    },
+    {
+      "name": "on_reached_actions",
+      "label": "到達時アクション (on_reached_actions)",
+      "type": "list",
+      "item": {
+        "type": "union",
+        "discriminator": "type",
+        "variants": [
+          {
+            "value": "service",
+            "label": "サービス呼び出し",
+            "fields": [
+              { "name": "service", "label": "サービスパス", "type": "string" },
+              { "name": "srv_module", "label": "Python モジュール", "type": "string" },
+              { "name": "srv_class", "label": "サービス型クラス名", "type": "string" },
+              { "name": "request", "label": "リクエスト", "type": "map" }
+            ]
+          },
+          {
+            "value": "publish",
+            "label": "トピックパブリッシュ",
+            "fields": [
+              { "name": "topic", "label": "トピックパス", "type": "string" },
+              { "name": "msg_module", "label": "Python モジュール", "type": "string" },
+              { "name": "msg_class", "label": "メッセージ型クラス名", "type": "string" },
+              { "name": "data", "label": "メッセージフィールド", "type": "map" }
+            ]
+          },
+          {
+            "value": "load_map",
+            "label": "マップロード",
+            "fields": [
+              { "name": "localization", "label": "測位マップ YAML パス", "type": "string" },
+              { "name": "planning", "label": "計画マップ YAML パス", "type": "string" }
+            ]
+          },
+          {
+            "value": "amcl_reset",
+            "label": "AMCL リセット",
+            "fields": []
+          },
+          {
+            "value": "wait",
+            "label": "待機",
+            "fields": [{ "name": "countdown_ms", "label": "待機時間 [ms]", "type": "integer", "default": 3000 }]
+          },
+          {
+            "value": "wait_trigger",
+            "label": "外部トリガー待ち",
+            "fields": []
+          },
+          {
+            "value": "set_navigation_mode",
+            "label": "ナビゲーションモード切替",
+            "fields": [
+              {
+                "name": "mode",
+                "label": "モード",
+                "type": "string",
+                "default": "normal",
+                "enum_values": ["normal", "queue_wait"]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "globals": [
+    {
+      "name": "default_is_through_point",
+      "label": "既定: 通過点として扱う (defaults.is_through_point)",
+      "type": "boolean",
+      "value": true
+    },
+    {
+      "name": "default_through_tolerance",
+      "label": "既定: 通過判定半径 [m] (defaults.through_tolerance)",
+      "type": "float",
+      "value": 3.0
+    },
+    {
+      "name": "default_reach_tolerance",
+      "label": "既定: 参考値・到達判定には未使用 (defaults.reach_tolerance)",
+      "type": "float",
+      "value": 0.5
+    }
+  ]
+}

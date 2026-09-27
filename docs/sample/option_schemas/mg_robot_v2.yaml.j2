@@ -1,0 +1,27 @@
+version: "2.0"
+
+defaults:
+  reach_tolerance: {{ globals.default_reach_tolerance }}
+  through_tolerance: {{ globals.default_through_tolerance }}
+  is_through_point: {{ globals.default_is_through_point | tojson }}
+
+waypoints:
+{% for wp in waypoints %}
+  - index: {{ wp.index }}
+    pose:
+      position: {x: {{ wp.x }}, y: {{ wp.y }}, z: {{ wp.z }}}
+      orientation: {x: {{ wp.qx }}, y: {{ wp.qy }}, z: {{ wp.qz }}, w: {{ wp.qw }}}
+{% if wp.raw_options.is_through_point is defined or wp.raw_options.through_tolerance is defined %}
+    navigation:
+{% if wp.raw_options.is_through_point is defined %}
+      is_through_point: {{ wp.raw_options.is_through_point | tojson }}
+{% endif %}
+{% if wp.raw_options.through_tolerance is defined %}
+      through_tolerance: {{ wp.raw_options.through_tolerance }}
+{% endif %}
+{% endif %}
+{% if wp.raw_options.on_reached_actions is defined %}
+    on_reached_actions:
+{{ wp.raw_options.on_reached_actions | toyaml(6) }}
+{% endif %}
+{% endfor %}

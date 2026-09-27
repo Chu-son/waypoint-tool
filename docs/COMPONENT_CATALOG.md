@@ -105,8 +105,11 @@
   - **概要**: 特定の基準ノードからの相対距離・相対角度のリアルタイム算出・入力フィールド。
   - **主要Props**: `targetNode`, `baseNode`
 - **`CustomOptionsGroup`** ([`src/components/ui/properties/CustomOptionsGroup.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/CustomOptionsGroup.tsx))
-  - **概要**: プロジェクトで定義された Schema（速度、モード等）に基づき動的生成されるプロパティ入力群。
-  - **主要Props**: `options`, `schema`, `onChange`
+  - **概要**: プロジェクトで定義された Schema（速度、モード等）に基づき動的生成されるプロパティ入力群。scalar とその CSV list は自前で描画し、`object`/`map`/`union`、および要素がそれらの `list` は `OptionValueEditor` に委譲する。複数選択時、後者は「個別に編集してください」と表示する。
+  - **主要Props**: `isMultiSelection`, `node`, `handleUpdate`
+- **`OptionValueEditor`** ([`src/components/ui/properties/OptionValueEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/OptionValueEditor.tsx))
+  - **概要**: Option Schema の `TypeSpec` に従って値を再帰的に編集するコンポーネント（`CustomOptionsGroup` / `AnnotationCustomOptionsGroup` が共用）。`list` は要素の追加・削除・並べ替え（構造体要素はカード、スカラー要素は CSV 入力）、`object` は固定フィールド入力、`map` はキーの追加・リネーム・削除、`union` はバリアント選択（`switchUnionVariant` で同名フィールドを引き継ぐ）+ フィールド入力、`any` は JSON テキスト編集を行う。構造を変える操作は1回の `runInHistoryTransaction` にまとめ、テキスト入力は focus/blur で履歴トランザクションの開始・終了を行う。
+  - **主要Props**: `spec`, `value`, `onChange`, `name`, `defaultValue`, `disabled`
 - **`GeneratorNodePanel`** ([`src/components/ui/properties/GeneratorNodePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/GeneratorNodePanel.tsx))
   - **概要**: 生成されたジェネレーターノードの再編集・引数調整・Waypoint展開 (Explode) を行うUI。
   - **主要Props**: `nodeId`
@@ -186,11 +189,20 @@
   - **概要**: プラグインが必要とする入力（座標 `point`、点群 `points`、領域 `rectangle`、参照 `waypoint`、アノテーション `annotation`、カスタムレイヤー `custom_layer`）の定義・編集エディタ。
   - **主要Props**: `inputDef`, `value`, `onChange`
 - **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/modals/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/ExportModal.tsx))
-  - **概要**: Handlebars テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。
+  - **概要**: Handlebars/Jinja テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/modals/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/SettingsModal.tsx))
-  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`（Waypoint Options と Global Fields の2リスト。行 UI は `SchemaFieldRow` を共用）, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`, `PluginsTab` の7タブを保持。
+  - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`（Waypoint Options と Global Fields の2リスト。行 UI は `SchemaFieldRow` を共用）, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`（テンプレートごとに Engine (`Handlebars`/`Jinja`) を選択できる）, `PluginsTab` の7タブを保持。
   - **主要Props**: `isOpen`, `onClose`
+- **`SchemaFieldRow`** ([`src/components/ui/settings/SchemaFieldRow.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/SchemaFieldRow.tsx))
+  - **概要**: Option Schema の1フィールド分（Key/Label/Type/Default）を編集する行。`OptionSchemaTab` の Waypoint Options / Global Fields の両リストで共用する。Type に `object`/`map`/`union` を選ぶと、それぞれ `FieldListEditor` / `VariantListEditor` / Map Value Type セレクタを出し分ける。`list` の要素型が `object`/`union` の場合も同様に入れ子編集できる。
+  - **主要Props**: `def`, `groupLabel`, `valueLabel`, `value`, `isDuplicateName`, `onChangeDef`, `onChangeValue`, `onRemove`
+- **`FieldListEditor`** / **`NestedFieldRow`** ([`src/components/ui/settings/FieldListEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/FieldListEditor.tsx))
+  - **概要**: `object` のフィールド一覧、または `union` の1バリアント分のフィールド一覧を編集する。ネストするフィールドの型は `string`/`float`/`integer`/`boolean`/`map`/`any` に限定し（それ以上の深い入れ子は YAML/JSON インポートに委ねる）、`NestedFieldRow` が1フィールド分の Key/Label/Type/Enum を編集する。
+  - **主要Props**: `fields`, `onChange`, `addLabel`
+- **`VariantListEditor`** ([`src/components/ui/settings/VariantListEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/VariantListEditor.tsx))
+  - **概要**: `union` の判別キー (`discriminator`) に対する値ごとのバリアント一覧を編集する。バリアントの追加・削除・値/ラベルの編集、および各バリアントのフィールド一覧（`FieldListEditor`）を持つ。
+  - **主要Props**: `variants`, `onChange`
 - **`AppearanceTab`** ([`src/components/ui/settings/AppearanceTab.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/AppearanceTab.tsx))
   - **概要**: 外観・表示設定タブ。テーマモード（Light/Dark）、アクセントカラープリセット、マップ透過度、パス外観（色・透過度・幅同期）、ROS占有グリッド閾値（障害物・フリー・ネゲート）の設定を提供。
   - **主要Props**: なし
@@ -316,5 +328,11 @@
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
   - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`
 - **`conditionalStyles`** ([`src/utils/conditionalStyles.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/conditionalStyles.ts))
-  - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。
+  - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。プロパティパスは `options.navigation.is_through_point` のように `object` フィールドまで辿れる。
   - **主要関数**: `resolveWaypointConditionalStyle`, `resolvePathConditionalStyle`, `resolveFootprintConditionalStyle`, `resolveAnnotationConditionalStyle`, `evaluateConditionGroup`, `drawDashedLine`, `parseColorSafe`
+- **`optionSchema`** ([`src/utils/optionSchema.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionSchema.ts))
+  - **概要**: Option Schema（`OptionsSchema`）の正規化・検証・パス列挙。旧形式（`list` の `item_type` をフラットに持つ形）を現行の再帰形（`item: { type }`）へ変換する。
+  - **主要関数**: `normalizeOptionsSchema`, `normalizeTypeSpec`, `validateSchema`, `listScalarPaths`
+- **`optionValues`** ([`src/utils/optionValues.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionValues.ts))
+  - **概要**: `TypeSpec` に従った値の再帰的な変換・検証・既定値解決・生成・比較を行う純粋関数群。Option Schema の値まわり（インポートの型変換、Inspector の入力、キャンバスラベル、Generator の差分検出、エクスポートの `options`/`raw_options` 分離）はすべてここに集約する。
+  - **主要関数**: `coerceValue`, `validateValue`, `resolveWithDefaults`, `createValue`, `createUnionVariantValue`, `switchUnionVariant`, `summarizeValue`, `deepEqual`, `toStoredValue`, `isValueValid`
