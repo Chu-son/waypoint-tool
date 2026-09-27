@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
+import { useResolvedMapLayers } from '../../hooks/useResolvedMapLayers';
 import { v4 as uuidv4 } from 'uuid';
 import { ManualCustomLayer, EditObject, WaypointNode } from '../../types/store';
 import { GridLayer } from './layers/GridLayer';
@@ -12,7 +13,8 @@ import { WaypointLayer } from './layers/WaypointLayer';
 import { PluginLayer } from './layers/PluginLayer';
 import { SnappingGuideLayer } from './layers/SnappingGuideLayer';
 import { ExportRegionLayer } from './layers/ExportRegionLayer';
-import { MapEditSingleLayer, MapEditToolOverlay } from './layers/MapEditLayer';
+import { MapEditToolOverlay } from './layers/MapEditLayer';
+import { LayerStack } from './layers/LayerStack';
 import { AnnotationLayer } from './layers/AnnotationLayer';
 import { MeasureLayer } from './layers/MeasureLayer';
 import { GeoTileLayer } from './layers/GeoTileLayer';
@@ -39,7 +41,6 @@ import {
 } from './utils/viewport';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
-import { MapLayerSprite } from './MapLayerSprite';
 import { getFallbackGridColors } from './utils/canvasTheme';
 import { findNearestObjectCenter, hitTestRectHandles } from './utils/hitTest';
 import { CANVAS_ACCENT_COLOR } from './canvasConstants';
@@ -83,8 +84,7 @@ export function MapCanvas() {
   const setCursorPosition = useAppStore((state) => state.setCursorPosition);
   const setMapScale = useAppStore((state) => state.setMapScale);
 
-  const mapLayers = useAppStore((state) => state.mapLayers);
-  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const mapLayers = useResolvedMapLayers();
   const enableSnapping = useAppStore((state) => state.enableSnapping);
   const isExportPreview = useAppStore((state) => state.isExportPreview);
 
@@ -1860,26 +1860,17 @@ export function MapCanvas() {
           {/* 0. Geographic base map (OSM / satellite tiles) at the very back */}
           <GeoTileLayer scale={scale} position={position} />
 
-          {/* 1. Base Map Layers Group */}
-          <pixiContainer label="map-layers-group">
-            {shouldShowBlendedPreview ? (
-              <>
-                {previewError && !previewTexture ? (
-                  <pixiText
-                    text={`Error: ${previewError}`}
-                    x={0}
-                    y={0}
-                    style={textStyle}
-                    anchor={0.5}
-                    scale={{ x: 1 / scale, y: -1 / scale }}
-                  />
-                ) : previewTexture &&
-                  !previewTexture.destroyed &&
-                  previewTexture.source &&
-                  !previewTexture.source.destroyed &&
-                  previewTexture.source.style ? (
-                  <MapLayerSprite
-                    layer={{
+          {/* 1. Layer stack: map instances and custom layers in the user's order, bottom to top */}
+          <LayerStack
+            scale={scale}
+            textStyle={textStyle}
+            fallbackTexture={fallbackTexture}
+            blendedPreview={
+              shouldShowBlendedPreview
+                ? {
+                    texture: previewTexture,
+                    error: previewError,
+                    layer: {
                       id: '__blended_preview__',
                       name: isExportPreview ? 'Export Preview' : 'Occupancy Highlight Preview',
                       visible: true,
@@ -1891,77 +1882,19 @@ export function MapCanvas() {
                         free_thresh: occupancySettings.defaultFreeThresh,
                         negate: occupancySettings.defaultNegate,
                       },
-                      width: previewTexture.width,
-                      height: previewTexture.height,
-                      z_index: 0,
-                      blend_mode: 'overwrite',
-                    }}
-                    overrideTexture={previewTexture}
-                    scale={scale}
-                    textStyle={textStyle}
-                  />
-                ) : null}
-              </>
-            ) : mapLayers.length > 0 ? (
-              [...mapLayers]
-                .reverse()
-                .map((layer) => <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />)
-            ) : customLayers.length === 0 ? (
-              <pixiSprite texture={fallbackTexture} anchor={0.5} scale={{ x: 1, y: -1 }} />
-            ) : null}
-          </pixiContainer>
-
-          {/* 2. Custom Layers Group (Always rendered on top of Map Layers) */}
-          <pixiContainer label="custom-layers-group">
-            {shouldShowBlendedPreview ? (
-              /* Overlay reference custom layers during blended preview */
-              <>
-                {customLayers
-                  .filter((l) => l.visible && !!l.is_reference)
-                  .slice()
-                  .reverse()
-                  .map((layer) => {
-                    if (layer.type === 'plugin') {
-                      return <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />;
-                    } else {
-                      return (
-                        <MapEditSingleLayer
-                          key={layer.id}
-                          scale={scale}
-                          layer={layer}
-                          selectedEditObjectId={selectedEditObjectId}
-                          isExportPreview={true}
-                          onObjectPointerDown={handleEditObjectPointerDown}
-                          onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
-                          onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
-                        />
-                      );
-                    }
-                  })}
-              </>
-            ) : (
-              /* Normal rendering: all custom layers in order from bottom (back) to top (front) */
-              <>
-                {[...customLayers].reverse().map((layer) => {
-                  if (layer.type === 'plugin') {
-                    return <MapLayerSprite key={layer.id} layer={layer} scale={scale} textStyle={textStyle} />;
-                  } else {
-                    return (
-                      <MapEditSingleLayer
-                        key={layer.id}
-                        scale={scale}
-                        layer={layer}
-                        selectedEditObjectId={selectedEditObjectId}
-                        isExportPreview={false}
-                        onObjectPointerDown={handleEditObjectPointerDown}
-                        onObjectHandlePointerDown={handleEditObjectHandlePointerDown}
-                        onObjectResizeHandlePointerDown={handleEditObjectResizeHandlePointerDown}
-                      />
-                    );
+                      width: previewTexture?.width ?? 0,
+                      height: previewTexture?.height ?? 0,
+                    },
                   }
-                })}
-              </>
-            )}
+                : null
+            }
+            editHandlers={{
+              selectedEditObjectId,
+              onObjectPointerDown: handleEditObjectPointerDown,
+              onObjectHandlePointerDown: handleEditObjectHandlePointerDown,
+              onObjectResizeHandlePointerDown: handleEditObjectResizeHandlePointerDown,
+            }}
+          >
             {/* Transient editing tool previews and brush cursor overlay */}
             <MapEditToolOverlay
               scale={scale}
@@ -1970,7 +1903,7 @@ export function MapCanvas() {
               brushPreviewRadius={brushRadiusWorld}
               isExportPreview={shouldShowBlendedPreview}
             />
-          </pixiContainer>
+          </LayerStack>
           {showGrid && <GridLayer scale={scale} />}
 
           {/* Render Path (Lines connecting all waypoints in sequential order, continuous across groups) */}

@@ -24,6 +24,8 @@ export const CANVAS_PREVIEW_COLOR = 0x8a8f98;
 export const CANVAS_HIT_AREA_COLOR = 0xffffff;
 /** High-contrast white for handle fills, center dots and inner rings. */
 export const CANVAS_CONTRAST_COLOR = 0xffffff;
+/** Fill of a stencil mask. Only its shape matters, the color is never shown. */
+export const CANVAS_MASK_FILL = 0xffffff;
 /** Dark background behind on-canvas text labels. */
 export const CANVAS_LABEL_BG = 0x0f172a;
 export const CANVAS_LABEL_BG_ALT = 0x1e293b;

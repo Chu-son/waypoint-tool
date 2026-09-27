@@ -4,6 +4,7 @@ import { WaypointNode, CustomLayer, AnnotationObject, InsertionTarget } from '..
 import { ActiveSelection } from '../../types/selection';
 import type { GeoAlignment } from '../../types/geo';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
+import { reconcileLayerOrder } from '../../utils/layerStack';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -14,11 +15,20 @@ export type HistorySnapshot = {
   selection: ActiveSelection;
   anchorNodeId: string | null;
   customLayers: CustomLayer[];
+  /** Stack order at capture time; reconciled against the layers that exist when restored. */
+  layerOrder: string[];
   annotationObjects: Record<string, AnnotationObject>;
   annotationOrder: string[];
   insertionTarget: InsertionTarget | null;
   geoAlignment: GeoAlignment;
 };
+
+/** Restores the stack order saved in `snapshot` for the layers that exist after restoring its custom layers. */
+const restoredLayerOrder = (state: AppState, snapshot: HistorySnapshot): string[] =>
+  reconcileLayerOrder(snapshot.layerOrder, [
+    ...state.mapLayers.map((l) => l.id),
+    ...snapshot.customLayers.map((l) => l.id),
+  ]);
 
 export type HistorySlice = {
   historyPast: HistorySnapshot[];
@@ -58,6 +68,7 @@ const captureSnapshot = (state: AppState): HistorySnapshot => ({
   ),
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
+  layerOrder: [...state.layerOrder],
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
   annotationOrder: [...(state.annotationOrder ?? [])],
   insertionTarget: state.insertionTarget ? { ...state.insertionTarget } : null,
@@ -132,6 +143,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selection: restoredSelection,
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
+        layerOrder: restoredLayerOrder(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         insertionTarget: restoredTarget,
@@ -169,6 +181,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selection: restoredSelection,
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
+        layerOrder: restoredLayerOrder(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         insertionTarget: restoredTarget,

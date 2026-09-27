@@ -1,4 +1,4 @@
-import { OptionsSchema, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../types/store';
+import { OptionsSchema, PluginInstance, MapLayerClip, ImportFieldMapping } from '../types/store';
 
 export type MapLoadResult = {
   info: {
@@ -31,6 +31,7 @@ export type ExportMapsOptions = {
     opacity: number;
     blend_mode: string;
     z_index: number;
+    clip?: MapLayerClip | null;
   }[];
 };
 
@@ -41,6 +42,7 @@ export type BlendPreviewLayerInput = {
   blend_mode: string;
   z_index: number;
   visible: boolean;
+  clip?: MapLayerClip | null;
 };
 
 export type BlendPreviewResult = {
@@ -66,7 +68,7 @@ export interface IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
-    mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
+    mapLayers?: BlendPreviewLayerInput[],
   ): Promise<any>;
   getPythonEnvironments(): Promise<string[]>;
   scaffoldPlugin(pluginName: string, targetDir: string): Promise<PluginInstance>;
@@ -111,6 +113,7 @@ export type PackageExportMapItem = {
     opacity: number;
     blend_mode: string;
     z_index: number;
+    clip?: MapLayerClip | null;
   }[];
 };
 

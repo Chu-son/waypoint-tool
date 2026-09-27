@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
 import { normalizeProjectData } from '../serialization/projectSerializer';
 import { prepareLayersForExport } from '../../services/mapRasterize';
-import { ProjectMapLayer } from '../../types/store';
+import { layerStackState, makeMap } from '../../test/fixtures';
 
 describe('Custom Layers Reference Flag', () => {
   beforeEach(() => {
@@ -69,20 +69,6 @@ describe('Custom Layers Reference Flag', () => {
   });
 
   it('excludes reference layers from prepareLayersForExport', async () => {
-    const mockMapLayers: ProjectMapLayer[] = [
-      {
-        id: 'map1',
-        name: 'Map 1',
-        info: { resolution: 0.05, origin: [0, 0, 0] },
-        image_base64: 'map-b64',
-        width: 100,
-        height: 100,
-        visible: true,
-        opacity: 1.0,
-        z_index: 0,
-      },
-    ];
-
     const mockCustomLayers = [
       {
         id: 'ref1',
@@ -90,7 +76,6 @@ describe('Custom Layers Reference Flag', () => {
         type: 'manual' as const,
         visible: true,
         opacity: 1.0,
-        z_index: 0,
         is_reference: true,
         editObjects: [
           {
@@ -111,7 +96,6 @@ describe('Custom Layers Reference Flag', () => {
         type: 'manual' as const,
         visible: true,
         opacity: 1.0,
-        z_index: 1,
         is_reference: false,
         editObjects: [
           {
@@ -136,7 +120,6 @@ describe('Custom Layers Reference Flag', () => {
         info: { resolution: 0.05, origin: [0, 0, 0] as [number, number, number], width: 100, height: 100 },
         visible: true,
         opacity: 1.0,
-        z_index: 2,
         is_reference: true,
       },
       {
@@ -149,12 +132,16 @@ describe('Custom Layers Reference Flag', () => {
         info: { resolution: 0.05, origin: [0, 0, 0] as [number, number, number], width: 100, height: 100 },
         visible: true,
         opacity: 1.0,
-        z_index: 3,
         is_reference: false,
       },
     ];
 
-    const result = await prepareLayersForExport(mockMapLayers, mockCustomLayers as any);
+    const map = layerStackState(makeMap('map1', { image_base64: 'map-b64' }));
+    const result = await prepareLayersForExport({
+      ...map,
+      customLayers: mockCustomLayers as any,
+      layerOrder: [...mockCustomLayers.map((l) => l.id), 'map1'],
+    });
 
     // map1, norm1, norm2 の3つが含まれ、ref1 と ref2 は除外されるべき
     const resultIds = result.map((r) => r.id);

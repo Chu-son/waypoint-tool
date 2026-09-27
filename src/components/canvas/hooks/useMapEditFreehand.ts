@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '../../../stores/appStore';
+import { useResolvedMapLayers } from '../../../hooks/useResolvedMapLayers';
 import { FreehandEditObject } from '../../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -41,7 +42,7 @@ function simplifyPoints(points: Array<{ x: number; y: number }>, epsilon: number
 export function useMapEditFreehand() {
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const activeMapLayerId = useAppStore((state) => state.activeMapLayerId);
-  const mapLayers = useAppStore((state) => state.mapLayers);
+  const mapLayers = useResolvedMapLayers();
   const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
   const mapEditBrushSize = useAppStore((state) => state.mapEditBrushSize); // in pixels
   const addEditObject = useAppStore((state) => state.addEditObject);

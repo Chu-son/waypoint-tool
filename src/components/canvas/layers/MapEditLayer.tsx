@@ -4,7 +4,7 @@ import { CanvasHandle } from '../common/CanvasHandle';
 import { computePointsBoundingBox } from '../../../utils/geometry';
 import { CANVAS_ACCENT_COLOR, CANVAS_HIT_AREA_COLOR, CANVAS_PREVIEW_COLOR } from '../canvasConstants';
 
-interface SingleLayerProps {
+export interface SingleLayerProps {
   scale: number;
   layer: ManualCustomLayer;
   selectedEditObjectId: string | null;
@@ -396,64 +396,6 @@ export function MapEditToolOverlay({
           }}
         />
       )}
-    </>
-  );
-}
-
-interface MapEditLayerProps {
-  scale: number;
-  editLayers: ManualCustomLayer[];
-  selectedEditObjectId: string | null;
-  previewObject: EditObject | null;
-  brushPreviewPos: { x: number; y: number } | null;
-  brushPreviewRadius: number;
-  isExportPreview: boolean;
-  onObjectPointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string) => void;
-  onObjectHandlePointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string) => void;
-  onObjectResizeHandlePointerDown?: (e: FederatedPointerEvent, layerId: string, objId: string, handle: string) => void;
-}
-
-/**
- * Legacy MapEditLayer component for rendering multiple editLayers together.
- */
-export function MapEditLayer({
-  scale,
-  editLayers,
-  selectedEditObjectId,
-  previewObject,
-  brushPreviewPos,
-  brushPreviewRadius,
-  isExportPreview,
-  onObjectPointerDown,
-  onObjectHandlePointerDown,
-  onObjectResizeHandlePointerDown,
-}: MapEditLayerProps) {
-  const visibleLayers = editLayers.filter((l) => l.visible).sort((a, b) => a.z_index - b.z_index);
-
-  return (
-    <>
-      {/* Existing EditLayers */}
-      {visibleLayers.map((layer) => (
-        <MapEditSingleLayer
-          key={layer.id}
-          scale={scale}
-          layer={layer}
-          selectedEditObjectId={selectedEditObjectId}
-          isExportPreview={isExportPreview}
-          onObjectPointerDown={onObjectPointerDown}
-          onObjectHandlePointerDown={onObjectHandlePointerDown}
-          onObjectResizeHandlePointerDown={onObjectResizeHandlePointerDown}
-        />
-      ))}
-
-      {/* Tool preview overlay */}
-      <MapEditToolOverlay
-        scale={scale}
-        previewObject={previewObject}
-        brushPreviewPos={brushPreviewPos}
-        brushPreviewRadius={brushPreviewRadius}
-        isExportPreview={isExportPreview}
-      />
     </>
   );
 }

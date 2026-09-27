@@ -10,6 +10,8 @@ describe('AppStore Zustand Store', () => {
     store.rootNodeIds = [];
     store.selectedNodeIds = [];
     store.mapLayers = [];
+    store.mapSources = [];
+    store.layerOrder = [];
     store.optionsSchema = null;
     store.exportTemplates = [];
     store.isDirty = false;
@@ -126,32 +128,30 @@ describe('AppStore Zustand Store', () => {
   });
 
   it('should handle map layer operations', () => {
-    const { addMapLayer, updateMapLayer, removeMapLayer, reorderMapLayers } = useAppStore.getState();
+    const { addMapLayer, updateMapLayer, removeMapLayer, reorderLayers } = useAppStore.getState();
 
     addMapLayer('Map 1', null, 'base1', 100, 100);
-    const id1 = useAppStore.getState().mapLayers[0].id;
+    const id1 = useAppStore.getState().layerOrder[0];
 
     addMapLayer('Map 2', null, 'base2', 100, 100);
-    const id2 = useAppStore.getState().mapLayers[0].id; // Map 2 is at index 0 now
+    const id2 = useAppStore.getState().layerOrder[0]; // A newly added map goes on top of the stack
 
     let state = useAppStore.getState();
     expect(state.mapLayers.length).toBe(2);
+    expect(state.layerOrder).toEqual([id2, id1]);
     expect(state.isDirty).toBe(true);
 
     updateMapLayer(id1, { visible: false });
-    expect(useAppStore.getState().mapLayers[1].visible).toBe(false);
+    expect(useAppStore.getState().mapLayers.find((l) => l.id === id1)?.visible).toBe(false);
 
-    reorderMapLayers(0, 1);
+    reorderLayers(0, 1);
     state = useAppStore.getState();
     // Before: [id2, id1]. Move 0 to 1 -> [id1, id2]
-    expect(state.mapLayers[0].id).toBe(id1);
-    expect(state.mapLayers[1].id).toBe(id2);
-    expect(state.mapLayers[0].z_index).toBeGreaterThanOrEqual(0);
-    expect(state.mapLayers[1].z_index).toBeGreaterThanOrEqual(0);
+    expect(state.layerOrder).toEqual([id1, id2]);
 
     removeMapLayer(id2);
-    expect(useAppStore.getState().mapLayers.length).toBe(1);
-    expect(useAppStore.getState().mapLayers[0].id).toBe(id1);
+    expect(useAppStore.getState().mapLayers.map((l) => l.id)).toEqual([id1]);
+    expect(useAppStore.getState().layerOrder).toEqual([id1]);
   });
 
   it('should reset isDirty when loading project data', () => {

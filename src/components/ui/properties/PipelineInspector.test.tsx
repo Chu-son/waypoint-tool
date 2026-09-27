@@ -52,7 +52,6 @@ const pipelineLayer: PluginCustomLayer = {
   plugin_id: 'step-1',
   visible: true,
   opacity: 0.7,
-  z_index: 0,
   blend_mode: 'overwrite',
   is_reference: false,
   params: {},

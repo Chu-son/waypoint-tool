@@ -1,7 +1,7 @@
 import type { OptionsSchema } from './options';
 import type { WaypointNode } from './waypoint';
 import type { AnnotationGroup, AnnotationObject } from './annotation';
-import type { CustomLayer, ExportRegion, OccupancySettings, ProjectMapLayer } from './layer';
+import type { CustomLayer, ExportRegion, MapSource, OccupancySettings, ProjectMapLayer } from './layer';
 import type { DefaultExportFormat, ExportProfile, ExportTemplate } from './export';
 import type { RobotFootprint } from './footprint';
 import type { ConditionalStyleRule } from './style';
@@ -21,7 +21,11 @@ export interface ProjectData {
   version?: number;
   root_node_ids?: string[];
   nodes?: Record<string, WaypointNode>;
-  map_layers?: ProjectMapLayer[];
+  /** Loaded maps. Absent in files saved before a map could have several instances. */
+  map_sources?: MapSource[];
+  /** Map instances; in files without `map_sources` these are whole maps carrying their own image and info. */
+  map_layers?: any[];
+  layer_order?: string[];
   custom_layers?: CustomLayer[];
   annotation_objects?: AnnotationObject[];
   annotation_groups?: Record<string, AnnotationGroup>;
@@ -62,7 +66,10 @@ export interface StrictProjectData {
   version: number;
   root_node_ids: string[];
   nodes: Record<string, WaypointNode>;
+  map_sources: MapSource[];
   map_layers: ProjectMapLayer[];
+  /** Ids of every map instance and custom layer, top of the stack first. */
+  layer_order: string[];
   custom_layers: CustomLayer[];
   annotation_objects: AnnotationObject[];
   annotation_groups: Record<string, AnnotationGroup>;

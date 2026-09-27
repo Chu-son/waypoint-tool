@@ -9,7 +9,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
-import { makeGroup, makeMapLayer, makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../test/fixtures';
+import {
+  layerStackState,
+  makeGroup,
+  makeMap,
+  makePlugin,
+  makeTransform,
+  makeWaypoint,
+  waypointTree,
+} from '../../test/fixtures';
 import { useAppStore } from '../../stores/appStore';
 import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
 import { quaternionToYaw } from '../../utils/transformUtils';
@@ -341,9 +349,9 @@ describe('MapCanvas tools', () => {
 
   describe('fit to maps', () => {
     it('frames both the maps and every waypoint, including ones added after the map', () => {
-      const { viewport } = renderCanvas({
-        mapLayers: [makeMapLayer('m', { width: 100, height: 100, info: { resolution: 0.1, origin: [0, 0, 0] } })],
-      });
+      const { viewport } = renderCanvas(
+        layerStackState(makeMap('m', { width: 100, height: 100, info: { resolution: 0.1, origin: [0, 0, 0] } })),
+      );
       // A waypoint far outside the map, nested in a group, added after the map was loaded.
       act(() =>
         useAppStore.setState(

@@ -12,7 +12,9 @@ const LOADING_TASK_ID = 'blended-preview';
  * when something that affects the blend changes.
  */
 export function useBlendedPreview() {
+  const mapSources = useAppStore((state) => state.mapSources);
   const mapLayers = useAppStore((state) => state.mapLayers);
+  const layerOrder = useAppStore((state) => state.layerOrder);
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const occupancySettings = useAppStore((state) => state.occupancySettings);
   const isExportPreview = useAppStore((state) => state.isExportPreview);
@@ -26,16 +28,16 @@ export function useBlendedPreview() {
   const [previewInfo, setPreviewInfo] = useState<any>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
 
-  // Changes to blend_mode, z_index, visibility, images, custom layers or occupancy settings.
+  // Changes to blend_mode, stack order, clip, visibility, images, custom layers or occupancy settings.
   const previewSyncKey = useMemo(() => {
+    const sourceKey = JSON.stringify(mapSources.map((s) => ({ id: s.id, hasImage: !!s.image_base64, info: s.info })));
     const mapKey = JSON.stringify(
       mapLayers.map((l) => ({
         id: l.id,
-        blend_mode: l.blend_mode || 'overwrite',
-        z_index: l.z_index,
+        sourceId: l.sourceId,
+        blend_mode: l.blend_mode,
         visible: l.visible,
-        hasImage: !!l.image_base64,
-        info: l.info,
+        clip: l.clip,
       })),
     );
     const customKey = JSON.stringify(
@@ -44,7 +46,6 @@ export function useBlendedPreview() {
         type: l.type,
         visible: l.visible,
         is_reference: l.is_reference || false,
-        z_index: l.z_index,
         blend_mode: l.blend_mode || 'overwrite',
         objCount: l.type === 'manual' ? l.editObjects.length : 0,
         editObjects: l.type === 'manual' ? l.editObjects : undefined,
@@ -52,8 +53,8 @@ export function useBlendedPreview() {
       })),
     );
     const occKey = JSON.stringify(occupancySettings);
-    return `${shouldShowBlendedPreview}::${mapKey}::${customKey}::${occKey}`;
-  }, [shouldShowBlendedPreview, mapLayers, customLayers, occupancySettings]);
+    return `${shouldShowBlendedPreview}::${sourceKey}::${mapKey}::${layerOrder.join(',')}::${customKey}::${occKey}`;
+  }, [shouldShowBlendedPreview, mapSources, mapLayers, layerOrder, customLayers, occupancySettings]);
 
   useEffect(() => {
     if (!shouldShowBlendedPreview) {
@@ -71,7 +72,7 @@ export function useBlendedPreview() {
     });
     setPreviewError(null);
 
-    prepareLayersForExport(mapLayers, customLayers)
+    prepareLayersForExport({ mapSources, mapLayers, customLayers, layerOrder })
       .then((layerInputs) => {
         if (cancelled) return null;
         if (!layerInputs || layerInputs.length === 0) return null;
@@ -116,7 +117,9 @@ export function useBlendedPreview() {
   }, [
     shouldShowBlendedPreview,
     previewSyncKey,
+    mapSources,
     mapLayers,
+    layerOrder,
     customLayers,
     occupancySettings,
     isExportPreview,
