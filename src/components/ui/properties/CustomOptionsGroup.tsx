@@ -5,11 +5,22 @@ import { Checkbox } from '../common/Checkbox';
 import { OptionDef, WaypointNode } from '../../../types/store';
 import { cn } from '../../../utils/cn';
 import { PropertySectionHeader } from './PropertySectionHeader';
+import { OptionValueEditor } from './OptionValueEditor';
 
 interface CustomOptionsGroupProps {
   isMultiSelection: boolean;
   node: WaypointNode | null;
   handleUpdate: (id: string, updates: any) => void;
+}
+
+/** list<scalar> 以外の list、および object/map/union/any は、専用の再帰エディタ（OptionValueEditor）に任せる。 */
+function needsStructuredEditor(opt: OptionDef): boolean {
+  if (opt.type === 'object' || opt.type === 'map' || opt.type === 'union' || opt.type === 'any') return true;
+  if (opt.type === 'list') {
+    const itemType = opt.item?.type ?? 'string';
+    return itemType === 'object' || itemType === 'map' || itemType === 'union' || itemType === 'any';
+  }
+  return false;
 }
 
 export function CustomOptionsGroup({ isMultiSelection, node, handleUpdate }: CustomOptionsGroupProps) {
@@ -68,7 +79,25 @@ export function CustomOptionsGroup({ isMultiSelection, node, handleUpdate }: Cus
                   className="mb-1"
                 />
 
-                {opt.type === 'list' ? (
+                {needsStructuredEditor(opt) ? (
+                  isMultiSelection ? (
+                    <p className="text-xs text-text-muted italic p-2 bg-surface-panel/40 rounded border border-border-base/30">
+                      Mixed — select a single waypoint to edit.
+                    </p>
+                  ) : (
+                    <OptionValueEditor
+                      spec={opt}
+                      value={node?.options?.[opt.name]}
+                      defaultValue={opt.default}
+                      onChange={(v) => {
+                        if (!node) return;
+                        const current = useAppStore.getState().nodes[node.id];
+                        handleUpdate(node.id, { options: { ...(current.options || {}), [opt.name]: v } });
+                      }}
+                      name={opt.name}
+                    />
+                  )
+                ) : opt.type === 'list' ? (
                   <Input
                     type="text"
                     value={Array.isArray(nodeOptVal) ? nodeOptVal.join(', ') : String(nodeOptVal || '')}

@@ -5,6 +5,17 @@ import { Label } from '../common/Label';
 import { Input } from '../common/Input';
 import { Select } from '../common/Select';
 import { ToggleSwitch } from '../common/ToggleSwitch';
+import { OptionValueEditor } from './OptionValueEditor';
+
+/** list<scalar> 以外の list、および object/map/union/any は、専用の再帰エディタ（OptionValueEditor）に任せる。 */
+function needsStructuredEditor(opt: OptionDef): boolean {
+  if (opt.type === 'object' || opt.type === 'map' || opt.type === 'union' || opt.type === 'any') return true;
+  if (opt.type === 'list') {
+    const itemType = opt.item?.type ?? 'string';
+    return itemType === 'object' || itemType === 'map' || itemType === 'union' || itemType === 'any';
+  }
+  return false;
+}
 
 export function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject }) {
   const optionsSchema = useAppStore((state) => state.optionsSchema);
@@ -43,7 +54,18 @@ export function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject })
                 <span className="opacity-50 text-[10px] uppercase font-normal">({opt.type})</span>
               </Label>
 
-              {opt.type === 'list' ? (
+              {needsStructuredEditor(opt) ? (
+                <OptionValueEditor
+                  spec={opt}
+                  value={obj.options?.[opt.name]}
+                  defaultValue={opt.default}
+                  onChange={(v) => {
+                    const current = useAppStore.getState().annotationObjects[obj.id];
+                    updateAnnotationObject(obj.id, { options: { ...(current?.options || {}), [opt.name]: v } });
+                  }}
+                  name={opt.name}
+                />
+              ) : opt.type === 'list' ? (
                 <Input
                   type="text"
                   value={Array.isArray(optVal) ? optVal.join(', ') : String(optVal || '')}
