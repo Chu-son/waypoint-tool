@@ -1,18 +1,20 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { Button } from '../common/Button';
-import { Input } from '../common/Input';
-import { FieldLabel } from '../common/FieldLabel';
-import { cn } from '../../../utils/cn';
+import { Button } from '../../common/Button';
+import { Input } from '../../common/Input';
+import { FieldLabel } from '../../common/FieldLabel';
+import { cn } from '../../../../utils/cn';
 import { FieldListEditor } from './FieldListEditor';
-import type { VariantDef } from '../../../types/options';
+import type { VariantDef } from '../../../../types/options';
 
 /** union の discriminator（判別キー）に対する値ごとの、バリアント一覧を編集する。 */
 export function VariantListEditor({
   variants,
   onChange,
+  definitionNames,
 }: {
   variants: VariantDef[];
   onChange: (variants: VariantDef[]) => void;
+  definitionNames: string[];
 }) {
   const handleAdd = () => {
     onChange([...variants, { value: `variant_${variants.length + 1}`, fields: [] }]);
@@ -71,6 +73,7 @@ export function VariantListEditor({
             <FieldListEditor
               fields={variant.fields}
               onChange={(fields) => handleUpdate(i, { fields })}
+              definitionNames={definitionNames}
               addLabel="Add Field to Variant"
             />
           </div>

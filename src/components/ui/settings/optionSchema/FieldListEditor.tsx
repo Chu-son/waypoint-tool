@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
-import { Button } from '../common/Button';
-import { NestedFieldRow } from './NestedFieldRow';
-import type { FieldDef } from '../../../types/options';
+import { Button } from '../../common/Button';
+import { FieldEditor } from './FieldEditor';
+import type { FieldDef } from '../../../../types/options';
 
 /** Returns a `base`, `base_1`, `base_2`... key that no field in `fields` uses yet. */
 function uniqueFieldName(base: string, fields: { name: string }[]) {
@@ -18,10 +18,12 @@ function uniqueFieldName(base: string, fields: { name: string }[]) {
 export function FieldListEditor({
   fields,
   onChange,
+  definitionNames,
   addLabel = 'Add Nested Field',
 }: {
   fields: FieldDef[];
   onChange: (fields: FieldDef[]) => void;
+  definitionNames: string[];
   addLabel?: string;
 }) {
   const handleAdd = () => {
@@ -39,11 +41,16 @@ export function FieldListEditor({
   return (
     <div className="space-y-1.5">
       {fields.map((f, i) => (
-        <NestedFieldRow
+        <FieldEditor
           key={i}
           field={f}
+          groupLabel="Field"
+          valueLabel="Default"
+          value={f.default}
+          definitionNames={definitionNames}
           isDuplicateName={fields.filter((o) => o.name === f.name).length > 1}
-          onChange={(updates) => handleUpdate(i, updates)}
+          onChangeField={(updates) => handleUpdate(i, updates)}
+          onChangeValue={(value) => handleUpdate(i, { default: value })}
           onRemove={() => handleRemove(i)}
         />
       ))}

@@ -1,13 +1,13 @@
-import { Plus, Save, Upload, Download, Database, Globe } from 'lucide-react';
+import { Plus, Save, Upload, Download, Database, Globe, BookMarked } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { GlobalFieldDef, OptionDef, OptionsSchema } from '../../../types/store';
+import { DefinitionDef, GlobalFieldDef, OptionDef, OptionsSchema } from '../../../types/store';
 import { Button } from '../common/Button';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
-import { SchemaFieldRow } from './SchemaFieldRow';
+import { FieldEditor } from './optionSchema/FieldEditor';
+import { DefinitionListEditor } from './optionSchema/DefinitionListEditor';
 import { notify } from '../../../services/notify';
-import { toStoredValue } from '../../../utils/optionValues';
 import { normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
 
 /** Returns a `base`, `base_1`, `base_2`... key that no field in `fields` uses yet. */
@@ -28,16 +28,24 @@ export function OptionSchemaTab() {
 
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
   const [localGlobals, setLocalGlobals] = useState<GlobalFieldDef[]>([]);
+  const [localDefinitions, setLocalDefinitions] = useState<DefinitionDef[]>([]);
 
   useEffect(() => {
     setLocalOptions(globalOptionsSchema?.options || []);
     setLocalGlobals(globalOptionsSchema?.globals || []);
+    setLocalDefinitions(globalOptionsSchema?.definitions || []);
   }, [globalOptionsSchema]);
+
+  const definitionNames = localDefinitions.map((d) => d.name).filter((n) => n.trim() !== '');
 
   const handleSaveOptions = () => {
     // トップレベルのキー重複・空欄、既定値・グローバル値の型不一致、union のバリアント重複や
     // 判別キーとの名前衝突、ref の未定義・循環参照まで、すべて validateSchema が再帰的に検証する。
-    const schemaErrors = validateSchema({ options: localOptions, globals: localGlobals });
+    const schemaErrors = validateSchema({
+      options: localOptions,
+      globals: localGlobals,
+      definitions: localDefinitions,
+    });
 
     if (schemaErrors.length > 0) {
       void notify(`スキーマの定義に誤りがあります。\n${schemaErrors[0].message} (${schemaErrors[0].path})`);
@@ -48,7 +56,8 @@ export function OptionSchemaTab() {
     setGlobalOptionsSchema(
       normalizeOptionsSchema({
         options: localOptions,
-        globals: localGlobals.map((g) => ({ ...g, value: toStoredValue(g, g.value) })),
+        globals: localGlobals,
+        definitions: localDefinitions,
       }),
     );
     useAppStore.setState({ isDirty: true });
@@ -58,14 +67,14 @@ export function OptionSchemaTab() {
   const handleAddOption = () => {
     setLocalOptions([
       ...localOptions,
-      { name: uniqueFieldName('new_option', localOptions), label: 'New Option', type: 'string', default: '' },
+      { name: uniqueFieldName('new_option', localOptions), label: 'New Option', type: 'string' },
     ]);
   };
 
   const handleAddGlobal = () => {
     setLocalGlobals([
       ...localGlobals,
-      { name: uniqueFieldName('new_global', localGlobals), label: 'New Global', type: 'string', value: '' },
+      { name: uniqueFieldName('new_global', localGlobals), label: 'New Global', type: 'string' },
     ]);
   };
 
@@ -86,10 +95,7 @@ export function OptionSchemaTab() {
       });
       if (!savePath) return;
 
-      const dataToExport = {
-        options: localOptions,
-        globals: localGlobals.map((g) => ({ ...g, value: toStoredValue(g, g.value) })),
-      };
+      const dataToExport = { options: localOptions, globals: localGlobals, definitions: localDefinitions };
 
       await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
       void notify('オプションスキーマをエクスポートしました。');
@@ -145,6 +151,7 @@ export function OptionSchemaTab() {
       const schema: OptionsSchema = normalizeOptionsSchema(rawSchema);
       setLocalOptions(schema.options);
       setLocalGlobals(schema.globals);
+      setLocalDefinitions(schema.definitions || []);
       void notify('オプションスキーマをインポートしました。');
     } catch (err) {
       console.error('Failed to import options schema:', err);
@@ -178,15 +185,16 @@ export function OptionSchemaTab() {
 
       <div className="space-y-3 px-1">
         {localOptions.map((opt, i) => (
-          <SchemaFieldRow
+          <FieldEditor
             key={i}
-            def={opt}
+            field={opt}
             groupLabel="Option"
             valueLabel="Default"
             value={opt.default}
+            definitionNames={definitionNames}
             isDuplicateName={localOptions.filter((o) => o.name === opt.name).length > 1}
-            onChangeDef={(updates) => handleUpdateOption(i, updates)}
-            onChangeValue={(value) => handleUpdateOption(i, { default: value as OptionDef['default'] })}
+            onChangeField={(updates) => handleUpdateOption(i, updates)}
+            onChangeValue={(value) => handleUpdateOption(i, { default: value })}
             onRemove={() => setLocalOptions(localOptions.filter((_, idx) => idx !== i))}
           />
         ))}
@@ -208,21 +216,32 @@ export function OptionSchemaTab() {
 
       <div className="space-y-3 px-1">
         {localGlobals.map((field, i) => (
-          <SchemaFieldRow
+          <FieldEditor
             key={i}
-            def={field}
+            field={field}
             groupLabel="Global field"
             valueLabel="Value"
             value={field.value}
+            definitionNames={definitionNames}
             isDuplicateName={localGlobals.filter((g) => g.name === field.name).length > 1}
-            onChangeDef={(updates) => handleUpdateGlobal(i, updates)}
-            onChangeValue={(value) => handleUpdateGlobal(i, { value: value as GlobalFieldDef['value'] })}
+            onChangeField={(updates) => handleUpdateGlobal(i, updates)}
+            onChangeValue={(value) => handleUpdateGlobal(i, { value })}
             onRemove={() => setLocalGlobals(localGlobals.filter((_, idx) => idx !== i))}
           />
         ))}
         {localGlobals.length === 0 && (
           <EmptyState message="No global fields defined. Click 'Add Global' to create one." />
         )}
+      </div>
+
+      <TabSectionHeader
+        title="Definitions"
+        subtitle="Named, reusable types. Reference them from any field's type as Ref, to avoid repeating the same structure (e.g. a shared action union) in several places."
+        icon={BookMarked}
+      />
+
+      <div className="px-1">
+        <DefinitionListEditor definitions={localDefinitions} onChange={setLocalDefinitions} />
       </div>
     </div>
   );
