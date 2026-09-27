@@ -4,7 +4,11 @@ import { BackendAPI } from '../../../api';
 import { v4 as uuidv4 } from 'uuid';
 import { ExportProfile, ExportTargetItem, ExportTargetType } from '../../../types/store';
 import { resolveExportFiles, buildExportTreePreview } from '../../../utils/exportTemplateEngine';
-import { extractGlobalsForExport, extractWaypointsForExport } from '../../../utils/exportWaypointUtils';
+import {
+  extractGlobalsForExport,
+  extractWaypointsForExport,
+  countWaypointsWithInvalidOptions,
+} from '../../../utils/exportWaypointUtils';
 import { buildExportPackageItems, formatSessionTimestamp } from '../../../utils/exportPackage';
 import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
@@ -298,6 +302,14 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     if (!rootDir) {
       void notify('出力先ルートフォルダを指定してください。');
       return;
+    }
+
+    const invalidCount = countWaypointsWithInvalidOptions(rootNodeIds, nodes, optionsSchema);
+    if (invalidCount > 0) {
+      const proceed = await confirmAction(
+        `${invalidCount} 件のウェイポイントで、必須項目が未入力、または値の型がスキーマと一致していません。このままエクスポートを続けますか？`,
+      );
+      if (!proceed) return;
     }
 
     try {

@@ -10,9 +10,13 @@ Option Schema の再帰的な型（`object`/`map`/`union`）と、エクスポ�
 `mg_waypoint_navigation`（`~/ros_workspace/mg_robot/mg_waypoint_navigation/doc/waypoint_format.md`）の
 v2.0 ウェイポイント YAML を出力する例です。
 
-- `on_reached_actions` は `type` によってフィールド構成が変わるタグ付きユニオンのリスト
-  （`service`, `publish`, `load_map`, `amcl_reset`, `wait`, `wait_trigger`, `set_navigation_mode` の7種類）。
-  `service`/`publish` の `request`/`data` は自由なキーを持つ `map` 型。
+- `on_reached_actions` は `type` によってフィールド構成が変わるタグ付きユニオン（`service`, `publish`,
+  `load_map`, `amcl_reset`, `wait`, `wait_trigger`, `set_navigation_mode` の7種類）を要素とするリスト。
+  ユニオン自体は `definitions.action` として1箇所だけ定義し、`on_reached_actions` からは
+  `{ "type": "ref", "ref": "action" }` で参照している。同じ `action` 型を `on_departure_actions` のような
+  別のフィールドからも再利用できる。
+  `service`/`publish` の `request`/`data` は自由なキーを持つ `map` 型。`service`/`topic` 等の
+  必須フィールドには `required: true` を付けている（値が無くエクスポートすると確認ダイアログが出る）。
 - テンプレートは `raw_options.on_reached_actions` を参照しており、アクションを設定していない
   ウェイポイントでは `on_reached_actions` フィールド自体を出力しない（受け側の `defaults` 適用に委ねる）。
 - `toyaml(6)` フィルタで、アクション配列をブロック形式 YAML として正しい字下げで埋め込んでいる。

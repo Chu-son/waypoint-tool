@@ -15,69 +15,9 @@
     {
       "name": "on_reached_actions",
       "label": "到達時アクション (on_reached_actions)",
+      "description": "definitions.action（到達時に実行するアクション）を要素とするリスト。",
       "type": "list",
-      "item": {
-        "type": "union",
-        "discriminator": "type",
-        "variants": [
-          {
-            "value": "service",
-            "label": "サービス呼び出し",
-            "fields": [
-              { "name": "service", "label": "サービスパス", "type": "string" },
-              { "name": "srv_module", "label": "Python モジュール", "type": "string" },
-              { "name": "srv_class", "label": "サービス型クラス名", "type": "string" },
-              { "name": "request", "label": "リクエスト", "type": "map" }
-            ]
-          },
-          {
-            "value": "publish",
-            "label": "トピックパブリッシュ",
-            "fields": [
-              { "name": "topic", "label": "トピックパス", "type": "string" },
-              { "name": "msg_module", "label": "Python モジュール", "type": "string" },
-              { "name": "msg_class", "label": "メッセージ型クラス名", "type": "string" },
-              { "name": "data", "label": "メッセージフィールド", "type": "map" }
-            ]
-          },
-          {
-            "value": "load_map",
-            "label": "マップロード",
-            "fields": [
-              { "name": "localization", "label": "測位マップ YAML パス", "type": "string" },
-              { "name": "planning", "label": "計画マップ YAML パス", "type": "string" }
-            ]
-          },
-          {
-            "value": "amcl_reset",
-            "label": "AMCL リセット",
-            "fields": []
-          },
-          {
-            "value": "wait",
-            "label": "待機",
-            "fields": [{ "name": "countdown_ms", "label": "待機時間 [ms]", "type": "integer", "default": 3000 }]
-          },
-          {
-            "value": "wait_trigger",
-            "label": "外部トリガー待ち",
-            "fields": []
-          },
-          {
-            "value": "set_navigation_mode",
-            "label": "ナビゲーションモード切替",
-            "fields": [
-              {
-                "name": "mode",
-                "label": "モード",
-                "type": "string",
-                "default": "normal",
-                "enum_values": ["normal", "queue_wait"]
-              }
-            ]
-          }
-        ]
-      }
+      "item": { "type": "ref", "ref": "action" }
     }
   ],
   "globals": [
@@ -98,6 +38,73 @@
       "label": "既定: 参考値・到達判定には未使用 (defaults.reach_tolerance)",
       "type": "float",
       "value": 0.5
+    }
+  ],
+  "definitions": [
+    {
+      "name": "action",
+      "label": "到達時アクション",
+      "description": "type によってフィールド構成が変わるタグ付きユニオン。on_departure_actions のような別のリストからも同じ型を再利用できる。",
+      "type": "union",
+      "discriminator": "type",
+      "variants": [
+        {
+          "value": "service",
+          "label": "サービス呼び出し",
+          "fields": [
+            { "name": "service", "label": "サービスパス", "type": "string", "required": true },
+            { "name": "srv_module", "label": "Python モジュール", "type": "string", "required": true },
+            { "name": "srv_class", "label": "サービス型クラス名", "type": "string", "required": true },
+            { "name": "request", "label": "リクエスト", "type": "map" }
+          ]
+        },
+        {
+          "value": "publish",
+          "label": "トピックパブリッシュ",
+          "fields": [
+            { "name": "topic", "label": "トピックパス", "type": "string", "required": true },
+            { "name": "msg_module", "label": "Python モジュール", "type": "string", "required": true },
+            { "name": "msg_class", "label": "メッセージ型クラス名", "type": "string", "required": true },
+            { "name": "data", "label": "メッセージフィールド", "type": "map" }
+          ]
+        },
+        {
+          "value": "load_map",
+          "label": "マップロード",
+          "fields": [
+            { "name": "localization", "label": "測位マップ YAML パス", "type": "string" },
+            { "name": "planning", "label": "計画マップ YAML パス", "type": "string" }
+          ]
+        },
+        {
+          "value": "amcl_reset",
+          "label": "AMCL リセット",
+          "fields": []
+        },
+        {
+          "value": "wait",
+          "label": "待機",
+          "fields": [{ "name": "countdown_ms", "label": "待機時間 [ms]", "type": "integer", "default": 3000 }]
+        },
+        {
+          "value": "wait_trigger",
+          "label": "外部トリガー待ち",
+          "fields": []
+        },
+        {
+          "value": "set_navigation_mode",
+          "label": "ナビゲーションモード切替",
+          "fields": [
+            {
+              "name": "mode",
+              "label": "モード",
+              "type": "string",
+              "default": "normal",
+              "enum_values": ["normal", "queue_wait"]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

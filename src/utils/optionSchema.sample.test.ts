@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import raw from '../../docs/sample/option_schemas/mg_robot_v2.schema.json';
-import { normalizeOptionsSchema, validateSchema } from './optionSchema';
+import { normalizeOptionsSchema, validateSchema, resolveOptionsSchema } from './optionSchema';
 
 /**
  * docs/sample/option_schemas/mg_robot_v2.schema.json は USER_GUIDE.md が例として示すスキーマであり、
- * ドキュメントと実装が乖離しないよう、正規化・検証の両方を通ることをここで保証する。
+ * ドキュメントと実装が乖離しないよう、正規化・検証・ref 解決のすべてを通ることをここで保証する。
  */
 describe('docs/sample/option_schemas/mg_robot_v2.schema.json', () => {
   const schema = normalizeOptionsSchema(raw);
@@ -13,12 +13,17 @@ describe('docs/sample/option_schemas/mg_robot_v2.schema.json', () => {
     expect(validateSchema(schema)).toEqual([]);
   });
 
-  it('defines on_reached_actions as a list of a discriminated union with all 7 mg_robot action types', () => {
+  it('defines on_reached_actions as a list referencing the shared "action" definition via ref', () => {
     const opt = schema.options.find((o) => o.name === 'on_reached_actions');
     expect(opt?.type).toBe('list');
-    expect(opt?.item?.type).toBe('union');
-    expect(opt?.item?.discriminator).toBe('type');
-    expect(opt?.item?.variants?.map((v) => v.value)).toEqual([
+    expect(opt?.item).toEqual({ type: 'ref', ref: 'action' });
+  });
+
+  it('defines the "action" definition as a discriminated union with all 7 mg_robot action types', () => {
+    const action = schema.definitions?.find((d) => d.name === 'action');
+    expect(action?.type).toBe('union');
+    expect(action?.discriminator).toBe('type');
+    expect(action?.variants?.map((v) => v.value)).toEqual([
       'service',
       'publish',
       'load_map',
@@ -29,10 +34,21 @@ describe('docs/sample/option_schemas/mg_robot_v2.schema.json', () => {
     ]);
   });
 
-  it("gives the 'service' variant a map field for the free-form request body", () => {
-    const opt = schema.options.find((o) => o.name === 'on_reached_actions');
-    const service = opt?.item?.variants?.find((v) => v.value === 'service');
+  it("marks the 'service' and 'publish' variants' essential fields as required, and gives them a map field for the free-form body", () => {
+    const action = schema.definitions?.find((d) => d.name === 'action');
+    const service = action?.variants?.find((v) => v.value === 'service');
+    expect(service?.fields.find((f) => f.name === 'service')?.required).toBe(true);
     expect(service?.fields.find((f) => f.name === 'request')?.type).toBe('map');
+
+    const publish = action?.variants?.find((v) => v.value === 'publish');
+    expect(publish?.fields.find((f) => f.name === 'topic')?.required).toBe(true);
+  });
+
+  it('resolves the ref so on_reached_actions can be evaluated the same way as an inline union', () => {
+    const resolved = resolveOptionsSchema(schema);
+    const opt = resolved?.options.find((o) => o.name === 'on_reached_actions');
+    expect(opt?.item?.type).toBe('union');
+    expect(opt?.item?.variants?.map((v) => v.value)).toContain('wait');
   });
 
   it('defines the three defaults-block fields as globals', () => {

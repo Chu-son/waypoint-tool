@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { extractGlobalsForExport, extractWaypointsForExport } from './exportWaypointUtils';
+import {
+  extractGlobalsForExport,
+  extractWaypointsForExport,
+  countWaypointsWithInvalidOptions,
+} from './exportWaypointUtils';
 import type { WaypointNode, OptionsSchema } from '../types/store';
 
 describe('extractGlobalsForExport', () => {
@@ -122,5 +126,81 @@ describe('exportWaypointUtils', () => {
 
     expect(result.options.on_reached_actions).toEqual([{ type: 'wait', countdown_ms: 3000 }]);
     expect(result.raw_options.on_reached_actions).toEqual([{ type: 'wait' }]);
+  });
+});
+
+describe('countWaypointsWithInvalidOptions', () => {
+  const nodesTree = (options: Record<string, any>[]): Record<string, WaypointNode> =>
+    Object.fromEntries(
+      options.map((opt, i) => [
+        `node-${i}`,
+        {
+          id: `node-${i}`,
+          type: 'manual' as const,
+          transform: { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+          options: opt,
+          children_ids: [],
+        },
+      ]),
+    );
+
+  it('returns 0 when there is no schema, or none of its options are required', () => {
+    const nodes = nodesTree([{}]);
+    expect(countWaypointsWithInvalidOptions(['node-0'], nodes, null)).toBe(0);
+
+    const schema: OptionsSchema = { options: [{ name: 'speed', label: 'Speed', type: 'float' }], globals: [] };
+    expect(countWaypointsWithInvalidOptions(['node-0'], nodes, schema)).toBe(0);
+  });
+
+  it('counts a waypoint missing a required top-level field with no default', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'service', label: 'Service', type: 'string', required: true }],
+      globals: [],
+    };
+    const nodes = nodesTree([{}, { service: '/foo' }]);
+    expect(countWaypointsWithInvalidOptions(['node-0', 'node-1'], nodes, schema)).toBe(1);
+  });
+
+  it('does not count a required field that has a default', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'mode', label: 'Mode', type: 'string', required: true, default: 'normal' }],
+      globals: [],
+    };
+    const nodes = nodesTree([{}]);
+    expect(countWaypointsWithInvalidOptions(['node-0'], nodes, schema)).toBe(0);
+  });
+
+  it('counts a waypoint missing a required field nested inside a union variant', () => {
+    const schema: OptionsSchema = {
+      options: [
+        {
+          name: 'on_reached_actions',
+          label: 'Actions',
+          type: 'list',
+          item: {
+            type: 'union',
+            discriminator: 'type',
+            variants: [
+              { value: 'service', fields: [{ name: 'service', label: 'Service', type: 'string', required: true }] },
+            ],
+          },
+        },
+      ],
+      globals: [],
+    };
+    const nodes = nodesTree([
+      { on_reached_actions: [{ type: 'service' }] },
+      { on_reached_actions: [{ type: 'service', service: '/foo' }] },
+    ]);
+    expect(countWaypointsWithInvalidOptions(['node-0', 'node-1'], nodes, schema)).toBe(1);
+  });
+
+  it('counts a waypoint whose value does not match the declared choices', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'mode', label: 'Mode', type: 'string', enum_values: ['normal', 'queue_wait'] }],
+      globals: [],
+    };
+    const nodes = nodesTree([{ mode: 'bogus' }, { mode: 'normal' }]);
+    expect(countWaypointsWithInvalidOptions(['node-0', 'node-1'], nodes, schema)).toBe(1);
   });
 });

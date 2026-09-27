@@ -141,6 +141,36 @@ describe('ExportModal UI', () => {
     );
   });
 
+  it('asks for confirmation before exporting when a required option is missing, and exports on confirm', async () => {
+    useAppStore.setState({
+      optionsSchema: { options: [{ name: 'service', label: 'Service', type: 'string', required: true }], globals: [] },
+    });
+    const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+    const mockOnClose = vi.fn();
+    render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+    await waitFor(() => expect(ask).toHaveBeenCalledWith(expect.stringContaining('1 件'), expect.anything()));
+    await waitFor(() => expect(BackendAPI.executeExportPackage).toHaveBeenCalled());
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('cancels the export when the user declines the missing-required-option confirmation', async () => {
+    useAppStore.setState({
+      optionsSchema: { options: [{ name: 'service', label: 'Service', type: 'string', required: true }], globals: [] },
+    });
+    vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+    const mockOnClose = vi.fn();
+    render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+    await waitFor(() => expect(DialogAPI.ask).toHaveBeenCalled());
+    expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
+    expect(mockOnClose).not.toHaveBeenCalled();
+  });
+
   describe('path pattern editing', () => {
     const PATTERN = 'waypoints/{{yyyymmdd}}_waypoints.yaml';
     const storedPattern = () => useAppStore.getState().exportProfiles[0].items[0].relativePathPattern;

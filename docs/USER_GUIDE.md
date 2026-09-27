@@ -249,50 +249,60 @@ Waypoint にロボット独自のカスタム属性を付加できます。
 
 | 型        | 説明                                                   | Inspector での編集                       |
 | --------- | ------------------------------------------------------ | ----------------------------------------- |
-| `string`  | 文字列。`Dropdown Enums` を設定するとプルダウンになる。 | テキスト入力 / プルダウン                 |
+| `string`  | 文字列。**Choices** を設定するとプルダウンになる。      | テキスト入力 / プルダウン                 |
 | `float` / `integer` | 数値。                                        | 数値入力                                  |
 | `boolean` | 真偽値。                                                | トグルスイッチ                            |
-| `list`    | 配列。要素の型 (`List Item Type`) を選べる。            | 要素がスカラーなら CSV 入力、`object`/`union` 等の構造体なら追加・削除・並べ替えできるカード一覧 |
+| `list`    | 配列。要素の型を選べる。                                | 要素がスカラーなら1件ずつの入力欄（カンマ区切りテキストからの一括貼り付けも可）、`object`/`union` 等の構造体なら追加・削除・並べ替えできるカード一覧 |
 | `object`  | 固定フィールドを持つ入れ子オブジェクト。                | フィールドごとの入力欄                    |
-| `map`     | 自由なキーと、共通の値の型 (`Map Value Type`) を持つ辞書。 | キーの追加・リネーム・削除 + 値の入力  |
+| `map`     | 自由なキーと、共通の値の型を持つ辞書。                  | キーの追加・リネーム・削除 + 値の入力  |
 | `union`   | 判別キー (`Discriminator Key`) の値ごとにフィールド構成が変わるタグ付きバリアント。 | バリアント選択 + 選択中バリアントのフィールド入力（バリアントを切り替えると、同名のフィールドは値を引き継ぎ、新しいバリアントに無いフィールドは破棄される） |
 | `any`     | 構造を規定しない自由な JSON 値。                        | JSON テキスト入力                         |
+| `Ref`     | `Definitions`（後述）で定義した型を参照する。           | 参照先の型と同じ編集 UI                   |
 
-`list`/`object`/`map`/`union` は組み合わせて入れ子にできます。例えば「`type` によってフィールド構成が変わるアクションのリスト」は、`list` の要素を `union` にし、`union` の各バリアントに固定フィールド（`string`/`float`/`integer`/`boolean`/`map`/`any`）を定義することで表現できます。設定画面のスキーマ編集では、この入れ子は `union` の各バリアントのフィールドまで（object のフィールドや map の値まで）GUI から組み立てられます。それより深い入れ子が必要な場合は、後述の YAML/JSON インポートを使ってください。
+`list`/`object`/`map`/`union` は GUI 上で自由な深さに入れ子にできます（例: `object` のフィールドがさらに `list<union>` を持つ、といった構成も組み立てられます）。
+
+各フィールドには、任意で **Required**（値も既定値も未設定だと Inspector で警告し、エクスポート前に件数を示して確認する）と **Description**（Inspector にツールチップとして表示される補足説明）を設定できます。
 
 **例: 到達時に実行するアクションの一覧**（`type` によって必要なフィールドが変わる）
+
+同じ構造を複数のフィールドから使い回したい場合は、`Settings > Option Schema` の **Definitions** セクションで名前付きの型を定義し、フィールドの型を `Ref` にしてその名前を選びます。例えば「到達時アクション」を `action` という名前で1つ定義しておけば、`on_reached_actions` と `on_departure_actions` の両方から同じ `action` 型を参照できます。
 
 ```yaml
 options:
   - name: on_reached_actions
     label: "到達時アクション"
     type: list
-    item:
-      type: union
-      discriminator: type
-      variants:
-        - value: wait
-          label: "待機"
-          fields:
-            - { name: countdown_ms, label: "待機時間(ms)", type: integer, default: 3000 }
-        - value: service
-          label: "サービス呼び出し"
-          fields:
-            - { name: service, label: "サービス名", type: string }
-            - { name: request, label: "リクエスト", type: map }
-        - value: amcl_reset
-          label: "AMCLリセット"
-          fields: []
+    item: { type: ref, ref: action }
+definitions:
+  - name: action
+    type: union
+    discriminator: type
+    variants:
+      - value: wait
+        label: "待機"
+        fields:
+          - { name: countdown_ms, label: "待機時間(ms)", type: integer, default: 3000 }
+      - value: service
+        label: "サービス呼び出し"
+        fields:
+          - { name: service, label: "サービス名", type: string, required: true }
+          - { name: request, label: "リクエスト", type: map }
+      - value: amcl_reset
+        label: "AMCLリセット"
+        fields: []
 ```
 
-この YAML を `Settings > Option Schema` の **Import** から読み込むと、`on_reached_actions` オプションが定義され、各 Waypoint の Inspector でアクションを1件ずつ追加し、種類（`wait` / `service` / `amcl_reset`）を選んでフィールドを入力できるようになります。
+この YAML を `Settings > Option Schema` の **Import** から読み込むと、`on_reached_actions` オプションが定義され、各 Waypoint の Inspector でアクションを1件ずつ追加し、種類（`wait` / `service` / `amcl_reset`）を選んでフィールドを入力できるようになります。`service` フィールドは `required: true` なので、未入力のままだと Inspector に必須マーク（`*`）が表示されます。
 
 ### 未設定の値とスキーマ既定値の違い
 
-フィールドに何も入力しなければ、その値は「未設定」としてプロジェクトファイルに保存されません（`default` を書いても、それはあくまで Inspector の表示や、エクスポート時の補完に使われるだけです）。この区別は、「フィールドを省略すると受け側のデフォルトが使われる」形式の外部フォーマットへ書き出す際に重要です。エクスポートテンプレートからは、次の2種類の値を参照できます。
+フィールドに何も入力しなければ、その値は「未設定」としてプロジェクトファイルに保存されません（`default` を書いても、それはあくまで Inspector の表示や、エクスポート時の補完に使われるだけです）。この区別は、「フィールドを省略すると受け側のデフォルトが使われる」形式の外部フォーマットへ書き出す際に重要です。
 
-- `options.*`: スキーマの既定値を補った実効値（既存のテンプレートと同じ、これまでどおりの参照方法）
-- `raw_options.*`: 明示的に入力された値だけ（未入力のフィールドは含まれない）
+- 値を明示的に入力したフィールドには、Inspector に「既定値に戻す」ボタン（↺）が表示され、クリックすると未設定に戻ります。
+- 未設定のフィールドには、既定値がプレースホルダとグレーの「既定」バッジで示されます（実際の値としては保存されません）。
+- エクスポートテンプレートからは、次の2種類の値を参照できます。
+  - `options.*`: スキーマの既定値を補った実効値（既存のテンプレートと同じ、これまでどおりの参照方法）
+  - `raw_options.*`: 明示的に入力された値だけ（未入力のフィールドは含まれない）
 
 ### グローバルフィールド（プロジェクト全体の変数）
 
@@ -383,6 +393,7 @@ waypoints:
 ### 一括エクスポートプロファイル (Export Profiles)
 複数のエクスポート処理（例: ゴール地点YAML、通過点JSON、切り出しマップ画像PNG）を1つの「プロファイル」として保存し、ワンクリックで全ファイルを一括生成できます。
 - 出力先ファイルの既存ファイル衝突を事前に検知し、「上書き（Overwrite）」または「自動バックアップ（Backup）」を安全に選択できます。
+- Option Schema で `required` を設定したフィールドが未入力（既定値も無い）のウェイポイントがある場合、あるいは値の型がスキーマと合わない場合は、件数を示す確認ダイアログが表示されます。エクスポート自体はブロックされないため、意図的に空のまま出力したい場合は「続行」を選べます。
 
 ### マップ切り出しエクスポート
 ツールバーの **「Add Export Region」** でキャンバス上に領域枠を作成し、`File > Export Maps...` から指定範囲のマップ画像のみを高解像度ラスタライズして保存できます。

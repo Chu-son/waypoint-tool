@@ -1,7 +1,7 @@
 import type { WaypointNode, OptionsSchema, OptionValue } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
 import { quaternionToYaw } from './transformUtils';
-import { resolveWithDefaults } from './optionValues';
+import { resolveWithDefaults, validateField } from './optionValues';
 
 export interface ExportedWaypointItem {
   index: number;
@@ -79,4 +79,26 @@ export function extractWaypointsForExport(
       };
     })
     .filter((n): n is ExportedWaypointItem => n !== null);
+}
+
+/**
+ * オプションの値に問題（`required` なのに値も既定値も無い、値の型がスキーマと合わない等）を
+ * 持つウェイポイントの件数を数える。エクスポート前の確認（ブロックはせず、件数を示して
+ * 続行を確認する）に使う。`required`/型検証は object のフィールドや union のバリアント
+ * フィールドまで再帰的に見るため、`optionsSchema` は ref を解決済みの実効スキーマを渡すこと。
+ */
+export function countWaypointsWithInvalidOptions(
+  rootNodeIds: string[],
+  nodes: Record<string, WaypointNode>,
+  optionsSchema: OptionsSchema | null,
+): number {
+  const fields = optionsSchema?.options ?? [];
+  if (fields.length === 0) return 0;
+
+  const flatIds = getFlattenedWaypointIds(rootNodeIds, nodes);
+  return flatIds.filter((id) => {
+    const node = nodes[id];
+    if (!node) return false;
+    return fields.some((field) => validateField(field, node.options?.[field.name], field.name).length > 0);
+  }).length;
 }
