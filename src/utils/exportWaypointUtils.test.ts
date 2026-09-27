@@ -1,6 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { extractWaypointsForExport } from './exportWaypointUtils';
+import { extractGlobalsForExport, extractWaypointsForExport } from './exportWaypointUtils';
 import type { WaypointNode, OptionsSchema } from '../types/store';
+
+describe('extractGlobalsForExport', () => {
+  it('maps each global field name to its value and leaves out fields without a value', () => {
+    const schema: OptionsSchema = {
+      options: [],
+      globals: [
+        { name: 'default_speed', label: 'Default Speed', type: 'float', value: 0.5 },
+        { name: 'frame_id', label: 'Frame', type: 'string', value: 'map' },
+        { name: 'tags', label: 'Tags', type: 'list', item_type: 'string', value: ['a', 'b'] },
+        { name: 'unset', label: 'Unset', type: 'string' },
+      ],
+    };
+
+    expect(extractGlobalsForExport(schema)).toEqual({ default_speed: 0.5, frame_id: 'map', tags: ['a', 'b'] });
+  });
+
+  it('returns no globals when the project has no option schema', () => {
+    expect(extractGlobalsForExport(null)).toEqual({});
+  });
+});
 
 describe('exportWaypointUtils', () => {
   it('extracts waypoints in DFS order with schema defaults and yaw computation', () => {
@@ -41,6 +61,7 @@ describe('exportWaypointUtils', () => {
 
     const schema: OptionsSchema = {
       options: [{ name: 'speed', label: 'Speed', type: 'number', default: 1.5 }],
+      globals: [],
     };
 
     const result = extractWaypointsForExport(['node-1', 'node-2'], nodes, schema, 1);

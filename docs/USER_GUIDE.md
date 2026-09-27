@@ -245,6 +245,27 @@ Waypoint にロボット独自のカスタム属性を付加できます。
 2. **「Add Field」** をクリックし、フィールド名、表示ラベル、型（`string`, `float`, `integer`, `boolean`, `list`）、デフォルト値を設定します。
 3. 「Apply Schema」を押すと、全 Waypoint の Inspector 内に専用の入力フォーム（スライダー、セレクトボックス、トグルスイッチ等）が動的に生成されます。
 
+### グローバルフィールド（プロジェクト全体の変数）
+
+Waypoint ごとではなく、プロジェクト全体で1つの値を持つ変数を定義できます。エクスポートするファイルに「デフォルト速度」のような全体設定の項目がある場合に使います。
+
+1. `Settings > Option Schema` タブの **「Global Fields」** で **「Add Global」** をクリックし、フィールド名、表示ラベル、型、**値（Value）** を設定して「Apply」を押します。値はプロジェクト（`.wptroj`）に保存されます。
+2. `Settings > Export Templates` のテンプレート編集欄に **Global Fields** のチップが表示されます。クリックすると `{{@root.globals.フィールド名}}` が挿入されます。
+3. エクスポート時、テンプレート内でグローバルフィールドの値に置き換わります。
+
+```handlebars
+default_speed: {{globals.default_speed}}
+{{#each waypoints}}
+- id: {{id}}
+  speed: {{options.speed}}
+  frame: {{@root.globals.frame_id}}
+{{/each}}
+```
+
+- `{{#each waypoints}}` の内側からは `{{@root.globals.名前}}` で参照します。
+- 値が未入力のフィールドは出力に含まれず、テンプレート上では空になります。
+- 既定のYAML/JSON出力（テンプレートを使わない形式）にはグローバルフィールドは含まれません。
+
 ---
 
 ## 11. 自動生成プラグイン & パイプライン (Generators & Pipelines)

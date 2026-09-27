@@ -72,7 +72,7 @@ describe('PropertiesPanel', () => {
     renderWithStore(<PropertiesPanel />, {
       ...waypointTree([makeWaypoint('node-1')]),
       selectedNodeIds: ['node-1'],
-      optionsSchema: { options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }] },
+      optionsSchema: { options: [{ name: 'speed', label: 'Target Speed', type: 'float', default: 0.5 }], globals: [] },
       visibleAttributes: [],
     });
 

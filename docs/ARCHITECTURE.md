@@ -144,7 +144,7 @@ graph TD
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
 - **`pathCalculatorSlice.ts`**: 経路計算プラグイン（障害物回避ルーティング等）の選択・パラメータ・計算結果、デバウンス付き再計算 (`recalculatePath`)。
-- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
+- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema（ウェイポイント属性 `options` とプロジェクト全体変数 `globals`）、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
 - **`interactionSlice.ts`**: 状態機械および対話管理（10種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、サイドバーパネルの自由ドッキング配置構造（`panelLayout`：左/右パネル所属タブ一覧・並び替え・相互移動・永続化）、アクティブタブ（`activateTab`）、モーダル表示状態、ズーム/パン位置。
 - **`geoMapSlice.ts`**: 背景地図（OSM / 衛星画像）の設定 `geoMap`（有効/無効、ベースマップ ID とカスタム URL、不透明度、ワールド原点の地理座標、位置合わせ `alignment`）と、ドラッグ／数値入力による位置合わせの編集セッション（`beginGeoAlignDrag` → `updateGeoAlignDrag` → `endGeoAlignDrag` / `cancelGeoAlignDrag`）。位置合わせは Undo 履歴に含まれ、1 セッションが Undo 1 回になる。プロジェクトファイルの `geo_map` に保存し、読込時は `migrations/geoMapNormalization.ts` で検証・補完する。

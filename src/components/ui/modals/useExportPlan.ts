@@ -4,7 +4,7 @@ import { BackendAPI } from '../../../api';
 import { v4 as uuidv4 } from 'uuid';
 import { ExportProfile, ExportTargetItem, ExportTargetType } from '../../../types/store';
 import { resolveExportFiles, buildExportTreePreview } from '../../../utils/exportTemplateEngine';
-import { extractWaypointsForExport } from '../../../utils/exportWaypointUtils';
+import { extractGlobalsForExport, extractWaypointsForExport } from '../../../utils/exportWaypointUtils';
 import { buildExportPackageItems, formatSessionTimestamp } from '../../../utils/exportPackage';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
@@ -358,6 +358,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             root_dir: rootDir,
             conflict_resolution: activeProfile.conflictResolution,
             session_timestamp: formatSessionTimestamp(sessionDate),
+            globals: extractGlobalsForExport(optionsSchema),
             waypoint_items: waypointItems,
             map_items: mapItems,
           });

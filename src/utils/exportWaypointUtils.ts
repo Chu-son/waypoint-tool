@@ -1,4 +1,4 @@
-import type { WaypointNode, OptionsSchema } from '../types/store';
+import type { WaypointNode, OptionsSchema, OptionValue } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
 import { quaternionToYaw } from './transformUtils';
 
@@ -15,6 +15,15 @@ export interface ExportedWaypointItem {
   qz: number;
   qw: number;
   options: Record<string, any>;
+}
+
+/** グローバルフィールドをテンプレートの `globals` 変数へ渡す形にする。値が未設定のフィールドは含めない。 */
+export function extractGlobalsForExport(optionsSchema: OptionsSchema | null): Record<string, OptionValue> {
+  const globals: Record<string, OptionValue> = {};
+  optionsSchema?.globals.forEach((field) => {
+    if (field.value !== undefined) globals[field.name] = field.value;
+  });
+  return globals;
 }
 
 export function extractWaypointsForExport(

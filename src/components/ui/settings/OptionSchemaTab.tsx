@@ -1,15 +1,26 @@
-import { Plus, Save, Trash2, Upload, Download, Database } from 'lucide-react';
+import { Plus, Save, Upload, Download, Database, Globe } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { OptionDef, OptionsSchema } from '../../../types/store';
+import { GlobalFieldDef, OptionDef, OptionsSchema } from '../../../types/store';
 import { Button } from '../common/Button';
-import { Input } from '../common/Input';
-import { Select } from '../common/Select';
-import { cn } from '../../../utils/cn';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
-import { FieldLabel } from '../common/FieldLabel';
+import { SchemaFieldRow } from './SchemaFieldRow';
 import { notify } from '../../../services/notify';
+import { isOptionValueValid, toStoredOptionValue } from '../../../utils/optionValues';
+
+const hasDuplicates = (names: string[]) => new Set(names).size !== names.length;
+
+/** Returns a `base`, `base_1`, `base_2`... key that no field in `fields` uses yet. */
+function uniqueFieldName(base: string, fields: { name: string }[]) {
+  let name = base;
+  let counter = 1;
+  while (fields.some((f) => f.name === name)) {
+    name = `${base}_${counter}`;
+    counter++;
+  }
+  return name;
+}
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -17,33 +28,25 @@ export function OptionSchemaTab() {
   const lastDirectory = useAppStore((state) => state.lastDirectory);
 
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
+  const [localGlobals, setLocalGlobals] = useState<GlobalFieldDef[]>([]);
 
   useEffect(() => {
     setLocalOptions(globalOptionsSchema?.options || []);
+    setLocalGlobals(globalOptionsSchema?.globals || []);
   }, [globalOptionsSchema]);
 
-  const isDefaultValid = (opt: OptionDef) => {
-    if (opt.default === undefined || opt.default === '') return true;
-    if (opt.type === 'integer') return !isNaN(Number(opt.default)) && Number.isInteger(Number(opt.default));
-    if (opt.type === 'float') return !isNaN(Number(opt.default));
-    if (opt.type === 'boolean') {
-      const str = String(opt.default).toLowerCase();
-      return str === 'true' || str === 'false';
-    }
-    return true;
-  };
-
   const handleSaveOptions = () => {
-    const hasEmptyName = localOptions.some((opt) => opt.name.trim() === '');
-    const names = localOptions.map((opt) => opt.name);
-    const hasDuplicates = new Set(names).size !== names.length;
-    const hasInvalidDefaults = localOptions.some((opt) => !isDefaultValid(opt));
+    const hasEmptyName = [...localOptions, ...localGlobals].some((f) => f.name.trim() === '');
+    const hasDuplicateOptions = hasDuplicates(localOptions.map((opt) => opt.name));
+    const hasDuplicateGlobals = hasDuplicates(localGlobals.map((g) => g.name));
+    const hasInvalidDefaults = localOptions.some((opt) => !isOptionValueValid(opt.type, opt.default));
+    const hasInvalidGlobalValues = localGlobals.some((g) => !isOptionValueValid(g.type, g.value));
 
     if (hasEmptyName) {
       void notify('Key Name cannot be empty.');
       return;
     }
-    if (hasDuplicates) {
+    if (hasDuplicateOptions || hasDuplicateGlobals) {
       void notify('Key Names must be unique. Duplicate keys found.');
       return;
     }
@@ -51,29 +54,39 @@ export function OptionSchemaTab() {
       void notify('Some options have default values that do not match their type.');
       return;
     }
+    if (hasInvalidGlobalValues) {
+      void notify('Some global fields have values that do not match their type.');
+      return;
+    }
 
-    setGlobalOptionsSchema({ options: localOptions });
+    setGlobalOptionsSchema({
+      options: localOptions,
+      globals: localGlobals.map((g) => ({ ...g, value: toStoredOptionValue(g.value, g.type) })),
+    });
     useAppStore.setState({ isDirty: true });
     void notify('オプションスキーマを保存しました。');
   };
 
   const handleAddOption = () => {
-    const baseName = 'new_option';
-    let newName = baseName;
-    let counter = 1;
-    while (localOptions.some((opt) => opt.name === newName)) {
-      newName = `${baseName}_${counter}`;
-      counter++;
-    }
-    setLocalOptions([...localOptions, { name: newName, label: 'New Option', type: 'string', default: '' }]);
+    setLocalOptions([
+      ...localOptions,
+      { name: uniqueFieldName('new_option', localOptions), label: 'New Option', type: 'string', default: '' },
+    ]);
   };
 
-  const handleRemoveOption = (index: number) => {
-    setLocalOptions(localOptions.filter((_, i) => i !== index));
+  const handleAddGlobal = () => {
+    setLocalGlobals([
+      ...localGlobals,
+      { name: uniqueFieldName('new_global', localGlobals), label: 'New Global', type: 'string', value: '' },
+    ]);
   };
 
   const handleUpdateOption = (index: number, updates: Partial<OptionDef>) => {
     setLocalOptions(localOptions.map((opt, i) => (i === index ? { ...opt, ...updates } : opt)));
+  };
+
+  const handleUpdateGlobal = (index: number, updates: Partial<GlobalFieldDef>) => {
+    setLocalGlobals(localGlobals.map((g, i) => (i === index ? { ...g, ...updates } : g)));
   };
 
   const handleExportSchema = async () => {
@@ -87,6 +100,7 @@ export function OptionSchemaTab() {
 
       const dataToExport = {
         options: localOptions,
+        globals: localGlobals.map((g) => ({ ...g, value: toStoredOptionValue(g.value, g.type) })),
       };
 
       await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
@@ -140,6 +154,8 @@ export function OptionSchemaTab() {
       }
 
       setLocalOptions(schema.options || []);
+      // 外部ファイルの globals は任意項目。無ければ空として扱う。
+      setLocalGlobals(Array.isArray(schema.globals) ? schema.globals : []);
       void notify('オプションスキーマをインポートしました。');
     } catch (err) {
       console.error('Failed to import options schema:', err);
@@ -173,162 +189,52 @@ export function OptionSchemaTab() {
 
       <div className="space-y-3 px-1">
         {localOptions.map((opt, i) => (
-          <div
+          <SchemaFieldRow
             key={i}
-            className="flex gap-3 items-start bg-surface-panel/40 p-4 rounded-xl border border-border-base/30 shadow-subtle hover:border-border-base/60 transition-all"
-          >
-            <div className="flex-1 space-y-4">
-              <div className="grid grid-cols-12 gap-3">
-                <SchemaFieldCell label="Key Name" className="col-span-3">
-                  <Input
-                    type="text"
-                    value={opt.name}
-                    onChange={(e) => {
-                      const sanitized = e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
-                      handleUpdateOption(i, { name: sanitized });
-                    }}
-                    className={cn(
-                      'h-8 text-[13px] font-mono',
-                      localOptions.filter((o) => o.name === opt.name).length > 1 || opt.name.trim() === ''
-                        ? 'border-danger-base focus:border-danger-base ring-danger-base/20'
-                        : '',
-                    )}
-                    placeholder="e.g. velocity"
-                  />
-                </SchemaFieldCell>
-                <SchemaFieldCell label="Label" className="col-span-3">
-                  <Input
-                    type="text"
-                    value={opt.label}
-                    onChange={(e) => handleUpdateOption(i, { label: e.target.value })}
-                    className="h-8 text-[13px]"
-                    placeholder="e.g. Target Speed"
-                  />
-                </SchemaFieldCell>
-                <SchemaFieldCell label="Type" className="col-span-3">
-                  <Select
-                    value={opt.type}
-                    onChange={(e) => handleUpdateOption(i, { type: e.target.value })}
-                    className="h-8 text-[13px]"
-                  >
-                    <option value="string">String</option>
-                    <option value="float">Float</option>
-                    <option value="integer">Integer</option>
-                    <option value="boolean">Boolean</option>
-                    <option value="list">List (Array)</option>
-                  </Select>
-                </SchemaFieldCell>
-                <SchemaFieldCell label="Default" className="col-span-3">
-                  <Input
-                    type="text"
-                    value={
-                      opt.default !== undefined
-                        ? Array.isArray(opt.default)
-                          ? opt.default.join(', ')
-                          : String(opt.default)
-                        : ''
-                    }
-                    onChange={(e) => {
-                      if (opt.type === 'list') {
-                        const rawArr = e.target.value
-                          .split(',')
-                          .map((s) => s.trim())
-                          .filter((s) => s.length > 0);
-                        let parsedArr: any[] = rawArr;
-                        if (opt.item_type === 'float') {
-                          parsedArr = rawArr.map((s) => parseFloat(s)).filter((n) => !isNaN(n));
-                        } else if (opt.item_type === 'integer') {
-                          parsedArr = rawArr.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
-                        } else if (opt.item_type === 'boolean') {
-                          parsedArr = rawArr.map((s) => s === 'true' || s === '1');
-                        }
-                        handleUpdateOption(i, { default: parsedArr });
-                      } else {
-                        handleUpdateOption(i, {
-                          default: e.target.value,
-                        });
-                      }
-                    }}
-                    className={cn(
-                      'h-8 text-[13px] font-mono',
-                      !isDefaultValid(opt) ? 'border-danger-base focus:border-danger-base ring-danger-base/20' : '',
-                    )}
-                    placeholder={opt.type === 'list' ? 'csv' : opt.type === 'boolean' ? 'true/false' : '0'}
-                  />
-                </SchemaFieldCell>
-              </div>
-              {opt.type === 'list' && (
-                <div className="flex gap-2 mt-1">
-                  <SchemaFieldCell label="List Item Type" className="w-48">
-                    <Select
-                      value={opt.item_type || 'string'}
-                      onChange={(e) =>
-                        handleUpdateOption(i, {
-                          item_type: e.target.value,
-                        })
-                      }
-                      className="h-8 text-[13px]"
-                    >
-                      <option value="string">String</option>
-                      <option value="float">Float</option>
-                      <option value="integer">Integer</option>
-                      <option value="boolean">Boolean</option>
-                    </Select>
-                  </SchemaFieldCell>
-                </div>
-              )}
-              {opt.type === 'string' && (
-                <div className="flex gap-2 mt-1">
-                  <SchemaFieldCell label="Dropdown Enums (csv, optional)" className="flex-1">
-                    <Input
-                      type="text"
-                      value={opt.enum_values ? opt.enum_values.join(', ') : ''}
-                      onChange={(e) =>
-                        handleUpdateOption(i, {
-                          enum_values: e.target.value
-                            .split(',')
-                            .map((s) => s.trim())
-                            .filter((s) => s.length > 0),
-                        })
-                      }
-                      className="h-8 text-[13px]"
-                      placeholder="e.g. none, docking"
-                    />
-                  </SchemaFieldCell>
-                </div>
-              )}
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => handleRemoveOption(i)}
-              className="mt-6 text-text-muted hover:text-danger-base hover:bg-danger-base/10"
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
+            def={opt}
+            groupLabel="Option"
+            valueLabel="Default"
+            value={opt.default}
+            isDuplicateName={localOptions.filter((o) => o.name === opt.name).length > 1}
+            onChangeDef={(updates) => handleUpdateOption(i, updates)}
+            onChangeValue={(value) => handleUpdateOption(i, { default: value })}
+            onRemove={() => setLocalOptions(localOptions.filter((_, idx) => idx !== i))}
+          />
         ))}
         {localOptions.length === 0 && (
           <EmptyState message="No custom options defined. Click 'Add Field' to create one." />
         )}
       </div>
-    </div>
-  );
-}
 
-function SchemaFieldCell({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn('space-y-1.5', className)}>
-      <FieldLabel className="ml-1">{label}</FieldLabel>
-      {children}
+      <TabSectionHeader
+        title="Global Fields"
+        subtitle="Project-wide values, not tied to a waypoint. Reference them in export templates as {{globals.name}}."
+        icon={Globe}
+        actions={
+          <Button variant="secondary" size="sm" onClick={handleAddGlobal}>
+            <Plus size={14} className="mr-1" /> Add Global
+          </Button>
+        }
+      />
+
+      <div className="space-y-3 px-1">
+        {localGlobals.map((field, i) => (
+          <SchemaFieldRow
+            key={i}
+            def={field}
+            groupLabel="Global field"
+            valueLabel="Value"
+            value={field.value}
+            isDuplicateName={localGlobals.filter((g) => g.name === field.name).length > 1}
+            onChangeDef={(updates) => handleUpdateGlobal(i, updates)}
+            onChangeValue={(value) => handleUpdateGlobal(i, { value: value as GlobalFieldDef['value'] })}
+            onRemove={() => setLocalGlobals(localGlobals.filter((_, idx) => idx !== i))}
+          />
+        ))}
+        {localGlobals.length === 0 && (
+          <EmptyState message="No global fields defined. Click 'Add Global' to create one." />
+        )}
+      </div>
     </div>
   );
 }

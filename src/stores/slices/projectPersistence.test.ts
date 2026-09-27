@@ -107,6 +107,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       ],
       options_schema: {
         options: [],
+        globals: [],
       },
       export_templates: [
         {

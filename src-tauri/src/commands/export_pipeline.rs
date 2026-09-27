@@ -12,6 +12,9 @@ pub struct ExportPackageOptions {
     pub root_dir: String,
     pub conflict_resolution: String, // "overwrite" | "backup_file"
     pub session_timestamp: String,
+    /// プロジェクト全体の変数。テンプレートから `globals` として参照できる。
+    #[serde(default)]
+    pub globals: serde_json::Map<String, serde_json::Value>,
     pub waypoint_items: Vec<PackageWaypointItem>,
     pub map_items: Vec<PackageMapItem>,
 }
@@ -84,8 +87,11 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
         // Handlebars or YAML/JSON serialization
         let content = if let Some(tmpl) = wp_item.template {
             let reg = Handlebars::new();
-            reg.render_template(&tmpl, &serde_json::json!({ "waypoints": wp_item.waypoints }))
-                .map_err(|e| format!("Template render error for {}: {}", wp_item.path, e))?
+            reg.render_template(
+                &tmpl,
+                &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": options.globals }),
+            )
+            .map_err(|e| format!("Template render error for {}: {}", wp_item.path, e))?
         } else if wp_item.path.to_lowercase().ends_with(".yaml") || wp_item.path.to_lowercase().ends_with(".yml") {
             serde_yaml::to_string(&wp_item.waypoints)
                 .map_err(|e| format!("YAML serialization error for {}: {}", wp_item.path, e))?
@@ -265,6 +271,7 @@ mod tests {
             root_dir: tmp.path().to_string_lossy().to_string(),
             conflict_resolution: "backup_file".to_string(),
             session_timestamp: "20260912_110000".to_string(),
+            globals: serde_json::Map::new(),
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
@@ -284,5 +291,35 @@ mod tests {
 
         let new_content = fs::read_to_string(&wp_path).unwrap();
         assert!(new_content.contains("wp1"));
+    }
+
+    #[test]
+    fn test_execute_export_package_template_can_reference_globals() {
+        let tmp = TempDir::new().unwrap();
+        let wp_path = tmp.path().join("wp.txt");
+
+        let mut globals = serde_json::Map::new();
+        globals.insert("default_speed".to_string(), serde_json::json!(0.5));
+
+        let options = ExportPackageOptions {
+            root_dir: tmp.path().to_string_lossy().to_string(),
+            conflict_resolution: "overwrite".to_string(),
+            session_timestamp: "20260912_110000".to_string(),
+            globals,
+            waypoint_items: vec![PackageWaypointItem {
+                path: wp_path.to_string_lossy().to_string(),
+                waypoints: vec![serde_json::json!({ "id": "wp1" }), serde_json::json!({ "id": "wp2" })],
+                template: Some(
+                    "speed={{globals.default_speed}}\n{{#each waypoints}}{{id}}:{{@root.globals.default_speed}}\n{{/each}}"
+                        .to_string(),
+                ),
+                image_data_b64: None,
+            }],
+            map_items: vec![],
+        };
+
+        execute_export_package(options).unwrap();
+
+        assert_eq!(fs::read_to_string(&wp_path).unwrap(), "speed=0.5\nwp1:0.5\nwp2:0.5\n");
     }
 }

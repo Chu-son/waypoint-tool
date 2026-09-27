@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { coerceOptionValue } from './optionValues';
 import { ImportFieldMapping, OptionDef, OptionsSchema, WaypointNode, WaypointOptions } from '../types/store';
 
 // デフォルトYAML/JSON形式（export_waypointsがラップなしのルート配列として出力する形式）に対応する既定マッピング。
@@ -30,24 +31,7 @@ function toNumber(v: any): number | undefined {
 }
 
 // OptionDef.type に応じた型変換（ExportModalのfullOptions構築ロジックの逆変換）。
-function coerceValue(v: any, opt: OptionDef): any {
-  switch (opt.type) {
-    case 'integer': {
-      const n = parseInt(v, 10);
-      return Number.isNaN(n) ? opt.default : n;
-    }
-    case 'float': {
-      const n = parseFloat(v);
-      return Number.isNaN(n) ? opt.default : n;
-    }
-    case 'boolean':
-      return typeof v === 'boolean' ? v : String(v).toLowerCase() === 'true';
-    case 'list':
-      return Array.isArray(v) ? v : [v];
-    default:
-      return v; // string / enum
-  }
-}
+const coerceValue = (v: any, opt: OptionDef) => coerceOptionValue(v, opt.type, opt.default);
 
 function coerceOptions(raw: Record<string, any>, schema: OptionsSchema | null): WaypointOptions {
   if (!schema) return { ...raw };
