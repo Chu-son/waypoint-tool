@@ -233,6 +233,9 @@ describe('inlineRemovedPresets', () => {
           name: 'action',
           type: 'object',
           fields: [{ name: 'countdown_ms', label: 'Countdown', type: 'integer' }],
+          // `inlineRemovedPresets` の呼び出し側（OptionSchemaTab）は、まだ削除が反映される前の
+          // 「適用済み」スキーマを渡す契約なので、ここでも削除前の状態（プリセットがまだ残っている）を再現する。
+          presets: [{ name: 'quick', value: { countdown_ms: 500 } }],
         },
       ],
     };

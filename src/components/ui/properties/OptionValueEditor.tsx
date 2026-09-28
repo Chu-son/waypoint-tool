@@ -11,7 +11,7 @@ import {
   createValue,
   switchUnionVariant,
   parseCsvList,
-  isPresetRef,
+  isActivePresetRef,
   findPresetByName,
   findMatchingPreset,
 } from '../../../utils/optionValues';
@@ -155,7 +155,7 @@ function PresetSelector({
 }) {
   const transactions = useContext(ValueEditTransactionContext);
   const presets = spec.presets ?? [];
-  const currentRefName = isPresetRef(value) ? value.$preset : undefined;
+  const currentRefName = isActivePresetRef(spec, value) ? value.$preset : undefined;
   const isUnresolvedRef = currentRefName !== undefined && !findPresetByName(spec, currentRefName);
 
   return (
@@ -247,13 +247,15 @@ export function OptionValueEditor({
 
   // プリセットを参照中は、実体の値は読み取り専用でプリセットの値を表示する（編集は「カスタム値」への
   // 切り離しを経由する）。未定義のプリセットを参照している場合は、型別コントロール自体を出さない。
-  const activePreset = !mixed && isPresetRef(value) ? findPresetByName(spec, value.$preset) : undefined;
-  const isUnresolvedRef = !mixed && isPresetRef(value) && !activePreset;
+  const activePreset = !mixed && isActivePresetRef(spec, value) ? findPresetByName(spec, value.$preset) : undefined;
+  const isUnresolvedRef = !mixed && isActivePresetRef(spec, value) && !activePreset;
   const displayValue = mixed ? undefined : activePreset ? activePreset.value : value;
   const disabled = disabledProp || !!activePreset;
 
   const matchingPreset =
-    hasPresets && !mixed && value !== undefined && !isPresetRef(value) ? findMatchingPreset(spec, value) : undefined;
+    hasPresets && !mixed && value !== undefined && !isActivePresetRef(spec, value)
+      ? findMatchingPreset(spec, value)
+      : undefined;
 
   const control = isUnresolvedRef
     ? null

@@ -125,7 +125,7 @@ export function PresetListEditor({
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     type="text"
-                    aria-label={`${scope} preset name`}
+                    aria-label={`${scope} preset[${i}] name`}
                     value={p.name}
                     onChange={(e) =>
                       handleUpdate(i, { name: e.target.value.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() })
@@ -135,7 +135,7 @@ export function PresetListEditor({
                   />
                   <Input
                     type="text"
-                    aria-label={`${p.name} preset label`}
+                    aria-label={`${scope} preset[${i}] label`}
                     value={p.label || ''}
                     onChange={(e) => handleUpdate(i, { label: e.target.value || undefined })}
                     className="h-7 text-[12px]"
@@ -146,7 +146,7 @@ export function PresetListEditor({
                   spec={{ ...spec, presets: undefined, preset_only: false }}
                   value={p.value}
                   onChange={(v) => handleUpdate(i, { value: v ?? null })}
-                  name={`${p.name} preset value`}
+                  name={`${scope} preset[${i}] value`}
                   showResetControl={false}
                 />
                 {count !== null && (
@@ -174,7 +174,7 @@ export function PresetListEditor({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label={`Remove preset ${p.name}`}
+                aria-label={`Remove ${scope} preset[${i}]`}
                 onClick={() => handleRemove(i)}
                 className="text-text-muted hover:text-danger-base hover:bg-danger-base/10"
               >

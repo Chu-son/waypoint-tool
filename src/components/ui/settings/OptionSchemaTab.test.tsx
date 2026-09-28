@@ -299,11 +299,11 @@ describe('OptionSchemaTab Presets', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /Add Preset/ }));
-    const presetName = screen.getByLabelText('options.tolerance preset name');
+    const presetName = screen.getByLabelText('options.tolerance preset[0] name');
     await user.clear(presetName);
     await user.type(presetName, 'small');
-    await user.type(screen.getByLabelText('small preset label'), 'Small');
-    await user.type(screen.getByLabelText('small preset value'), '0.1');
+    await user.type(screen.getByLabelText('options.tolerance preset[0] label'), 'Small');
+    await user.type(screen.getByLabelText('options.tolerance preset[0] value'), '0.1');
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
     expect(getAppState().optionsSchema?.options[0].presets).toEqual([{ name: 'small', label: 'Small', value: 0.1 }]);
@@ -345,7 +345,7 @@ describe('OptionSchemaTab Presets', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Remove preset small' }));
+    await user.click(screen.getByRole('button', { name: 'Remove options.tolerance preset[0]' }));
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
     expect(getAppState().optionsSchema?.options[0].presets).toEqual([]);
@@ -437,7 +437,7 @@ describe('OptionSchemaTab Presets', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Remove preset small' }));
+    await user.click(screen.getByRole('button', { name: 'Remove options.tolerance preset[0]' }));
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
     expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('1 件'));
@@ -455,12 +455,72 @@ describe('OptionSchemaTab Presets', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Remove preset small' }));
+    await user.click(screen.getByRole('button', { name: 'Remove options.tolerance preset[0]' }));
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
     expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'small' } });
     // Apply 自体も中止されるので、スキーマは古いまま（削除前のプリセットが残っている）。
     expect(getAppState().optionsSchema?.options[0].presets).toEqual([{ name: 'small', value: 0.1 }]);
+  });
+
+  it('gives each preset in the same field its own uniquely addressable name/label/value inputs and remove button', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: {
+        options: [
+          {
+            name: 'tolerance',
+            label: 'Tolerance',
+            type: 'float',
+            presets: [
+              { name: 'small', label: 'Small', value: 0.1 },
+              { name: 'large', label: 'Large', value: 0.5 },
+            ],
+          },
+        ],
+        globals: [],
+      },
+    });
+
+    // 同一フィールド内の2件のプリセットが、それぞれ一意に取得できる（曖昧一致で失敗しない）ことを確認する。
+    expect(screen.getByLabelText('options.tolerance preset[0] name')).toHaveValue('small');
+    expect(screen.getByLabelText('options.tolerance preset[1] name')).toHaveValue('large');
+    expect(screen.getByLabelText('options.tolerance preset[0] label')).toHaveValue('Small');
+    expect(screen.getByLabelText('options.tolerance preset[1] label')).toHaveValue('Large');
+    expect(screen.getByLabelText('options.tolerance preset[0] value')).toHaveValue(0.1);
+    expect(screen.getByLabelText('options.tolerance preset[1] value')).toHaveValue(0.5);
+
+    await user.click(screen.getByRole('button', { name: 'Remove options.tolerance preset[1]' }));
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(getAppState().optionsSchema?.options[0].presets).toEqual([{ name: 'small', label: 'Small', value: 0.1 }]);
+  });
+
+  it('gives presets that share a name across different fields distinct, non-colliding labels', () => {
+    renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: {
+        options: [
+          {
+            name: 'tolerance_a',
+            label: 'Tolerance A',
+            type: 'float',
+            presets: [{ name: 'small', label: 'Small', value: 0.1 }],
+          },
+          {
+            name: 'tolerance_b',
+            label: 'Tolerance B',
+            type: 'float',
+            presets: [{ name: 'small', label: 'Small', value: 0.2 }],
+          },
+        ],
+        globals: [],
+      },
+    });
+
+    // 別フィールドの同名プリセット（どちらも "small"）が、scope で区別され曖昧にならないことを確認する。
+    expect(screen.getByLabelText('options.tolerance_a preset[0] label')).toHaveValue('Small');
+    expect(screen.getByLabelText('options.tolerance_b preset[0] label')).toHaveValue('Small');
+    expect(screen.getByLabelText('options.tolerance_a preset[0] value')).toHaveValue(0.1);
+    expect(screen.getByLabelText('options.tolerance_b preset[0] value')).toHaveValue(0.2);
   });
 });
 

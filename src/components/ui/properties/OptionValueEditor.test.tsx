@@ -498,6 +498,21 @@ describe('OptionValueEditor presets', () => {
     expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'large' } });
     expect(getAppState().nodes['node-2'].options).toEqual({ tolerance: { $preset: 'large' } });
   });
+
+  it('renders an ordinary editor (not an "undefined preset" error) for a field with no presets whose value happens to have a $preset key', () => {
+    const noPresetsSchema: OptionsSchema = {
+      options: [{ name: 'metadata', label: 'Metadata', type: 'any' }],
+      globals: [],
+    };
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { metadata: { $preset: 'x', note: 'important' } } })]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: noPresetsSchema,
+    });
+
+    expect(screen.queryByText(/未定義のプリセットです/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('metadata')).toBeInTheDocument();
+  });
 });
 
 describe('OptionValueEditor resolves definitions/ref before rendering', () => {

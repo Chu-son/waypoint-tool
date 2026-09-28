@@ -8,7 +8,7 @@
  * 同じ定義を複数箇所から `ref` している場合でも、プリセットの使用件数・置換は1つのスコープに集約される。
  */
 import type { DefinitionDef, OptionsSchema, OptionValue, PresetDef, TypeSpec } from '../types/options';
-import { deepEqual, findPresetByName, isPlainObject, isPresetRef } from './optionValues';
+import { deepEqual, findPresetByName, isActivePresetRef, isPlainObject } from './optionValues';
 
 type OptionValues = Record<string, OptionValue | undefined>;
 
@@ -38,7 +38,7 @@ function visitForUsage(
     if (def) visitForUsage(def, value, `definitions.${spec.ref}`, definitionsByName, counts);
     return;
   }
-  if (isPresetRef(value)) {
+  if (isActivePresetRef(spec, value)) {
     bumpUsage(counts, scope, value.$preset);
     return;
   }
@@ -121,7 +121,7 @@ function replaceInValue(
       definitionsByName,
     );
   }
-  if (isPresetRef(value)) return { value, count: 0 }; // 既にプリセット参照になっている
+  if (isActivePresetRef(spec, value)) return { value, count: 0 }; // 既にプリセット参照になっている
   if (currentScope === targetScope && deepEqual(value, presetValue)) {
     return { value: { $preset: presetName }, count: 1 };
   }
@@ -325,10 +325,10 @@ function inlineInValue(
       definitionsByName,
     );
   }
-  if (currentScope === targetScope && isPresetRef(value) && value.$preset === presetName) {
+  if (currentScope === targetScope && isActivePresetRef(spec, value) && value.$preset === presetName) {
     return { value: literalValue, count: 1 };
   }
-  if (isPresetRef(value)) return { value, count: 0 };
+  if (isActivePresetRef(spec, value)) return { value, count: 0 };
   if (spec.type === 'list' && Array.isArray(value) && spec.item) {
     let count = 0;
     const items = value.map((v) => {

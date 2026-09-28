@@ -3,9 +3,22 @@ import type { FieldDef, OptionValue, PresetDef, PresetRef, ScalarType, TypeSpec 
 export const isPlainObject = (v: unknown): v is Record<string, OptionValue> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 
-/** 値がプリセット参照（`{ $preset: name }`）かどうかを判定する。 */
+/** 値がプリセット参照（`{ $preset: name }`）の形をしているかどうかを判定する（構造だけを見る）。 */
 export function isPresetRef(value: unknown): value is PresetRef {
   return isPlainObject(value) && typeof value.$preset === 'string';
+}
+
+/**
+ * 値をプリセット参照として実際に解決してよいかを判定する。`isPresetRef` の構造チェックに加えて、
+ * その型仕様が `presets` を1件以上持っていることを要求する。
+ *
+ * `$preset` は予約キーだが、`any` 型やプリセットの無い `object`/`map` の値は、たまたま `$preset` という
+ * キーを持つ通常のデータでありうる（例: プラグインが生成した任意の JSON）。`presets` が定義されていない型で
+ * この区別を省くと、そうした値が「未定義のプリセットへの参照」として誤って扱われ、解決結果が `undefined` に
+ * なって値が消えたり、Inspector が何も表示しなくなったりする。呼び出し側は必ずこちらを使うこと。
+ */
+export function isActivePresetRef(spec: TypeSpec, value: unknown): value is PresetRef {
+  return (spec.presets?.length ?? 0) > 0 && isPresetRef(value);
 }
 
 /** 型仕様が持つプリセットの中から、名前が一致するものを探す。 */
@@ -52,7 +65,8 @@ export function parseCsvList(text: string, itemType: ScalarType): OptionValue[] 
  */
 export function coerceValue(spec: TypeSpec, raw: any, fallback?: OptionValue): OptionValue | undefined {
   // プリセット参照は、参照先の型に関わらずそのまま素通しする（実際の値への変換は表示・エクスポート時に行う）。
-  if (isPresetRef(raw)) return raw;
+  // ただしこの型に `presets` が無ければ、`$preset` キーを持つだけの通常の値として扱う（isActivePresetRef 参照）。
+  if (isActivePresetRef(spec, raw)) return raw;
   switch (spec.type) {
     case 'integer': {
       const n = parseInt(raw, 10);
@@ -122,7 +136,7 @@ export interface ValueValidationError {
 export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueValidationError[] {
   if (value === undefined || value === '') return [];
 
-  if (isPresetRef(value)) {
+  if (isActivePresetRef(spec, value)) {
     return findPresetByName(spec, value.$preset) ? [] : [{ path, message: `未定義のプリセットです: ${value.$preset}` }];
   }
   if (spec.preset_only) {
@@ -197,7 +211,7 @@ export function validateField(field: FieldDef, value: OptionValue | undefined, p
 export function resolvePresets(spec: TypeSpec, value: OptionValue | undefined): OptionValue | undefined {
   if (value === undefined) return undefined;
   let resolved: OptionValue | undefined = value;
-  if (isPresetRef(value)) {
+  if (isActivePresetRef(spec, value)) {
     resolved = findPresetByName(spec, value.$preset)?.value;
     if (resolved === undefined) return undefined;
   }
@@ -335,7 +349,7 @@ export function switchUnionVariant(spec: TypeSpec, value: OptionValue, newVarian
 /** キャンバスのラベル表示用に、値を短い文字列へ要約する。 */
 export function summarizeValue(spec: TypeSpec, value: OptionValue | undefined): string {
   if (value === undefined || value === null) return '';
-  if (isPresetRef(value)) {
+  if (isActivePresetRef(spec, value)) {
     const preset = findPresetByName(spec, value.$preset);
     return preset ? (preset.label ?? preset.name) : `[未定義のプリセット: ${value.$preset}]`;
   }

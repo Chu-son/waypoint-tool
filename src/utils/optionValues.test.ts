@@ -412,4 +412,32 @@ describe('presets', () => {
     expect(summarizeValue(toleranceSpec, { $preset: 'small' })).toBe('Small');
     expect(summarizeValue(toleranceSpec, { $preset: 'unknown' })).toBe('[未定義のプリセット: unknown]');
   });
+
+  // `$preset` is a reserved key only for a type that actually declares `presets`. A field with no presets
+  // (e.g. `any`, or an `object`/`map` with no presets configured) may legitimately hold a value that happens
+  // to have a `$preset` key — such a value must be treated as ordinary data, not as an unresolved reference.
+  describe('a value that looks like a preset reference, on a type with no presets configured', () => {
+    const noPresetsSpec: TypeSpec = { type: 'any' };
+    const literalLookingLikeRef = { $preset: 'x', note: 'important' };
+    const noPresetsField: FieldDef = { ...noPresetsSpec, name: 'metadata', label: 'Metadata' };
+
+    it('resolvePresets / resolveWithDefaults pass the value through unchanged instead of dropping it', () => {
+      expect(resolvePresets(noPresetsSpec, literalLookingLikeRef)).toEqual(literalLookingLikeRef);
+      expect(resolveWithDefaults(noPresetsField, literalLookingLikeRef)).toEqual(literalLookingLikeRef);
+    });
+
+    it('validateValue does not flag it as an undefined preset', () => {
+      expect(validateValue(noPresetsSpec, literalLookingLikeRef)).toEqual([]);
+    });
+
+    it('coerceValue does not short-circuit it as a preset reference', () => {
+      // `any` の default 分岐はそのまま raw を返すため、結果としては同じ値になるが、
+      // `isActivePresetRef` を経由せず switch のデフォルト分岐を通ったことを他のケースと合わせて保証する。
+      expect(coerceValue(noPresetsSpec, literalLookingLikeRef)).toEqual(literalLookingLikeRef);
+    });
+
+    it('summarizeValue formats it as ordinary data, not as "[未定義のプリセット]"', () => {
+      expect(summarizeValue(noPresetsSpec, literalLookingLikeRef)).toBe(JSON.stringify(literalLookingLikeRef));
+    });
+  });
 });
