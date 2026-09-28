@@ -108,7 +108,7 @@
   - **概要**: プロジェクトで定義された Schema（速度、モード等）に基づき動的生成されるプロパティ入力群。全ての型の値編集を `OptionValueEditor` に委譲する。`resolveOptionsSchema` で ref を解決した実効スキーマを使い、行の key にノード ID を含めて選択切替時に確実に remount する。複数選択時はスカラーを一括設定でき、複合型は「個別に編集してください」と表示する。
   - **主要Props**: `isMultiSelection`, `node`, `handleUpdate`
 - **`OptionValueEditor`** ([`src/components/ui/properties/OptionValueEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/OptionValueEditor.tsx))
-  - **概要**: Option Schema の `TypeSpec` に従って値を再帰的に編集するコンポーネント（`CustomOptionsGroup` / `AnnotationCustomOptionsGroup`、および設定画面の `FieldEditor`（既定値・グローバル値の編集）が共用）。`list` は要素の追加・削除・並べ替え（構造体要素はカード、スカラー要素は行ごとの入力 + カンマ区切り貼り付け）、`object` は固定フィールド入力、`map` はキーの追加・リネーム・削除、`union` はバリアント選択（`switchUnionVariant` で同名フィールドを引き継ぐ）+ フィールド入力、`any` は JSON テキスト編集を行う。値が明示的に設定されているフィールドには「既定値に戻す」ボタンを、未設定のフィールドには「既定」バッジを表示する（`showResetControl` で無効化可）。`ValueEditTransactionContext`（既定は no-op）経由で Undo/Redo トランザクションの実装を注入でき、Inspector はストアの `historySlice` と連動した実装を providing する。構造を変える操作は1回のトランザクションにまとめ、テキスト入力は focus/blur でトランザクションの開始・終了を行う。
+  - **概要**: Option Schema の `TypeSpec` に従って値を再帰的に編集するコンポーネント（`CustomOptionsGroup` / `AnnotationCustomOptionsGroup`、および設定画面の `FieldEditor`（既定値・グローバル値の編集）が共用）。`list` は要素の追加・削除・並べ替え（構造体要素はカード、スカラー要素は行ごとの入力 + カンマ区切り貼り付け）、`object` は固定フィールド入力、`map` はキーの追加・リネーム・削除、`union` はバリアント選択（`switchUnionVariant` で同名フィールドを引き継ぐ）+ フィールド入力、`any` は JSON テキスト編集を行う。値が明示的に設定されているフィールドには「既定値に戻す」ボタンを、未設定のフィールドには「既定」バッジを表示する（`showResetControl` で無効化可）。`spec.presets` が1件以上あれば、型別コントロールの上にプリセット選択（`PresetSelector`）を出す。参照中は下のコントロールを読み取り専用にし、「カスタム値」への切り替えで参照先の値をコピーして編集を続けられる（`preset_only` では「カスタム値」自体を出さない）。カスタム値がいずれかのプリセットと完全に一致すれば「参照にする」を提示する。複数選択（`mixed`）でも、複合型を含めプリセット選択自体は出し、選択中の全ノードへ一括設定できる。`ValueEditTransactionContext`（既定は no-op）経由で Undo/Redo トランザクションの実装を注入でき、Inspector はストアの `historySlice` と連動した実装を providing する。構造を変える操作は1回のトランザクションにまとめ、テキスト入力は focus/blur でトランザクションの開始・終了を行う。
   - **主要Props**: `spec`, `value`, `onChange`, `name`, `defaultValue`, `disabled`, `mixed`, `showResetControl`
 - **`GeneratorNodePanel`** ([`src/components/ui/properties/GeneratorNodePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/GeneratorNodePanel.tsx))
   - **概要**: 生成されたジェネレーターノードの再編集・引数調整・Waypoint展開 (Explode) を行うUI。
@@ -195,20 +195,23 @@
   - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`（Waypoint Options / Global Fields / Definitions の3セクション。行 UI は `optionSchema/FieldEditor` を共用）, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`（テンプレートごとに Engine (`Handlebars`/`Jinja`) を選択できる）, `PluginsTab` の7タブを保持。
   - **主要Props**: `isOpen`, `onClose`
 - **`optionSchema/FieldEditor`** ([`src/components/ui/settings/optionSchema/FieldEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/FieldEditor.tsx))
-  - **概要**: Option Schema の1フィールド分（Key/Label/Required/Description + 型仕様 + 既定値/値）を編集する行。`OptionSchemaTab` の Waypoint Options / Global Fields、および `FieldListEditor`/`VariantListEditor` から呼ばれる object のフィールド・union のバリアントフィールドで共用する。型仕様の編集自体は再帰的な `TypeSpecEditor` に委譲し、既定値/値は `OptionValueEditor` による型付き入力で編集する（CSV テキストは廃止）。
-  - **主要Props**: `field`, `groupLabel`, `valueLabel`, `value`, `definitionNames`, `isDuplicateName`, `onChangeField`, `onChangeValue`, `onRemove`
+  - **概要**: Option Schema の1フィールド分（Key/Label/Required/Description + 型仕様 + 既定値/値）を編集する行。`OptionSchemaTab` の Waypoint Options / Global Fields、および `FieldListEditor`/`VariantListEditor` から呼ばれる object のフィールド・union のバリアントフィールドで共用する。型仕様の編集自体は再帰的な `TypeSpecEditor` に委譲し、既定値/値は `OptionValueEditor` による型付き入力で編集する（CSV テキストは廃止）。`scope`（自身の `optionPresets.ts` 走査上の位置。例: `options.tolerance`）と `isAppliedAndUnchanged` は、そのまま `TypeSpecEditor`（延いては Presets パネル）へ渡す。
+  - **主要Props**: `field`, `groupLabel`, `valueLabel`, `value`, `definitionNames`, `scope`, `isAppliedAndUnchanged`, `isDuplicateName`, `onChangeField`, `onChangeValue`, `onRemove`
 - **`optionSchema/TypeSpecEditor`** ([`src/components/ui/settings/optionSchema/TypeSpecEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/TypeSpecEditor.tsx))
-  - **概要**: 値の型仕様（`TypeSpec`）を再帰的に編集する。Type セレクトで `ref` を含む全種別を選べ、`list`/`object`/`map`/`union` はそれぞれ要素・フィールド・値型・バリアントを、同じ `TypeSpecEditor`/`FieldListEditor` で再帰的に編集するため、GUI 上のネストの深さに実質的な制限が無い。`string` の選択肢は `ChoicesEditor` で、`ref` は `definitionNames` からのセレクトで編集する。
-  - **主要Props**: `spec`, `onChange`, `definitionNames`, `fieldName`
+  - **概要**: 値の型仕様（`TypeSpec`）を再帰的に編集する。Type セレクトで `ref` を含む全種別を選べ、`list`/`object`/`map`/`union` はそれぞれ要素・フィールド・値型・バリアントを、同じ `TypeSpecEditor`/`FieldListEditor` で再帰的に編集するため、GUI 上のネストの深さに実質的な制限が無い。`string` の選択肢は `ChoicesEditor` で、`ref` は `definitionNames` からのセレクトで編集する。`ref` 以外の全型の末尾に `PresetListEditor` を出す。`scope` は再帰の各段で `optionPresets.ts` の走査と同じ形式（`.item`/`.value_type`/`.fields.<name>`/`.variants.<value>.fields.<name>`）に伸ばして渡す。
+  - **主要Props**: `spec`, `onChange`, `definitionNames`, `fieldName`, `scope`, `isAppliedAndUnchanged`
 - **`optionSchema/FieldListEditor`** ([`src/components/ui/settings/optionSchema/FieldListEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/FieldListEditor.tsx))
-  - **概要**: `object` のフィールド一覧、または `union` の1バリアント分のフィールド一覧を編集する。各行は `FieldEditor` で、ネストする型に制限は無い。
-  - **主要Props**: `fields`, `onChange`, `definitionNames`, `addLabel`
+  - **概要**: `object` のフィールド一覧、または `union` の1バリアント分のフィールド一覧を編集する。各行は `FieldEditor` で、ネストする型に制限は無い。各フィールドの `scope` は `${parentScope}.fields.${name}`。
+  - **主要Props**: `fields`, `onChange`, `definitionNames`, `parentScope`, `isAppliedAndUnchanged`, `addLabel`
 - **`optionSchema/VariantListEditor`** ([`src/components/ui/settings/optionSchema/VariantListEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/VariantListEditor.tsx))
-  - **概要**: `union` の判別キー (`discriminator`) に対する値ごとのバリアント一覧を編集する。バリアントの追加・削除・値/ラベルの編集、および各バリアントのフィールド一覧（`FieldListEditor`）を持つ。
-  - **主要Props**: `variants`, `onChange`, `definitionNames`
+  - **概要**: `union` の判別キー (`discriminator`) に対する値ごとのバリアント一覧を編集する。バリアントの追加・削除・値/ラベルの編集、および各バリアントのフィールド一覧（`FieldListEditor`。`parentScope` に `.variants.<value>` を足して渡す）を持つ。
+  - **主要Props**: `variants`, `onChange`, `definitionNames`, `parentScope`, `isAppliedAndUnchanged`
 - **`optionSchema/DefinitionListEditor`** ([`src/components/ui/settings/optionSchema/DefinitionListEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/DefinitionListEditor.tsx))
-  - **概要**: `OptionsSchema.definitions`（名前付き型定義）の一覧を編集する。各定義は Name/Label/Description + `TypeSpecEditor` で構成され、他のフィールドから `ref` で参照できる。
-  - **主要Props**: `definitions`, `onChange`
+  - **概要**: `OptionsSchema.definitions`（名前付き型定義）の一覧を編集する。各定義は Name/Label/Description + `TypeSpecEditor`（`scope: definitions.<name>`）で構成され、他のフィールドから `ref` で参照できる。
+  - **主要Props**: `definitions`, `onChange`, `isAppliedAndUnchanged`
+- **`optionSchema/PresetListEditor`** ([`src/components/ui/settings/optionSchema/PresetListEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/PresetListEditor.tsx))
+  - **概要**: 型仕様が持つ `presets`（名前・ラベル・`OptionValueEditor` による型付きの値）の追加・編集・削除、および `preset_only` の切り替えを行う。`isAppliedAndUnchanged` のとき（Apply/Import 直後で未適用の編集が無いとき）だけ、ストアの `nodes`/`annotationObjects`/`globals` を `optionPresets.ts` の `countPresetUsages`/`replaceMatchingValuesWithPreset` と突き合わせ、`scope` ごとの使用件数と「一致する未参照の値」の件数を表示し、後者を1つの履歴トランザクションで参照へ一括置換するボタンを出す。
+  - **主要Props**: `spec`, `onChange`, `scope`, `isAppliedAndUnchanged`
 - **`optionSchema/ChoicesEditor`** ([`src/components/ui/settings/optionSchema/ChoicesEditor.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/settings/optionSchema/ChoicesEditor.tsx))
   - **概要**: `string` 型の選択肢 (`enum_values`) をチップの追加・削除で編集する。既定値欄と紛らわしかった CSV テキスト入力を置き換えたもの。
   - **主要Props**: `values`, `onChange`, `fieldName`
@@ -340,8 +343,11 @@
   - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。プロパティパスは `options.navigation.is_through_point` のように `object` フィールドまで辿れる。
   - **主要関数**: `resolveWaypointConditionalStyle`, `resolvePathConditionalStyle`, `resolveFootprintConditionalStyle`, `resolveAnnotationConditionalStyle`, `evaluateConditionGroup`, `drawDashedLine`, `parseColorSafe`
 - **`optionSchema`** ([`src/utils/optionSchema.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionSchema.ts))
-  - **概要**: Option Schema（`OptionsSchema`）の正規化・ref 解決・検証・パス列挙。旧形式（`list` の `item_type` をフラットに持つ形）を現行の再帰形（`item: { type }`）へ変換する。`definitions`/`ref` の展開（`expandSchemaRefs`）と、スキーマのオブジェクト同一性でメモ化した展開結果の取得（`resolveOptionsSchema`）を提供する。保存・スキーマ編集は `ref` を保ったままの生スキーマで行い、値の表示・編集・条件付き書式評価・エクスポートは `resolveOptionsSchema` を経由した実効スキーマを使う。
+  - **概要**: Option Schema（`OptionsSchema`）の正規化・ref 解決・検証・パス列挙。旧形式（`list` の `item_type` をフラットに持つ形）を現行の再帰形（`item: { type }`）へ変換する。`definitions`/`ref` の展開（`expandSchemaRefs`）と、スキーマのオブジェクト同一性でメモ化した展開結果の取得（`resolveOptionsSchema`）を提供する。保存・スキーマ編集は `ref` を保ったままの生スキーマで行い、値の表示・編集・条件付き書式評価・エクスポートは `resolveOptionsSchema` を経由した実効スキーマを使う。`resolveTypeSpec`/`coerceSpecDefaultsDeep`（内部）は `presets`/`preset_only` も ref 展開・型変換の対象に含める。`validateSchema` はプリセット名の重複・空欄、値の型不一致、値が別のプリセットを参照すること（連鎖）の禁止、`preset_only` なのにプリセットが0件、を検証する。
   - **主要関数**: `normalizeOptionsSchema`, `normalizeTypeSpec`, `resolveTypeSpec`, `expandSchemaRefs`, `resolveOptionsSchema`, `validateSchema`, `listPropertyPaths`
 - **`optionValues`** ([`src/utils/optionValues.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionValues.ts))
-  - **概要**: `TypeSpec`/`FieldDef` に従った値の再帰的な変換・検証・既定値解決・生成・比較を行う純粋関数群。Option Schema の値まわり（インポートの型変換、Inspector の入力、キャンバスラベル、Generator の差分検出、エクスポートの `options`/`raw_options` 分離、エクスポート前の必須チェック）はすべてここに集約する。`validateField` は型検証に加えて `required`（値・既定値のいずれも無い場合はエラー）を見る。
-  - **主要関数**: `coerceValue`, `validateValue`, `validateField`, `resolveWithDefaults`, `createValue`, `createUnionVariantValue`, `switchUnionVariant`, `summarizeValue`, `deepEqual`, `toStoredValue`, `isValueValid`, `parseCsvList`
+  - **概要**: `TypeSpec`/`FieldDef` に従った値の再帰的な変換・検証・既定値解決・生成・比較を行う純粋関数群。Option Schema の値まわり（インポートの型変換、Inspector の入力、キャンバスラベル、Generator の差分検出、エクスポートの `options`/`raw_options` 分離、エクスポート前の必須チェック）はすべてここに集約する。`validateField` は型検証に加えて `required`（値・既定値のいずれも無い場合はエラー）を見る。`resolvePresets` はプリセット参照 (`{ $preset: name }`) を、list/object/map/union の中に入れ子で現れるものも含めて再帰的に実際の値へ解決する。`resolveWithDefaults` は `resolvePresets` → 既定値の補完の順で解決する。
+  - **主要関数**: `coerceValue`, `validateValue`, `validateField`, `resolveWithDefaults`, `resolvePresets`, `isPresetRef`, `findPresetByName`, `findMatchingPreset`, `createValue`, `createUnionVariantValue`, `switchUnionVariant`, `summarizeValue`, `deepEqual`, `toStoredValue`, `isValueValid`, `parseCsvList`
+- **`optionPresets`** ([`src/utils/optionPresets.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionPresets.ts))
+  - **概要**: プリセット参照の使用状況の集計と一括置換のための、スキーマと値を並行して辿る純粋関数群。スキーマ上の位置は `scope` 文字列（例: `options.tolerance`, `definitions.action.variants.wait.fields.countdown_ms`）で表し、`ref` は参照先の `definitions` のスコープへ折りたたむ（同じ定義を複数箇所から参照していても使用件数・置換は1つのスコープに集約される）。`OptionSchemaTab`／`PresetListEditor` から使う。
+  - **主要関数**: `countPresetUsages`, `usageCountFor`, `replaceMatchingValuesWithPreset`, `collectPresetScopes`, `inlineRemovedPresets`

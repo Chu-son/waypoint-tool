@@ -51,6 +51,15 @@ describe('docs/sample/option_schemas/mg_robot_v2.schema.json', () => {
     expect(opt?.item?.variants?.map((v) => v.value)).toContain('wait');
   });
 
+  it('gives through_tolerance a small/large preset choice, and the shared "action" type two full-action presets', () => {
+    const throughTolerance = schema.options.find((o) => o.name === 'through_tolerance');
+    expect(throughTolerance?.presets?.map((p) => p.name)).toEqual(['small', 'large']);
+
+    const action = schema.definitions?.find((d) => d.name === 'action');
+    expect(action?.presets?.map((p) => p.name)).toEqual(['front_lidar_on', 'front_lidar_off']);
+    expect(action?.presets?.[0].value).toMatchObject({ type: 'service', request: { data: true } });
+  });
+
   it('defines the three defaults-block fields as globals', () => {
     expect(schema.globals.map((g) => g.name)).toEqual([
       'default_is_through_point',

@@ -9,8 +9,13 @@
     {
       "name": "through_tolerance",
       "label": "通過判定半径 [m] (through_tolerance)",
+      "description": "運用上は小/大の2種類しか使わないため、プリセットから選ぶ。数値を直接入力することもできる。",
       "type": "float",
-      "default": 3.0
+      "default": 3.0,
+      "presets": [
+        { "name": "small", "label": "小 (1.5m)", "value": 1.5 },
+        { "name": "large", "label": "大 (3.0m)", "value": 3.0 }
+      ]
     },
     {
       "name": "on_reached_actions",
@@ -47,6 +52,31 @@
       "description": "type によってフィールド構成が変わるタグ付きユニオン。on_departure_actions のような別のリストからも同じ型を再利用できる。",
       "type": "union",
       "discriminator": "type",
+      "presets": [
+        {
+          "name": "front_lidar_on",
+          "label": "前方LiDAR 有効化",
+          "description": "同じサービスを呼ぶウェイポイントが複数あるとき、この1件を変えるだけで全箇所に反映される。",
+          "value": {
+            "type": "service",
+            "service": "/front_lidar/enable",
+            "srv_module": "std_srvs.srv",
+            "srv_class": "SetBool",
+            "request": { "data": true }
+          }
+        },
+        {
+          "name": "front_lidar_off",
+          "label": "前方LiDAR 無効化",
+          "value": {
+            "type": "service",
+            "service": "/front_lidar/enable",
+            "srv_module": "std_srvs.srv",
+            "srv_class": "SetBool",
+            "request": { "data": false }
+          }
+        }
+      ],
       "variants": [
         {
           "value": "service",

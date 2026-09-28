@@ -7,7 +7,7 @@
  * `ref` に行き当たったら参照先の definitions のスコープへ折りたたむ。こうすることで、
  * 同じ定義を複数箇所から `ref` している場合でも、プリセットの使用件数・置換は1つのスコープに集約される。
  */
-import type { DefinitionDef, OptionsSchema, OptionValue, TypeSpec } from '../types/options';
+import type { DefinitionDef, OptionsSchema, OptionValue, PresetDef, TypeSpec } from '../types/options';
 import { deepEqual, findPresetByName, isPlainObject, isPresetRef } from './optionValues';
 
 type OptionValues = Record<string, OptionValue | undefined>;
@@ -265,4 +265,194 @@ export function replaceMatchingValuesWithPreset(
   });
 
   return { optionValuesList: newList, globalValues: newGlobals, count: total };
+}
+
+/**
+ * スキーマ内の、`presets` を1件以上持つすべての型ノードを、その `scope` 文字列をキーとして列挙する
+ * （`ref` は参照先の definitions のスコープへ折りたたむ）。`OptionSchemaTab` の Apply 時に、
+ * 適用前後のスキーマで同じ scope を比べ、消えたプリセットを検出するために使う。
+ */
+export function collectPresetScopes(schema: OptionsSchema): Map<string, PresetDef[]> {
+  const definitionsByName = definitionsMap(schema);
+  const out = new Map<string, PresetDef[]>();
+
+  const visit = (spec: TypeSpec, scope: string, refChain: ReadonlySet<string>): void => {
+    if (spec.type === 'ref') {
+      const def = spec.ref ? definitionsByName.get(spec.ref) : undefined;
+      if (!def || refChain.has(spec.ref!)) return;
+      visit(def, `definitions.${spec.ref}`, new Set([...refChain, spec.ref!]));
+      return;
+    }
+    if (spec.presets && spec.presets.length > 0) out.set(scope, spec.presets);
+    if (spec.type === 'list' && spec.item) visit(spec.item, `${scope}.item`, refChain);
+    if (spec.type === 'object') {
+      (spec.fields ?? []).forEach((f) => visit(f, `${scope}.fields.${f.name}`, refChain));
+    }
+    if (spec.type === 'map' && spec.value_type) visit(spec.value_type, `${scope}.value_type`, refChain);
+    if (spec.type === 'union') {
+      (spec.variants ?? []).forEach((v) =>
+        v.fields.forEach((f) => visit(f, `${scope}.variants.${v.value}.fields.${f.name}`, refChain)),
+      );
+    }
+  };
+
+  schema.options.forEach((o) => visit(o, `options.${o.name}`, new Set()));
+  schema.globals.forEach((g) => visit(g, `globals.${g.name}`, new Set()));
+  (schema.definitions ?? []).forEach((d) => visit(d, `definitions.${d.name}`, new Set()));
+  return out;
+}
+
+function inlineInValue(
+  spec: TypeSpec,
+  value: OptionValue | undefined,
+  targetScope: string,
+  currentScope: string,
+  presetName: string,
+  literalValue: OptionValue,
+  definitionsByName: Map<string, DefinitionDef>,
+): ReplaceResult {
+  if (value === undefined) return { value, count: 0 };
+  if (spec.type === 'ref') {
+    const def = spec.ref ? definitionsByName.get(spec.ref) : undefined;
+    if (!def) return { value, count: 0 };
+    return inlineInValue(
+      def,
+      value,
+      targetScope,
+      `definitions.${spec.ref}`,
+      presetName,
+      literalValue,
+      definitionsByName,
+    );
+  }
+  if (currentScope === targetScope && isPresetRef(value) && value.$preset === presetName) {
+    return { value: literalValue, count: 1 };
+  }
+  if (isPresetRef(value)) return { value, count: 0 };
+  if (spec.type === 'list' && Array.isArray(value) && spec.item) {
+    let count = 0;
+    const items = value.map((v) => {
+      const r = inlineInValue(
+        spec.item!,
+        v,
+        targetScope,
+        `${currentScope}.item`,
+        presetName,
+        literalValue,
+        definitionsByName,
+      );
+      count += r.count;
+      return r.value as OptionValue;
+    });
+    return { value: items, count };
+  }
+  if (spec.type === 'object' && isPlainObject(value)) {
+    let count = 0;
+    const result: Record<string, OptionValue> = { ...value };
+    (spec.fields ?? []).forEach((f) => {
+      if (result[f.name] === undefined) return;
+      const r = inlineInValue(
+        f,
+        result[f.name],
+        targetScope,
+        `${currentScope}.fields.${f.name}`,
+        presetName,
+        literalValue,
+        definitionsByName,
+      );
+      result[f.name] = r.value as OptionValue;
+      count += r.count;
+    });
+    return { value: result, count };
+  }
+  if (spec.type === 'map' && isPlainObject(value)) {
+    let count = 0;
+    const valueSpec = spec.value_type ?? { type: 'any' };
+    const result: Record<string, OptionValue> = {};
+    Object.keys(value).forEach((k) => {
+      const r = inlineInValue(
+        valueSpec,
+        value[k],
+        targetScope,
+        `${currentScope}.value_type`,
+        presetName,
+        literalValue,
+        definitionsByName,
+      );
+      result[k] = r.value as OptionValue;
+      count += r.count;
+    });
+    return { value: result, count };
+  }
+  if (spec.type === 'union' && isPlainObject(value)) {
+    const discriminator = spec.discriminator || 'type';
+    const variantValue = value[discriminator];
+    const variant = (spec.variants ?? []).find((v) => v.value === variantValue);
+    let count = 0;
+    const result: Record<string, OptionValue> = { ...value };
+    (variant?.fields ?? []).forEach((f) => {
+      if (result[f.name] === undefined) return;
+      const r = inlineInValue(
+        f,
+        result[f.name],
+        targetScope,
+        `${currentScope}.variants.${String(variantValue)}.fields.${f.name}`,
+        presetName,
+        literalValue,
+        definitionsByName,
+      );
+      result[f.name] = r.value as OptionValue;
+      count += r.count;
+    });
+    return { value: result, count };
+  }
+  return { value, count: 0 };
+}
+
+/**
+ * スキーマから削除されたプリセットへの参照を、そのプリセットが持っていた実際の値へ展開する
+ * （`$preset` 参照のまま残すと、削除後にエクスポート結果が壊れてしまうため）。
+ * `schema` には、値がまだ従っている旧いスキーマ（削除される前の、`ref`/`definitions` を含む生のスキーマ）を渡す。
+ */
+export function inlineRemovedPresets(
+  schema: OptionsSchema,
+  optionValuesList: OptionValues[],
+  globalValues: OptionValues,
+  removals: { scope: string; name: string; value: OptionValue }[],
+): ReplaceMatchingValuesResult {
+  const definitionsByName = definitionsMap(schema);
+  let total = 0;
+  let list = optionValuesList;
+  let globals = globalValues;
+
+  removals.forEach(({ scope, name, value: literalValue }) => {
+    list = list.map((ov) => {
+      const next: OptionValues = { ...ov };
+      schema.options.forEach((o) => {
+        if (next[o.name] === undefined) return;
+        const r = inlineInValue(o, next[o.name], scope, `options.${o.name}`, name, literalValue, definitionsByName);
+        next[o.name] = r.value;
+        total += r.count;
+      });
+      return next;
+    });
+    const nextGlobals: OptionValues = { ...globals };
+    schema.globals.forEach((g) => {
+      if (nextGlobals[g.name] === undefined) return;
+      const r = inlineInValue(
+        g,
+        nextGlobals[g.name],
+        scope,
+        `globals.${g.name}`,
+        name,
+        literalValue,
+        definitionsByName,
+      );
+      nextGlobals[g.name] = r.value;
+      total += r.count;
+    });
+    globals = nextGlobals;
+  });
+
+  return { optionValuesList: list, globalValues: globals, count: total };
 }

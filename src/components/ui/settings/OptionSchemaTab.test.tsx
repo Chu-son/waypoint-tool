@@ -426,6 +426,42 @@ describe('OptionSchemaTab Presets', () => {
 
     expect(getAppState().nodes['node-1'].options).toEqual({ action: { $preset: 'quick' } });
   });
+
+  it('inlines references to a deleted preset back to its value, after confirming, and still saves the schema', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { tolerance: { $preset: 'small' } } })]),
+      optionsSchema: {
+        options: [{ name: 'tolerance', label: 'Tolerance', type: 'float', presets: [{ name: 'small', value: 0.1 }] }],
+        globals: [],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove preset small' }));
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining('1 件'));
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: 0.1 });
+    expect(getAppState().optionsSchema?.options[0].presets).toEqual([]);
+  });
+
+  it('keeps the reference and aborts saving when inlining a deleted preset is declined', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { tolerance: { $preset: 'small' } } })]),
+      optionsSchema: {
+        options: [{ name: 'tolerance', label: 'Tolerance', type: 'float', presets: [{ name: 'small', value: 0.1 }] }],
+        globals: [],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove preset small' }));
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'small' } });
+    // Apply 自体も中止されるので、スキーマは古いまま（削除前のプリセットが残っている）。
+    expect(getAppState().optionsSchema?.options[0].presets).toEqual([{ name: 'small', value: 0.1 }]);
+  });
 });
 
 describe('OptionSchemaTab Choices editor', () => {

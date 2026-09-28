@@ -1,14 +1,15 @@
 import { Plus, Save, Upload, Download, Database, Globe, BookMarked } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { DefinitionDef, GlobalFieldDef, OptionDef, OptionsSchema } from '../../../types/store';
+import { DefinitionDef, GlobalFieldDef, OptionDef, OptionsSchema, OptionValue } from '../../../types/store';
 import { Button } from '../common/Button';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { FieldEditor } from './optionSchema/FieldEditor';
 import { DefinitionListEditor } from './optionSchema/DefinitionListEditor';
-import { notify } from '../../../services/notify';
+import { confirmAction, notify } from '../../../services/notify';
 import { normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
+import { collectPresetScopes, inlineRemovedPresets } from '../../../utils/optionPresets';
 
 // `optionsSchema.definitions` が無いスキーマでは `?? []` の代わりにこの安定した参照を使う。
 // 呼び出しの度に新しい配列を作ってしまうと、`isAppliedAndUnchanged` の参照比較が常に偽になる。
@@ -29,6 +30,11 @@ export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
   const setGlobalOptionsSchema = useAppStore((state) => state.setOptionsSchema);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
+  const nodes = useAppStore((state) => state.nodes);
+  const annotationObjects = useAppStore((state) => state.annotationObjects);
+  const updateNodes = useAppStore((state) => state.updateNodes);
+  const updateAnnotationObject = useAppStore((state) => state.updateAnnotationObject);
+  const runInHistoryTransaction = useAppStore((state) => state.runInHistoryTransaction);
 
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
   const [localGlobals, setLocalGlobals] = useState<GlobalFieldDef[]>([]);
@@ -52,7 +58,7 @@ export function OptionSchemaTab() {
     localGlobals === globalOptionsSchema.globals &&
     localDefinitions === (globalOptionsSchema.definitions ?? EMPTY_DEFINITIONS);
 
-  const handleSaveOptions = () => {
+  const handleSaveOptions = async () => {
     // トップレベルのキー重複・空欄、既定値・グローバル値の型不一致、union のバリアント重複や
     // 判別キーとの名前衝突、ref の未定義・循環参照まで、すべて validateSchema が再帰的に検証する。
     const schemaErrors = validateSchema({
@@ -67,13 +73,58 @@ export function OptionSchemaTab() {
     }
 
     // 構造を常に正規形（discriminator の既定値補完、item の既定 {type: 'string'} 補完等）で保存する。
-    setGlobalOptionsSchema(
-      normalizeOptionsSchema({
-        options: localOptions,
-        globals: localGlobals,
-        definitions: localDefinitions,
-      }),
-    );
+    const normalized = normalizeOptionsSchema({
+      options: localOptions,
+      globals: localGlobals,
+      definitions: localDefinitions,
+    });
+
+    // 直前に Apply されていたスキーマと比べて、消えたプリセット（フィールド自体の削除・改名を含む）が
+    // あれば、それを参照している値をプリセットの実際の値に展開する。展開しないまま Apply すると、
+    // 値が `$preset` を指したままになり、そのプリセットの定義が無くなってエクスポート結果が壊れてしまう。
+    if (globalOptionsSchema) {
+      const oldScopes = collectPresetScopes(globalOptionsSchema);
+      const newScopes = collectPresetScopes(normalized);
+      const removals: { scope: string; name: string; value: OptionValue }[] = [];
+      oldScopes.forEach((oldPresets, scope) => {
+        const newNames = new Set((newScopes.get(scope) ?? []).map((p) => p.name));
+        oldPresets.forEach((p) => {
+          if (!newNames.has(p.name)) removals.push({ scope, name: p.name, value: p.value });
+        });
+      });
+
+      if (removals.length > 0) {
+        const nodeIds = Object.keys(nodes);
+        const annotationIds = Object.keys(annotationObjects);
+        const optionValuesList = [
+          ...nodeIds.map((id) => nodes[id].options ?? {}),
+          ...annotationIds.map((id) => annotationObjects[id].options ?? {}),
+        ];
+        const oldGlobalValues = Object.fromEntries(globalOptionsSchema.globals.map((g) => [g.name, g.value]));
+        const result = inlineRemovedPresets(globalOptionsSchema, optionValuesList, oldGlobalValues, removals);
+
+        if (result.count > 0) {
+          const proceed = await confirmAction(
+            `削除されたプリセットへの参照が ${result.count} 件あります。実際の値に展開してから保存しますか？`,
+          );
+          if (!proceed) return;
+
+          runInHistoryTransaction(() => {
+            const nodeUpdates: Record<string, { options: (typeof result.optionValuesList)[number] }> = {};
+            nodeIds.forEach((id, i) => {
+              nodeUpdates[id] = { options: result.optionValuesList[i] };
+            });
+            if (Object.keys(nodeUpdates).length > 0) updateNodes(nodeUpdates);
+            annotationIds.forEach((id, i) => {
+              updateAnnotationObject(id, { options: result.optionValuesList[nodeIds.length + i] });
+            });
+          });
+          normalized.globals = normalized.globals.map((g) => ({ ...g, value: result.globalValues[g.name] }));
+        }
+      }
+    }
+
+    setGlobalOptionsSchema(normalized);
     useAppStore.setState({ isDirty: true });
     void notify('オプションスキーマを保存しました。');
   };

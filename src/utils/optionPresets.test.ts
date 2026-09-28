@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { countPresetUsages, usageCountFor, replaceMatchingValuesWithPreset } from './optionPresets';
+import {
+  countPresetUsages,
+  usageCountFor,
+  replaceMatchingValuesWithPreset,
+  collectPresetScopes,
+  inlineRemovedPresets,
+} from './optionPresets';
 import type { OptionsSchema } from '../types/options';
 
 const toleranceSchema: OptionsSchema = {
@@ -158,5 +164,82 @@ describe('replaceMatchingValuesWithPreset', () => {
     );
     expect(result.count).toBe(0);
     expect(result.optionValuesList).toEqual([{ tolerance: 0.1 }]);
+  });
+});
+
+describe('collectPresetScopes', () => {
+  it('lists every type node that declares presets, keyed by its scope', () => {
+    const scopes = collectPresetScopes(toleranceSchema);
+    expect(scopes.get('options.tolerance')).toEqual([
+      { name: 'small', value: 0.1 },
+      { name: 'large', value: 0.5 },
+    ]);
+    expect(scopes.get('globals.default_tolerance')).toEqual([{ name: 'small', value: 0.1 }]);
+  });
+
+  it('collapses a ref onto its definition scope, and finds presets nested inside object fields', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'a', label: 'A', type: 'ref', ref: 'tol' }],
+      globals: [],
+      definitions: [
+        {
+          name: 'tol',
+          type: 'object',
+          fields: [{ name: 'value', label: 'Value', type: 'float', presets: [{ name: 'small', value: 0.1 }] }],
+        },
+      ],
+    };
+    const scopes = collectPresetScopes(schema);
+    expect(scopes.get('definitions.tol.fields.value')).toEqual([{ name: 'small', value: 0.1 }]);
+    expect(scopes.has('options.a')).toBe(false);
+  });
+
+  it('returns an empty map when nothing declares presets', () => {
+    const schema: OptionsSchema = { options: [{ name: 'a', label: 'A', type: 'float' }], globals: [] };
+    expect(collectPresetScopes(schema).size).toBe(0);
+  });
+});
+
+describe('inlineRemovedPresets', () => {
+  it('replaces a reference to a removed preset with its literal value, leaving other values untouched', () => {
+    const result = inlineRemovedPresets(
+      toleranceSchema,
+      [{ tolerance: { $preset: 'small' } }, { tolerance: { $preset: 'large' } }, { tolerance: 0.3 }],
+      {},
+      [{ scope: 'options.tolerance', name: 'small', value: 0.1 }],
+    );
+    expect(result.optionValuesList).toEqual([
+      { tolerance: 0.1 },
+      { tolerance: { $preset: 'large' } },
+      { tolerance: 0.3 },
+    ]);
+    expect(result.count).toBe(1);
+  });
+
+  it('inlines a removed global value', () => {
+    const result = inlineRemovedPresets(toleranceSchema, [], { default_tolerance: { $preset: 'small' } }, [
+      { scope: 'globals.default_tolerance', name: 'small', value: 0.1 },
+    ]);
+    expect(result.globalValues).toEqual({ default_tolerance: 0.1 });
+    expect(result.count).toBe(1);
+  });
+
+  it('inlines a reference nested inside a list of refs, honoring the definition scope', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'actions', label: 'Actions', type: 'list', item: { type: 'ref', ref: 'action' } }],
+      globals: [],
+      definitions: [
+        {
+          name: 'action',
+          type: 'object',
+          fields: [{ name: 'countdown_ms', label: 'Countdown', type: 'integer' }],
+        },
+      ],
+    };
+    const result = inlineRemovedPresets(schema, [{ actions: [{ $preset: 'quick' }, { countdown_ms: 9000 }] }], {}, [
+      { scope: 'definitions.action', name: 'quick', value: { countdown_ms: 500 } },
+    ]);
+    expect(result.optionValuesList).toEqual([{ actions: [{ countdown_ms: 500 }, { countdown_ms: 9000 }] }]);
+    expect(result.count).toBe(1);
   });
 });

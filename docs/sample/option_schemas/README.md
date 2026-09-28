@@ -20,6 +20,10 @@ v2.0 ウェイポイント YAML を出力する例です。
 - テンプレートは `raw_options.on_reached_actions` を参照しており、アクションを設定していない
   ウェイポイントでは `on_reached_actions` フィールド自体を出力しない（受け側の `defaults` 適用に委ねる）。
 - `toyaml(6)` フィルタで、アクション配列をブロック形式 YAML として正しい字下げで埋め込んでいる。
+- `through_tolerance` には小 (1.5m) / 大 (3.0m) の2値をプリセットとして定義しており、`definitions.action`
+  には「前方LiDARの有効化/無効化」という定型のサービス呼び出しアクションを丸ごとプリセットとして
+  定義している。`on_reached_actions`/`on_departure_actions` のどちらから使っても、`definitions.action`
+  のプリセットは共有される。プリセットの値を1箇所変えれば、参照している全ウェイポイントに反映される。
 
 このサンプルは mg_robot 専用のコードを一切含まない。Option Schema と Jinja テンプレートだけで
 表現できることを示す（=「タグ付きユニオンのリスト」という一般的なパターンへの対応）。

@@ -261,7 +261,7 @@ Waypoint にロボット独自のカスタム属性を付加できます。
 
 `list`/`object`/`map`/`union` は GUI 上で自由な深さに入れ子にできます（例: `object` のフィールドがさらに `list<union>` を持つ、といった構成も組み立てられます）。
 
-各フィールドには、任意で **Required**（値も既定値も未設定だと Inspector で警告し、エクスポート前に件数を示して確認する）と **Description**（Inspector にツールチップとして表示される補足説明）を設定できます。
+各フィールドには、任意で **Required**（値も既定値も未設定だと Inspector で警告し、エクスポート前に件数を示して確認する）と **Description**（Inspector にツールチップとして表示される補足説明）を設定できます。また、`Ref` 以外のどの型にも **Presets**（名前付きの値の候補）を定義できます。詳しくは後述の「プリセット」を参照してください。
 
 **例: 到達時に実行するアクションの一覧**（`type` によって必要なフィールドが変わる）
 
@@ -293,6 +293,46 @@ definitions:
 ```
 
 この YAML を `Settings > Option Schema` の **Import** から読み込むと、`on_reached_actions` オプションが定義され、各 Waypoint の Inspector でアクションを1件ずつ追加し、種類（`wait` / `service` / `amcl_reset`）を選んでフィールドを入力できるようになります。`service` フィールドは `required: true` なので、未入力のままだと Inspector に必須マーク（`*`）が表示されます。
+
+### プリセット（名前付きの値の候補）
+
+「tolerance は実際には小/大の2種類しか使わない」「同じサービスを呼ぶアクションを何度も同じ内容で入力するのは大変」といった場合は、フィールドの型に **Presets** を定義しておくと、Inspector からは値を直接入力する代わりに名前で選べるようになります。プリセットの値を後から変更すると、それを参照している全ての Waypoint に一括で反映されます。
+
+1. `Settings > Option Schema` で、フィールド（Option / Global / `object` のフィールド / `union` のバリアントフィールド / Definitions）の型編集欄にある **「Presets」** で **「Add Preset」** をクリックし、名前・表示ラベル・値（既定値と同じ、型付きの入力欄）を設定します。
+2. 「プリセットからのみ選択可能にする」にチェックすると、そのフィールドは自由な値を入力できなくなり、プリセットからの選択に限定されます（チェックしない場合は、プリセットを選ぶこともカスタム値を入力することもできます）。
+3. Apply 後、Inspector の対象フィールドにプリセットのプルダウンが現れます。プリセットを選ぶと、値はそのプリセットへの参照になり、下の入力欄は参照先の値を読み取り専用で表示します。「カスタム値」を選ぶと、参照していた値をコピーして編集を続けられます。
+
+`union` 型そのものにプリセットを付けると、「定型のアクション一式」を丸ごと再利用できます。`definitions` に定義した型のプリセットは、その型を `ref` で参照している全箇所で共有されます。
+
+```yaml
+options:
+  - name: through_tolerance
+    label: "通過判定半径 [m]"
+    type: float
+    default: 3.0
+    presets:
+      - { name: small, label: "小 (1.5m)", value: 1.5 }
+      - { name: large, label: "大 (3.0m)", value: 3.0 }
+definitions:
+  - name: action
+    type: union
+    discriminator: type
+    presets:
+      - name: front_lidar_on
+        label: "前方LiDAR 有効化"
+        value: { type: service, service: /front_lidar/enable, srv_module: std_srvs.srv, srv_class: SetBool, request: { data: true } }
+    variants:
+      - value: service
+        fields:
+          - { name: service, label: "サービス名", type: string, required: true }
+          - { name: srv_module, label: "モジュール", type: string, required: true }
+          - { name: srv_class, label: "クラス名", type: string, required: true }
+          - { name: request, label: "リクエスト", type: map }
+```
+
+**既存の値をプリセットへまとめて置き換える**: すでに入力済みの値（インポートした値を含む）が、あるプリセットと完全に一致していても、自動では参照に変わりません。`Settings > Option Schema` の該当プリセットに「使用中: N件」「一致する未参照の値: M件」という表示が出るので（Apply 済みで未適用の編集が無いときだけ表示されます）、「一致する値を参照に置換」をクリックすると、一致する全ての値を一括で参照に置き換えます（Undo 可能）。
+
+**プリセットの名前変更・削除**: プリセットの名前を変えると、既存の参照は「未定義のプリセット」として警告されます（Inspector から選び直せます）。プリセット自体を削除して Apply すると、それを参照していた値は自動的に削除前の実際の値へ展開され（エクスポート結果が変わらないように）、件数を示して確認されます。
 
 ### 未設定の値とスキーマ既定値の違い
 
