@@ -7,7 +7,14 @@ import { Select } from '../common/Select';
 import { Checkbox } from '../common/Checkbox';
 import { FieldLabel } from '../common/FieldLabel';
 import { cn } from '../../../utils/cn';
-import { createValue, switchUnionVariant, parseCsvList } from '../../../utils/optionValues';
+import {
+  createValue,
+  switchUnionVariant,
+  parseCsvList,
+  isPresetRef,
+  findPresetByName,
+  findMatchingPreset,
+} from '../../../utils/optionValues';
 import type { FieldDef, OptionValue, ScalarType, TypeSpec, VariantDef } from '../../../types/options';
 
 // ============================================================================
@@ -125,6 +132,63 @@ function ValueWithResetControl({
 }
 
 // ============================================================================
+// プリセット選択
+// ============================================================================
+
+/**
+ * 型仕様が持つ `presets` から選ぶセレクタ。「カスタム値」を選ぶと、それまで参照していた
+ * プリセットの値をコピーして編集可能な状態に切り離す（`preset_only` では「カスタム値」自体を出さない）。
+ * 未定義のプリセットを参照している場合は、その旨をエラー表示する。
+ */
+function PresetSelector({
+  spec,
+  value,
+  onChange,
+  name,
+  disabled,
+}: {
+  spec: TypeSpec;
+  value: OptionValue | undefined;
+  onChange: (value: OptionValue | undefined) => void;
+  name: string;
+  disabled?: boolean;
+}) {
+  const transactions = useContext(ValueEditTransactionContext);
+  const presets = spec.presets ?? [];
+  const currentRefName = isPresetRef(value) ? value.$preset : undefined;
+  const isUnresolvedRef = currentRefName !== undefined && !findPresetByName(spec, currentRefName);
+
+  return (
+    <div className="space-y-0.5">
+      <Select
+        aria-label={`${name} preset`}
+        value={currentRefName ?? ''}
+        disabled={disabled}
+        onChange={(e) => {
+          const nextName = e.target.value;
+          if (nextName === '') {
+            // カスタム値へ切り離す: 参照していたプリセットの値をコピーして、そのまま編集を続けられるようにする。
+            const detachedValue = currentRefName ? findPresetByName(spec, currentRefName)?.value : value;
+            transactions.run(() => onChange(detachedValue));
+          } else {
+            transactions.run(() => onChange({ $preset: nextName }));
+          }
+        }}
+        className="h-7 text-xs"
+      >
+        {!spec.preset_only && <option value="">カスタム値</option>}
+        {presets.map((p) => (
+          <option key={p.name} value={p.name}>
+            {p.label || p.name}
+          </option>
+        ))}
+      </Select>
+      {isUnresolvedRef && <p className="text-[10px] text-danger-base">未定義のプリセットです: {currentRefName}</p>}
+    </div>
+  );
+}
+
+// ============================================================================
 // メインディスパッチャ
 // ============================================================================
 
@@ -156,7 +220,7 @@ export function OptionValueEditor({
   onChange,
   name,
   defaultValue,
-  disabled,
+  disabled: disabledProp,
   mixed,
   showResetControl = true,
 }: OptionValueEditorProps) {
@@ -165,139 +229,172 @@ export function OptionValueEditor({
   // historyTransactionDepth の再入可能な設計により、実際のスナップショットは一度しか取られない。
   const emit = (v: OptionValue | undefined) => transactions.run(() => onChange(v));
 
+  const hasPresets = (spec.presets?.length ?? 0) > 0;
+  const presetSelector = hasPresets ? (
+    <PresetSelector spec={spec} value={mixed ? undefined : value} onChange={emit} name={name} disabled={disabledProp} />
+  ) : null;
+
   if (mixed && !isScalarType(spec.type)) {
     return (
-      <p className="text-xs text-text-muted italic p-2 bg-surface-panel/40 rounded border border-border-base/30">
-        Mixed — select a single waypoint to edit.
-      </p>
+      <div className="space-y-1">
+        {presetSelector}
+        <p className="text-xs text-text-muted italic p-2 bg-surface-panel/40 rounded border border-border-base/30">
+          Mixed — select a single waypoint to edit.
+        </p>
+      </div>
     );
   }
 
-  const displayValue = mixed ? undefined : value;
+  // プリセットを参照中は、実体の値は読み取り専用でプリセットの値を表示する（編集は「カスタム値」への
+  // 切り離しを経由する）。未定義のプリセットを参照している場合は、型別コントロール自体を出さない。
+  const activePreset = !mixed && isPresetRef(value) ? findPresetByName(spec, value.$preset) : undefined;
+  const isUnresolvedRef = !mixed && isPresetRef(value) && !activePreset;
+  const displayValue = mixed ? undefined : activePreset ? activePreset.value : value;
+  const disabled = disabledProp || !!activePreset;
 
-  const control = (() => {
-    switch (spec.type) {
-      case 'string':
-        if (spec.enum_values && spec.enum_values.length > 0) {
-          return (
-            <Select
-              aria-label={name}
-              value={displayValue !== undefined ? String(displayValue) : ''}
-              disabled={disabled}
-              onChange={(e) => emit(e.target.value === '' ? undefined : e.target.value)}
-              className="h-8 text-xs"
-            >
-              <option value="">
-                {mixed ? 'Mixed' : defaultValue !== undefined ? `既定: ${defaultValue}` : '(未設定)'}
-              </option>
-              {spec.enum_values.map((v) => (
-                <option key={v} value={v}>
-                  {v}
-                </option>
-              ))}
-            </Select>
-          );
+  const matchingPreset =
+    hasPresets && !mixed && value !== undefined && !isPresetRef(value) ? findMatchingPreset(spec, value) : undefined;
+
+  const control = isUnresolvedRef
+    ? null
+    : (() => {
+        switch (spec.type) {
+          case 'string':
+            if (spec.enum_values && spec.enum_values.length > 0) {
+              return (
+                <Select
+                  aria-label={name}
+                  value={displayValue !== undefined ? String(displayValue) : ''}
+                  disabled={disabled}
+                  onChange={(e) => emit(e.target.value === '' ? undefined : e.target.value)}
+                  className="h-8 text-xs"
+                >
+                  <option value="">
+                    {mixed ? 'Mixed' : defaultValue !== undefined ? `既定: ${defaultValue}` : '(未設定)'}
+                  </option>
+                  {spec.enum_values.map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </Select>
+              );
+            }
+            return (
+              <Input
+                type="text"
+                aria-label={name}
+                value={displayValue !== undefined ? String(displayValue) : ''}
+                placeholder={scalarPlaceholder('string', defaultValue, mixed)}
+                disabled={disabled}
+                onFocus={transactions.begin}
+                onBlur={transactions.end}
+                onChange={(e) => emit(e.target.value === '' ? undefined : e.target.value)}
+                className="h-8 text-xs"
+              />
+            );
+          case 'integer':
+          case 'float':
+            return (
+              <Input
+                type="number"
+                step={spec.type === 'float' ? '0.1' : '1'}
+                aria-label={name}
+                value={displayValue !== undefined ? String(displayValue) : ''}
+                placeholder={scalarPlaceholder(spec.type, defaultValue, mixed)}
+                disabled={disabled}
+                onFocus={transactions.begin}
+                onBlur={transactions.end}
+                onChange={(e) => {
+                  if (e.target.value === '') {
+                    emit(undefined);
+                    return;
+                  }
+                  const n = spec.type === 'float' ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
+                  if (!isNaN(n)) emit(n);
+                }}
+                className="h-8 text-xs font-mono"
+              />
+            );
+          case 'boolean':
+            return (
+              <Checkbox
+                aria-label={name}
+                checked={displayValue !== undefined ? Boolean(displayValue) : Boolean(defaultValue)}
+                disabled={disabled}
+                onChange={(e) => emit(e.target.checked)}
+              />
+            );
+          case 'list':
+            return (
+              <ListValueEditor
+                spec={spec}
+                value={Array.isArray(displayValue) ? displayValue : []}
+                onChange={emit}
+                name={name}
+                disabled={disabled}
+              />
+            );
+          case 'object':
+            return (
+              <ObjectValueEditor
+                spec={spec}
+                value={isRecord(displayValue) ? displayValue : {}}
+                onChange={emit}
+                name={name}
+                disabled={disabled}
+              />
+            );
+          case 'map':
+            return (
+              <MapValueEditor
+                spec={spec}
+                value={isRecord(displayValue) ? displayValue : {}}
+                onChange={emit}
+                name={name}
+                disabled={disabled}
+              />
+            );
+          case 'union':
+            return (
+              <UnionValueEditor
+                spec={spec}
+                value={isRecord(displayValue) ? displayValue : undefined}
+                onChange={emit}
+                name={name}
+                disabled={disabled}
+              />
+            );
+          case 'any':
+          default:
+            return <AnyValueEditor value={displayValue} onChange={emit} name={name} disabled={disabled} />;
         }
-        return (
-          <Input
-            type="text"
-            aria-label={name}
-            value={displayValue !== undefined ? String(displayValue) : ''}
-            placeholder={scalarPlaceholder('string', defaultValue, mixed)}
-            disabled={disabled}
-            onFocus={transactions.begin}
-            onBlur={transactions.end}
-            onChange={(e) => emit(e.target.value === '' ? undefined : e.target.value)}
-            className="h-8 text-xs"
-          />
-        );
-      case 'integer':
-      case 'float':
-        return (
-          <Input
-            type="number"
-            step={spec.type === 'float' ? '0.1' : '1'}
-            aria-label={name}
-            value={displayValue !== undefined ? String(displayValue) : ''}
-            placeholder={scalarPlaceholder(spec.type, defaultValue, mixed)}
-            disabled={disabled}
-            onFocus={transactions.begin}
-            onBlur={transactions.end}
-            onChange={(e) => {
-              if (e.target.value === '') {
-                emit(undefined);
-                return;
-              }
-              const n = spec.type === 'float' ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-              if (!isNaN(n)) emit(n);
-            }}
-            className="h-8 text-xs font-mono"
-          />
-        );
-      case 'boolean':
-        return (
-          <Checkbox
-            aria-label={name}
-            checked={displayValue !== undefined ? Boolean(displayValue) : Boolean(defaultValue)}
-            disabled={disabled}
-            onChange={(e) => emit(e.target.checked)}
-          />
-        );
-      case 'list':
-        return (
-          <ListValueEditor
-            spec={spec}
-            value={Array.isArray(value) ? value : []}
-            onChange={emit}
-            name={name}
-            disabled={disabled}
-          />
-        );
-      case 'object':
-        return (
-          <ObjectValueEditor
-            spec={spec}
-            value={isRecord(value) ? value : {}}
-            onChange={emit}
-            name={name}
-            disabled={disabled}
-          />
-        );
-      case 'map':
-        return (
-          <MapValueEditor
-            spec={spec}
-            value={isRecord(value) ? value : {}}
-            onChange={emit}
-            name={name}
-            disabled={disabled}
-          />
-        );
-      case 'union':
-        return (
-          <UnionValueEditor
-            spec={spec}
-            value={isRecord(value) ? value : undefined}
-            onChange={emit}
-            name={name}
-            disabled={disabled}
-          />
-        );
-      case 'any':
-      default:
-        return <AnyValueEditor value={value} onChange={emit} name={name} disabled={disabled} />;
-    }
-  })();
+      })();
 
   return (
     <ValueWithResetControl
       value={value}
       defaultValue={defaultValue}
       onChange={onChange}
-      disabled={disabled}
+      disabled={disabledProp}
       enabled={showResetControl && !mixed}
     >
-      {control}
+      <div className="space-y-1">
+        {presetSelector}
+        {control}
+        {matchingPreset && (
+          <p className="text-[10px] text-text-muted">
+            プリセット「{matchingPreset.label ?? matchingPreset.name}」と同じ値です。{' '}
+            <button
+              type="button"
+              className="underline text-primary-base hover:text-primary-hover"
+              onClick={() => emit({ $preset: matchingPreset.name })}
+            >
+              参照にする
+            </button>
+          </p>
+        )}
+      </div>
     </ValueWithResetControl>
   );
 }

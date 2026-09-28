@@ -1,4 +1,4 @@
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { PropertiesPanel } from './PropertiesPanel';
 import { renderWithStore } from '../../../test/render';
@@ -402,6 +402,101 @@ describe('OptionValueEditor multi-selection', () => {
 
     expect(screen.getByText(/select a single waypoint to edit/)).toBeInTheDocument();
     expect(screen.queryByLabelText('navigation.is_through_point')).not.toBeInTheDocument();
+  });
+});
+
+describe('OptionValueEditor presets', () => {
+  const toleranceSchema: OptionsSchema = {
+    options: [
+      {
+        name: 'tolerance',
+        label: 'Tolerance',
+        type: 'float',
+        default: 0.2,
+        presets: [
+          { name: 'small', label: 'Small', value: 0.1 },
+          { name: 'large', label: 'Large', value: 0.5 },
+        ],
+      },
+    ],
+    globals: [],
+  };
+
+  it('selects a preset and shows its resolved value, read-only', async () => {
+    const { user } = renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1')]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: toleranceSchema,
+    });
+
+    await user.selectOptions(screen.getByLabelText('tolerance preset'), 'small');
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'small' } });
+    const input = screen.getByLabelText('tolerance');
+    expect(input).toHaveValue(0.1);
+    expect(input).toBeDisabled();
+  });
+
+  it('detaches to a custom value by copying the referenced preset’s value, which becomes editable', async () => {
+    const { user } = renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { tolerance: { $preset: 'small' } } })]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: toleranceSchema,
+    });
+
+    await user.selectOptions(screen.getByLabelText('tolerance preset'), '');
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: 0.1 });
+    expect(screen.getByLabelText('tolerance')).toBeEnabled();
+  });
+
+  it('omits the "custom value" option for a preset_only field', () => {
+    const presetOnlySchema: OptionsSchema = {
+      options: [{ ...toleranceSchema.options[0], preset_only: true }],
+      globals: [],
+    };
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1')]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: presetOnlySchema,
+    });
+
+    expect(within(screen.getByLabelText('tolerance preset')).queryByText('カスタム値')).not.toBeInTheDocument();
+  });
+
+  it('offers to convert a custom value that matches a preset exactly into a reference', async () => {
+    const { user } = renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { tolerance: 0.1 } })]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: toleranceSchema,
+    });
+
+    await user.click(screen.getByRole('button', { name: '参照にする' }));
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'small' } });
+  });
+
+  it('flags a reference to a preset that no longer exists', () => {
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { tolerance: { $preset: 'unknown' } } })]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: toleranceSchema,
+    });
+
+    expect(screen.getByText(/未定義のプリセットです: unknown/)).toBeInTheDocument();
+  });
+
+  it('bulk-applies a preset across every selected waypoint', async () => {
+    const { user } = renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1'), makeWaypoint('node-2')]),
+      selectedNodeIds: ['node-1', 'node-2'],
+      optionsSchema: toleranceSchema,
+    });
+
+    await user.selectOptions(screen.getByLabelText('tolerance preset'), 'large');
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'large' } });
+    expect(getAppState().nodes['node-2'].options).toEqual({ tolerance: { $preset: 'large' } });
   });
 });
 
