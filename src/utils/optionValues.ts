@@ -1,7 +1,23 @@
-import type { FieldDef, OptionValue, ScalarType, TypeSpec } from '../types/options';
+import type { FieldDef, OptionValue, PresetDef, PresetRef, ScalarType, TypeSpec } from '../types/options';
 
-const isPlainObject = (v: unknown): v is Record<string, OptionValue> =>
+export const isPlainObject = (v: unknown): v is Record<string, OptionValue> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** 値がプリセット参照（`{ $preset: name }`）かどうかを判定する。 */
+export function isPresetRef(value: unknown): value is PresetRef {
+  return isPlainObject(value) && typeof value.$preset === 'string';
+}
+
+/** 型仕様が持つプリセットの中から、名前が一致するものを探す。 */
+export function findPresetByName(spec: TypeSpec, name: string): PresetDef | undefined {
+  return (spec.presets ?? []).find((p) => p.name === name);
+}
+
+/** 値が、型仕様が持ついずれかのプリセットと完全に一致するかを調べる（一致すれば、そのプリセットを返す）。 */
+export function findMatchingPreset(spec: TypeSpec, value: OptionValue | undefined): PresetDef | undefined {
+  if (value === undefined || isPresetRef(value)) return undefined;
+  return (spec.presets ?? []).find((p) => deepEqual(p.value, value));
+}
 
 /** union 値から判別キーの値を取り出す。 */
 function getVariantValue(spec: TypeSpec, value: unknown): string | undefined {
@@ -35,6 +51,8 @@ export function parseCsvList(text: string, itemType: ScalarType): OptionValue[] 
  * 変換できない場合は `fallback` を返す。list/object/map/union は再帰的に変換する。
  */
 export function coerceValue(spec: TypeSpec, raw: any, fallback?: OptionValue): OptionValue | undefined {
+  // プリセット参照は、参照先の型に関わらずそのまま素通しする（実際の値への変換は表示・エクスポート時に行う）。
+  if (isPresetRef(raw)) return raw;
   switch (spec.type) {
     case 'integer': {
       const n = parseInt(raw, 10);
@@ -104,6 +122,13 @@ export interface ValueValidationError {
 export function validateValue(spec: TypeSpec, value: unknown, path = ''): ValueValidationError[] {
   if (value === undefined || value === '') return [];
 
+  if (isPresetRef(value)) {
+    return findPresetByName(spec, value.$preset) ? [] : [{ path, message: `未定義のプリセットです: ${value.$preset}` }];
+  }
+  if (spec.preset_only) {
+    return [{ path, message: 'プリセットから選択してください。' }];
+  }
+
   switch (spec.type) {
     case 'integer':
       return isNaN(Number(value)) || !Number.isInteger(Number(value))
@@ -165,20 +190,77 @@ export function validateField(field: FieldDef, value: OptionValue | undefined, p
 }
 
 /**
- * 明示的に入力された値（`value`）に、スキーマの既定値を再帰的に補って実効値を返す。
- * `value` が `undefined` ならフィールドの `default` をそのまま返す。
+ * プリセット参照（`{ $preset: name }`）を、対応する `TypeSpec.presets` の値に再帰的に置き換える。
+ * 参照自体だけでなく、値の中に入れ子で現れる参照（list の要素、object/union のフィールド、map の値）も解決する。
+ * 未定義の参照は `undefined` にする（`validateValue` が別途エラーとして報告する前提）。
  */
-export function resolveWithDefaults(field: FieldDef, value: OptionValue | undefined): OptionValue | undefined {
-  if (value === undefined) return field.default;
-  return resolveNestedDefaults(field, value);
+export function resolvePresets(spec: TypeSpec, value: OptionValue | undefined): OptionValue | undefined {
+  if (value === undefined) return undefined;
+  let resolved: OptionValue | undefined = value;
+  if (isPresetRef(value)) {
+    resolved = findPresetByName(spec, value.$preset)?.value;
+    if (resolved === undefined) return undefined;
+  }
+  if (spec.type === 'list' && Array.isArray(resolved) && spec.item) {
+    const itemSpec = spec.item;
+    return resolved.map((v) => resolvePresets(itemSpec, v) as OptionValue);
+  }
+  if (spec.type === 'object' && isPlainObject(resolved)) {
+    const result: Record<string, OptionValue> = { ...resolved };
+    (spec.fields ?? []).forEach((f) => {
+      if (result[f.name] !== undefined) result[f.name] = resolvePresets(f, result[f.name]) as OptionValue;
+    });
+    return result;
+  }
+  if (spec.type === 'map' && isPlainObject(resolved)) {
+    const valueSpec = spec.value_type ?? { type: 'any' };
+    const result: Record<string, OptionValue> = {};
+    Object.keys(resolved).forEach((k) => {
+      result[k] = resolvePresets(valueSpec, resolved[k]) as OptionValue;
+    });
+    return result;
+  }
+  if (spec.type === 'union' && isPlainObject(resolved)) {
+    const variant = findVariant(spec, getVariantValue(spec, resolved));
+    if (variant) {
+      const result: Record<string, OptionValue> = { ...resolved };
+      variant.fields.forEach((f) => {
+        if (result[f.name] !== undefined) result[f.name] = resolvePresets(f, result[f.name]) as OptionValue;
+      });
+      return result;
+    }
+  }
+  return resolved;
 }
 
+/**
+ * 明示的に入力された値（`value`）に、プリセット参照の解決とスキーマの既定値を再帰的に適用して実効値を返す。
+ * `value` が `undefined` ならフィールドの `default`（これもプリセット参照でありうる）を解決して返す。
+ */
+export function resolveWithDefaults(field: FieldDef, value: OptionValue | undefined): OptionValue | undefined {
+  if (value === undefined) {
+    return field.default === undefined ? undefined : resolvePresets(field, field.default);
+  }
+  const withoutPresetRefs = resolvePresets(field, value);
+  return withoutPresetRefs === undefined ? undefined : resolveNestedDefaults(field, withoutPresetRefs);
+}
+
+/**
+ * プリセット参照を解決済みの値に、入れ子の object/union フィールドが持つ既定値を補う。
+ * list はどの深さの要素型にも、map はどんな値型にも再帰する（プリセットや既定値がどの深さにもありうるため）。
+ */
 function resolveNestedDefaults(spec: TypeSpec, value: OptionValue): OptionValue {
   if (spec.type === 'list' && Array.isArray(value) && spec.item) {
     const itemSpec = spec.item;
-    return value.map((v) =>
-      itemSpec.type === 'object' || itemSpec.type === 'union' ? resolveNestedDefaults(itemSpec, v) : v,
-    );
+    return value.map((v) => resolveNestedDefaults(itemSpec, v));
+  }
+  if (spec.type === 'map' && isPlainObject(value)) {
+    const valueSpec = spec.value_type ?? { type: 'any' };
+    const result: Record<string, OptionValue> = {};
+    Object.keys(value).forEach((k) => {
+      result[k] = resolveNestedDefaults(valueSpec, value[k]);
+    });
+    return result;
   }
   if (spec.type === 'object' && isPlainObject(value)) {
     const result: Record<string, OptionValue> = { ...value };
@@ -207,8 +289,14 @@ export function createUnionVariantValue(spec: TypeSpec, variantValue: string): O
   return { [discriminator]: variantValue };
 }
 
-/** 型仕様に応じた、値未設定な状態からの初期値を作る（list への新規アイテム追加等に使う）。 */
+/**
+ * 型仕様に応じた、値未設定な状態からの初期値を作る（list への新規アイテム追加等に使う）。
+ * `preset_only` な型は自由な値を持てないため、先頭のプリセットへの参照を初期値にする。
+ */
 export function createValue(spec: TypeSpec): OptionValue {
+  if (spec.preset_only && spec.presets && spec.presets.length > 0) {
+    return { $preset: spec.presets[0].name };
+  }
   switch (spec.type) {
     case 'string':
       return '';
@@ -247,6 +335,10 @@ export function switchUnionVariant(spec: TypeSpec, value: OptionValue, newVarian
 /** キャンバスのラベル表示用に、値を短い文字列へ要約する。 */
 export function summarizeValue(spec: TypeSpec, value: OptionValue | undefined): string {
   if (value === undefined || value === null) return '';
+  if (isPresetRef(value)) {
+    const preset = findPresetByName(spec, value.$preset);
+    return preset ? (preset.label ?? preset.name) : `[未定義のプリセット: ${value.$preset}]`;
+  }
   switch (spec.type) {
     case 'list': {
       if (!Array.isArray(value)) return '';

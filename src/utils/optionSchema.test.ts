@@ -416,3 +416,145 @@ describe('listPropertyPaths', () => {
     expect(listPropertyPaths(schema)).toEqual(['options.nav', 'options.nav.is_through_point']);
   });
 });
+
+describe('presets', () => {
+  it('normalizes a field’s presets and preset_only, but drops presets from a ref (they live on the definition)', () => {
+    const field = normalizeTypeSpec({
+      type: 'float',
+      presets: [
+        { name: 'small', value: '0.1' },
+        { name: '', value: 0.5 },
+      ],
+      preset_only: true,
+    });
+    expect(field).toEqual({
+      type: 'float',
+      presets: [
+        { name: 'small', value: '0.1' },
+        { name: '', value: 0.5 },
+      ],
+      preset_only: true,
+    });
+
+    const refField = normalizeTypeSpec({ type: 'ref', ref: 'action', presets: [{ name: 'x', value: 1 }] });
+    expect(refField).toEqual({ type: 'ref', ref: 'action' });
+  });
+
+  it('coerces preset values to the field’s effective type, including through a ref', () => {
+    const schema = normalizeOptionsSchema({
+      options: [
+        { name: 'tolerance', label: 'Tolerance', type: 'float', presets: [{ name: 'small', value: '0.1' }] },
+        { name: 'actions', label: 'Actions', type: 'list', item: { type: 'ref', ref: 'action' } },
+      ],
+      globals: [],
+      definitions: [
+        {
+          name: 'action',
+          type: 'object',
+          fields: [{ name: 'countdown_ms', label: 'Countdown', type: 'integer' }],
+          presets: [{ name: 'default', value: { countdown_ms: '3000' } }],
+        },
+      ],
+    });
+    expect(schema.options[0].presets).toEqual([{ name: 'small', value: 0.1 }]);
+    expect(schema.definitions?.[0].presets).toEqual([{ name: 'default', value: { countdown_ms: 3000 } }]);
+  });
+
+  it('carries presets and preset_only through resolveTypeSpec for every branch (list/object/map/union/string/scalar)', () => {
+    const definitionsByName = new Map<string, DefinitionDef>();
+    const presets = [{ name: 'p', value: 1 }];
+    (['list', 'object', 'map', 'union', 'string', 'float'] as const).forEach((type) => {
+      const spec = { type, presets, preset_only: true } as any;
+      const resolved = resolveTypeSpec(spec, definitionsByName);
+      expect(resolved.presets).toEqual(presets);
+      expect(resolved.preset_only).toBe(true);
+    });
+  });
+
+  it('exposes a definition’s presets on every field that refs it (expandSchemaRefs)', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'action', label: 'Action', type: 'ref', ref: 'action' }],
+      globals: [],
+      definitions: [
+        {
+          name: 'action',
+          type: 'string',
+          presets: [{ name: 'stop', value: 'stop' }],
+        },
+      ],
+    };
+    const expanded = expandSchemaRefs(schema);
+    expect(expanded.options[0].presets).toEqual([{ name: 'stop', value: 'stop' }]);
+  });
+
+  it('validateSchema rejects a duplicate or empty preset name, a mistyped preset value, and preset chaining', () => {
+    const schema: OptionsSchema = {
+      options: [
+        {
+          name: 'tolerance',
+          label: 'Tolerance',
+          type: 'float',
+          presets: [
+            { name: 'small', value: 0.1 },
+            { name: 'small', value: 0.2 },
+            { name: '', value: 0.3 },
+            { name: 'bad', value: 'not-a-number' },
+            { name: 'chained', value: { $preset: 'small' } },
+          ],
+        },
+      ],
+      globals: [],
+    };
+    const errors = validateSchema(schema);
+    expect(errors.some((e) => e.message.includes('プリセット名が重複'))).toBe(true);
+    expect(errors.some((e) => e.message.includes('プリセット名を空にすることはできません'))).toBe(true);
+    expect(errors.some((e) => e.path === 'options[0].presets[3].value')).toBe(true);
+    expect(errors.some((e) => e.message.includes('別のプリセットを参照することはできません'))).toBe(true);
+  });
+
+  it('validateSchema requires at least one preset when preset_only is set', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'tolerance', label: 'Tolerance', type: 'float', preset_only: true }],
+      globals: [],
+    };
+    expect(validateSchema(schema).some((e) => e.message.includes('プリセットからのみ選択可能'))).toBe(true);
+  });
+
+  it('validateSchema accepts a preset value for a preset_only field without flagging it as a raw value', () => {
+    const schema: OptionsSchema = {
+      options: [
+        {
+          name: 'tolerance',
+          label: 'Tolerance',
+          type: 'float',
+          preset_only: true,
+          presets: [{ name: 'small', value: 0.1 }],
+        },
+      ],
+      globals: [],
+    };
+    expect(validateSchema(schema)).toEqual([]);
+  });
+
+  it('resolveOptionsSchema resolves a default that is a preset reference against the effective type', () => {
+    const resolved = resolveOptionsSchema({
+      options: [
+        {
+          name: 'tolerance',
+          label: 'Tolerance',
+          type: 'ref',
+          ref: 'tolerance_type',
+        } as any,
+      ],
+      globals: [],
+      definitions: [
+        {
+          name: 'tolerance_type',
+          type: 'float',
+          presets: [{ name: 'small', value: 0.1 }],
+        },
+      ],
+    });
+    expect(resolved?.options[0].presets).toEqual([{ name: 'small', value: 0.1 }]);
+  });
+});

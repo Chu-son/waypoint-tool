@@ -7,11 +7,15 @@ import {
   validateField,
   parseCsvList,
   resolveWithDefaults,
+  resolvePresets,
   createValue,
   createUnionVariantValue,
   switchUnionVariant,
   summarizeValue,
   deepEqual,
+  isPresetRef,
+  findPresetByName,
+  findMatchingPreset,
 } from './optionValues';
 import type { FieldDef, TypeSpec } from '../types/options';
 
@@ -317,5 +321,95 @@ describe('deepEqual', () => {
 
   it('detects a difference in array length', () => {
     expect(deepEqual([1, 2], [1, 2, 3])).toBe(false);
+  });
+});
+
+describe('presets', () => {
+  const toleranceSpec: TypeSpec = {
+    type: 'float',
+    presets: [
+      { name: 'small', label: 'Small', value: 0.1 },
+      { name: 'large', label: 'Large', value: 0.5 },
+    ],
+  };
+  const toleranceField: FieldDef = { ...toleranceSpec, name: 'tolerance', label: 'Tolerance', default: 0.2 };
+
+  it('recognizes a preset reference and finds it by name', () => {
+    expect(isPresetRef({ $preset: 'small' })).toBe(true);
+    expect(isPresetRef({ foo: 'small' })).toBe(false);
+    expect(findPresetByName(toleranceSpec, 'large')?.value).toBe(0.5);
+    expect(findPresetByName(toleranceSpec, 'unknown')).toBeUndefined();
+  });
+
+  it('finds the preset that matches a raw value exactly, but not for an existing reference', () => {
+    expect(findMatchingPreset(toleranceSpec, 0.1)?.name).toBe('small');
+    expect(findMatchingPreset(toleranceSpec, 0.3)).toBeUndefined();
+    expect(findMatchingPreset(toleranceSpec, { $preset: 'small' })).toBeUndefined();
+  });
+
+  it('resolves a scalar preset reference to its value', () => {
+    expect(resolvePresets(toleranceSpec, { $preset: 'large' })).toBe(0.5);
+  });
+
+  it('resolves preset references nested inside list items, object fields, map values and union variants', () => {
+    const listSpec: TypeSpec = { type: 'list', item: toleranceSpec };
+    expect(resolvePresets(listSpec, [{ $preset: 'small' }, 0.9])).toEqual([0.1, 0.9]);
+
+    const objectSpec: TypeSpec = { type: 'object', fields: [toleranceField] };
+    expect(resolvePresets(objectSpec, { tolerance: { $preset: 'large' } })).toEqual({ tolerance: 0.5 });
+
+    const mapSpec: TypeSpec = { type: 'map', value_type: toleranceSpec };
+    expect(resolvePresets(mapSpec, { a: { $preset: 'small' } })).toEqual({ a: 0.1 });
+
+    const unionSpec: TypeSpec = {
+      type: 'union',
+      discriminator: 'type',
+      variants: [{ value: 'wait', fields: [toleranceField] }],
+    };
+    expect(resolvePresets(unionSpec, { type: 'wait', tolerance: { $preset: 'small' } })).toEqual({
+      type: 'wait',
+      tolerance: 0.1,
+    });
+  });
+
+  it('returns undefined for an undefined preset reference', () => {
+    expect(resolvePresets(toleranceSpec, { $preset: 'unknown' })).toBeUndefined();
+  });
+
+  it('resolveWithDefaults resolves a preset reference as the explicit value', () => {
+    expect(resolveWithDefaults(toleranceField, { $preset: 'small' })).toBe(0.1);
+  });
+
+  it('resolveWithDefaults resolves the default itself when it is a preset reference', () => {
+    const field: FieldDef = { ...toleranceField, default: { $preset: 'large' } };
+    expect(resolveWithDefaults(field, undefined)).toBe(0.5);
+  });
+
+  it('validateValue accepts a defined preset reference and rejects an undefined one', () => {
+    expect(validateValue(toleranceSpec, { $preset: 'small' })).toEqual([]);
+    expect(validateValue(toleranceSpec, { $preset: 'unknown' })).toEqual([
+      { path: '', message: '未定義のプリセットです: unknown' },
+    ]);
+  });
+
+  it('validateValue rejects a raw value when the field is preset_only', () => {
+    const presetOnlySpec: TypeSpec = { ...toleranceSpec, preset_only: true };
+    expect(validateValue(presetOnlySpec, 0.3)).toEqual([{ path: '', message: 'プリセットから選択してください。' }]);
+    expect(validateValue(presetOnlySpec, { $preset: 'small' })).toEqual([]);
+  });
+
+  it('createValue starts a preset_only field as a reference to its first preset', () => {
+    const presetOnlySpec: TypeSpec = { ...toleranceSpec, preset_only: true };
+    expect(createValue(presetOnlySpec)).toEqual({ $preset: 'small' });
+  });
+
+  it('coerceValue and toStoredValue pass a preset reference through unchanged', () => {
+    expect(coerceValue(toleranceSpec, { $preset: 'small' })).toEqual({ $preset: 'small' });
+    expect(toStoredValue(toleranceSpec, { $preset: 'small' })).toEqual({ $preset: 'small' });
+  });
+
+  it('summarizeValue shows the preset label, or a marker for an undefined preset', () => {
+    expect(summarizeValue(toleranceSpec, { $preset: 'small' })).toBe('Small');
+    expect(summarizeValue(toleranceSpec, { $preset: 'unknown' })).toBe('[未定義のプリセット: unknown]');
   });
 });

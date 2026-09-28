@@ -28,6 +28,34 @@ export interface TypeSpec {
   variants?: VariantDef[];
   /** `ref`: 参照先の `OptionsSchema.definitions[].name`。 */
   ref?: string;
+  /**
+   * 名前付きの値の候補（プリセット）。`ref` 自身には持たせず、参照先の `definitions` 側に集約する
+   * （同じ型を使う全箇所で共有するため）。値には `PresetRef`（`{ $preset: name }`）で参照する。
+   */
+  presets?: PresetDef[];
+  /** true の場合、この型の値は `presets` から選ぶことしかできず、自由な値の入力を許さない。 */
+  preset_only?: boolean;
+}
+
+/**
+ * `TypeSpec.presets` の1件。名前で参照される、名前付きの値。
+ * 値を変更すると、その名前を参照している全箇所に反映される（サービス呼び出しの定型パターンや、
+ * tolerance の「小/大」のような、運用上の選択肢を表現する）。
+ */
+export interface PresetDef {
+  name: string;
+  label?: string;
+  description?: string;
+  value: OptionValue;
+}
+
+/**
+ * プリセットへの参照値。`$preset` は予約キーであり、`presets` を持つ型の値としてのみ解釈される。
+ * それ以外の型（`any` や、プリセットの無い `map` の値など）では通常のオブジェクトとして扱われる。
+ */
+export interface PresetRef {
+  [key: string]: OptionValue;
+  $preset: string;
 }
 
 /** 名前とラベルを持つ、名前付きフィールド定義。 */

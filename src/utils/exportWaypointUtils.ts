@@ -1,7 +1,7 @@
 import type { WaypointNode, OptionsSchema, OptionValue } from '../types/store';
 import { getFlattenedWaypointIds } from './treeUtils';
 import { quaternionToYaw } from './transformUtils';
-import { resolveWithDefaults, validateField } from './optionValues';
+import { resolvePresets, resolveWithDefaults, validateField } from './optionValues';
 
 export interface ExportedWaypointItem {
   index: number;
@@ -29,7 +29,9 @@ export interface ExportedWaypointItem {
 export function extractGlobalsForExport(optionsSchema: OptionsSchema | null): Record<string, OptionValue> {
   const globals: Record<string, OptionValue> = {};
   optionsSchema?.globals.forEach((field) => {
-    if (field.value !== undefined) globals[field.name] = field.value;
+    if (field.value === undefined) return;
+    const resolved = resolvePresets(field, field.value);
+    if (resolved !== undefined) globals[field.name] = resolved;
   });
   return globals;
 }
@@ -48,11 +50,17 @@ export function extractWaypointsForExport(
       if (!node) return null;
 
       // raw_options: 明示的に入力された値だけ（スキーマに無い未知キーも含めてそのまま引き継ぐ）。
+      // プリセット参照はここで実際の値に解決する（テンプレートに `$preset` が漏れないようにするため）が、
+      // 既定値は補わない（未設定のフィールドの扱いを受け側フォーマットに委ねられるようにするため）。
       const rawOptions: Record<string, any> = { ...(node.options ?? {}) };
+      optionsSchema?.options.forEach((opt) => {
+        if (rawOptions[opt.name] === undefined) return;
+        rawOptions[opt.name] = resolvePresets(opt, rawOptions[opt.name]);
+      });
       // options: raw_options にスキーマの既定値を再帰的に補完した実効値。
       const resolvedOptions: Record<string, any> = { ...rawOptions };
       optionsSchema?.options.forEach((opt) => {
-        const resolved = resolveWithDefaults(opt, rawOptions[opt.name]);
+        const resolved = resolveWithDefaults(opt, node.options?.[opt.name]);
         if (resolved !== undefined) resolvedOptions[opt.name] = resolved;
       });
 

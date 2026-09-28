@@ -4,11 +4,12 @@ import type {
   OptionDef,
   GlobalFieldDef,
   OptionsSchema,
+  PresetDef,
   ScalarType,
   TypeSpec,
   ValueType,
 } from '../types/options';
-import { coerceValue, validateValue } from './optionValues';
+import { coerceValue, isPresetRef, validateValue } from './optionValues';
 
 const SCALAR_TYPES: ReadonlySet<ScalarType> = new Set(['string', 'float', 'integer', 'boolean']);
 const VALUE_TYPES: ReadonlySet<ValueType> = new Set([...SCALAR_TYPES, 'list', 'object', 'map', 'union', 'any', 'ref']);
@@ -64,9 +65,26 @@ export function normalizeTypeSpec(raw: any): TypeSpec {
 
   if (type === 'ref') {
     spec.ref = typeof raw?.ref === 'string' ? raw.ref : '';
+  } else {
+    // プリセットは `ref` 自身には持たせない（参照先の definitions 側に集約する設計のため）。
+    if (Array.isArray(raw?.presets)) {
+      spec.presets = raw.presets.map(normalizePresetDef);
+    }
+    if (raw?.preset_only === true) spec.preset_only = true;
   }
 
   return spec;
+}
+
+/** `TypeSpec.presets` の1件を正規化する。値の型変換は `coerceSchemaDefaultsAndValues` がまとめて行う。 */
+function normalizePresetDef(raw: any): PresetDef {
+  const preset: PresetDef = {
+    name: typeof raw?.name === 'string' ? raw.name : '',
+    value: raw?.value !== undefined ? raw.value : null,
+  };
+  if (typeof raw?.label === 'string' && raw.label) preset.label = raw.label;
+  if (typeof raw?.description === 'string' && raw.description) preset.description = raw.description;
+  return preset;
 }
 
 /** 名前付きフィールド定義を正規化する（`normalizeTypeSpec` に name/label/description/default/required を加える）。 */
@@ -133,6 +151,13 @@ export function normalizeOptionsSchema(raw: any): OptionsSchema {
  * `type: 'ref'` を、対応する `definitions` の中身で再帰的に置き換えた型仕様を返す。
  * 未定義の参照・循環参照は（`validateSchema` が別途エラーとして報告する前提で）`{ type: 'any' }` にフォールバックする。
  */
+/** `resolveTypeSpec` の各 case の結果に、元の型仕様が持つ `presets` / `preset_only` を付け加える。 */
+function withPresetFields<T extends TypeSpec>(base: T, spec: TypeSpec): T {
+  if (spec.presets && spec.presets.length > 0) (base as TypeSpec).presets = spec.presets;
+  if (spec.preset_only) (base as TypeSpec).preset_only = true;
+  return base;
+}
+
 export function resolveTypeSpec(
   spec: TypeSpec,
   definitionsByName: Map<string, DefinitionDef>,
@@ -147,31 +172,46 @@ export function resolveTypeSpec(
   }
   switch (spec.type) {
     case 'list':
-      return {
-        type: 'list',
-        item: spec.item ? resolveTypeSpec(spec.item, definitionsByName, seen) : { type: 'string' },
-      };
+      return withPresetFields(
+        {
+          type: 'list',
+          item: spec.item ? resolveTypeSpec(spec.item, definitionsByName, seen) : { type: 'string' },
+        },
+        spec,
+      );
     case 'object':
-      return { type: 'object', fields: (spec.fields ?? []).map((f) => resolveFieldDef(f, definitionsByName, seen)) };
+      return withPresetFields(
+        { type: 'object', fields: (spec.fields ?? []).map((f) => resolveFieldDef(f, definitionsByName, seen)) },
+        spec,
+      );
     case 'map':
-      return {
-        type: 'map',
-        value_type: spec.value_type ? resolveTypeSpec(spec.value_type, definitionsByName, seen) : { type: 'any' },
-      };
+      return withPresetFields(
+        {
+          type: 'map',
+          value_type: spec.value_type ? resolveTypeSpec(spec.value_type, definitionsByName, seen) : { type: 'any' },
+        },
+        spec,
+      );
     case 'union':
-      return {
-        type: 'union',
-        discriminator: spec.discriminator || 'type',
-        variants: (spec.variants ?? []).map((v) => ({
-          value: v.value,
-          ...(v.label ? { label: v.label } : {}),
-          fields: v.fields.map((f) => resolveFieldDef(f, definitionsByName, seen)),
-        })),
-      };
+      return withPresetFields(
+        {
+          type: 'union',
+          discriminator: spec.discriminator || 'type',
+          variants: (spec.variants ?? []).map((v) => ({
+            value: v.value,
+            ...(v.label ? { label: v.label } : {}),
+            fields: v.fields.map((f) => resolveFieldDef(f, definitionsByName, seen)),
+          })),
+        },
+        spec,
+      );
     case 'string':
-      return spec.enum_values ? { type: 'string', enum_values: spec.enum_values } : { type: 'string' };
+      return withPresetFields(
+        spec.enum_values ? { type: 'string', enum_values: spec.enum_values } : { type: 'string' },
+        spec,
+      );
     default:
-      return { type: spec.type };
+      return withPresetFields({ type: spec.type }, spec);
   }
 }
 
@@ -231,28 +271,38 @@ export function resolveOptionsSchema(schema: OptionsSchema | null): OptionsSchem
  * 型仕様のツリーとフィールドのツリーの両方を再帰的に辿る。
  */
 function coerceSpecDefaultsDeep(raw: TypeSpec, resolved: TypeSpec): TypeSpec {
-  switch (raw.type) {
+  // プリセットの値も、既定値と同じくこの型の実効型（resolved）に合わせて変換する。
+  // プリセットの値自体が別のプリセットを参照することは禁止している（validateSchema 側で検出）ので、
+  // ここで isPresetRef を通しても連鎖せず、coerceValue の素通し処理で安全に扱える。
+  const base: TypeSpec =
+    raw.presets && raw.presets.length > 0
+      ? { ...raw, presets: raw.presets.map((p) => ({ ...p, value: coerceValue(resolved, p.value, p.value)! })) }
+      : raw;
+
+  switch (base.type) {
     case 'list':
-      return raw.item ? { ...raw, item: coerceSpecDefaultsDeep(raw.item, resolved.item ?? { type: 'string' }) } : raw;
+      return base.item
+        ? { ...base, item: coerceSpecDefaultsDeep(base.item, resolved.item ?? { type: 'string' }) }
+        : base;
     case 'object':
       return {
-        ...raw,
-        fields: (raw.fields ?? []).map((f, i) => coerceFieldDefaultsDeep(f, (resolved.fields ?? [])[i] ?? f)),
+        ...base,
+        fields: (base.fields ?? []).map((f, i) => coerceFieldDefaultsDeep(f, (resolved.fields ?? [])[i] ?? f)),
       };
     case 'map':
-      return raw.value_type
-        ? { ...raw, value_type: coerceSpecDefaultsDeep(raw.value_type, resolved.value_type ?? { type: 'any' }) }
-        : raw;
+      return base.value_type
+        ? { ...base, value_type: coerceSpecDefaultsDeep(base.value_type, resolved.value_type ?? { type: 'any' }) }
+        : base;
     case 'union':
       return {
-        ...raw,
-        variants: (raw.variants ?? []).map((v, vi) => ({
+        ...base,
+        variants: (base.variants ?? []).map((v, vi) => ({
           ...v,
           fields: v.fields.map((f, fi) => coerceFieldDefaultsDeep(f, (resolved.variants ?? [])[vi]?.fields[fi] ?? f)),
         })),
       };
     default:
-      return raw;
+      return base;
   }
 }
 
@@ -324,6 +374,44 @@ function validateFieldList(
   });
 }
 
+/**
+ * 型仕様が持つ `presets` を検証する。プリセット名の空欄・重複、値の型不一致に加えて、
+ * プリセットの値が別のプリセットを参照すること（連鎖）を禁止する。
+ * `preset_only` を付けているのにプリセットが1件も無い場合もここで検出する。
+ */
+function validatePresets(
+  spec: TypeSpec,
+  path: string,
+  definitionsByName: Map<string, DefinitionDef>,
+  errors: SchemaValidationError[],
+): void {
+  if (spec.preset_only && (spec.presets ?? []).length === 0) {
+    errors.push({ path, message: 'プリセットからのみ選択可能にする場合は、1件以上プリセットを定義してください。' });
+  }
+  if (!spec.presets || spec.presets.length === 0) return;
+
+  // プリセットの値そのものは参照ではない生の値なので、`preset_only` の制約は外して検証する
+  // （外さないと「プリセットから選択してください」というエラーが常に出てしまう）。
+  const resolved: TypeSpec = { ...resolveTypeSpec(spec, definitionsByName), preset_only: false };
+  const seen = new Map<string, number>();
+  spec.presets.forEach((p, i) => {
+    const presetPath = `${path}.presets[${i}]`;
+    if (!p.name || p.name.trim() === '') {
+      errors.push({ path: presetPath, message: 'プリセット名を空にすることはできません。' });
+    } else {
+      seen.set(p.name, (seen.get(p.name) ?? 0) + 1);
+    }
+    if (isPresetRef(p.value)) {
+      errors.push({ path: presetPath, message: 'プリセットの値に別のプリセットを参照することはできません。' });
+    } else {
+      errors.push(...validateValue(resolved, p.value, `${presetPath}.value`));
+    }
+  });
+  seen.forEach((count, name) => {
+    if (count > 1) errors.push({ path, message: `プリセット名が重複しています: ${name}` });
+  });
+}
+
 function validateNestedShape(
   spec: TypeSpec,
   path: string,
@@ -331,6 +419,7 @@ function validateNestedShape(
   errors: SchemaValidationError[],
   refChain: ReadonlySet<string> = new Set(),
 ): void {
+  validatePresets(spec, path, definitionsByName, errors);
   if (spec.type === 'ref') {
     if (!spec.ref || spec.ref.trim() === '') {
       errors.push({ path, message: '参照先の型名を指定してください。' });

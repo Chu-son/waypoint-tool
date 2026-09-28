@@ -54,8 +54,34 @@ fn validate_type_spec(value: &JsonValue, path: &str) -> Result<(), String> {
     validate_recursive_shape(obj, path)
 }
 
+/// `presets`（プリセット。名前付きの値の候補）の構造を検証する。値の型自体はフロントエンドの
+/// `validateSchema` が担うため、ここでは「配列であること」「各要素が `name` を持つこと」だけを見る。
+fn validate_presets(obj: &serde_json::Map<String, JsonValue>, path: &str) -> Result<(), String> {
+    if let Some(presets) = obj.get("presets") {
+        let list = presets
+            .as_array()
+            .ok_or_else(|| format!("{}.presets: expected an array", path))?;
+        for (i, p) in list.iter().enumerate() {
+            let preset_obj = p
+                .as_object()
+                .ok_or_else(|| format!("{}.presets[{}]: expected an object", path, i))?;
+            match preset_obj.get("name") {
+                Some(JsonValue::String(s)) if !s.is_empty() => {}
+                _ => {
+                    return Err(format!(
+                        "{}.presets[{}]: missing required non-empty string field `name`",
+                        path, i
+                    ))
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// `type` の値に応じて、入れ子になった型仕様（item/fields/value/variants）を再帰的に検証する。
 fn validate_recursive_shape(obj: &serde_json::Map<String, JsonValue>, path: &str) -> Result<(), String> {
+    validate_presets(obj, path)?;
     match obj.get("type").and_then(|v| v.as_str()).unwrap_or("") {
         "list" => {
             if let Some(item) = obj.get("item") {
@@ -325,6 +351,45 @@ definitions:
         );
         let result = load_options_schema(file.path().to_str().unwrap());
         assert!(result.is_err(), "Should error when a definition has no `name`");
+    }
+
+    #[test]
+    fn test_load_schema_with_presets() {
+        let file = write_temp_yaml(
+            r#"
+options:
+  - name: tolerance
+    label: "Tolerance"
+    type: float
+    presets:
+      - {name: small, label: "Small", value: 0.1}
+      - {name: large, label: "Large", value: 0.5}
+    preset_only: true
+"#,
+        );
+        let result = load_options_schema(file.path().to_str().unwrap()).expect("schema with presets should parse");
+        let presets = result.get("options").unwrap()[0]
+            .get("presets")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(presets.len(), 2);
+    }
+
+    #[test]
+    fn test_load_schema_preset_missing_name_is_invalid() {
+        let file = write_temp_yaml(
+            r#"
+options:
+  - name: tolerance
+    label: "Tolerance"
+    type: float
+    presets:
+      - {value: 0.1}
+"#,
+        );
+        let result = load_options_schema(file.path().to_str().unwrap());
+        assert!(result.is_err(), "Should error when a preset has no `name`");
     }
 
     #[test]
