@@ -19,11 +19,16 @@ export function FieldListEditor({
   fields,
   onChange,
   definitionNames,
+  parentScope,
+  isAppliedAndUnchanged,
   addLabel = 'Add Nested Field',
 }: {
   fields: FieldDef[];
   onChange: (fields: FieldDef[]) => void;
   definitionNames: string[];
+  /** 親（object/union のバリアント）のスコープ。各フィールドは `${parentScope}.fields.${name}` になる。 */
+  parentScope: string;
+  isAppliedAndUnchanged: boolean;
   addLabel?: string;
 }) {
   const handleAdd = () => {
@@ -48,6 +53,8 @@ export function FieldListEditor({
           valueLabel="Default"
           value={f.default}
           definitionNames={definitionNames}
+          scope={`${parentScope}.fields.${f.name}`}
+          isAppliedAndUnchanged={isAppliedAndUnchanged}
           isDuplicateName={fields.filter((o) => o.name === f.name).length > 1}
           onChangeField={(updates) => handleUpdate(i, updates)}
           onChangeValue={(value) => handleUpdate(i, { default: value })}

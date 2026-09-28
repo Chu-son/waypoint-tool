@@ -5,6 +5,7 @@ import { SchemaFieldCell } from './SchemaFieldCell';
 import { ChoicesEditor } from './ChoicesEditor';
 import { FieldListEditor } from './FieldListEditor';
 import { VariantListEditor } from './VariantListEditor';
+import { PresetListEditor } from './PresetListEditor';
 import type { TypeSpec, ValueType } from '../../../../types/options';
 
 /**
@@ -26,13 +27,28 @@ export interface TypeSpecEditorProps {
   definitionNames: string[];
   /** aria-label の接頭辞（例: フィールド名、あるいは "on_reached_actions item"）。 */
   fieldName: string;
+  /**
+   * `spec` がスキーマ全体の中で占める位置を表す文字列（`optionPresets.ts` の走査と同じ形式。
+   * 例: `options.tolerance`, `definitions.action.variants.wait.fields.countdown_ms`）。
+   * `presets` の使用件数の集計・一括置換のスコープとして使う。
+   */
+  scope: string;
+  /** Apply 済みのスキーマとローカルの編集内容が一致しているか（プリセットの使用件数・一括置換の可否）。 */
+  isAppliedAndUnchanged: boolean;
 }
 
 /**
  * 値の型仕様を再帰的に編集する。list/object/map/union は、それぞれの中の型仕様を
  * 同じ `TypeSpecEditor` で編集するため、GUI 上のネストの深さに制限が無い。
  */
-export function TypeSpecEditor({ spec, onChange, definitionNames, fieldName }: TypeSpecEditorProps) {
+export function TypeSpecEditor({
+  spec,
+  onChange,
+  definitionNames,
+  fieldName,
+  scope,
+  isAppliedAndUnchanged,
+}: TypeSpecEditorProps) {
   return (
     <div className="space-y-2">
       <SchemaFieldCell label="Type" className="w-56">
@@ -95,6 +111,8 @@ export function TypeSpecEditor({ spec, onChange, definitionNames, fieldName }: T
             onChange={(item) => onChange({ ...spec, item })}
             definitionNames={definitionNames}
             fieldName={`${fieldName} item`}
+            scope={`${scope}.item`}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
           />
         </div>
       )}
@@ -105,6 +123,8 @@ export function TypeSpecEditor({ spec, onChange, definitionNames, fieldName }: T
             fields={spec.fields ?? []}
             onChange={(fields) => onChange({ ...spec, fields })}
             definitionNames={definitionNames}
+            parentScope={scope}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
           />
         </div>
       )}
@@ -117,6 +137,8 @@ export function TypeSpecEditor({ spec, onChange, definitionNames, fieldName }: T
             onChange={(value_type) => onChange({ ...spec, value_type })}
             definitionNames={definitionNames}
             fieldName={`${fieldName} value`}
+            scope={`${scope}.value_type`}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
           />
         </div>
       )}
@@ -137,8 +159,19 @@ export function TypeSpecEditor({ spec, onChange, definitionNames, fieldName }: T
             variants={spec.variants ?? []}
             onChange={(variants) => onChange({ ...spec, variants })}
             definitionNames={definitionNames}
+            parentScope={scope}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
           />
         </div>
+      )}
+
+      {spec.type !== 'ref' && (
+        <PresetListEditor
+          spec={spec}
+          onChange={(updates) => onChange({ ...spec, ...updates })}
+          scope={scope}
+          isAppliedAndUnchanged={isAppliedAndUnchanged}
+        />
       )}
     </div>
   );

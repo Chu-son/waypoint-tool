@@ -25,9 +25,11 @@ function uniqueDefinitionName(base: string, definitions: { name: string }[]) {
 export function DefinitionListEditor({
   definitions,
   onChange,
+  isAppliedAndUnchanged,
 }: {
   definitions: DefinitionDef[];
   onChange: (definitions: DefinitionDef[]) => void;
+  isAppliedAndUnchanged: boolean;
 }) {
   const allNames = definitions.map((d) => d.name).filter((n) => n.trim() !== '');
 
@@ -102,6 +104,8 @@ export function DefinitionListEditor({
               onChange={(spec) => handleUpdate(i, spec)}
               definitionNames={definitionNamesForThis}
               fieldName={d.name}
+              scope={`definitions.${d.name}`}
+              isAppliedAndUnchanged={isAppliedAndUnchanged}
             />
           </div>
         );

@@ -19,6 +19,9 @@ export interface FieldEditorProps {
   value: OptionValue | undefined;
   /** `ref` の選択肢に出す、定義済みの型名一覧。 */
   definitionNames: string[];
+  /** このフィールド自身のスコープ（`optionPresets.ts` の走査と同じ形式）。プリセットの使用件数集計に使う。 */
+  scope: string;
+  isAppliedAndUnchanged: boolean;
   /** True when another field in the same list uses this key name. */
   isDuplicateName: boolean;
   onChangeField: (updates: Partial<FieldDef>) => void;
@@ -38,6 +41,8 @@ export function FieldEditor({
   valueLabel,
   value,
   definitionNames,
+  scope,
+  isAppliedAndUnchanged,
   isDuplicateName,
   onChangeField,
   onChangeValue,
@@ -101,6 +106,8 @@ export function FieldEditor({
           onChange={(spec) => onChangeField(spec)}
           definitionNames={definitionNames}
           fieldName={field.name}
+          scope={scope}
+          isAppliedAndUnchanged={isAppliedAndUnchanged}
         />
 
         <SchemaFieldCell label={valueLabel}>

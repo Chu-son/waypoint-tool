@@ -10,6 +10,10 @@ import { DefinitionListEditor } from './optionSchema/DefinitionListEditor';
 import { notify } from '../../../services/notify';
 import { normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
 
+// `optionsSchema.definitions` が無いスキーマでは `?? []` の代わりにこの安定した参照を使う。
+// 呼び出しの度に新しい配列を作ってしまうと、`isAppliedAndUnchanged` の参照比較が常に偽になる。
+const EMPTY_DEFINITIONS: DefinitionDef[] = [];
+
 /** Returns a `base`, `base_1`, `base_2`... key that no field in `fields` uses yet. */
 function uniqueFieldName(base: string, fields: { name: string }[]) {
   let name = base;
@@ -33,10 +37,20 @@ export function OptionSchemaTab() {
   useEffect(() => {
     setLocalOptions(globalOptionsSchema?.options || []);
     setLocalGlobals(globalOptionsSchema?.globals || []);
-    setLocalDefinitions(globalOptionsSchema?.definitions || []);
+    setLocalDefinitions(globalOptionsSchema?.definitions || EMPTY_DEFINITIONS);
   }, [globalOptionsSchema]);
 
   const definitionNames = localDefinitions.map((d) => d.name).filter((n) => n.trim() !== '');
+
+  // ローカルの編集内容が、直近に Apply/Import したスキーマと（参照として）一致しているか。
+  // Apply/Import 直後は上の useEffect が globalOptionsSchema の配列をそのまま local state にコピーするため、
+  // 一致していれば参照が同一になる。プリセットの使用件数・一括置換は、実際のノード値と対応が取れている
+  // このときだけ有効にする（未適用の編集中はノードの値がまだ古いスキーマの構造のままのため）。
+  const isAppliedAndUnchanged =
+    !!globalOptionsSchema &&
+    localOptions === globalOptionsSchema.options &&
+    localGlobals === globalOptionsSchema.globals &&
+    localDefinitions === (globalOptionsSchema.definitions ?? EMPTY_DEFINITIONS);
 
   const handleSaveOptions = () => {
     // トップレベルのキー重複・空欄、既定値・グローバル値の型不一致、union のバリアント重複や
@@ -192,6 +206,8 @@ export function OptionSchemaTab() {
             valueLabel="Default"
             value={opt.default}
             definitionNames={definitionNames}
+            scope={`options.${opt.name}`}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
             isDuplicateName={localOptions.filter((o) => o.name === opt.name).length > 1}
             onChangeField={(updates) => handleUpdateOption(i, updates)}
             onChangeValue={(value) => handleUpdateOption(i, { default: value })}
@@ -223,6 +239,8 @@ export function OptionSchemaTab() {
             valueLabel="Value"
             value={field.value}
             definitionNames={definitionNames}
+            scope={`globals.${field.name}`}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
             isDuplicateName={localGlobals.filter((g) => g.name === field.name).length > 1}
             onChangeField={(updates) => handleUpdateGlobal(i, updates)}
             onChangeValue={(value) => handleUpdateGlobal(i, { value })}
@@ -241,7 +259,11 @@ export function OptionSchemaTab() {
       />
 
       <div className="px-1">
-        <DefinitionListEditor definitions={localDefinitions} onChange={setLocalDefinitions} />
+        <DefinitionListEditor
+          definitions={localDefinitions}
+          onChange={setLocalDefinitions}
+          isAppliedAndUnchanged={isAppliedAndUnchanged}
+        />
       </div>
     </div>
   );

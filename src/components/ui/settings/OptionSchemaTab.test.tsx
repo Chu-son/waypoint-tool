@@ -4,6 +4,7 @@ import { OptionSchemaTab } from './OptionSchemaTab';
 import { renderWithStore } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { DialogAPI } from '../../../api';
+import { waypointTree, makeWaypoint } from '../../../test/fixtures';
 
 describe('OptionSchemaTab global fields', () => {
   it('saves a global field with a typed value into the project schema', async () => {
@@ -288,6 +289,142 @@ describe('OptionSchemaTab Definitions (named, reusable types)', () => {
     await user.click(screen.getByRole('button', { name: /Apply/ }));
 
     expect(getAppState().optionsSchema?.definitions).toEqual([]);
+  });
+});
+
+describe('OptionSchemaTab Presets', () => {
+  it('adds a preset to an option and saves it with a typed value', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: { options: [{ name: 'tolerance', label: 'Tolerance', type: 'float' }], globals: [] },
+    });
+
+    await user.click(screen.getByRole('button', { name: /Add Preset/ }));
+    const presetName = screen.getByLabelText('options.tolerance preset name');
+    await user.clear(presetName);
+    await user.type(presetName, 'small');
+    await user.type(screen.getByLabelText('small preset label'), 'Small');
+    await user.type(screen.getByLabelText('small preset value'), '0.1');
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(getAppState().optionsSchema?.options[0].presets).toEqual([{ name: 'small', label: 'Small', value: 0.1 }]);
+  });
+
+  it('checking "preset only" is saved onto the type spec', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: {
+        options: [
+          {
+            name: 'tolerance',
+            label: 'Tolerance',
+            type: 'float',
+            presets: [{ name: 'small', value: 0.1 }],
+          },
+        ],
+        globals: [],
+      },
+    });
+
+    await user.click(screen.getByLabelText('options.tolerance preset only'));
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(getAppState().optionsSchema?.options[0].preset_only).toBe(true);
+  });
+
+  it('removes a preset', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: {
+        options: [
+          {
+            name: 'tolerance',
+            label: 'Tolerance',
+            type: 'float',
+            presets: [{ name: 'small', value: 0.1 }],
+          },
+        ],
+        globals: [],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Remove preset small' }));
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(getAppState().optionsSchema?.options[0].presets).toEqual([]);
+  });
+
+  it('shows how many waypoints use a preset, once the schema is applied, and lets matching values be bulk-replaced', async () => {
+    const schema = {
+      options: [
+        {
+          name: 'tolerance',
+          label: 'Tolerance',
+          type: 'float' as const,
+          presets: [{ name: 'small', label: 'Small', value: 0.1 }],
+        },
+      ],
+      globals: [],
+    };
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      ...waypointTree([
+        makeWaypoint('node-1', { options: { tolerance: { $preset: 'small' } } }),
+        makeWaypoint('node-2', { options: { tolerance: 0.1 } }),
+        makeWaypoint('node-3', { options: { tolerance: 0.9 } }),
+      ]),
+      optionsSchema: schema,
+    });
+
+    // node-1 は既に参照済みで使用中1件。node-2 は値が一致するだけ（未参照）なので、まだ「使用中」には数えないが、
+    // 置換候補として1件示す。
+    expect(screen.getByText(/使用中: 1件/)).toBeInTheDocument();
+    expect(screen.getByText(/一致する未参照の値: 1件/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /一致する値を参照に置換/ }));
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ tolerance: { $preset: 'small' } });
+    expect(getAppState().nodes['node-2'].options).toEqual({ tolerance: { $preset: 'small' } });
+    expect(getAppState().nodes['node-3'].options).toEqual({ tolerance: 0.9 });
+    // 置換後は node-2 も参照になったので、使用件数の表示は2件に更新される。
+    expect(screen.getByText(/使用中: 2件/)).toBeInTheDocument();
+  });
+
+  it('does not show usage counts while there are unapplied local edits', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { tolerance: { $preset: 'small' } } })]),
+      optionsSchema: {
+        options: [{ name: 'tolerance', label: 'Tolerance', type: 'float', presets: [{ name: 'small', value: 0.1 }] }],
+        globals: [],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add Field' }));
+
+    expect(screen.queryByText(/使用中:/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Apply 後に使用件数・一括置換を利用できます。/).length).toBeGreaterThan(0);
+  });
+
+  it('shares one preset panel for every ref to the same definition, and counts usage across all of them', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      ...waypointTree([makeWaypoint('node-1', { options: { action: { countdown_ms: 500 } } })]),
+      optionsSchema: {
+        options: [{ name: 'action', label: 'Action', type: 'ref', ref: 'action_type' }],
+        globals: [],
+        definitions: [
+          {
+            name: 'action_type',
+            type: 'object',
+            fields: [{ name: 'countdown_ms', label: 'Countdown', type: 'integer' }],
+            presets: [{ name: 'quick', label: 'Quick', value: { countdown_ms: 500 } }],
+          },
+        ],
+      },
+    });
+
+    // まだ参照は無い（使用中0件）が、node-1 の値が「quick」に一致するので置換候補は1件。
+    expect(screen.getByText(/使用中: 0件/)).toBeInTheDocument();
+    expect(screen.getByText(/一致する未参照の値: 1件/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /一致する値を参照に置換/ }));
+
+    expect(getAppState().nodes['node-1'].options).toEqual({ action: { $preset: 'quick' } });
   });
 });
 

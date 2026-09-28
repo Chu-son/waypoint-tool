@@ -11,10 +11,15 @@ export function VariantListEditor({
   variants,
   onChange,
   definitionNames,
+  parentScope,
+  isAppliedAndUnchanged,
 }: {
   variants: VariantDef[];
   onChange: (variants: VariantDef[]) => void;
   definitionNames: string[];
+  /** 親（union）のスコープ。各バリアントのフィールドは `${parentScope}.variants.${value}.fields.${name}` になる。 */
+  parentScope: string;
+  isAppliedAndUnchanged: boolean;
 }) {
   const handleAdd = () => {
     onChange([...variants, { value: `variant_${variants.length + 1}`, fields: [] }]);
@@ -74,6 +79,8 @@ export function VariantListEditor({
               fields={variant.fields}
               onChange={(fields) => handleUpdate(i, { fields })}
               definitionNames={definitionNames}
+              parentScope={`${parentScope}.variants.${variant.value}`}
+              isAppliedAndUnchanged={isAppliedAndUnchanged}
               addLabel="Add Field to Variant"
             />
           </div>
