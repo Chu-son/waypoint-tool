@@ -1,14 +1,15 @@
 import { Plus, Save, Upload, Download, Database, Globe, BookMarked } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { DefinitionDef, GlobalFieldDef, OptionDef, OptionsSchema, OptionValue } from '../../../types/store';
 import { Button } from '../common/Button';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { FieldEditor } from './optionSchema/FieldEditor';
+import { SchemaGlobalsContext } from './optionSchema/SchemaGlobalsContext';
 import { DefinitionListEditor } from './optionSchema/DefinitionListEditor';
 import { confirmAction, notify } from '../../../services/notify';
-import { normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
+import { collectGlobalDefaultLinks, normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
 import { collectPresetScopes, inlineRemovedPresets } from '../../../utils/optionPresets';
 
 // `optionsSchema.definitions` が無いスキーマでは `?? []` の代わりにこの安定した参照を使う。
@@ -45,6 +46,11 @@ export function OptionSchemaTab() {
     setLocalGlobals(globalOptionsSchema?.globals || []);
     setLocalDefinitions(globalOptionsSchema?.definitions || EMPTY_DEFINITIONS);
   }, [globalOptionsSchema]);
+
+  const globalsContext = useMemo(
+    () => ({ globals: localGlobals, linkedFields: collectGlobalDefaultLinks(localOptions, localDefinitions) }),
+    [localGlobals, localOptions, localDefinitions],
+  );
 
   const definitionNames = localDefinitions.map((d) => d.name).filter((n) => n.trim() !== '');
 
@@ -225,97 +231,107 @@ export function OptionSchemaTab() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <TabSectionHeader
-        title="Waypoint Options Schema"
-        subtitle="Define custom properties that can be attached to waypoints."
-        icon={Database}
-        actions={
-          <>
-            <Button variant="secondary" size="sm" onClick={handleImportSchema}>
-              <Upload size={14} className="mr-1" /> Import
+    <SchemaGlobalsContext.Provider value={globalsContext}>
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <TabSectionHeader
+          title="Waypoint Options Schema"
+          subtitle="Define custom properties that can be attached to waypoints."
+          icon={Database}
+          actions={
+            <>
+              <Button variant="secondary" size="sm" onClick={handleImportSchema}>
+                <Upload size={14} className="mr-1" /> Import
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleExportSchema}>
+                <Download size={14} className="mr-1" /> Export
+              </Button>
+              <Button variant="primary" size="sm" onClick={handleSaveOptions}>
+                <Save size={14} className="mr-1" /> Apply
+              </Button>
+            </>
+          }
+        />
+
+        <TabSectionHeader
+          title="Global Fields"
+          subtitle="Project-wide values, not tied to a waypoint. Reference them in export templates as {{globals.name}}."
+          icon={Globe}
+          actions={
+            <Button variant="secondary" size="sm" onClick={handleAddGlobal}>
+              <Plus size={14} className="mr-1" /> Add Global
             </Button>
-            <Button variant="secondary" size="sm" onClick={handleExportSchema}>
-              <Download size={14} className="mr-1" /> Export
-            </Button>
+          }
+        />
+
+        <div className="space-y-3 px-1">
+          {localGlobals.map((field, i) => (
+            <FieldEditor
+              key={i}
+              field={field}
+              groupLabel="Global field"
+              valueLabel="Value"
+              value={field.value}
+              definitionNames={definitionNames}
+              scope={`globals.${field.name}`}
+              isAppliedAndUnchanged={isAppliedAndUnchanged}
+              isDuplicateName={localGlobals.filter((g) => g.name === field.name).length > 1}
+              onChangeField={(updates) => handleUpdateGlobal(i, updates)}
+              onChangeValue={(value) => handleUpdateGlobal(i, { value })}
+              onRemove={() => setLocalGlobals(localGlobals.filter((_, idx) => idx !== i))}
+            />
+          ))}
+          {localGlobals.length === 0 && (
+            <EmptyState message="No global fields defined. Click 'Add Global' to create one." />
+          )}
+        </div>
+
+        <TabSectionHeader
+          title="Waypoint Options"
+          subtitle="Per-waypoint properties. A field can be left unset on a waypoint and fall back to its default."
+          icon={Database}
+          actions={
             <Button variant="secondary" size="sm" onClick={handleAddOption}>
               <Plus size={14} className="mr-1" /> Add Field
             </Button>
-            <Button variant="primary" size="sm" onClick={handleSaveOptions}>
-              <Save size={14} className="mr-1" /> Apply
-            </Button>
-          </>
-        }
-      />
-
-      <div className="space-y-3 px-1">
-        {localOptions.map((opt, i) => (
-          <FieldEditor
-            key={i}
-            field={opt}
-            groupLabel="Option"
-            valueLabel="Default"
-            value={opt.default}
-            definitionNames={definitionNames}
-            scope={`options.${opt.name}`}
-            isAppliedAndUnchanged={isAppliedAndUnchanged}
-            isDuplicateName={localOptions.filter((o) => o.name === opt.name).length > 1}
-            onChangeField={(updates) => handleUpdateOption(i, updates)}
-            onChangeValue={(value) => handleUpdateOption(i, { default: value })}
-            onRemove={() => setLocalOptions(localOptions.filter((_, idx) => idx !== i))}
-          />
-        ))}
-        {localOptions.length === 0 && (
-          <EmptyState message="No custom options defined. Click 'Add Field' to create one." />
-        )}
-      </div>
-
-      <TabSectionHeader
-        title="Global Fields"
-        subtitle="Project-wide values, not tied to a waypoint. Reference them in export templates as {{globals.name}}."
-        icon={Globe}
-        actions={
-          <Button variant="secondary" size="sm" onClick={handleAddGlobal}>
-            <Plus size={14} className="mr-1" /> Add Global
-          </Button>
-        }
-      />
-
-      <div className="space-y-3 px-1">
-        {localGlobals.map((field, i) => (
-          <FieldEditor
-            key={i}
-            field={field}
-            groupLabel="Global field"
-            valueLabel="Value"
-            value={field.value}
-            definitionNames={definitionNames}
-            scope={`globals.${field.name}`}
-            isAppliedAndUnchanged={isAppliedAndUnchanged}
-            isDuplicateName={localGlobals.filter((g) => g.name === field.name).length > 1}
-            onChangeField={(updates) => handleUpdateGlobal(i, updates)}
-            onChangeValue={(value) => handleUpdateGlobal(i, { value })}
-            onRemove={() => setLocalGlobals(localGlobals.filter((_, idx) => idx !== i))}
-          />
-        ))}
-        {localGlobals.length === 0 && (
-          <EmptyState message="No global fields defined. Click 'Add Global' to create one." />
-        )}
-      </div>
-
-      <TabSectionHeader
-        title="Definitions"
-        subtitle="Named, reusable types. Reference them from any field's type as Ref, to avoid repeating the same structure (e.g. a shared action union) in several places."
-        icon={BookMarked}
-      />
-
-      <div className="px-1">
-        <DefinitionListEditor
-          definitions={localDefinitions}
-          onChange={setLocalDefinitions}
-          isAppliedAndUnchanged={isAppliedAndUnchanged}
+          }
         />
+
+        <div className="space-y-3 px-1">
+          {localOptions.map((opt, i) => (
+            <FieldEditor
+              key={i}
+              field={opt}
+              groupLabel="Option"
+              valueLabel="Default"
+              value={opt.default}
+              definitionNames={definitionNames}
+              scope={`options.${opt.name}`}
+              isAppliedAndUnchanged={isAppliedAndUnchanged}
+              isDuplicateName={localOptions.filter((o) => o.name === opt.name).length > 1}
+              onChangeField={(updates) => handleUpdateOption(i, updates)}
+              onChangeValue={(value) => handleUpdateOption(i, { default: value })}
+              onRemove={() => setLocalOptions(localOptions.filter((_, idx) => idx !== i))}
+            />
+          ))}
+          {localOptions.length === 0 && (
+            <EmptyState message="No custom options defined. Click 'Add Field' to create one." />
+          )}
+        </div>
+
+        <TabSectionHeader
+          title="Definitions"
+          subtitle="Named, reusable types. Reference them from any field's type as Ref, to avoid repeating the same structure (e.g. a shared action union) in several places."
+          icon={BookMarked}
+        />
+
+        <div className="px-1">
+          <DefinitionListEditor
+            definitions={localDefinitions}
+            onChange={setLocalDefinitions}
+            isAppliedAndUnchanged={isAppliedAndUnchanged}
+          />
+        </div>
       </div>
-    </div>
+    </SchemaGlobalsContext.Provider>
   );
 }

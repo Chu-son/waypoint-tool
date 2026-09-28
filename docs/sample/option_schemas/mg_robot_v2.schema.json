@@ -4,7 +4,8 @@
       "name": "is_through_point",
       "label": "通過点として扱う (is_through_point)",
       "type": "boolean",
-      "default": true
+      "default": true,
+      "default_global": "default_is_through_point"
     },
     {
       "name": "through_tolerance",
@@ -12,6 +13,7 @@
       "description": "運用上は小/大の2種類しか使わないため、プリセットから選ぶ。数値を直接入力することもできる。",
       "type": "float",
       "default": 3.0,
+      "default_global": "default_through_tolerance",
       "presets": [
         { "name": "small", "label": "小 (1.5m)", "value": 1.5 },
         { "name": "large", "label": "大 (3.0m)", "value": 3.0 }

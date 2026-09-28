@@ -56,14 +56,21 @@ function formatScalar(v: OptionValue): string {
   return Array.isArray(v) ? v.join(', ') : String(v);
 }
 
+/** 「既定: 値」の表示文言。グローバル変数に連動している場合は、その名前も添えて出所を示す。 */
+function defaultLabel(defaultValue: OptionValue, defaultGlobal?: string): string {
+  const base = `既定: ${formatScalar(defaultValue)}`;
+  return defaultGlobal ? `${base}（グローバル ${defaultGlobal}）` : base;
+}
+
 /** 型に応じた、未入力時のプレースホルダ文言。既定値があればそれを優先して示す。 */
 function scalarPlaceholder(
   type: ScalarType,
   defaultValue: OptionValue | undefined,
   mixed?: boolean,
+  defaultGlobal?: string,
 ): string | undefined {
   if (mixed) return 'Mixed';
-  if (defaultValue !== undefined) return `既定: ${formatScalar(defaultValue)}`;
+  if (defaultValue !== undefined) return defaultLabel(defaultValue, defaultGlobal);
   switch (type) {
     case 'float':
       return '例: 1.5';
@@ -88,6 +95,7 @@ function scalarPlaceholder(
 function ValueWithResetControl({
   value,
   defaultValue,
+  defaultGlobal,
   onChange,
   disabled,
   enabled = true,
@@ -95,6 +103,7 @@ function ValueWithResetControl({
 }: {
   value: OptionValue | undefined;
   defaultValue?: OptionValue;
+  defaultGlobal?: string;
   onChange: (value: OptionValue | undefined) => void;
   disabled?: boolean;
   enabled?: boolean;
@@ -122,7 +131,7 @@ function ValueWithResetControl({
       ) : defaultValue !== undefined ? (
         <span
           className="mt-1.5 text-[9px] px-1 py-0.5 rounded bg-surface-hover text-text-muted shrink-0 leading-none"
-          title="既定値を使用中"
+          title={defaultGlobal ? `既定値を使用中（グローバル ${defaultGlobal} に連動）` : '既定値を使用中'}
         >
           既定
         </span>
@@ -200,6 +209,8 @@ export interface OptionValueEditorProps {
   name: string;
   /** 未入力時にプレースホルダとして示す、解決済みの既定値。 */
   defaultValue?: OptionValue;
+  /** 既定値が連動しているグローバル変数名。指定があれば、既定値の表示に出所として添える。 */
+  defaultGlobal?: string;
   disabled?: boolean;
   /** 複数選択時: スカラーは空欄 + "Mixed" 表示で一括設定を許可し、複合型は編集不可のメッセージにする。 */
   mixed?: boolean;
@@ -220,6 +231,7 @@ export function OptionValueEditor({
   onChange,
   name,
   defaultValue,
+  defaultGlobal,
   disabled: disabledProp,
   mixed,
   showResetControl = true,
@@ -272,7 +284,11 @@ export function OptionValueEditor({
                   className="h-8 text-xs"
                 >
                   <option value="">
-                    {mixed ? 'Mixed' : defaultValue !== undefined ? `既定: ${defaultValue}` : '(未設定)'}
+                    {mixed
+                      ? 'Mixed'
+                      : defaultValue !== undefined
+                        ? defaultLabel(defaultValue, defaultGlobal)
+                        : '(未設定)'}
                   </option>
                   {spec.enum_values.map((v) => (
                     <option key={v} value={v}>
@@ -287,7 +303,7 @@ export function OptionValueEditor({
                 type="text"
                 aria-label={name}
                 value={displayValue !== undefined ? String(displayValue) : ''}
-                placeholder={scalarPlaceholder('string', defaultValue, mixed)}
+                placeholder={scalarPlaceholder('string', defaultValue, mixed, defaultGlobal)}
                 disabled={disabled}
                 onFocus={transactions.begin}
                 onBlur={transactions.end}
@@ -303,7 +319,7 @@ export function OptionValueEditor({
                 step={spec.type === 'float' ? '0.1' : '1'}
                 aria-label={name}
                 value={displayValue !== undefined ? String(displayValue) : ''}
-                placeholder={scalarPlaceholder(spec.type, defaultValue, mixed)}
+                placeholder={scalarPlaceholder(spec.type, defaultValue, mixed, defaultGlobal)}
                 disabled={disabled}
                 onFocus={transactions.begin}
                 onBlur={transactions.end}
@@ -320,12 +336,17 @@ export function OptionValueEditor({
             );
           case 'boolean':
             return (
-              <Checkbox
-                aria-label={name}
-                checked={displayValue !== undefined ? Boolean(displayValue) : Boolean(defaultValue)}
-                disabled={disabled}
-                onChange={(e) => emit(e.target.checked)}
-              />
+              <span className="inline-flex items-center gap-2">
+                <Checkbox
+                  aria-label={name}
+                  checked={displayValue !== undefined ? Boolean(displayValue) : Boolean(defaultValue)}
+                  disabled={disabled}
+                  onChange={(e) => emit(e.target.checked)}
+                />
+                {!mixed && displayValue === undefined && defaultValue !== undefined && (
+                  <span className="text-[10px] text-text-muted">{defaultLabel(defaultValue, defaultGlobal)}</span>
+                )}
+              </span>
             );
           case 'list':
             return (
@@ -377,6 +398,7 @@ export function OptionValueEditor({
     <ValueWithResetControl
       value={value}
       defaultValue={defaultValue}
+      defaultGlobal={defaultGlobal}
       onChange={onChange}
       disabled={disabledProp}
       enabled={showResetControl && !mixed}
@@ -1026,6 +1048,7 @@ function FieldValueRow({
           onChange={onChange}
           name={`${namePrefix}.${field.name}`}
           defaultValue={field.default}
+          defaultGlobal={field.default_global}
           disabled={disabled}
         />
       </div>

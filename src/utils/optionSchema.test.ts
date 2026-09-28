@@ -558,3 +558,97 @@ describe('presets', () => {
     expect(resolved?.options[0].presets).toEqual([{ name: 'small', value: 0.1 }]);
   });
 });
+
+describe('default_global (field default linked to a global variable)', () => {
+  const linkedSchema = (globalValue: unknown, extraOptions: any[] = []): OptionsSchema => ({
+    options: [
+      { name: 'is_through_point', label: 'Through', type: 'boolean', default: true, default_global: 'g_through' },
+      ...extraOptions,
+    ],
+    globals: [{ name: 'g_through', label: 'Through', type: 'boolean', value: globalValue as boolean }],
+  });
+
+  it('takes the linked global value as the field default, overriding a stale hand-written default', () => {
+    const schema = normalizeOptionsSchema(linkedSchema(false));
+    expect(schema.options[0].default).toBe(false);
+    expect(schema.options[0].default_global).toBe('g_through');
+  });
+
+  it('follows the global when it changes, and drops the default when the global has no value', () => {
+    const changed = normalizeOptionsSchema(linkedSchema(true));
+    expect(changed.options[0].default).toBe(true);
+    const unset = normalizeOptionsSchema(linkedSchema(undefined));
+    expect(unset.options[0].default).toBeUndefined();
+  });
+
+  it('links fields nested inside an object and inside a definition', () => {
+    const schema = normalizeOptionsSchema({
+      options: [
+        {
+          name: 'nav',
+          label: 'Nav',
+          type: 'object',
+          fields: [{ name: 'through', label: 'Through', type: 'boolean', default_global: 'g_through' }],
+        },
+        { name: 'action', label: 'Action', type: 'ref', ref: 'act' },
+      ],
+      globals: [{ name: 'g_through', label: 'Through', type: 'boolean', value: false }],
+      definitions: [
+        {
+          name: 'act',
+          type: 'object',
+          fields: [{ name: 'through', label: 'Through', type: 'boolean', default_global: 'g_through' }],
+        },
+      ],
+    });
+    expect(schema.options[0].fields?.[0].default).toBe(false);
+    expect(schema.definitions?.[0].fields?.[0].default).toBe(false);
+    // ref 展開後のスキーマでも、連動した既定値が見える。
+    expect(resolveOptionsSchema(schema)?.options[1].fields?.[0].default).toBe(false);
+  });
+
+  it('resolves a preset reference held by the global into the actual value', () => {
+    const schema = normalizeOptionsSchema({
+      options: [{ name: 'tol', label: 'Tol', type: 'float', default_global: 'g_tol' }],
+      globals: [
+        {
+          name: 'g_tol',
+          label: 'Tol',
+          type: 'float',
+          presets: [{ name: 'small', value: 0.1 }],
+          value: { $preset: 'small' },
+        },
+      ],
+    });
+    expect(schema.options[0].default).toBe(0.1);
+  });
+
+  it('is idempotent', () => {
+    const once = normalizeOptionsSchema(linkedSchema(false));
+    expect(normalizeOptionsSchema(once)).toEqual(once);
+  });
+
+  it('reports a link to an undefined global, a type mismatch, and a link on a global itself', () => {
+    const missing = validateSchema({
+      options: [{ name: 'a', label: 'A', type: 'boolean', default_global: 'nope' }],
+      globals: [],
+    });
+    expect(missing.map((e) => e.message).join('\n')).toContain('未定義のグローバル変数');
+
+    const mismatch = validateSchema({
+      options: [{ name: 'a', label: 'A', type: 'boolean', default_global: 'g' }],
+      globals: [{ name: 'g', label: 'G', type: 'string', value: 'text' }],
+    });
+    expect(mismatch.length).toBeGreaterThan(0);
+
+    const onGlobal = validateSchema({
+      options: [],
+      globals: [{ name: 'g', label: 'G', type: 'boolean', value: true, default_global: 'g2' }],
+    });
+    expect(onGlobal.map((e) => e.message).join('\n')).toContain('グローバル変数に default_global は指定できません');
+  });
+
+  it('accepts a valid link', () => {
+    expect(validateSchema(normalizeOptionsSchema(linkedSchema(false)))).toEqual([]);
+  });
+});

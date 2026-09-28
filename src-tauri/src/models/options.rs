@@ -21,6 +21,13 @@ fn validate_field_like(value: &JsonValue, path: &str) -> Result<(), String> {
         }
     }
 
+    // `default_global`（既定値を連動させるグローバル変数名）は任意だが、あれば文字列であること。
+    if let Some(v) = obj.get("default_global") {
+        if !v.is_string() {
+            return Err(format!("{}.default_global: expected a string", path));
+        }
+    }
+
     validate_recursive_shape(obj, path)
 }
 
@@ -374,6 +381,37 @@ options:
             .as_array()
             .unwrap();
         assert_eq!(presets.len(), 2);
+    }
+
+    #[test]
+    fn test_load_schema_default_global_must_be_a_string() {
+        let ok = write_temp_yaml(
+            r#"
+options:
+  - name: through
+    label: Through
+    type: boolean
+    default_global: g_through
+globals:
+  - name: g_through
+    label: G
+    type: boolean
+    value: true
+"#,
+        );
+        assert!(load_options_schema(ok.path().to_str().unwrap()).is_ok());
+
+        let bad = write_temp_yaml(
+            r#"
+options:
+  - name: through
+    label: Through
+    type: boolean
+    default_global: 1
+globals: []
+"#,
+        );
+        assert!(load_options_schema(bad.path().to_str().unwrap()).is_err());
     }
 
     #[test]

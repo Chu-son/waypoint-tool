@@ -80,6 +80,7 @@ export function CustomOptionsGroup({ isMultiSelection, node, handleUpdate }: Cus
                     spec={opt}
                     value={node?.options?.[opt.name]}
                     defaultValue={opt.default}
+                    defaultGlobal={opt.default_global}
                     mixed={isMultiSelection}
                     onChange={handleChange}
                     name={opt.name}

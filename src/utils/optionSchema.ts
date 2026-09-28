@@ -4,12 +4,13 @@ import type {
   OptionDef,
   GlobalFieldDef,
   OptionsSchema,
+  OptionValue,
   PresetDef,
   ScalarType,
   TypeSpec,
   ValueType,
 } from '../types/options';
-import { coerceValue, isPresetRef, validateValue } from './optionValues';
+import { coerceValue, isPresetRef, resolvePresets, validateValue } from './optionValues';
 
 const SCALAR_TYPES: ReadonlySet<ScalarType> = new Set(['string', 'float', 'integer', 'boolean']);
 const VALUE_TYPES: ReadonlySet<ValueType> = new Set([...SCALAR_TYPES, 'list', 'object', 'map', 'union', 'any', 'ref']);
@@ -97,6 +98,7 @@ export function normalizeFieldDef(raw: any): FieldDef {
   };
   if (typeof raw?.description === 'string' && raw.description) field.description = raw.description;
   if (raw?.default !== undefined) field.default = raw.default;
+  if (typeof raw?.default_global === 'string' && raw.default_global) field.default_global = raw.default_global;
   if (raw?.required === true) field.required = true;
   return field;
 }
@@ -140,7 +142,84 @@ export function normalizeOptionsSchema(raw: any): OptionsSchema {
     globals: Array.isArray(raw.globals) ? raw.globals.map(normalizeGlobalFieldDef) : [],
     definitions: Array.isArray(raw.definitions) ? raw.definitions.map(normalizeDefinitionDef) : [],
   };
-  return coerceSchemaDefaultsAndValues(structural);
+  return applyGlobalDefaultLinks(coerceSchemaDefaultsAndValues(structural));
+}
+
+// ============================================================================
+// 既定値のグローバル連動（default_global）
+// ============================================================================
+
+function hasGlobalLink(spec: TypeSpec): boolean {
+  if ((spec as FieldDef).default_global) return true;
+  switch (spec.type) {
+    case 'list':
+      return !!spec.item && hasGlobalLink(spec.item);
+    case 'map':
+      return !!spec.value_type && hasGlobalLink(spec.value_type);
+    case 'object':
+      return (spec.fields ?? []).some(hasGlobalLink);
+    case 'union':
+      return (spec.variants ?? []).some((v) => v.fields.some(hasGlobalLink));
+    default:
+      return false;
+  }
+}
+
+function linkSpec<T extends TypeSpec & { default?: OptionValue; default_global?: string }>(
+  spec: T,
+  globalsByName: Map<string, GlobalFieldDef>,
+): T {
+  if (!hasGlobalLink(spec)) return spec;
+  const next: T = { ...spec };
+  const link = spec.default_global;
+  if (link) {
+    const g = globalsByName.get(link);
+    const value = g?.value === undefined ? undefined : resolvePresets(g, g.value);
+    if (value === undefined) delete next.default;
+    else next.default = value;
+  }
+  if (spec.item) next.item = linkSpec(spec.item, globalsByName);
+  if (spec.value_type) next.value_type = linkSpec(spec.value_type, globalsByName);
+  if (spec.fields) next.fields = spec.fields.map((f) => linkSpec(f, globalsByName));
+  if (spec.variants) {
+    next.variants = spec.variants.map((v) => ({ ...v, fields: v.fields.map((f) => linkSpec(f, globalsByName)) }));
+  }
+  return next;
+}
+
+function collectLinks(spec: TypeSpec, path: string, out: Map<string, string[]>): void {
+  const link = (spec as FieldDef).default_global;
+  if (link) out.set(link, [...(out.get(link) ?? []), path]);
+  if (spec.item) collectLinks(spec.item, `${path}.item`, out);
+  if (spec.value_type) collectLinks(spec.value_type, `${path}.value_type`, out);
+  (spec.fields ?? []).forEach((f) => collectLinks(f, `${path}.${f.name}`, out));
+  (spec.variants ?? []).forEach((v) => v.fields.forEach((f) => collectLinks(f, `${path}.${v.value}.${f.name}`, out)));
+}
+
+/** グローバル名 → それに既定値を連動させているフィールドのパス一覧。グローバル側に影響範囲を表示するために使う。 */
+export function collectGlobalDefaultLinks(options: OptionDef[], definitions: DefinitionDef[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  options.forEach((o) => collectLinks(o, `options.${o.name}`, out));
+  definitions.forEach((d) => collectLinks(d, `definitions.${d.name}`, out));
+  return out;
+}
+
+/**
+ * `default_global` を持つフィールドの `default` を、参照先グローバルの現在値（プリセット解決後）で上書きする。
+ * 導出した既定値をスキーマ上に実体化しておくことで、既定値を読む側（解決・必須判定・Inspector・エクスポート等）は
+ * 連動の存在を意識せずに済む。冪等。連動が1つも無ければ入力をそのまま返す。
+ * グローバルに値が無い場合は既定値なしになる。存在しないグローバルの参照は `validateSchema` が報告する。
+ */
+export function applyGlobalDefaultLinks(schema: OptionsSchema): OptionsSchema {
+  const definitions = schema.definitions ?? [];
+  const linked = [...schema.options, ...definitions].some(hasGlobalLink);
+  if (!linked) return schema;
+  const globalsByName = new Map(schema.globals.map((g) => [g.name, g]));
+  return {
+    ...schema,
+    options: schema.options.map((o) => linkSpec(o, globalsByName)),
+    ...(schema.definitions ? { definitions: definitions.map((d) => linkSpec(d, globalsByName)) } : {}),
+  };
 }
 
 // ============================================================================
@@ -224,6 +303,7 @@ function resolveFieldDef(
   const resolved: FieldDef = { ...resolvedSpec, name: field.name, label: field.label };
   if (field.description !== undefined) resolved.description = field.description;
   if (field.default !== undefined) resolved.default = field.default;
+  if (field.default_global) resolved.default_global = field.default_global;
   if (field.required) resolved.required = true;
   return resolved;
 }
@@ -487,6 +567,33 @@ function validateDefinitions(definitions: DefinitionDef[], errors: SchemaValidat
   });
 }
 
+/** `default_global` の参照先の存在・型の妥当性・グローバル自身への指定禁止を、型仕様の木全体で検証する。 */
+function validateGlobalLinks(
+  spec: TypeSpec,
+  path: string,
+  ctx: { globals: GlobalFieldDef[]; definitionsByName: Map<string, DefinitionDef>; inGlobals: boolean },
+  errors: SchemaValidationError[],
+): void {
+  const link = (spec as FieldDef).default_global;
+  if (link !== undefined) {
+    const g = ctx.globals.find((x) => x.name === link);
+    if (ctx.inGlobals) {
+      errors.push({ path: `${path}.default_global`, message: 'グローバル変数に default_global は指定できません。' });
+    } else if (!g) {
+      errors.push({ path: `${path}.default_global`, message: `未定義のグローバル変数を参照しています: ${link}` });
+    } else if (g.value !== undefined) {
+      const resolvedField = resolveTypeSpec(spec, ctx.definitionsByName);
+      errors.push(...validateValue(resolvedField, resolvePresets(g, g.value), `${path}.default_global(${link})`));
+    }
+  }
+  if (spec.item) validateGlobalLinks(spec.item, `${path}.item`, ctx, errors);
+  if (spec.value_type) validateGlobalLinks(spec.value_type, `${path}.value_type`, ctx, errors);
+  (spec.fields ?? []).forEach((f, i) => validateGlobalLinks(f, `${path}.fields[${i}]`, ctx, errors));
+  (spec.variants ?? []).forEach((v, vi) =>
+    v.fields.forEach((f, i) => validateGlobalLinks(f, `${path}.variants[${vi}].fields[${i}]`, ctx, errors)),
+  );
+}
+
 /** スキーマ全体を再帰的に検証する。設定画面の Apply 時に呼び、エラーがあれば保存を止める。 */
 export function validateSchema(schema: OptionsSchema): SchemaValidationError[] {
   const errors: SchemaValidationError[] = [];
@@ -497,6 +604,10 @@ export function validateSchema(schema: OptionsSchema): SchemaValidationError[] {
   definitions.forEach((d, i) => validateNestedShape(d, `definitions[${i}]`, definitionsByName, errors));
   validateFieldList(schema.options, 'options', definitionsByName, errors);
   validateFieldList(schema.globals, 'globals', definitionsByName, errors);
+  const linkCtx = { globals: schema.globals, definitionsByName, inGlobals: false };
+  schema.options.forEach((o, i) => validateGlobalLinks(o, `options[${i}]`, linkCtx, errors));
+  definitions.forEach((d, i) => validateGlobalLinks(d, `definitions[${i}]`, linkCtx, errors));
+  schema.globals.forEach((g, i) => validateGlobalLinks(g, `globals[${i}]`, { ...linkCtx, inGlobals: true }, errors));
   schema.globals.forEach((g, i) => {
     if (g.value === undefined) return;
     const resolved = resolveTypeSpec(g, definitionsByName);

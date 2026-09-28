@@ -5,6 +5,7 @@ import {
   countWaypointsWithInvalidOptions,
 } from './exportWaypointUtils';
 import type { WaypointNode, OptionsSchema } from '../types/store';
+import { normalizeOptionsSchema } from './optionSchema';
 
 describe('extractGlobalsForExport', () => {
   it('maps each global field name to its value and leaves out fields without a value', () => {
@@ -263,5 +264,28 @@ describe('presets in export output', () => {
       ],
     };
     expect(extractGlobalsForExport(schema)).toEqual({ default_tolerance: 0.1 });
+  });
+});
+
+describe('export of a field whose default is linked to a global', () => {
+  it('exports the linked global value in options for an omitted field, and keeps it out of raw_options', () => {
+    const nodes: Record<string, WaypointNode> = {
+      'node-1': {
+        id: 'node-1',
+        type: 'manual',
+        transform: { x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 },
+        options: {},
+        children_ids: [],
+      },
+    };
+    const schema = normalizeOptionsSchema({
+      options: [{ name: 'through', label: 'Through', type: 'boolean', default: true, default_global: 'g_through' }],
+      globals: [{ name: 'g_through', label: 'G', type: 'boolean', value: false }],
+    });
+
+    const [wp] = extractWaypointsForExport(['node-1'], nodes, schema, 0);
+
+    expect(wp.options.through).toBe(false);
+    expect(wp.raw_options).toEqual({});
   });
 });

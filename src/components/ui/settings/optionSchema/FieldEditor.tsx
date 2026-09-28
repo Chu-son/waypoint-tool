@@ -7,6 +7,9 @@ import { cn } from '../../../../utils/cn';
 import { OptionValueEditor } from '../../properties/OptionValueEditor';
 import { SchemaFieldCell } from './SchemaFieldCell';
 import { TypeSpecEditor } from './TypeSpecEditor';
+import { useSchemaGlobals } from './SchemaGlobalsContext';
+import { Select } from '../../common/Select';
+import { resolvePresets, summarizeValue } from '../../../../utils/optionValues';
 import type { FieldDef, OptionValue } from '../../../../types/options';
 
 export interface FieldEditorProps {
@@ -48,6 +51,12 @@ export function FieldEditor({
   onChangeValue,
   onRemove,
 }: FieldEditorProps) {
+  const { globals, linkedFields } = useSchemaGlobals();
+  const isGlobal = groupLabel === 'Global field';
+  const linkedGlobal = field.default_global ? globals.find((g) => g.name === field.default_global) : undefined;
+  const linkedValue = linkedGlobal?.value === undefined ? undefined : resolvePresets(linkedGlobal, linkedGlobal.value);
+  const linkedBy = isGlobal ? (linkedFields.get(field.name) ?? []) : [];
+
   return (
     <div className="flex gap-3 items-start bg-surface-panel/40 p-4 rounded-xl border border-border-base/30 shadow-subtle hover:border-border-base/60 transition-all">
       <div className="flex-1 space-y-3">
@@ -111,13 +120,58 @@ export function FieldEditor({
         />
 
         <SchemaFieldCell label={valueLabel}>
-          <OptionValueEditor
-            spec={field}
-            value={value}
-            onChange={onChangeValue}
-            name={`${field.name} ${valueLabel.toLowerCase()}`}
-            showResetControl={false}
-          />
+          {!isGlobal && (
+            <Select
+              aria-label={`${field.name} default source`}
+              value={field.default_global !== undefined ? 'global' : 'fixed'}
+              onChange={(e) =>
+                onChangeField(
+                  e.target.value === 'global'
+                    ? { default_global: globals[0]?.name ?? '' }
+                    : { default_global: undefined },
+                )
+              }
+              className="h-8 text-xs mb-1.5"
+            >
+              <option value="fixed">固定値</option>
+              <option value="global">グローバル変数に連動</option>
+            </Select>
+          )}
+          {field.default_global !== undefined ? (
+            <div className="space-y-1">
+              <Select
+                aria-label={`${field.name} default global`}
+                value={field.default_global}
+                onChange={(e) => onChangeField({ default_global: e.target.value })}
+                className="h-8 text-xs"
+              >
+                <option value="">(選択してください)</option>
+                {globals.map((g) => (
+                  <option key={g.name} value={g.name}>
+                    {g.name}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-[10px] text-text-muted">
+                {linkedGlobal
+                  ? `現在の既定値: ${linkedValue === undefined ? '(未設定)' : summarizeValue(field, linkedValue)}（グローバル値の変更に追従します）`
+                  : '存在するグローバル変数を選択してください。'}
+              </p>
+            </div>
+          ) : (
+            <OptionValueEditor
+              spec={field}
+              value={value}
+              onChange={onChangeValue}
+              name={`${field.name} ${valueLabel.toLowerCase()}`}
+              showResetControl={false}
+            />
+          )}
+          {linkedBy.length > 0 && (
+            <p className="text-[10px] text-text-muted mt-1">
+              このグローバル値を既定値として使うフィールド: {linkedBy.join(', ')}
+            </p>
+          )}
         </SchemaFieldCell>
       </div>
       <Button

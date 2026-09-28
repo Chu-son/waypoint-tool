@@ -49,6 +49,7 @@ export function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject })
                 spec={opt}
                 value={obj.options?.[opt.name]}
                 defaultValue={opt.default}
+                defaultGlobal={opt.default_global}
                 onChange={(v: OptionValue | undefined) => {
                   const current = useAppStore.getState().annotationObjects[obj.id];
                   const next = { ...(current?.options || {}) };

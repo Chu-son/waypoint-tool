@@ -64,6 +64,12 @@ export interface FieldDef extends TypeSpec {
   label: string;
   description?: string;
   default?: OptionValue;
+  /**
+   * 既定値をグローバル変数（`OptionsSchema.globals[].name`）に連動させる。指定した場合、`default` は
+   * そのグローバルの現在値から導出される（`applyGlobalDefaultLinks`）ため、手入力の既定値とは併用しない。
+   * グローバル自身には指定できない。
+   */
+  default_global?: string;
   /** true の場合、値も既定値も未設定だと Inspector とエクスポート前チェックで警告する。 */
   required?: boolean;
 }

@@ -544,3 +544,50 @@ describe('OptionSchemaTab Choices editor', () => {
     expect(saved?.default).toBe('queue_wait');
   });
 });
+
+describe('OptionSchemaTab section order', () => {
+  it('lists Global Fields before Waypoint Options and Definitions', () => {
+    renderWithStore(<OptionSchemaTab />);
+    const headings = screen.getAllByRole('heading').map((h) => h.textContent);
+    const globalsAt = headings.findIndex((t) => t?.includes('Global Fields'));
+    const optionsAt = headings.findIndex((t) => t === 'Waypoint Options');
+    const definitionsAt = headings.findIndex((t) => t?.includes('Definitions'));
+    expect(globalsAt).toBeGreaterThanOrEqual(0);
+    expect(globalsAt).toBeLessThan(optionsAt);
+    expect(optionsAt).toBeLessThan(definitionsAt);
+  });
+});
+
+describe('OptionSchemaTab default linked to a global', () => {
+  const schema = {
+    options: [{ name: 'through', label: 'Through', type: 'boolean' as const, default: true }],
+    globals: [{ name: 'g_through', label: 'G', type: 'boolean' as const, value: true }],
+  };
+
+  it('links a field default to a global, and the stored default follows the global value on Apply', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, { optionsSchema: schema });
+
+    await user.selectOptions(screen.getByLabelText('through default source'), 'global');
+    await user.selectOptions(screen.getByLabelText('through default global'), 'g_through');
+    expect(screen.getByText(/このグローバル値を既定値として使うフィールド: options.through/)).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText('g_through value'));
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    const applied = getAppState().optionsSchema!;
+    expect(applied.globals[0].value).toBe(false);
+    expect(applied.options[0]).toEqual(expect.objectContaining({ default_global: 'g_through', default: false }));
+  });
+
+  it('blocks Apply while the link has no global selected', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />, {
+      optionsSchema: { options: schema.options, globals: [] },
+    });
+
+    await user.selectOptions(screen.getByLabelText('through default source'), 'global');
+    await user.click(screen.getByRole('button', { name: /Apply/ }));
+
+    expect(getAppState().optionsSchema?.options[0].default_global).toBeUndefined();
+    expect(getAppState().optionsSchema?.options[0].default).toBe(true);
+  });
+});

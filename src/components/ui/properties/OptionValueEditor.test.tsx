@@ -549,3 +549,42 @@ describe('OptionValueEditor resolves definitions/ref before rendering', () => {
     });
   });
 });
+
+describe('OptionValueEditor default linked to a global', () => {
+  it('shows an unset boolean as checked with its default and the global it follows from', () => {
+    const schema: OptionsSchema = {
+      options: [{ name: 'through', label: 'Through', type: 'boolean', default: true, default_global: 'g_through' }],
+      globals: [{ name: 'g_through', label: 'G', type: 'boolean', value: true }],
+    };
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1')]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: schema,
+    });
+
+    expect(screen.getByLabelText('through')).toBeChecked();
+    expect(screen.getByText('既定: true（グローバル g_through）')).toBeInTheDocument();
+  });
+
+  it('follows the global value when it is changed in the schema', () => {
+    renderWithStore(<PropertiesPanel />, {
+      ...waypointTree([makeWaypoint('node-1')]),
+      selectedNodeIds: ['node-1'],
+      optionsSchema: {
+        options: [{ name: 'through', label: 'Through', type: 'boolean', default: true, default_global: 'g_through' }],
+        globals: [{ name: 'g_through', label: 'G', type: 'boolean', value: true }],
+      },
+    });
+    expect(screen.getByLabelText('through')).toBeChecked();
+
+    act(() => {
+      getAppState().setOptionsSchema({
+        options: [{ name: 'through', label: 'Through', type: 'boolean', default: true, default_global: 'g_through' }],
+        globals: [{ name: 'g_through', label: 'G', type: 'boolean', value: false }],
+      });
+    });
+
+    expect(screen.getByLabelText('through')).not.toBeChecked();
+    expect(screen.getByText('既定: false（グローバル g_through）')).toBeInTheDocument();
+  });
+});
