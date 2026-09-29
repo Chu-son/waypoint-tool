@@ -7,7 +7,7 @@ import { Modal, ModalHeader, ModalContent, ModalFooter } from '../common/Modal';
 import { Label } from '../common/Label';
 import { Select } from '../common/Select';
 import { useState, useEffect } from 'react';
-import { ExportTemplate } from '../../../types/store';
+import { ExportTemplate, TemplateEngine } from '../../../types/store';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { SectionDivider } from '../common/SectionDivider';
@@ -15,6 +15,31 @@ import { InlineFieldRow } from '../common/InlineFieldRow';
 import { FieldLabel } from '../common/FieldLabel';
 import { AlertBox } from '../common/AlertBox';
 import { notify } from '../../../services/notify';
+
+/** 新規テンプレートの既定の雛形。新規作成の既定エンジンは Jinja。 */
+const DEFAULT_TEMPLATE_CONTENT: Record<TemplateEngine, string> = {
+  jinja:
+    '{% for wp in waypoints %}\nwp_{{ wp.index }}:\n  x: {{ wp.x }}\n  y: {{ wp.y }}\n  yaw: {{ wp.yaw }}\n{% endfor %}',
+  handlebars: '{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}',
+};
+
+/** テンプレート挿入チップに使う、waypoint 1件分の基本フィールド（engine ごとの記法）。 */
+function coreFieldChips(engine: TemplateEngine): string[] {
+  const fields = ['index', 'id', 'type', 'x', 'y', 'z', 'yaw', 'qx', 'qy', 'qz', 'qw'];
+  return engine === 'jinja' ? fields.map((f) => `{{ wp.${f} }}`) : fields.map((f) => `{{${f}}}`);
+}
+
+function globalFieldChip(engine: TemplateEngine, name: string): string {
+  return engine === 'jinja' ? `{{ globals.${name} }}` : `{{@root.globals.${name}}}`;
+}
+
+function optionChip(engine: TemplateEngine, name: string): string {
+  return engine === 'jinja' ? `{{ wp.options.${name} }}` : `{{options.${name}}}`;
+}
+
+function rawOptionChip(engine: TemplateEngine, name: string): string {
+  return engine === 'jinja' ? `{{ wp.raw_options.${name} }}` : `{{raw_options.${name}}}`;
+}
 
 function TemplateCreateModal({
   isOpen,
@@ -24,13 +49,20 @@ function TemplateCreateModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local' }) => void;
-  initialData?: { name: string; suffix: string; extension: string; scope: 'global' | 'local' };
+  onSubmit: (data: {
+    name: string;
+    suffix: string;
+    extension: string;
+    scope: 'global' | 'local';
+    engine: TemplateEngine;
+  }) => void;
+  initialData?: { name: string; suffix: string; extension: string; scope: 'global' | 'local'; engine?: TemplateEngine };
 }) {
   const [name, setName] = useState(initialData?.name || 'New Template');
   const [suffix, setSuffix] = useState(initialData?.suffix || '');
   const [extension, setExtension] = useState(initialData?.extension || 'txt');
   const [scope, setScope] = useState<'global' | 'local'>(initialData?.scope || 'global');
+  const [engine, setEngine] = useState<TemplateEngine>(initialData?.engine || 'jinja');
 
   useEffect(() => {
     if (isOpen) {
@@ -38,6 +70,7 @@ function TemplateCreateModal({
       setSuffix(initialData?.suffix || '');
       setExtension(initialData?.extension || 'txt');
       setScope(initialData?.scope || 'global');
+      setEngine(initialData?.engine || 'jinja');
     }
   }, [isOpen, initialData]);
 
@@ -65,6 +98,20 @@ function TemplateCreateModal({
             <Input value={extension} onChange={(e) => setExtension(e.target.value)} placeholder="txt" />
           </div>
         </div>
+        {!initialData && (
+          <div className="space-y-1">
+            <Label htmlFor="new-template-engine">Template Engine</Label>
+            <Select
+              id="new-template-engine"
+              aria-label="Template Engine"
+              value={engine}
+              onChange={(e) => setEngine(e.target.value as TemplateEngine)}
+            >
+              <option value="jinja">Jinja (if/for, arithmetic, filters)</option>
+              <option value="handlebars">Handlebars ({'{{#each}}'})</option>
+            </Select>
+          </div>
+        )}
         <div className="space-y-1">
           <Label>Scope</Label>
           <Select value={scope} onChange={(e) => setScope(e.target.value as any)}>
@@ -80,7 +127,7 @@ function TemplateCreateModal({
         <Button variant="ghost" onClick={onClose} className="text-text-muted">
           Cancel
         </Button>
-        <Button onClick={() => onSubmit({ name, suffix, extension, scope })} className="bg-primary-base">
+        <Button onClick={() => onSubmit({ name, suffix, extension, scope, engine })} className="bg-primary-base">
           Save
         </Button>
       </ModalFooter>
@@ -211,15 +258,21 @@ export function ExportTemplatesTab() {
   const [importData, setImportData] = useState<any>(null);
   const [existingImportTemplate, setExistingImportTemplate] = useState<ExportTemplate | undefined>(undefined);
 
-  const handleCreateOrCopy = (data: { name: string; suffix: string; extension: string; scope: 'global' | 'local' }) => {
+  const handleCreateOrCopy = (data: {
+    name: string;
+    suffix: string;
+    extension: string;
+    scope: 'global' | 'local';
+    engine: TemplateEngine;
+  }) => {
     addExportTemplate({
       id: uuidv4(),
       name: data.name,
       extension: data.extension,
       suffix: data.suffix,
       scope: data.scope,
-      content:
-        modalSourceContent || '{{#each waypoints}}\nwp_{{index}}:\n  x: {{x}}\n  y: {{y}}\n  yaw: {{yaw}}\n{{/each}}',
+      engine: data.engine,
+      content: modalSourceContent || DEFAULT_TEMPLATE_CONTENT[data.engine],
     });
     setIsModalOpen(false);
   };
@@ -230,12 +283,14 @@ export function ExportTemplatesTab() {
     setIsModalOpen(true);
   };
 
-  const openCopyModal = (template: any) => {
+  const openCopyModal = (template: ExportTemplate) => {
     setModalInitialData({
       name: `Copy of ${template.name}`,
       suffix: template.suffix,
       extension: template.extension,
       scope: template.scope || 'global',
+      // コピー元のエンジンをそのまま引き継ぐ（コピーなので記法を変えない）。
+      engine: template.engine || 'handlebars',
     });
     setModalSourceContent(template.content);
     setIsModalOpen(true);
@@ -256,6 +311,7 @@ export function ExportTemplatesTab() {
         extension: template.extension,
         suffix: template.suffix || '',
         content: template.content,
+        engine: template.engine,
       };
 
       await BackendAPI.writeTextFile(savePath, JSON.stringify(dataToExport, null, 2));
@@ -317,6 +373,8 @@ export function ExportTemplatesTab() {
   }) => {
     if (!importData) return;
 
+    // インポート元ファイルに engine が無ければ、旧形式のテンプレートとして handlebars 扱いにする。
+    const importedEngine: TemplateEngine = importData.engine === 'jinja' ? 'jinja' : 'handlebars';
     if (data.action === 'overwrite' && existingImportTemplate) {
       updateExportTemplate(existingImportTemplate.id, {
         name: data.name,
@@ -324,6 +382,7 @@ export function ExportTemplatesTab() {
         extension: data.extension,
         scope: data.scope,
         content: importData.content,
+        engine: importedEngine,
       });
     } else {
       addExportTemplate({
@@ -333,6 +392,7 @@ export function ExportTemplatesTab() {
         extension: data.extension,
         scope: data.scope,
         content: importData.content,
+        engine: importedEngine,
       });
     }
 
@@ -434,12 +494,15 @@ export function ExportTemplatesTab() {
         </div>
       </div>
 
-      <AlertBox variant="info" title="Handlebars Iteration Syntax">
-        Wrap your logic inside{' '}
-        <code className="bg-surface-base/50 text-primary-base px-1.5 py-0.5 rounded border border-primary-base/20 font-mono font-bold">
-          {'{{#each waypoints}}'} ... {'{{/each}}'}
-        </code>{' '}
-        to render all elements.
+      <AlertBox variant="info" title="Template Engines">
+        <span className="font-bold text-primary-base">Jinja</span> (recommended for new templates) supports{' '}
+        <code className="bg-surface-base/50 px-1 py-0.5 rounded font-mono">{'{% for wp in waypoints %}'}</code>,{' '}
+        <code className="bg-surface-base/50 px-1 py-0.5 rounded font-mono">{'{% if %}'}</code>, arithmetic and filters
+        such as <code className="bg-surface-base/50 px-1 py-0.5 rounded font-mono">tojson</code> /{' '}
+        <code className="bg-surface-base/50 px-1 py-0.5 rounded font-mono">toyaml</code>.{' '}
+        <span className="font-bold">Handlebars</span> templates keep working with{' '}
+        <code className="bg-surface-base/50 px-1 py-0.5 rounded font-mono">{'{{#each waypoints}}'}</code> for backward
+        compatibility.
       </AlertBox>
 
       <div className="space-y-5">
@@ -488,6 +551,16 @@ export function ExportTemplatesTab() {
                     placeholder="yaml"
                   />
                 </InlineFieldRow>
+                <InlineFieldRow label="Engine">
+                  <Select
+                    value={template.engine || 'handlebars'}
+                    onChange={(e) => updateExportTemplate(template.id, { engine: e.target.value as TemplateEngine })}
+                    className="h-8 text-[11px] w-28"
+                  >
+                    <option value="jinja">Jinja</option>
+                    <option value="handlebars">Handlebars</option>
+                  </Select>
+                </InlineFieldRow>
                 <div className="flex items-center gap-1 bg-surface-base px-2 py-1 rounded border border-border-base/50 text-[10px] font-bold uppercase tracking-wider text-text-muted">
                   {template.scope === 'local' ? '[Local]' : '[Global]'}
                 </div>
@@ -530,25 +603,17 @@ export function ExportTemplatesTab() {
                   })
                 }
                 className="w-full h-48 bg-surface-base/50 border border-border-base/50 rounded-lg p-4 text-[11px] font-mono text-text-base focus:ring-2 focus:ring-primary-base/20 focus:border-primary-base outline-none transition-all resize-none shadow-inner"
-                placeholder="{{#each waypoints}}..."
+                placeholder={
+                  (template.engine || 'handlebars') === 'jinja'
+                    ? '{% for wp in waypoints %}...{% endfor %}'
+                    : '{{#each waypoints}}...'
+                }
                 spellCheck="false"
               />
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-1.5 items-center">
                   <FieldLabel className="mr-2">Core Fields</FieldLabel>
-                  {[
-                    '{{index}}',
-                    '{{id}}',
-                    '{{type}}',
-                    '{{x}}',
-                    '{{y}}',
-                    '{{z}}',
-                    '{{yaw}}',
-                    '{{qx}}',
-                    '{{qy}}',
-                    '{{qz}}',
-                    '{{qw}}',
-                  ].map((v) => (
+                  {coreFieldChips(template.engine || 'handlebars').map((v) => (
                     <button
                       key={v}
                       onClick={() => insertTemplateVar(template.id, v)}
@@ -561,29 +626,54 @@ export function ExportTemplatesTab() {
                 {globalOptionsSchema && globalOptionsSchema.globals.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
                     <FieldLabel className="mr-2">Global Fields</FieldLabel>
-                    {globalOptionsSchema.globals.map((g) => (
-                      <button
-                        key={g.name}
-                        onClick={() => insertTemplateVar(template.id, `{{@root.globals.${g.name}}}`)}
-                        className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
-                      >
-                        {`{{@root.globals.${g.name}}}`}
-                      </button>
-                    ))}
+                    {globalOptionsSchema.globals.map((g) => {
+                      const chip = globalFieldChip(template.engine || 'handlebars', g.name);
+                      return (
+                        <button
+                          key={g.name}
+                          onClick={() => insertTemplateVar(template.id, chip)}
+                          className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
+                        >
+                          {chip}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
                 {globalOptionsSchema?.options && globalOptionsSchema.options.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
                     <FieldLabel className="mr-2">Custom Options</FieldLabel>
-                    {globalOptionsSchema.options.map((o) => (
-                      <button
-                        key={o.name}
-                        onClick={() => insertTemplateVar(template.id, `{{options.${o.name}}}`)}
-                        className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
-                      >
-                        {`{{options.${o.name}}}`}
-                      </button>
-                    ))}
+                    {globalOptionsSchema.options.map((o) => {
+                      const chip = optionChip(template.engine || 'handlebars', o.name);
+                      return (
+                        <button
+                          key={o.name}
+                          onClick={() => insertTemplateVar(template.id, chip)}
+                          className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
+                        >
+                          {chip}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {globalOptionsSchema?.options && globalOptionsSchema.options.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
+                    <FieldLabel className="mr-2" title="値を明示的に入力したフィールドのみ（未設定は含まない）">
+                      Raw Options
+                    </FieldLabel>
+                    {globalOptionsSchema.options.map((o) => {
+                      const chip = rawOptionChip(template.engine || 'handlebars', o.name);
+                      return (
+                        <button
+                          key={o.name}
+                          onClick={() => insertTemplateVar(template.id, chip)}
+                          className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-text-muted border border-border-base/50 transition-all font-bold shadow-sm"
+                        >
+                          {chip}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>

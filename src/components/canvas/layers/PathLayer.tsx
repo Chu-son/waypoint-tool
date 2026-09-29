@@ -5,6 +5,7 @@ import { getFlattenedWaypointIds, getNodesAfterInsertionTarget } from '../../../
 import { DEFAULT_PATH_COLOR } from '../../../utils/colorPresets';
 import { getFootprintWidth } from '../../../utils/footprint';
 import { resolvePathConditionalStyle, parseColorSafe, drawDashedLine } from '../../../utils/conditionalStyles';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { CANVAS_MUTED_COLOR } from '../canvasConstants';
 
 export function PathLayer({ scale }: { scale: number }) {
@@ -20,7 +21,8 @@ export function PathLayer({ scale }: { scale: number }) {
   const robotFootprint = useAppStore((state) => state.robotFootprint);
   const conditionalStyles = useAppStore((state) => state.conditionalStyles);
   const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
 
   const afterNodeIds = useMemo(() => {
     return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);

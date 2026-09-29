@@ -122,7 +122,8 @@ export function ConditionGroupEditor({ group, onChange, onDelete, optionsList, d
   };
 
   const handleAddRule = () => {
-    const defaultProp = optionsList.length > 0 ? `options.${optionsList[0]}` : 'options.type';
+    // optionsList には既に "options.speed" 等の完全なプロパティパスが入っている（ConditionalStylesTab 参照）。
+    const defaultProp = optionsList.length > 0 ? optionsList[0] : 'options.type';
     const newRule: ConditionRule = {
       id: `rule_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       type: 'rule',

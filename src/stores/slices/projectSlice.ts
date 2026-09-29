@@ -25,6 +25,7 @@ import {
   DEFAULT_CONDITIONAL_STYLES_ENABLED,
   migrateAndNormalizeProjectData,
 } from '../migrations/projectMigration';
+import { applyGlobalDefaultLinks } from '../../utils/optionSchema';
 import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 import { notify, notifyError } from '../../services/notify';
 import { buildProjectData } from '../serialization/projectSerializer';
@@ -152,7 +153,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         };
       }),
     setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
-    setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
+    setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: applyGlobalDefaultLinks(schema), isDirty: true }),
     setRobotFootprint: (footprint: RobotFootprint) => set({ robotFootprint: footprint, isDirty: true }),
     setOccupancySettings: (settings: OccupancySettings) => set({ occupancySettings: settings, isDirty: true }),
     updateOccupancySettings: (updates: Partial<OccupancySettings>) =>

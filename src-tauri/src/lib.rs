@@ -3,6 +3,7 @@ pub mod io;
 pub mod map;
 pub mod models;
 pub mod plugins;
+pub mod templating;
 pub mod tiles;
 
 use tauri_plugin_window_state::StateFlags;

@@ -7,7 +7,17 @@ const regions: ExportRegion[] = [
   { id: 'r1', name: 'north', rect: { x: 0, y: 0, width: 10, height: 10 }, visible: true },
   { id: 'r2', name: 'south', rect: { x: 0, y: -10, width: 10, height: 10 }, visible: true },
 ];
-const templates: ExportTemplate[] = [{ id: 't1', name: 'CSV', extension: 'csv', suffix: '', content: '{{#each}}' }];
+const templates: ExportTemplate[] = [
+  { id: 't1', name: 'CSV', extension: 'csv', suffix: '', content: '{{#each}}' },
+  {
+    id: 't2',
+    name: 'YAML (Jinja)',
+    extension: 'yaml',
+    suffix: '',
+    content: '{% for wp in waypoints %}',
+    engine: 'jinja',
+  },
+];
 
 const item = (overrides: Partial<ExportTargetItem>): ExportTargetItem => ({
   id: 'i',
@@ -55,6 +65,16 @@ describe('buildExportPackageItems', () => {
       { path: '/out/wp.yaml', waypoints: [{ index: 0 }], template: undefined, image_data_b64: undefined },
       { path: '/out/wp.csv', waypoints: [{ index: 0 }], template: '{{#each}}', image_data_b64: undefined },
     ]);
+  });
+
+  it("carries the matched template's engine through to the waypoint item, and leaves it undefined for the default format", () => {
+    const { waypointItems } = build([
+      item({ id: 'a' }),
+      item({ id: 'b', type: 'waypoint_template', sourceId: 't2', relativePathPattern: 'wp2.yaml' }),
+    ]);
+
+    expect(waypointItems[0].engine).toBeUndefined();
+    expect(waypointItems[1].engine).toBe('jinja');
   });
 
   it('attaches the map screenshot only to items that ask for it', () => {

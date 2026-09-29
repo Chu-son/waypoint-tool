@@ -1,4 +1,4 @@
-import { OptionsSchema, PluginInstance } from '../../types/store';
+import { PluginInstance, TemplateEngine } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class MockBackendAPI implements IBackendAPI {
@@ -28,7 +28,7 @@ export class MockBackendAPI implements IBackendAPI {
     return { version: 1, root_node_ids: [], nodes: {}, map_layers: [] };
   }
 
-  async loadOptionsSchema(yamlPath: string): Promise<OptionsSchema> {
+  async loadOptionsSchema(yamlPath: string): Promise<unknown> {
     console.log('[Mock Backend] loadOptionsSchema called with path:', yamlPath);
     return { options: [], globals: [] };
   }
@@ -47,7 +47,7 @@ export class MockBackendAPI implements IBackendAPI {
     return [];
   }
 
-  async inferImportMapping(templateContent: string): Promise<any> {
+  async inferImportMapping(templateContent: string, _engine?: TemplateEngine): Promise<any> {
     console.log('[Mock Backend] inferImportMapping called, template length:', templateContent.length);
     return { itemsPath: '', x: 'x', y: 'y', z: 'z', yaw: 'yaw', optionsPath: 'options' };
   }

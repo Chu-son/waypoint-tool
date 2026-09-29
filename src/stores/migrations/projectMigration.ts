@@ -13,6 +13,7 @@ import {
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { normalizeGeoMap } from './geoMapNormalization';
 import { normalizeMapStack } from './mapStackNormalization';
+import { normalizeOptionsSchema } from '../../utils/optionSchema';
 import { v4 as uuidv4 } from 'uuid';
 
 export const DEFAULT_ROBOT_FOOTPRINT: CircularFootprint = {
@@ -305,15 +306,11 @@ export function normalizeV1(raw: any): StrictProjectData {
   const rawExportRegions = data.export_regions ?? data.exportRegions;
   const exportRegions = Array.isArray(rawExportRegions) ? rawExportRegions : [];
 
+  // スキーマ未定義（null）と、フィールド0件の空スキーマは意味が異なるため区別する。
+  // 旧形式（list の item_type がフラットに置かれた形等）は normalizeOptionsSchema が吸収する。
   const rawOptionsSchema = data.options_schema ?? data.optionsSchema;
   const optionsSchema: OptionsSchema | null =
-    rawOptionsSchema && typeof rawOptionsSchema === 'object'
-      ? {
-          ...rawOptionsSchema,
-          options: Array.isArray(rawOptionsSchema.options) ? rawOptionsSchema.options : [],
-          globals: Array.isArray(rawOptionsSchema.globals) ? rawOptionsSchema.globals : [],
-        }
-      : null;
+    rawOptionsSchema && typeof rawOptionsSchema === 'object' ? normalizeOptionsSchema(rawOptionsSchema) : null;
 
   const rawExportTemplates = data.export_templates ?? data.exportTemplates;
   const exportTemplates = Array.isArray(rawExportTemplates) ? rawExportTemplates : [];

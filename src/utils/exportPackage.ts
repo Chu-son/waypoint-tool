@@ -54,11 +54,13 @@ export function buildExportPackageItems(input: ExportPackageInput): {
     if (item.type === 'waypoint_template' || item.type === 'waypoint_default') {
       const file = primaryFileOf(item);
       if (!file) continue;
+      const matchedTemplate =
+        item.type === 'waypoint_template' ? templates.find((t) => t.id === item.sourceId) : undefined;
       waypointItems.push({
         path: file.fullPath,
         waypoints,
-        template:
-          item.type === 'waypoint_template' ? templates.find((t) => t.id === item.sourceId)?.content : undefined,
+        template: matchedTemplate?.content,
+        engine: matchedTemplate?.engine,
         image_data_b64: item.includeMapImage ? mapImageB64 : undefined,
       });
     } else if (item.type === 'map_all_regions') {

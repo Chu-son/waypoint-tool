@@ -26,7 +26,7 @@ describe('CustomLayerInspector', () => {
       type: 'python',
       executable: 'main.py',
       description: 'Inflates obstacles in the map',
-      properties: [{ name: 'radius', type: 'number', default: 0.5, label: 'Inflation Radius' }],
+      properties: [{ name: 'radius', type: 'float', default: 0.5, label: 'Inflation Radius' }],
       inputs: [{ id: 'seed_point', name: 'seed_point', type: 'point', label: 'Seed Point', required: true }],
     },
   };

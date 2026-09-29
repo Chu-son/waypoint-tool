@@ -4,6 +4,8 @@ import { TextStyle, FederatedPointerEvent } from 'pixi.js';
 import { computeLabelOffsets, LabelCandidate } from '../utils/labelLayout';
 import { getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
 import { quaternionToYaw } from '../../../utils/transformUtils';
+import { resolveWithDefaults, summarizeValue } from '../../../utils/optionValues';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import {
   CANVAS_ACCENT_COLOR,
   CANVAS_ACCENT_HOVER_COLOR,
@@ -106,7 +108,9 @@ export function WaypointLayer({
   const activePluginId = useAppStore((state) => state.activePluginId);
   const pluginInteractionData = useAppStore((state) => state.pluginInteractionData);
   const visibleAttributes = useAppStore((state) => state.visibleAttributes);
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  // ラベル表示・条件付き書式の評価は ref を解決した実効スキーマで行う。
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const showProperties = useAppStore((state) => state.showProperties);
   const conditionalStyles = useAppStore((state) => state.conditionalStyles);
@@ -184,13 +188,11 @@ export function WaypointLayer({
       optionKeys.forEach((attr) => {
         const key = attr.split('.')[1];
         const optDef = optionsSchema?.options?.find((o) => o.name === key);
-        let val = node.options?.[key];
-        if (val === undefined && optDef && optDef.default !== undefined) {
-          val = optDef.default;
-        }
+        const val = optDef ? resolveWithDefaults(optDef, node.options?.[key]) : node.options?.[key];
         if (val !== undefined && val !== '') {
           const displayLabel = optDef?.label || key;
-          lines.push(`${displayLabel}: ${Array.isArray(val) ? `[${val.join(', ')}]` : val}`);
+          const summary = optDef ? summarizeValue(optDef, val) : String(val);
+          lines.push(`${displayLabel}: ${summary}`);
         }
       });
     }

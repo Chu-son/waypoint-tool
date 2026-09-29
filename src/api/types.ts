@@ -1,4 +1,4 @@
-import { OptionsSchema, PluginInstance, MapLayerClip, ImportFieldMapping } from '../types/store';
+import { PluginInstance, MapLayerClip, ImportFieldMapping, TemplateEngine } from '../types/store';
 
 export type MapLoadResult = {
   info: {
@@ -57,10 +57,11 @@ export interface IBackendAPI {
   loadROSMap(yamlPath: string): Promise<MapLoadResult>;
   saveProject(path: string, data: any): Promise<void>;
   loadProject(path: string): Promise<any>;
-  loadOptionsSchema(yamlPath: string): Promise<OptionsSchema>;
+  /** 構造検証済みだが未正規化の生 JSON を返す。呼び出し側で `normalizeOptionsSchema` を通すこと。 */
+  loadOptionsSchema(yamlPath: string): Promise<unknown>;
   exportWaypoints(path: string, waypoints: Record<string, any>[], template?: string, imageB64?: string): Promise<void>;
   importWaypointsRaw(path: string): Promise<any>;
-  inferImportMapping(templateContent: string): Promise<ImportFieldMapping>;
+  inferImportMapping(templateContent: string, engine?: TemplateEngine): Promise<ImportFieldMapping>;
   fetchInstalledPlugins(): Promise<PluginInstance[]>;
   scanCustomPlugin(path: string): Promise<PluginInstance>;
   scanCustomPlugins(path: string): Promise<PluginInstance[]>;
@@ -94,6 +95,8 @@ export type PackageExportWaypointItem = {
   path: string;
   waypoints: Record<string, any>[];
   template?: string;
+  /** 省略時はバックエンド側で 'handlebars' として扱われる。 */
+  engine?: TemplateEngine;
   image_data_b64?: string;
 };
 

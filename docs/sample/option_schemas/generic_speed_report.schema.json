@@ -1,0 +1,30 @@
+{
+  "options": [
+    {
+      "name": "base_speed",
+      "label": "基準速度 [m/s]",
+      "type": "float",
+      "default": 1.0
+    },
+    {
+      "name": "zone",
+      "label": "走行ゾーン",
+      "type": "string",
+      "default": "normal",
+      "enum_values": ["normal", "slow", "caution"]
+    },
+    {
+      "name": "metadata",
+      "label": "任意メタデータ",
+      "type": "map"
+    }
+  ],
+  "globals": [
+    {
+      "name": "speed_factor",
+      "label": "全体速度係数",
+      "type": "float",
+      "value": 1.0
+    }
+  ]
+}

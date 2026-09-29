@@ -1,0 +1,4 @@
+index,x,y,effective_speed,zone,metadata
+{% for wp in waypoints %}
+{{ wp.index }},{{ wp.x }},{{ wp.y }},{{ (wp.options.base_speed * globals.speed_factor) | round(2) }},{{ wp.options.zone }},{{ wp.options.metadata | default({}) | tojson }}
+{% endfor %}

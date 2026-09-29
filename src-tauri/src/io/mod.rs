@@ -1,4 +1,4 @@
-use handlebars::Handlebars;
+use crate::templating::{self, TemplateEngine};
 use std::fs;
 
 pub fn save_project(path: &str, data: &serde_json::Value) -> Result<(), String> {
@@ -24,12 +24,11 @@ pub fn export_waypoints(
     image_data_b64: Option<String>,
 ) -> Result<(), String> {
     let content = if let Some(tmpl) = template {
-        let reg = Handlebars::new();
-        // Register the template string and render it with wrapped data
-        let rendered = reg
-            .render_template(&tmpl, &serde_json::json!({ "waypoints": waypoints }))
-            .map_err(|e| format!("Template render error: {}", e))?;
-        rendered
+        templating::render(
+            TemplateEngine::Handlebars,
+            &tmpl,
+            &serde_json::json!({ "waypoints": waypoints }),
+        )?
     } else if path.to_lowercase().ends_with(".yaml") || path.to_lowercase().ends_with(".yml") {
         serde_yaml::to_string(&waypoints).map_err(|e| format!("YAML serialization error: {}", e))?
     } else {
@@ -133,7 +132,7 @@ fn find_items_array(value: &serde_json::Value, prefix: &str) -> Option<(String, 
     }
 }
 
-pub fn infer_import_mapping(template: &str) -> Result<serde_json::Value, String> {
+pub fn infer_import_mapping(template: &str, engine: TemplateEngine) -> Result<serde_json::Value, String> {
     let waypoint = serde_json::json!({
         "index": 0,
         "id": "__WPT_ID_SENTINEL__",
@@ -146,13 +145,11 @@ pub fn infer_import_mapping(template: &str) -> Result<serde_json::Value, String>
         "qy": SENTINEL_QY,
         "qz": SENTINEL_QZ,
         "qw": SENTINEL_QW,
-        "options": {}
+        "options": {},
+        "raw_options": {}
     });
 
-    let reg = Handlebars::new();
-    let rendered = reg
-        .render_template(template, &serde_json::json!({ "waypoints": [waypoint] }))
-        .map_err(|e| format!("Template render error: {}", e))?;
+    let rendered = templating::render(engine, template, &serde_json::json!({ "waypoints": [waypoint] }))?;
 
     let parsed: serde_json::Value = serde_json::from_str(&rendered)
         .or_else(|_| serde_yaml::from_str::<serde_json::Value>(&rendered))
@@ -300,7 +297,7 @@ mod tests {
 {{/each}}  ]
 }"#;
 
-        let res = infer_import_mapping(template);
+        let res = infer_import_mapping(template, TemplateEngine::Handlebars);
         assert!(res.is_ok(), "Inference failed: {:?}", res.err());
         let mapping = res.unwrap();
 
@@ -317,8 +314,19 @@ mod tests {
     fn test_infer_import_mapping_flat_template_fails_without_position() {
         // x/yがテンプレートに存在しない場合はエラーになること
         let template = "{{#each waypoints}}PATH_{{index}}: CALL {{options.action}}\n{{/each}}";
-        let res = infer_import_mapping(template);
+        let res = infer_import_mapping(template, TemplateEngine::Handlebars);
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_infer_import_mapping_jinja_template() {
+        // Jinja エンジンで描画したテンプレートからも、座標パスを検出できることを確認する。
+        let template = "[\n{% for wp in waypoints %}{\"position\": {\"x\": {{ wp.x }}, \"y\": {{ wp.y }}}}{% if not loop.last %},{% endif %}\n{% endfor %}]";
+        let res = infer_import_mapping(template, TemplateEngine::Jinja);
+        assert!(res.is_ok(), "Inference failed: {:?}", res.err());
+        let mapping = res.unwrap();
+        assert_eq!(mapping["x"], "position.x");
+        assert_eq!(mapping["y"], "position.y");
     }
 
     #[test]
