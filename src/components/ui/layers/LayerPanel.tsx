@@ -30,6 +30,7 @@ import { CustomLayerCard } from './CustomLayerCard';
 import { MapLayerCard } from './MapLayerCard';
 import { GeoMapCard } from './GeoMapCard';
 import { RegionCard } from './RegionCard';
+import { LayerVisibilitySetBar } from './LayerVisibilitySetBar';
 
 export function LayerPanel() {
   const mapLayers = useResolvedMapLayers();
@@ -159,6 +160,8 @@ export function LayerPanel() {
       {/* Layer List Scroll Area */}
       <div className="flex-1 overflow-y-auto w-full p-4 space-y-4">
         <GeoMapCard />
+
+        <LayerVisibilitySetBar />
 
         {/* Global Composite Preview & Highlight Controls (Above Custom Layers) */}
         {(mapLayers.length > 0 || customLayers.length > 0) && (

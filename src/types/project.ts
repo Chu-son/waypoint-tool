@@ -1,7 +1,14 @@
 import type { OptionsSchema } from './options';
 import type { WaypointNode } from './waypoint';
 import type { AnnotationGroup, AnnotationObject } from './annotation';
-import type { CustomLayer, ExportRegion, MapSource, OccupancySettings, ProjectMapLayer } from './layer';
+import type {
+  CustomLayer,
+  ExportRegion,
+  LayerVisibilitySet,
+  MapSource,
+  OccupancySettings,
+  ProjectMapLayer,
+} from './layer';
 import type { DefaultExportFormat, ExportProfile, ExportTemplate } from './export';
 import type { RobotFootprint } from './footprint';
 import type { ConditionalStyleRule } from './style';
@@ -36,6 +43,9 @@ export interface ProjectData {
   export_templates?: any;
   default_export_formats?: DefaultExportFormat[] | string[];
   export_regions?: any[];
+  /** Files saved before layer visibility sets existed have neither field. */
+  layer_visibility_sets?: unknown;
+  active_layer_visibility_set_id?: unknown;
   robot_footprint?: RobotFootprint;
   occupancy_settings?: OccupancySettings;
   default_map_opacity?: number;
@@ -75,6 +85,8 @@ export interface StrictProjectData {
   annotation_groups: Record<string, AnnotationGroup>;
   root_annotation_ids: string[];
   export_regions: ExportRegion[];
+  layer_visibility_sets: LayerVisibilitySet[];
+  active_layer_visibility_set_id: string | null;
   options_schema: OptionsSchema | null;
   export_templates: ExportTemplate[];
   default_export_formats: DefaultExportFormat[];

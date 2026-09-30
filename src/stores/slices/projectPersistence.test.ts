@@ -105,6 +105,11 @@ describe('projectPersistence roundtrip & strict validation', () => {
           layerVisibility: {},
         },
       ],
+      layer_visibility_sets: [
+        { id: 'vis-1', name: 'Localization', visibility: { 'map-1': true, 'cust-1': false } },
+        { id: 'vis-2', name: 'Navigation', visibility: { 'map-1': true, 'cust-1': true } },
+      ],
+      active_layer_visibility_set_id: 'vis-2',
       options_schema: {
         options: [],
         globals: [],
@@ -208,6 +213,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'annotation_groups',
       'root_annotation_ids',
       'export_regions',
+      'layer_visibility_sets',
+      'active_layer_visibility_set_id',
       'options_schema',
       'export_templates',
       'default_export_formats',
@@ -245,6 +252,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.annotation_groups).toEqual(fullProjectData.annotation_groups);
     expect(saved.root_annotation_ids).toEqual(fullProjectData.root_annotation_ids);
     expect(saved.export_regions).toEqual(fullProjectData.export_regions);
+    expect(saved.layer_visibility_sets).toEqual(fullProjectData.layer_visibility_sets);
+    expect(saved.active_layer_visibility_set_id).toBe('vis-2');
     expect(saved.options_schema).toEqual(fullProjectData.options_schema);
     expect(saved.export_templates).toEqual(fullProjectData.export_templates);
     expect(saved.default_export_formats).toEqual(fullProjectData.default_export_formats);
@@ -342,6 +351,16 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(state.isDirty).toBe(false);
   });
 
+  it('forgets layer visibility sets on resetProject', () => {
+    useAppStore.getState().saveLayerVisibilitySet('Localization');
+    expect(useAppStore.getState().layerVisibilitySets).toHaveLength(1);
+
+    useAppStore.getState().resetProject();
+
+    expect(useAppStore.getState().layerVisibilitySets).toEqual([]);
+    expect(useAppStore.getState().activeLayerVisibilitySetId).toBeNull();
+  });
+
   it('resets autoRecalculatePath to true on resetProject', () => {
     useAppStore.getState().setProjectData({
       auto_recalculate_path: false,
@@ -425,6 +444,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       annotation_groups: {},
       root_annotation_ids: [],
       export_regions: [],
+      layer_visibility_sets: [],
+      active_layer_visibility_set_id: null,
       options_schema: null,
       export_templates: [],
       default_export_formats: DEFAULT_EXPORT_FORMATS,

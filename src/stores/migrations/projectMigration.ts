@@ -8,6 +8,7 @@ import {
   CircularFootprint,
   ConditionalStyleRule,
   ExportProfile,
+  LayerVisibilitySet,
   OptionsSchema,
 } from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
@@ -461,6 +462,9 @@ export function normalizeV1(raw: any): StrictProjectData {
                 mapFormat:
                   item.mapFormat === 'png_only' || item.map_format === 'png_only' ? 'png_only' : 'ros_standard',
                 includeMapImage: Boolean(item.includeMapImage ?? item.include_map_image),
+                ...(typeof (item.visibilitySetId ?? item.visibility_set_id) === 'string'
+                  ? { visibilitySetId: item.visibilitySetId ?? item.visibility_set_id }
+                  : {}),
                 enabled: item.enabled !== false,
               }))
             : [],
@@ -470,6 +474,28 @@ export function normalizeV1(raw: any): StrictProjectData {
   const rawActiveProfileId = data.active_export_profile_id ?? data.activeExportProfileId;
   const activeExportProfileId: string | null =
     typeof rawActiveProfileId === 'string' ? rawActiveProfileId : (exportProfiles[0]?.id ?? null);
+
+  // レイヤー表示セット。存在しないレイヤーのエントリは、ここで取り除く。
+  const existingLayerIds = new Set([...mapLayers.map((l) => l.id), ...customLayers.map((l) => l.id)]);
+  const rawVisibilitySets = data.layer_visibility_sets ?? data.layerVisibilitySets;
+  const layerVisibilitySets: LayerVisibilitySet[] = Array.isArray(rawVisibilitySets)
+    ? rawVisibilitySets
+        .filter((s: any) => s && typeof s === 'object')
+        .map((s: any) => ({
+          id: typeof s.id === 'string' ? s.id : uuidv4(),
+          name: typeof s.name === 'string' && s.name.trim() ? s.name : 'Layer Set',
+          visibility: Object.fromEntries(
+            Object.entries(s.visibility && typeof s.visibility === 'object' ? s.visibility : {}).filter(
+              ([layerId, visible]) => typeof visible === 'boolean' && existingLayerIds.has(layerId),
+            ),
+          ) as Record<string, boolean>,
+        }))
+    : [];
+
+  const rawActiveVisibilitySetId = data.active_layer_visibility_set_id ?? data.activeLayerVisibilitySetId;
+  const activeLayerVisibilitySetId: string | null = layerVisibilitySets.some((s) => s.id === rawActiveVisibilitySetId)
+    ? rawActiveVisibilitySetId
+    : null;
 
   return {
     version: 1,
@@ -504,6 +530,8 @@ export function normalizeV1(raw: any): StrictProjectData {
     conditional_styles_enabled: conditionalStylesEnabled,
     export_profiles: exportProfiles,
     active_export_profile_id: activeExportProfileId,
+    layer_visibility_sets: layerVisibilitySets,
+    active_layer_visibility_set_id: activeLayerVisibilitySetId,
     geo_map: normalizeGeoMap(data.geo_map),
     custom_ui_data: customUiData,
   };

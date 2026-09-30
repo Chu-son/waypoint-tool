@@ -246,6 +246,8 @@ describe('projectMigration', () => {
       'annotation_groups',
       'root_annotation_ids',
       'export_regions',
+      'layer_visibility_sets',
+      'active_layer_visibility_set_id',
       'options_schema',
       'export_templates',
       'default_export_formats',
@@ -628,6 +630,59 @@ describe('projectMigration', () => {
 
       expect(normalized.map_layers[0].clip).toEqual({ rects: [{ x: 0, y: 0, width: 1, height: 1 }] });
       expect(normalized.map_layers[1].clip).toBeNull();
+    });
+  });
+
+  describe('layer visibility sets', () => {
+    const layers = {
+      map_sources: [{ id: 's1', name: 'a', info: {}, image_base64: '', width: 1, height: 1 }],
+      map_layers: [{ id: 'map', sourceId: 's1', name: 'a', visible: true, opacity: 1, blend_mode: 'overwrite' }],
+      custom_layers: [{ id: 'wall', name: 'Wall', type: 'manual', visible: true, opacity: 1, editObjects: [] }],
+    };
+
+    it('gives a project saved before visibility sets existed none', () => {
+      const normalized = migrateAndNormalizeProjectData({ version: 1, ...layers });
+
+      expect(normalized.layer_visibility_sets).toEqual([]);
+      expect(normalized.active_layer_visibility_set_id).toBeNull();
+    });
+
+    it('keeps the sets of a current project', () => {
+      const sets = [{ id: 'v1', name: 'Localization', visibility: { map: true, wall: false } }];
+
+      const normalized = migrateAndNormalizeProjectData({
+        version: 1,
+        ...layers,
+        layer_visibility_sets: sets,
+        active_layer_visibility_set_id: 'v1',
+      });
+
+      expect(normalized.layer_visibility_sets).toEqual(sets);
+      expect(normalized.active_layer_visibility_set_id).toBe('v1');
+    });
+
+    it('drops entries for layers that no longer exist and values that are not on/off', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        version: 1,
+        ...layers,
+        layer_visibility_sets: [{ id: 'v1', name: 'Nav', visibility: { map: true, gone: true, wall: 'yes' } }],
+      });
+
+      expect(normalized.layer_visibility_sets[0].visibility).toEqual({ map: true });
+    });
+
+    it('repairs sets that are missing an id or a name, and ignores an active id that points nowhere', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        version: 1,
+        ...layers,
+        layer_visibility_sets: [null, { visibility: { map: false } }],
+        active_layer_visibility_set_id: 'missing',
+      });
+
+      expect(normalized.layer_visibility_sets).toHaveLength(1);
+      expect(normalized.layer_visibility_sets[0].id).toEqual(expect.any(String));
+      expect(normalized.layer_visibility_sets[0].name).not.toBe('');
+      expect(normalized.active_layer_visibility_set_id).toBeNull();
     });
   });
 

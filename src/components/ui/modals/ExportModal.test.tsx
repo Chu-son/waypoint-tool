@@ -4,6 +4,8 @@ import { ExportModal } from './ExportModal';
 import { BackendAPI, DialogAPI } from '../../../api';
 import { resetAppStore } from '../../../test/store';
 import { useAppStore } from '../../../stores/appStore';
+import { layerStackState, makeMap } from '../../../test/fixtures';
+import type { LayerVisibilitySet } from '../../../types/store';
 
 describe('ExportModal UI', () => {
   beforeEach(() => {
@@ -169,6 +171,127 @@ describe('ExportModal UI', () => {
     await waitFor(() => expect(DialogAPI.ask).toHaveBeenCalled());
     expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
     expect(mockOnClose).not.toHaveBeenCalled();
+  });
+
+  describe('layer visibility sets', () => {
+    const mapItem = (id: string, visibilitySetId: string | undefined, pattern = 'Map/{{name}}_{{set}}.pgm') => ({
+      id,
+      type: 'map_region' as const,
+      sourceId: 'reg1',
+      relativePathPattern: pattern,
+      mapFormat: 'ros_standard' as const,
+      ...(visibilitySetId ? { visibilitySetId } : {}),
+      enabled: true,
+    });
+    const setUp = (items: ReturnType<typeof mapItem>[], sets: LayerVisibilitySet[] = [localization, navigation]) =>
+      useAppStore.setState({
+        ...layerStackState(makeMap('base'), makeMap('obstacles')),
+        layerVisibilitySets: sets,
+        exportProfiles: [
+          {
+            id: 'test_prof',
+            name: '標準エクスポート',
+            conflictResolution: 'backup_file',
+            outputRootDir: '/mock/export/dir',
+            items,
+          },
+        ],
+      });
+    const localization = { id: 'loc', name: 'Localization', visibility: { base: true, obstacles: false } };
+    const navigation = { id: 'nav', name: 'Navigation', visibility: { base: true, obstacles: true } };
+    const exportNow = async () => {
+      const onClose = vi.fn();
+      render(<ExportModal isOpen={true} onClose={onClose} />);
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+      return onClose;
+    };
+
+    it('exports one region under two sets to separate files, each with its own layers', async () => {
+      setUp([mapItem('m1', 'loc'), mapItem('m2', 'nav')]);
+
+      const onClose = await exportNow();
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      const { map_items } = vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0];
+      expect(map_items.map((m) => [m.save_path, m.region.layerVisibility])).toEqual([
+        ['/mock/export/dir/Map/area_1_Localization', { base: true, obstacles: false }],
+        ['/mock/export/dir/Map/area_1_Navigation', { base: true, obstacles: true }],
+      ]);
+      // Layers hidden on the canvas are still handed over for the items whose set shows them.
+      expect(map_items[1].layers.map((l) => l.id).sort()).toEqual(['base', 'obstacles']);
+    });
+
+    it('draws the layers shown on the canvas for an item that names no set', async () => {
+      setUp([mapItem('m1', undefined)]);
+      useAppStore.getState().updateMapLayer('obstacles', { visible: false });
+
+      const onClose = await exportNow();
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      const { map_items } = vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0];
+      expect(map_items[0].save_path).toBe('/mock/export/dir/Map/area_1_current');
+      expect(map_items[0].region.layerVisibility).toEqual({ base: true, obstacles: false });
+    });
+
+    it('refuses to export when two maps would be written to the same file', async () => {
+      setUp([mapItem('m1', 'loc', 'Map/{{name}}.pgm'), mapItem('m2', 'nav', 'Map/{{name}}.pgm')]);
+
+      await exportNow();
+
+      await waitFor(() =>
+        expect(DialogAPI.message).toHaveBeenCalledWith(
+          expect.stringContaining('/mock/export/dir/Map/area_1.pgm'),
+          undefined,
+        ),
+      );
+      expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
+    });
+
+    it('refuses to export when the set an item uses has been deleted', async () => {
+      setUp([mapItem('m1', 'gone')]);
+
+      await exportNow();
+
+      await waitFor(() => expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('削除'), undefined));
+      expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
+    });
+
+    it('asks before exporting a set that does not cover a layer added later, and exports on confirm', async () => {
+      setUp([mapItem('m1', 'loc')], [{ ...localization, visibility: { base: true } }]);
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+
+      const onClose = await exportNow();
+
+      await waitFor(() => expect(ask).toHaveBeenCalledWith(expect.stringContaining('Localization'), expect.anything()));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(BackendAPI.executeExportPackage).toHaveBeenCalled();
+    });
+
+    it('does not export when that confirmation is declined', async () => {
+      setUp([mapItem('m1', 'loc')], [{ ...localization, visibility: { base: true } }]);
+      vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+
+      await exportNow();
+
+      await waitFor(() => expect(DialogAPI.ask).toHaveBeenCalled());
+      expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
+    });
+
+    it('lets a map item be assigned to a set, and keeps it once saved', () => {
+      setUp([mapItem('m1', undefined)]);
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+
+      fireEvent.change(screen.getByRole('combobox', { name: 'レイヤー表示セット' }), { target: { value: 'nav' } });
+      fireEvent.click(screen.getByRole('button', { name: '保存のみ' }));
+
+      expect(useAppStore.getState().exportProfiles[0].items[0].visibilitySetId).toBe('nav');
+    });
+
+    it('does not offer a set for a waypoint item', () => {
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+
+      expect(screen.queryByRole('combobox', { name: 'レイヤー表示セット' })).not.toBeInTheDocument();
+    });
   });
 
   describe('path pattern editing', () => {

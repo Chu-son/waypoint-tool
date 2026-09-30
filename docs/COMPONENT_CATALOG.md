@@ -153,7 +153,7 @@
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
   - **概要**: マップレイヤー (`ProjectMapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。マップとカスタムレイヤーは `layerOrder` に従う 1 本の「Layers」リストに並び、上下ボタンで種類をまたいで並べ替えできる。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
-  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：名前（ダブルクリック/右クリックで変更）・複製・姿勢/閾値（同じマップの全複製で共有）・不透明度・ブレンド・使用領域）, `MapClipEditor`（使用領域：オン/オフ、キャンバス上でのドラッグ描画（Draw on canvas）、左右上下の半分プリセット、矩形の X/Y/W/H 入力と追加/削除）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）
+  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：名前（ダブルクリック/右クリックで変更）・複製・姿勢/閾値（同じマップの全複製で共有）・不透明度・ブレンド・使用領域）, `MapClipEditor`（使用領域：オン/オフ、キャンバス上でのドラッグ描画（Draw on canvas）、左右上下の半分プリセット、矩形の X/Y/W/H 入力と追加/削除）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）, `LayerVisibilitySetBar`（レイヤー表示セット：プルダウンで選ぶと適用。新規保存・現在の表示での更新・名前変更・削除。保存後に追加されたレイヤーがあるセットは「(needs update)」、適用後に手で表示を変えたセットは「(modified)」と表示し、前者は警告バナーから更新できる。レイヤーが 1 つもないときは表示しない）
 - **`GeoAttribution`** ([`src/components/ui/overlays/GeoAttribution.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/GeoAttribution.tsx))
   - **概要**: 背景地図の表示中に、選択中のベースマップの帰属表示（例: © OpenStreetMap contributors）をキャンバス右下へ表示する。
   - **主要Props**: なし
@@ -189,7 +189,7 @@
   - **概要**: プラグインが必要とする入力（座標 `point`、点群 `points`、領域 `rectangle`、参照 `waypoint`、アノテーション `annotation`、カスタムレイヤー `custom_layer`）の定義・編集エディタ。
   - **主要Props**: `inputDef`, `value`, `onChange`
 - **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/modals/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/ExportModal.tsx))
-  - **概要**: Handlebars/Jinja テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。
+  - **概要**: Handlebars/Jinja テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。マップ出力の項目には、レイヤー表示セットの選択欄（`ExportVisibilitySetField`）があり、未選択なら現在の表示状態で出力する。パスパターンでは `{{set}}`（項目の表示セット名。未選択は `current`）が使える。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/modals/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/SettingsModal.tsx))
   - **概要**: アプリ設定ダイアログ。`GeneralTab`, `AppearanceTab`, `OptionSchemaTab`（Waypoint Options / Global Fields / Definitions の3セクション。行 UI は `optionSchema/FieldEditor` を共用）, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`（テンプレートごとに Engine (`Handlebars`/`Jinja`) を選択できる）, `PluginsTab` の7タブを保持。

@@ -19,6 +19,7 @@ import { Label } from '../common/Label';
 import { BrowseInput } from '../common/BrowseInput';
 import { cn } from '../../../utils/cn';
 import { TreeDirectoryNode, TreeFileNode } from '../../../utils/exportTemplateEngine';
+import { ExportVisibilitySetField } from './ExportVisibilitySetField';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     conflictFiles,
     exportProfiles,
     exportRegions,
+    layerVisibilitySets,
     handleAddItem,
     handleAddProfile,
     handleDeleteItem,
@@ -345,6 +347,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                         { var: '{{ss}}', label: '秒' },
                         { var: '{{project_name}}', label: 'プロジェクト' },
                         { var: '{{name}}', label: '名称' },
+                        { var: '{{set}}', label: '表示セット' },
                       ].map((chip) => (
                         <button
                           key={chip.var}
@@ -360,6 +363,14 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                     </div>
                   </div>
                 </div>
+
+                {selectedItem.type.startsWith('map') && (
+                  <ExportVisibilitySetField
+                    value={selectedItem.visibilitySetId}
+                    sets={layerVisibilitySets}
+                    onChange={(visibilitySetId) => handleUpdateItem(selectedItem.id, { visibilitySetId })}
+                  />
+                )}
 
                 {/* Map Format Options */}
                 {selectedItem.type.startsWith('map') && (
