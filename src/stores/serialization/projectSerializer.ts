@@ -35,6 +35,8 @@ export function buildProjectData(state: AppState): StrictProjectData {
     annotation_groups: state.annotationGroups || {},
     root_annotation_ids: state.rootAnnotationIds || [],
     export_regions: state.exportRegions,
+    layer_visibility_sets: state.layerVisibilitySets,
+    active_layer_visibility_set_id: state.activeLayerVisibilitySetId,
     options_schema: state.optionsSchema,
     export_templates: state.exportTemplates.filter((t: ExportTemplate) => t.scope === 'local'),
     default_export_formats: state.defaultExportFormats,

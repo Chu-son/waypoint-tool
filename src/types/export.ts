@@ -46,6 +46,8 @@ export interface ExportTargetItem {
   relativePathPattern: string;
   mapFormat?: 'ros_standard' | 'png_only';
   includeMapImage?: boolean;
+  /** Map items only: the layer visibility set that decides which layers are drawn. Absent means the current display. */
+  visibilitySetId?: string;
   enabled: boolean;
 }
 

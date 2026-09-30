@@ -144,6 +144,18 @@ export interface ProjectMapLayer {
 /** A map instance joined with the pixel data and metadata of its source, ready for drawing and export. */
 export type ResolvedMapLayer = ProjectMapLayer & Pick<MapSource, 'info' | 'image_base64' | 'width' | 'height'>;
 
+/**
+ * A named snapshot of which layers are shown. Only on/off is stored: stack order, opacity and
+ * blend mode stay with the layers. A layer with no entry (added after the set was saved) is
+ * "undecided" and keeps its current visibility when the set is applied.
+ */
+export interface LayerVisibilitySet {
+  id: string;
+  name: string;
+  /** Visible flag by layer id (map instances and custom layers alike). */
+  visibility: Record<string, boolean>;
+}
+
 export type ExportRegion = {
   id: string;
   name: string;
