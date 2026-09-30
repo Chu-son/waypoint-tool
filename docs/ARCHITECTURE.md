@@ -129,8 +129,9 @@ graph TD
    - ノード／アノテーション共通の子リスト操作（削除・挿入）は純粋関数 `src/utils/treeOps.ts`（`detachFromTree` / `insertIntoTree`）に集約されています。
 
 5. **バックエンド (Tauri / Rust Core)**:
-   - ファイルシステムの直接アクセス、Handlebars テンプレートによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
-   - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。
+   - ファイルシステムの直接アクセス、テンプレートエンジンによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
+   - テンプレートのレンダリングは `src-tauri/src/templating.rs` に集約されており、`TemplateEngine`（`handlebars` / `jinja`）に応じて Handlebars（後方互換）または MiniJinja（`{% for %}`/`{% if %}`、四則演算、`toyaml`/`deg`/`rad` 等のカスタムフィルタを追加した Jinja2 互換エンジン）でレンダリングする。`io::export_waypoints` / `io::infer_import_mapping` / `commands::export_pipeline::execute_export_package` の3箇所が共通してこれを呼ぶ。
+   - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。Option Schema の YAML 読み込み（`load_options_schema`）も同様に、型の正規化・検証はフロントエンド（`src/utils/optionSchema.ts`）を Single Source of Truth とし、Rust 側は「壊れた YAML を早期に弾く」構造チェックのみを行い、検証済みの生 JSON を返す。
    - 外部 Python プラグインプロセスを標準入出力 (`stdin` / `stdout`) で起動・同期通信します。
 
 ---
@@ -139,12 +140,16 @@ graph TD
 
 `src/stores/appStore.ts` は以下のスライスを統合して構築されています。
 
-- **`mapSlice.ts`**: ロード済みマップレイヤー情報、解像度、原点座標、不透明度、アクティブマップ設定、フットプリント全体表示トグル (`showFootprints`)。
+- **`mapSlice.ts`**: レイヤースタック。ロード済みマップ `mapSources`（画像・解像度・原点/姿勢・占有閾値。同じマップの全インスタンスで共有）、マップインスタンス `mapLayers`（`sourceId`・名前・表示・不透明度・ブレンド・使用領域 `clip`）、カスタムレイヤー `customLayers`、そして両者を通した積み順 `layerOrder`（最上位が先頭の id 列）。`duplicateMapLayer`（同じマップの別インスタンスを直上に追加）、`updateMapSource`（姿勢・閾値の編集）、`reorderLayers`（種類をまたぐ並べ替え）を持つ。アクティブマップ設定、フットプリント全体表示トグル (`showFootprints`) も含む。
+- **`layerVisibilitySlice.ts`**: レイヤー表示セット `layerVisibilitySets`（名前付きの表示 ON/OFF スナップショット）と、最後に適用・保存したセット `activeLayerVisibilitySetId`。保存・現在の表示での上書き・名前変更・削除・適用を持つ。セットが持つのはレイヤー id ごとの ON/OFF だけで、積み順・不透明度・ブレンドは持たない（積み順の単一情報源は `layerOrder` のまま）。セットに項目がないレイヤー（保存後に追加）は「未決定」で、適用しても現在の表示を保つ。存在しないレイヤーの項目は無視する。判定は純関数 `utils/layerVisibilitySets.ts`（`undecidedLayerIds` / `differsFromSet` / `resolveSetVisibility`）に置く。適用は Undo 1 回で戻せる（`historySlice` のスナップショットがマップの表示状態 `mapVisibility` を記録するのは、このように表示を一括で変える操作のときだけで、他の Undo が手動の表示切替を巻き戻さないようにしている）。プロジェクトファイルの `layer_visibility_sets` / `active_layer_visibility_set_id` に保存し、読込時は `projectMigration.ts` が存在しないレイヤーの項目と不正な値を取り除く。
 - **`nodeSlice.ts`**: Waypoint ノードおよびジェネレーターノードの追加・削除・編集・一括操作・Undo/Redo。
 - **`annotationSlice.ts`**: アノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）およびアノテーショングループ（`AnnotationGroup`）の追加・更新・削除・グループ解除(Explode)・ツリー順序管理・選択・表示トグル・ドラッグ配置モード。
 - **`pluginSlice.ts`**: 利用可能なプラグイン一覧、アクティブプラグイン設定、実行パラメータ・プレビュー状態、統合ジェネレーター実行・同期再生成パイプライン (`executeGeneratorPlugin`)。バインディング解決・結果パースは純粋関数（`utils/pluginBindings.ts`, `utils/pluginResult.ts`）に分離。
 - **`pathCalculatorSlice.ts`**: 経路計算プラグイン（障害物回避ルーティング等）の選択・パラメータ・計算結果、デバウンス付き再計算 (`recalculatePath`)。
-- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema、エクスポートテンプレート設定、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。
+- **`projectSlice.ts`**: プロジェクトメタデータ、Custom Option Schema（ウェイポイント属性 `options` とプロジェクト全体変数 `globals`。いずれも `src/utils/optionSchema.ts` の再帰的な `TypeSpec`（scalar / `list` / `object` / `map` / `union` / `any` / `ref`）で型定義される）、エクスポートテンプレート設定（テンプレートごとに `engine: 'handlebars' | 'jinja'` を持つ）、ロボットフットプリント設定 (`robotFootprint`)、条件付き書式設定 (`conditionalStyles`, `conditionalStylesEnabled`)、プロジェクト保存・ロード統括（`projectMigration.ts` と連携）。`node.options` には明示的に入力された値だけを保持し（スキーマの `default` とは区別する）、既定値の補完は `src/utils/optionValues.ts` の `resolveWithDefaults` が表示・エクスポート時に行う。
+  - **生スキーマと実効スキーマの使い分け**: ストアの `optionsSchema` は、`{ type: 'ref', ref: <definitions内の名前> }` を保ったままの**生スキーマ**である。保存（`projectSerializer.ts`）とスキーマ編集（`OptionSchemaTab` とその子コンポーネント群）はこの生スキーマをそのまま読み書きする。一方、値の表示・編集（`CustomOptionsGroup` / `AnnotationCustomOptionsGroup` / `OptionValueEditor`）、条件付き書式の評価（`WaypointLayer` 等の各描画レイヤー）、エクスポート（`useExportPlan.ts`）、インポート（`ImportModal.tsx`）は、`src/utils/optionSchema.ts` の `resolveOptionsSchema` を通した**実効スキーマ**（`ref` を再帰的に解決し、`definitions` を持たない形）を使う。`resolveOptionsSchema` は入力スキーマのオブジェクト同一性で結果をメモ化するため、`definitions` を持たないスキーマではそのまま同じ参照を返す。
+  - **プリセットの解決順序**: `TypeSpec.presets`（名前付きの値の候補）は、`ref` 自身には持たせず参照先の `definitions` に集約する設計のため、`resolveTypeSpec`/`expandSchemaRefs` が ref を解決する際にそのまま実効スキーマへ引き継がれる。値はプリセットへの参照 `{ "$preset": name }` として保存され、`src/utils/optionValues.ts` の `resolvePresets` が list/object/map/union の中に入れ子で現れるものも含めて再帰的に実際の値へ解決する。`resolveWithDefaults` は「プリセット参照の解決 → スキーマ既定値の補完」の順で適用するため、既定値そのものがプリセット参照でも解決される。エクスポートでは `raw_options`（プリセットのみ解決・既定値は補わない）と `options`（両方解決）の双方でこの順序が守られる。 **既定値のグローバル連動**: `FieldDef.default_global` を持つフィールドの `default` は、`applyGlobalDefaultLinks` が参照先グローバルの現在値（プリセット解決後）で導出してスキーマ上に実体化する。実体化は `normalizeOptionsSchema` の末尾と `projectSlice.setOptionsSchema` で行うため、ストア上のスキーマは常に同期済みで、`resolveWithDefaults`・必須判定・Inspector・エクスポートは既存の `default` の読み方のまま連動を反映する。
+  - **プリセットの使用件数・一括置換のスコープ**: `src/utils/optionPresets.ts` は、スキーマ上の型ノードの位置を `scope` 文字列（`options.<name>`, `globals.<name>`, `definitions.<name>`、およびその下の `.item`/`.value_type`/`.fields.<name>`/`.variants.<value>.fields.<name>`）で識別し、`ref` は参照先の `definitions` のスコープへ折りたたむ。これにより、同じ `definitions` の型を複数フィールドから参照していても、プリセットの使用件数・一括置換・Apply 時の削除追従は1つのスコープに集約される。`OptionSchemaTab` はこの scope 文字列を `TypeSpecEditor` の再帰と並行して構築し、`isAppliedAndUnchanged`（ローカルの編集内容が直近の Apply/Import 済みスキーマと参照レベルで一致しているか）が真のときだけ、実際のノード値と突き合わせた使用件数を表示する。
 - **`interactionSlice.ts`**: 状態機械および対話管理（10種の排他ツールモード `AppModeState`、単一真実源の選択モデル `ActiveSelection`、モーダルスタック `modalStack`、階層型エスケープパイプライン、キャンバス過渡ジェスチャーのアボート登録機構）。
 - **`uiSlice.ts`**: ツール選択（Move / Add Waypoint 等）、サイドバーパネルの自由ドッキング配置構造（`panelLayout`：左/右パネル所属タブ一覧・並び替え・相互移動・永続化）、アクティブタブ（`activateTab`）、モーダル表示状態、ズーム/パン位置。
 - **`geoMapSlice.ts`**: 背景地図（OSM / 衛星画像）の設定 `geoMap`（有効/無効、ベースマップ ID とカスタム URL、不透明度、ワールド原点の地理座標、位置合わせ `alignment`）と、ドラッグ／数値入力による位置合わせの編集セッション（`beginGeoAlignDrag` → `updateGeoAlignDrag` → `endGeoAlignDrag` / `cancelGeoAlignDrag`）。位置合わせは Undo 履歴に含まれ、1 セッションが Undo 1 回になる。プロジェクトファイルの `geo_map` に保存し、読込時は `migrations/geoMapNormalization.ts` で検証・補完する。
@@ -188,7 +193,14 @@ graph TD
 - 緯度経度 ⇔ ワールド座標の変換は `src/utils/geo/geoTransform.ts` に集約する。ワールド座標 = R(yaw)·(UTM − 原点のUTM) + (dx, dy)（X 右 / Y 上、m）。回転行列は 5.3 のマップ原点と同じ向き（反時計回りが正）。
 - UTM は必ず原点と同じゾーン・半球に固定して計算する（ゾーン境界をまたいでも連続に扱うため）。UTM の縮尺係数 (0.9996) は無視して m をそのままワールドの m とみなす。
 - タイルの配置は、タイル左上・右上・左下の 3 隅をワールド座標へ写して Sprite の位置・回転・スケールを求める（Web Mercator と UTM はどちらも等角なので、タイル 1 枚の範囲では相似変換として扱える）。
-- 背景地図は `MapCanvas` のワールドコンテナ内で最背面（`map-layers-group` より前）に描画する。タイルの取得は `BackendAPI.fetchMapTile` → Rust `tiles.rs` が担い、フロント側は `canvas/utils/tileCache.ts`（同時取得数の制限・LRU・失敗時の再試行間隔）で保持する。
+- 背景地図は `MapCanvas` のワールドコンテナ内で最背面（`layer-stack-group` より前）に描画する。タイルの取得は `BackendAPI.fetchMapTile` → Rust `tiles.rs` が担い、フロント側は `canvas/utils/tileCache.ts`（同時取得数の制限・LRU・失敗時の再試行間隔）で保持する。
+
+### 5.3.2 レイヤースタックの規約 (Layer Stack)
+- **ソースとインスタンスの分離**: マップの画像・メタデータは `MapSource` に 1 つだけ持ち、`ProjectMapLayer`（インスタンス）は `sourceId` で参照する。複製は同じ `sourceId` を指す新インスタンスを作るだけで、画像は複製しない。姿勢（`info.origin`）と占有閾値は source の属性なので、どのインスタンスから編集しても全複製に反映される。インスタンスを消して参照が 0 になった source は同時に削除する。
+- **積み順の単一情報源は `layerOrder`**: マップインスタンスとカスタムレイヤーの全 id を、最上位を先頭に並べる。レイヤーに `z_index` は持たせない。合成用の z は `stackZIndexes` が導出し（下が 0）、描画は `LayerStack`、エクスポート／プレビュー／プラグインへの入力は `prepareLayersForExport` が同じ順序で処理する。`layerOrder` は「存在するレイヤーをちょうど 1 回ずつ含む」ことを不変条件とし、Undo/Redo 復元時と読込時は `reconcileLayerOrder` で整える。
+- **使用領域 (clip)**: インスタンスは任意でワールド座標 (m) の矩形の和集合を持つ（半開区間 [x, x+w) × [y, y+h)。辺を共有する 2 矩形は重ならず隙間も生じない）。領域外のピクセルは合成に参加しない。フロントエンドは Pixi マスク（`clipMask.ts`）、Rust は `blending.rs` の `LayerClip::contains` で同じ判定を行い、`blend_layers_to_image`（プレビュー・統合エクスポート）と `occupancy.rs`（プラグインへ渡す占有格子）の両方に適用する。キャンバス上での編集は専用モード `map_clip_edit`（`useMapClipEdit` + `MapClipEditLayer`）が担い、`mapSlice` の `beginMapClipDrag` / `updateMapClipDrag` / `endMapClipDrag` / `cancelMapClipDrag` でドラッグ全体を Undo 1 回にまとめる（`geoMapSlice` の位置合わせドラッグと同じ方式）。履歴スナップショットはマップごとの clip（`mapClips`）を保持し、Undo/Redo 後に追加されたマップは影響を受けない。
+- **エクスポートと表示セット**: エクスポート項目（`ExportTargetItem.visibilitySetId`）は、描画するレイヤーを表示セットで決める（未指定は書き出し時点の表示状態）。`useExportPlan` は非表示のレイヤーも含めて `prepareLayersForExport(state, { includeHidden: true })` で 1 回だけ準備し、`exportPackage.ts` が項目ごとにセット（または現在の表示）から各レイヤーの ON/OFF を求め、`ExportRegion` 相当の `layerVisibility` として Rust へ渡す（Rust 側は、`false` のレイヤーを合成から外す）。実行前に、削除済みのセットを指す項目、同じ出力先に複数のマップが書かれる項目は中止し、セットが覆わないレイヤー（参照レイヤーを除く）があれば確認を挟む。同じ領域を別のセットで出すときは、出力パスに `{{set}}` を含めてファイル名を分ける。
+- **プロジェクトファイル**: `map_sources` / `map_layers`（インスタンス）/ `layer_order` を保存する。`map_sources` を持たない旧形式は `stores/migrations/mapStackNormalization.ts` が、旧マップ 1 枚 = source 1 + インスタンス 1（旧レイヤー id を引き継ぐ）に変換し、積み順は「カスタムレイヤー（上）→ マップ」とする。
 
 ### 5.4 ツリー変形時の挿入境界射影規約 (Adjacent Boundary Projection Standard)
 - ツリー変形（ノード削除、Group作成・解除、ノード移動、複製等）を行うすべての Store アクションは、直前ノードに基づく共通写像関数 `mapInsertionTarget`（`src/utils/treeUtils.ts`）を介して `insertionTarget` を安全に追従・更新しなければならない。

@@ -6,11 +6,16 @@ import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { FieldLabel } from '../common/FieldLabel';
-import { ProjectMapLayer } from '../../../types/store';
+import { InlineNameInput } from '../common/InlineNameInput';
+import { PoseAdjuster } from '../common/PoseAdjuster';
+import { ProjectMapLayer, ResolvedMapLayer } from '../../../types/store';
 import { LayerCardShell } from './LayerCardShell';
+import { MapClipEditor } from './MapClipEditor';
 
 interface MapLayerCardProps {
-  layer: ProjectMapLayer;
+  layer: ResolvedMapLayer;
+  /** How many map instances draw from this layer's source (pose and thresholds are shared between them). */
+  sharedCount: number;
   index: number;
   isFirst: boolean;
   isLast: boolean;
@@ -22,12 +27,20 @@ interface MapLayerCardProps {
   onMoveDown: () => void;
   onToggleVisible: () => void;
   onRemove: () => void;
-  onUpdateLayer: (updates: Partial<ProjectMapLayer>) => void;
+  onUpdateLayer: (updates: Partial<Omit<ProjectMapLayer, 'id' | 'sourceId'>>) => void;
+  /** Edits map data shared by every instance of this map: pose and occupancy thresholds. */
+  onUpdateSource: (updates: { info: ResolvedMapLayer['info'] }) => void;
+  onDuplicate: () => void;
+  isRenaming: boolean;
+  onStartRename: () => void;
+  onRename: (name: string) => void;
+  onCancelRename: () => void;
 }
 
 /** Card for one ROS map layer: pose adjustment, opacity, blend mode and occupancy thresholds. */
 export function MapLayerCard({
   layer,
+  sharedCount,
   index,
   isFirst,
   isLast,
@@ -40,6 +53,12 @@ export function MapLayerCard({
   onToggleVisible,
   onRemove,
   onUpdateLayer,
+  onUpdateSource,
+  onDuplicate,
+  isRenaming,
+  onStartRename,
+  onRename,
+  onCancelRename,
 }: MapLayerCardProps) {
   const [showSettings, setShowSettings] = useState(false);
   const occupancySettings = useAppStore((state) => state.occupancySettings);
@@ -76,7 +95,7 @@ export function MapLayerCard({
     const newOy = initialOrigin[1] + newDy;
     const newOyaw = initialOrigin[2] + newDeltaYawRad;
 
-    onUpdateLayer({
+    onUpdateSource({
       info: {
         ...layer.info,
         origin: [newOx, newOy, newOyaw],
@@ -86,7 +105,7 @@ export function MapLayerCard({
   };
 
   const handleResetPose = () => {
-    onUpdateLayer({
+    onUpdateSource({
       info: {
         ...layer.info,
         origin: [...initialOrigin],
@@ -102,7 +121,7 @@ export function MapLayerCard({
   };
 
   const handleUpdateInfo = (updates: Partial<{ occupied_thresh: number; free_thresh: number; negate: number }>) => {
-    onUpdateLayer({
+    onUpdateSource({
       info: {
         ...layer.info,
         origin,
@@ -113,7 +132,7 @@ export function MapLayerCard({
   };
 
   const handleResetThresholds = () => {
-    onUpdateLayer({
+    onUpdateSource({
       info: {
         ...layer.info,
         origin,
@@ -136,9 +155,20 @@ export function MapLayerCard({
       isFirst={isFirst}
       isLast={isLast}
       title={
-        <span className="text-sm font-bold text-text-base truncate block max-w-[140px]" title={layer.name}>
-          {layer.name}
-        </span>
+        isRenaming ? (
+          <InlineNameInput name={layer.name} onRename={onRename} onCancel={onCancelRename} className="max-w-[140px]" />
+        ) : (
+          <span
+            className="text-sm font-bold text-text-base truncate block max-w-[140px]"
+            title={`${layer.name} (double-click to rename)`}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              onStartRename();
+            }}
+          >
+            {layer.name}
+          </span>
+        )
       }
       subBadges={
         <>
@@ -149,14 +179,29 @@ export function MapLayerCard({
             </span>
           )}
           <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">Layer {index + 1}</span>
+          {sharedCount > 1 && (
+            <span
+              className="text-[9px] font-bold uppercase bg-primary-base/15 text-primary-base px-1 py-0.5 rounded"
+              title="Pose and thresholds are shared with the other layers of this map"
+            >
+              Shared ×{sharedCount}
+            </span>
+          )}
+          {layer.clip && (
+            <span className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded">
+              Clipped
+            </span>
+          )}
         </>
       }
       showSettings={showSettings}
       onToggleSettings={() => setShowSettings(!showSettings)}
-      settingsTooltip="Edit Map Layer (Pose, Opacity, Blend, Thresholds)"
+      settingsTooltip="Edit Map Layer (Pose, Opacity, Blend, Use Area, Thresholds)"
       onToggleVisible={onToggleVisible}
       onRemove={onRemove}
       removeTooltip="Remove Map"
+      onDuplicate={onDuplicate}
+      duplicateTooltip="Duplicate Map (to use a different area of it)"
     >
       {/* Section 1: Relative Pose */}
       <div className="space-y-2">
@@ -239,6 +284,12 @@ export function MapLayerCard({
           />
         </div>
 
+        <PoseAdjuster
+          onNudge={({ dx, dy, dyawDeg }) =>
+            handleUpdateDelta({ deltaX: deltaX + dx, deltaY: deltaY + dy, deltaYawDeg: deltaYawDeg + dyawDeg })
+          }
+        />
+
         {/* Subtext with original YAML origin */}
         <div
           className="text-[9px] text-text-muted truncate font-mono px-0.5"
@@ -276,7 +327,12 @@ export function MapLayerCard({
         </div>
       </div>
 
-      {/* Section 3: Occupancy Thresholds */}
+      {/* Section 3: Use Area (clip) */}
+      <div className="pt-2 border-t border-border-base/30">
+        <MapClipEditor layer={layer} onChange={(clip) => onUpdateLayer({ clip })} />
+      </div>
+
+      {/* Section 4: Occupancy Thresholds */}
       <div className="space-y-3 pt-2 border-t border-border-base/30">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold text-text-base flex items-center gap-1.5">

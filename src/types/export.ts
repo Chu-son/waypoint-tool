@@ -12,6 +12,9 @@ export type ImportFieldMapping = {
   optionsPath?: string;
 };
 
+/** エクスポートテンプレートのレンダリングエンジン。省略時（旧プロジェクトのテンプレート）は後方互換のため Handlebars。 */
+export type TemplateEngine = 'handlebars' | 'jinja';
+
 export type ExportTemplate = {
   id: string;
   name: string;
@@ -20,6 +23,8 @@ export type ExportTemplate = {
   content: string;
   scope?: 'global' | 'local';
   importMapping?: ImportFieldMapping;
+  /** 省略時は 'handlebars'（後方互換）。新規作成するテンプレートの既定は 'jinja'。 */
+  engine?: TemplateEngine;
 };
 
 export type DefaultExportFormat = {
@@ -41,6 +46,8 @@ export interface ExportTargetItem {
   relativePathPattern: string;
   mapFormat?: 'ros_standard' | 'png_only';
   includeMapImage?: boolean;
+  /** Map items only: the layer visibility set that decides which layers are drawn. Absent means the current display. */
+  visibilitySetId?: string;
   enabled: boolean;
 }
 

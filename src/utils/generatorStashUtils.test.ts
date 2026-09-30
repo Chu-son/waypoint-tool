@@ -6,7 +6,7 @@ import {
   normalizeAngle,
   areOptionsEqual,
 } from './generatorStashUtils';
-import { WaypointNode, Transform } from '../types/store';
+import { WaypointNode, Transform, WaypointOptions } from '../types/store';
 import { yawToQuaternion } from './transformUtils';
 
 describe('generatorStashUtils', () => {
@@ -32,6 +32,15 @@ describe('generatorStashUtils', () => {
       expect(areOptionsEqual({ a: 1 }, { a: 2 })).toBe(false);
       expect(areOptionsEqual({ a: [1, 2] }, { a: [1, 2] })).toBe(true);
       expect(areOptionsEqual({ a: [1, 2] }, { a: [1, 3] })).toBe(false);
+    });
+
+    it('deeply compares nested object_list/union values (e.g. on_reached_actions)', () => {
+      const a: WaypointOptions = { on_reached_actions: [{ type: 'wait', countdown_ms: 3000 }, { type: 'amcl_reset' }] };
+      const b: WaypointOptions = { on_reached_actions: [{ type: 'wait', countdown_ms: 3000 }, { type: 'amcl_reset' }] };
+      const c: WaypointOptions = { on_reached_actions: [{ type: 'wait', countdown_ms: 4000 }, { type: 'amcl_reset' }] };
+
+      expect(areOptionsEqual(a, b)).toBe(true);
+      expect(areOptionsEqual(a, c)).toBe(false);
     });
   });
 

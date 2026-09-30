@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Texture, TextStyle } from 'pixi.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Graphics, Texture, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
-import { ProjectMapLayer, PluginCustomLayer } from '../../types/store';
+import { ResolvedMapLayer, PluginCustomLayer } from '../../types/store';
 import { resolveThemeVariables } from '../../utils/themePresets';
 import { hexStringToVec3 } from '../../utils/colorUtils';
 import { OccupancyHighlightFilter } from './filters/OccupancyHighlightFilter';
+import { drawClipMask } from './utils/clipMask';
 
 /** Draws one occupancy-grid image (ROS map or plugin layer) at its ROS origin, with its name label. */
 export function MapLayerSprite({
@@ -13,7 +14,7 @@ export function MapLayerSprite({
   textStyle,
   overrideTexture,
 }: {
-  layer: ProjectMapLayer | PluginCustomLayer | any;
+  layer: ResolvedMapLayer | PluginCustomLayer | any;
   scale: number;
   textStyle: TextStyle;
   overrideTexture?: Texture | null;
@@ -29,6 +30,12 @@ export function MapLayerSprite({
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
   const themeMode = useAppStore((state) => state.themeMode);
   const themePreset = useAppStore((state) => state.themePreset);
+
+  // Only the clip rectangles of a map instance take part in drawing; the mask lives in world space
+  // next to the sprite so both share the same transform.
+  const clip: ResolvedMapLayer['clip'] = layer.clip ?? null;
+  const [clipMask, setClipMask] = useState<Graphics | null>(null);
+  const drawMask = useCallback((g: Graphics) => drawClipMask(g, clip), [clip]);
 
   const occThresh = layer.info?.occupied_thresh ?? 0.65;
   const freeThresh = layer.info?.free_thresh ?? 0.25;
@@ -170,17 +177,20 @@ export function MapLayerSprite({
 
   return (
     <pixiContainer>
-      <pixiSprite
-        key={texture.uid || layer.id}
-        texture={texture}
-        anchor={{ x: 0, y: 1 }}
-        x={ox}
-        y={oy}
-        rotation={yaw}
-        scale={{ x: resolution, y: -resolution }}
-        alpha={layer.opacity}
-        filters={highlightFilter ? [highlightFilter] : undefined}
-      />
+      {clip && <pixiGraphics ref={setClipMask} draw={drawMask} />}
+      <pixiContainer mask={clip ? clipMask : null} visible={!clip || !!clipMask}>
+        <pixiSprite
+          key={texture.uid || layer.id}
+          texture={texture}
+          anchor={{ x: 0, y: 1 }}
+          x={ox}
+          y={oy}
+          rotation={yaw}
+          scale={{ x: resolution, y: -resolution }}
+          alpha={layer.opacity}
+          filters={highlightFilter ? [highlightFilter] : undefined}
+        />
+      </pixiContainer>
       {/* Top-Left Map Layer Name */}
       <pixiContainer x={topLeftX} y={topLeftY} scale={{ x: 1 / scale, y: -1 / scale }}>
         <pixiText text={layer.name || 'Map Layer'} style={textStyle} anchor={{ x: 0, y: 1 }} x={4} y={-4} />

@@ -8,8 +8,7 @@ export interface CustomLayerBase {
   name: string;
   visible: boolean;
   opacity: number;
-  z_index: number;
-  blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
+  blend_mode?: MapBlendMode;
   is_reference?: boolean;
   pipeline_metadata?: PipelineMetadata;
 }
@@ -98,18 +97,63 @@ export interface MapLayerInfo {
   [key: string]: any;
 }
 
-/** A loaded ROS map layer as held in the store and saved in the project file. */
-export interface ProjectMapLayer {
+/**
+ * A loaded ROS map: the image and its metadata (resolution, pose in `info.origin`, occupancy
+ * thresholds). Held once per loaded file; one or more `ProjectMapLayer` instances draw from it, so
+ * pose and threshold edits apply to every instance of the same map.
+ */
+export interface MapSource {
   id: string;
   name: string;
   info: MapLayerInfo | any;
   image_base64: string;
   width: number;
   height: number;
+}
+
+/** World-space rectangle in meters. `x`/`y` is the minimum corner (Y up); covers [x, x+width) × [y, y+height). */
+export interface ClipRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The part of a map instance that takes part in blending: the union of `rects`. */
+export interface MapLayerClip {
+  rects: ClipRect[];
+}
+
+export type MapBlendMode = 'overwrite' | 'merge_obstacles' | 'merge_free';
+
+/**
+ * One use of a `MapSource` in the layer stack (stack order lives in `layerOrder`). Duplicating a map
+ * adds another instance of the same source, each with its own clip, opacity and blend mode.
+ */
+export interface ProjectMapLayer {
+  id: string;
+  sourceId: string;
+  name: string;
   visible: boolean;
   opacity: number;
-  z_index: number;
-  blend_mode?: 'overwrite' | 'merge_obstacles' | 'merge_free';
+  blend_mode: MapBlendMode;
+  /** `null` uses the whole map. */
+  clip: MapLayerClip | null;
+}
+
+/** A map instance joined with the pixel data and metadata of its source, ready for drawing and export. */
+export type ResolvedMapLayer = ProjectMapLayer & Pick<MapSource, 'info' | 'image_base64' | 'width' | 'height'>;
+
+/**
+ * A named snapshot of which layers are shown. Only on/off is stored: stack order, opacity and
+ * blend mode stay with the layers. A layer with no entry (added after the set was saved) is
+ * "undecided" and keeps its current visibility when the set is applied.
+ */
+export interface LayerVisibilitySet {
+  id: string;
+  name: string;
+  /** Visible flag by layer id (map instances and custom layers alike). */
+  visibility: Record<string, boolean>;
 }
 
 export type ExportRegion = {

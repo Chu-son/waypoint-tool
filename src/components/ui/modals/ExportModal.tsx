@@ -19,6 +19,7 @@ import { Label } from '../common/Label';
 import { BrowseInput } from '../common/BrowseInput';
 import { cn } from '../../../utils/cn';
 import { TreeDirectoryNode, TreeFileNode } from '../../../utils/exportTemplateEngine';
+import { ExportVisibilitySetField } from './ExportVisibilitySetField';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -33,14 +34,17 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     conflictFiles,
     exportProfiles,
     exportRegions,
+    layerVisibilitySets,
     handleAddItem,
     handleAddProfile,
     handleDeleteItem,
     handleDeleteProfile,
     handleDuplicateProfile,
-    handleExecuteExport,
     handleInsertVariable,
+    handlePatternSelect,
     handleRootDirChange,
+    handleSaveAndExport,
+    handleSaveOnly,
     handleToggleItemEnabled,
     handleUpdateItem,
     inputRef,
@@ -312,6 +316,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                   </Label>
                   <Input
                     ref={inputRef}
+                    onSelect={handlePatternSelect}
                     value={selectedItem.relativePathPattern}
                     onChange={(e) =>
                       handleUpdateItem(selectedItem.id, {
@@ -342,6 +347,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                         { var: '{{ss}}', label: '秒' },
                         { var: '{{project_name}}', label: 'プロジェクト' },
                         { var: '{{name}}', label: '名称' },
+                        { var: '{{set}}', label: '表示セット' },
                       ].map((chip) => (
                         <button
                           key={chip.var}
@@ -357,6 +363,14 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                     </div>
                   </div>
                 </div>
+
+                {selectedItem.type.startsWith('map') && (
+                  <ExportVisibilitySetField
+                    value={selectedItem.visibilitySetId}
+                    sets={layerVisibilitySets}
+                    onChange={(visibilitySetId) => handleUpdateItem(selectedItem.id, { visibilitySetId })}
+                  />
+                )}
 
                 {/* Map Format Options */}
                 {selectedItem.type.startsWith('map') && (
@@ -469,13 +483,16 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
           <Button variant="ghost" onClick={onClose} className="px-5 text-text-muted font-bold text-xs">
             キャンセル
           </Button>
+          <Button variant="outline" onClick={handleSaveOnly} className="px-4 text-xs font-bold">
+            保存のみ
+          </Button>
           <Button
-            onClick={handleExecuteExport}
+            onClick={handleSaveAndExport}
             disabled={activeProfile.items.filter((i) => i.enabled).length === 0}
             className="min-w-36 bg-primary-base hover:bg-primary-hover shadow-lg text-xs font-bold"
           >
             <Save size={14} className="mr-1.5" />
-            エクスポート実行 ({activeProfile.items.filter((i) => i.enabled).length}件)
+            保存してエクスポート ({activeProfile.items.filter((i) => i.enabled).length}件)
           </Button>
         </div>
       </ModalFooter>

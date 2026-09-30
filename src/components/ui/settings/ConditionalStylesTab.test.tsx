@@ -42,6 +42,7 @@ describe('ConditionalStylesTab', () => {
           { name: 'type', label: 'Type', type: 'string', default: 'normal' },
           { name: 'speed', label: 'Speed', type: 'float', default: 1.0 },
         ],
+        globals: [],
       },
     });
   });

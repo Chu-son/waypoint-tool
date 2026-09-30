@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { getFallbackGridColors } from './utils/canvasTheme';
 import { useAppStore } from '../../stores/appStore';
+import { layerStackState, makeMap } from '../../test/fixtures';
 
 // Mock PixiJS and @pixi/react
 vi.mock('@pixi/react', () => ({
@@ -110,19 +111,15 @@ describe('MapCanvas', () => {
 
   it('performs fitToMaps when triggerFitToMaps is called', async () => {
     useAppStore.setState({
-      mapLayers: [
-        {
-          id: 'layer1',
+      ...layerStackState(
+        makeMap('layer1', {
           name: 'map.yaml',
-          visible: true,
-          opacity: 1,
-          z_index: 0,
           image_base64: 'data:image/png;base64,mock',
           info: { resolution: 0.1, origin: [0, 0, 0] },
           width: 100,
           height: 100,
-        },
-      ],
+        }),
+      ),
     });
 
     render(<MapCanvas />);

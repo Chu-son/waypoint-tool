@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { useAppStore } from '../../stores/appStore';
 import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
+import { layerStackState, makeManualCustomLayer, makeMap } from '../../test/fixtures';
 
 // Mock PixiJS and @pixi/react
 vi.mock('@pixi/react', () => ({
@@ -46,73 +47,34 @@ describe('MapCanvas Layer Grouping and Hierarchy', () => {
     });
   });
 
-  it('renders map layers group container before custom layers group container', () => {
-    useAppStore.setState({
-      mapLayers: [
-        {
-          id: 'map-1',
-          name: 'Map 1',
-          visible: true,
-          opacity: 1,
-          z_index: 0,
-          image_base64: 'data:image/png;base64,map1',
-          info: { resolution: 0.05, origin: [0, 0, 0] },
-          width: 100,
-          height: 100,
-        },
-      ],
-      customLayers: [
-        {
-          id: 'custom-1',
-          name: 'Manual 1',
-          type: 'manual',
-          visible: true,
-          opacity: 1,
-          z_index: 0,
-          blend_mode: 'overwrite',
-          is_reference: false,
-          editObjects: [],
-        },
-      ],
-    });
+  it('draws maps and custom layers together in one layer stack', () => {
+    useAppStore.setState(
+      layerStackState(
+        makeMap('map-1', { image_base64: 'data:image/png;base64,map1' }),
+        makeManualCustomLayer('custom-1', { blend_mode: 'overwrite', is_reference: false }),
+        makeMap('map-2', { image_base64: 'data:image/png;base64,map2' }),
+      ),
+    );
 
     const { container } = render(<MapCanvas />);
-    expect(container).toBeInTheDocument();
 
-    const pixiApp = screen.getByTestId('pixi-app');
-    expect(pixiApp).toBeInTheDocument();
-
-    // Check that custom layers and map layers exist in state and remain separated
-    const state = useAppStore.getState();
-    expect(state.mapLayers).toHaveLength(1);
-    expect(state.customLayers).toHaveLength(1);
+    expect(screen.getByTestId('pixi-app')).toBeInTheDocument();
+    expect(container.querySelectorAll('[label="layer-stack-group"]')).toHaveLength(1);
   });
 
-  it('draws the geographic base map behind every other map layer', () => {
+  it('draws the geographic base map behind the layer stack', () => {
     useAppStore.setState({
-      mapLayers: [
-        {
-          id: 'map-1',
-          name: 'Map 1',
-          visible: true,
-          opacity: 1,
-          z_index: 0,
-          image_base64: 'data:image/png;base64,map1',
-          info: { resolution: 0.05, origin: [0, 0, 0] },
-          width: 100,
-          height: 100,
-        },
-      ],
+      ...layerStackState(makeMap('map-1', { image_base64: 'data:image/png;base64,map1' })),
       geoMap: { ...useAppStore.getState().geoMap, enabled: true },
     });
 
     const { container } = render(<MapCanvas />);
 
     const geo = container.querySelector('[label="geo-tile-layer"]');
-    const maps = container.querySelector('[label="map-layers-group"]');
+    const stack = container.querySelector('[label="layer-stack-group"]');
     expect(geo).not.toBeNull();
-    expect(maps).not.toBeNull();
-    expect(geo!.compareDocumentPosition(maps!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(stack).not.toBeNull();
+    expect(geo!.compareDocumentPosition(stack!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('shows the base map attribution only while the base map is on', () => {

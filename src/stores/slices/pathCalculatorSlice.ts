@@ -96,8 +96,6 @@ export const createPathCalculatorSlice: StateCreator<AppState, [], [], PathCalcu
         globalPythonPath,
         rootNodeIds,
         nodes,
-        mapLayers,
-        customLayers,
         robotFootprint,
       } = get();
 
@@ -134,9 +132,7 @@ export const createPathCalculatorSlice: StateCreator<AppState, [], [], PathCalcu
         const needsOccupancyGrid = plugin.manifest.needs?.some(
           (n) => n === 'occupancy_grid' || n === 'occupancy_grid_in_region',
         );
-        const layersToPass = needsOccupancyGrid
-          ? await prepareLayersForExport(mapLayers || [], customLayers || [])
-          : undefined;
+        const layersToPass = needsOccupancyGrid ? await prepareLayersForExport(get()) : undefined;
 
         const result = await BackendAPI.runPlugin(
           plugin,

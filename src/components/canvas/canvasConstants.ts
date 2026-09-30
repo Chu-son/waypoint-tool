@@ -24,6 +24,8 @@ export const CANVAS_PREVIEW_COLOR = 0x8a8f98;
 export const CANVAS_HIT_AREA_COLOR = 0xffffff;
 /** High-contrast white for handle fills, center dots and inner rings. */
 export const CANVAS_CONTRAST_COLOR = 0xffffff;
+/** Fill of a stencil mask. Only its shape matters, the color is never shown. */
+export const CANVAS_MASK_FILL = 0xffffff;
 /** Dark background behind on-canvas text labels. */
 export const CANVAS_LABEL_BG = 0x0f172a;
 export const CANVAS_LABEL_BG_ALT = 0x1e293b;
@@ -39,6 +41,8 @@ export const CANVAS_EXPORT_REGION_COLOR = 0x10b981;
 export const CANVAS_MEASURE_COLOR = 0x10b981;
 /** Origin marker of the geographic base map while it is being aligned. */
 export const CANVAS_GEO_ANCHOR_COLOR = 0xf59e0b;
+/** Outline and handles of the use area of a map layer while it is being edited. */
+export const CANVAS_CLIP_EDIT_COLOR = 0x38bdf8;
 export const CANVAS_MEASURE_LIGHT_COLOR = 0x34d399;
 /** Selection / hover outline of annotations. */
 export const CANVAS_ANNOTATION_HIGHLIGHT_COLOR = 0x60a5fa;

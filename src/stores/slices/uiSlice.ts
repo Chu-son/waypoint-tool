@@ -21,7 +21,14 @@ export interface LoadingTask {
 
 export type UISlice = {
   activeTool:
-    'select' | 'add_point' | 'add_generator' | 'add_rect_sweep' | 'add_export_region' | 'measure' | 'geo_align';
+    | 'select'
+    | 'add_point'
+    | 'add_generator'
+    | 'add_rect_sweep'
+    | 'add_export_region'
+    | 'measure'
+    | 'geo_align'
+    | 'map_clip';
   isSidebarOpen: boolean;
   mouseCenteredZoom: boolean;
   visibleAttributes: string[];

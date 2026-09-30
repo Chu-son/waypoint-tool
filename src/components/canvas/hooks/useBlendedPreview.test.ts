@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useBlendedPreview } from './useBlendedPreview';
 import { BackendAPI } from '../../../api';
 import { getAppState, resetAppStore } from '../../../test/store';
-import { makeMapLayer } from '../../../test/fixtures';
+import { layerStackState, makeMap } from '../../../test/fixtures';
 
 vi.mock('pixi.js', () => import('../../../test/mocks/pixi').then((m) => m.pixiJsMock));
 
@@ -18,7 +18,7 @@ describe('useBlendedPreview', () => {
       origin: [0, 0, 0],
       resolution: 0.05,
     });
-    resetAppStore({ mapLayers: [makeMapLayer('m1', { image_base64: 'data:image/png;base64,BBBB' })] });
+    resetAppStore(layerStackState(makeMap('m1', { image_base64: 'data:image/png;base64,BBBB' })));
   });
 
   it('does nothing while neither the export preview nor the occupancy highlight is on', () => {

@@ -4,7 +4,7 @@ import { PluginParamsPanel } from './PluginParamsPanel';
 import { BackendAPI } from '../../../api';
 import { renderWithStore } from '../../../test/render';
 import { getAppState } from '../../../test/store';
-import { makeMapLayer, makePlugin } from '../../../test/fixtures';
+import { layerStackState, makeMap, makePlugin } from '../../../test/fixtures';
 import type { AppState } from '../../../stores/appStore';
 import type { PluginInstance, PluginSetting } from '../../../types/store';
 
@@ -74,7 +74,7 @@ describe('PluginParamsPanel', () => {
   it('sends the visible map layers to plugins that need the occupancy grid', async () => {
     const runPlugin = vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue([{ x: 1, y: 2, yaw: 0 }]);
     const occPlugin = makePlugin('occ-plugin', { name: 'Occ Generator', needs: ['occupancy_grid'] });
-    renderPanel(occPlugin, { mapLayers: [makeMapLayer('m1', { image_base64: 'b64' })] });
+    renderPanel(occPlugin, layerStackState(makeMap('m1', { image_base64: 'b64' })));
 
     fireEvent.click(screen.getByText('Generate Path'));
 

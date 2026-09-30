@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { OptionsSchema, PluginInstance, ProjectMapLayer, ImportFieldMapping } from '../../types/store';
+import { PluginInstance, ImportFieldMapping, TemplateEngine } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
 
 export class TauriBackendAPI implements IBackendAPI {
@@ -15,7 +15,7 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('load_project', { path });
   }
 
-  async loadOptionsSchema(yamlPath: string): Promise<OptionsSchema> {
+  async loadOptionsSchema(yamlPath: string): Promise<unknown> {
     return invoke('load_options_schema', { yamlPath });
   }
 
@@ -32,8 +32,8 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('import_waypoints', { path });
   }
 
-  async inferImportMapping(templateContent: string): Promise<ImportFieldMapping> {
-    return invoke('infer_import_mapping', { template: templateContent });
+  async inferImportMapping(templateContent: string, engine?: TemplateEngine): Promise<ImportFieldMapping> {
+    return invoke('infer_import_mapping', { template: templateContent, engine });
   }
 
   async fetchInstalledPlugins(): Promise<PluginInstance[]> {
@@ -52,7 +52,7 @@ export class TauriBackendAPI implements IBackendAPI {
     pluginInstance: PluginInstance,
     contextData: any,
     pythonPath?: string,
-    mapLayers?: (ProjectMapLayer | BlendPreviewLayerInput)[],
+    mapLayers?: BlendPreviewLayerInput[],
   ): Promise<any> {
     return invoke('run_plugin', {
       pluginInstance,

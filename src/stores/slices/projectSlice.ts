@@ -25,6 +25,7 @@ import {
   DEFAULT_CONDITIONAL_STYLES_ENABLED,
   migrateAndNormalizeProjectData,
 } from '../migrations/projectMigration';
+import { applyGlobalDefaultLinks } from '../../utils/optionSchema';
 import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 import { notify, notifyError } from '../../services/notify';
 import { buildProjectData } from '../serialization/projectSerializer';
@@ -86,6 +87,7 @@ export type ProjectSlice = {
   removeExportProfile: (id: string) => void;
   setActiveExportProfileId: (id: string | null) => void;
   duplicateExportProfile: (id: string) => void;
+  replaceExportProfiles: (profiles: ExportProfile[], activeId: string | null) => void;
   setProjectData: (data: any) => void;
 
   loadProject: () => Promise<boolean>;
@@ -151,7 +153,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         };
       }),
     setGlobalPythonPath: (path: string) => set({ globalPythonPath: path, isDirty: true }),
-    setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: schema, isDirty: true }),
+    setOptionsSchema: (schema: OptionsSchema) => set({ optionsSchema: applyGlobalDefaultLinks(schema), isDirty: true }),
     setRobotFootprint: (footprint: RobotFootprint) => set({ robotFootprint: footprint, isDirty: true }),
     setOccupancySettings: (settings: OccupancySettings) => set({ occupancySettings: settings, isDirty: true }),
     updateOccupancySettings: (updates: Partial<OccupancySettings>) =>
@@ -257,6 +259,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
       }));
     },
 
+    replaceExportProfiles: (profiles: ExportProfile[], activeId: string | null) =>
+      set({ exportProfiles: profiles, activeExportProfileId: activeId, isDirty: true }),
+
     setProjectData: (rawData: any) => {
       get().abortCanvasGestures?.();
       set((state) => {
@@ -292,7 +297,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           nodes: data.nodes,
           selectedNodeIds: [],
           insertionTarget: null,
+          mapSources: data.map_sources,
           mapLayers: data.map_layers,
+          layerOrder: data.layer_order,
           customLayers: data.custom_layers,
           activeCustomLayerId: null,
           annotationObjects: annotationMap,
@@ -309,6 +316,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           isAnnotationEditMode: false,
           exportTemplates: [...globalTemplates, ...localTemplates],
           exportRegions: data.export_regions,
+          layerVisibilitySets: data.layer_visibility_sets,
+          activeLayerVisibilitySetId: data.active_layer_visibility_set_id,
           optionsSchema: data.options_schema,
           robotFootprint: data.robot_footprint,
           occupancySettings: data.occupancy_settings,
@@ -347,7 +356,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           nodes: {},
           selectedNodeIds: [],
           insertionTarget: null,
+          mapSources: [],
           mapLayers: [],
+          layerOrder: [],
           customLayers: [],
           activeCustomLayerId: null,
           annotationObjects: {},
@@ -376,6 +387,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           activeExportProfileId: DEFAULT_ACTIVE_EXPORT_PROFILE_ID,
           geoMap: DEFAULT_GEO_MAP,
           exportRegions: [],
+          layerVisibilitySets: [],
+          activeLayerVisibilitySetId: null,
           optionsSchema: null,
           robotFootprint: DEFAULT_ROBOT_FOOTPRINT,
           occupancySettings: DEFAULT_OCCUPANCY_SETTINGS,

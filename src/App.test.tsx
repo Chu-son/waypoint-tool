@@ -82,7 +82,7 @@ describe('App Integration', () => {
       const state = useAppStore.getState();
       expect(state.mapLayers.length).toBe(1);
       expect(state.mapLayers[0].name).toBe('map.yaml');
-      expect(state.mapLayers[0].image_base64).toBe('mockbase64');
+      expect(state.mapSources[0].image_base64).toBe('mockbase64');
     });
   });
 

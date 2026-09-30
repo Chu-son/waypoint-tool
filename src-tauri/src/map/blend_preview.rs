@@ -1,4 +1,4 @@
-use super::blending::{blend_layers_to_image, LayerInput, RectRegion};
+use super::blending::{blend_layers_to_image, LayerClip, LayerInput, RectRegion};
 use base64::{engine::general_purpose, Engine as _};
 use serde::Deserialize;
 
@@ -10,6 +10,8 @@ pub struct BlendPreviewLayer {
     pub blend_mode: String,
     pub z_index: i32,
     pub visible: bool,
+    #[serde(default)]
+    pub clip: Option<LayerClip>,
 }
 
 #[derive(serde::Serialize)]
@@ -157,6 +159,7 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
             origin: [l_ox, l_oy, l_oyaw],
             blend_mode: &layer.blend_mode,
             z_index: layer.z_index,
+            clip: layer.clip.as_ref(),
         });
     }
 

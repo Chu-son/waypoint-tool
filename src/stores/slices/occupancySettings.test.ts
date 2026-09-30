@@ -42,11 +42,11 @@ describe('Occupancy Settings & Highlight Store Integration', () => {
 
     useAppStore.getState().addMapLayer('Test Map', { resolution: 0.05 }, 'fake-base64', 100, 100);
 
-    const layers = useAppStore.getState().mapLayers;
-    expect(layers.length).toBe(1);
-    expect(layers[0].info.occupied_thresh).toBe(0.8);
-    expect(layers[0].info.free_thresh).toBe(0.3);
-    expect(layers[0].info.negate).toBe(1);
+    const sources = useAppStore.getState().mapSources;
+    expect(sources.length).toBe(1);
+    expect(sources[0].info.occupied_thresh).toBe(0.8);
+    expect(sources[0].info.free_thresh).toBe(0.3);
+    expect(sources[0].info.negate).toBe(1);
   });
 
   it('preserves existing map layer thresholds if provided in YAML info', () => {
@@ -60,11 +60,11 @@ describe('Occupancy Settings & Highlight Store Integration', () => {
         100,
       );
 
-    const layers = useAppStore.getState().mapLayers;
-    expect(layers.length).toBe(1);
-    expect(layers[0].info.occupied_thresh).toBe(0.55);
-    expect(layers[0].info.free_thresh).toBe(0.15);
-    expect(layers[0].info.negate).toBe(0);
+    const sources = useAppStore.getState().mapSources;
+    expect(sources.length).toBe(1);
+    expect(sources[0].info.occupied_thresh).toBe(0.55);
+    expect(sources[0].info.free_thresh).toBe(0.15);
+    expect(sources[0].info.negate).toBe(0);
   });
 
   it('toggles showOccupancyHighlight and updates alpha', () => {

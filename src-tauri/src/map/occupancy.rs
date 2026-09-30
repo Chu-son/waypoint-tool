@@ -1,4 +1,4 @@
-use super::blending::{apply_blend_cell, CellValue};
+use super::blending::{apply_blend_cell, CellValue, LayerClip};
 use crate::plugins::models::{OccupancyGridData, PluginMapLayer};
 use base64::{engine::general_purpose, Engine as _};
 use flate2::{write::ZlibEncoder, Compression};
@@ -17,6 +17,7 @@ pub struct LayerForBlend {
     pub negate: bool,
     pub occ_thresh: f64,
     pub free_thresh: f64,
+    pub clip: Option<LayerClip>,
 }
 
 pub fn parse_layer_info(info: Option<&serde_json::Value>) -> Result<(f64, [f64; 3], bool, f64, f64), String> {
@@ -97,6 +98,7 @@ pub fn build_occupancy_grid_from_layers(layers: &[&PluginMapLayer]) -> Result<Oc
             negate,
             occ_thresh,
             free_thresh,
+            clip: layer.clip.clone(),
         });
     }
 
@@ -158,6 +160,11 @@ pub fn build_occupancy_grid_from_layers(layers: &[&PluginMapLayer]) -> Result<Oc
             let mut combined_cell = CellValue::Unknown;
 
             for layer in &decoded_layers {
+                if let Some(clip) = &layer.clip {
+                    if !clip.contains(world_x, world_y) {
+                        continue;
+                    }
+                }
                 let (c_l, r_l) = world_to_pixel(world_x, world_y, layer.origin, layer.resolution, layer.image.height());
                 if c_l >= 0 && c_l < layer.image.width() as i32 && r_l >= 0 && r_l < layer.image.height() as i32 {
                     let pixel = layer.image.get_pixel(c_l as u32, r_l as u32);
@@ -268,6 +275,7 @@ mod tests {
             visible: true,
             blend_mode: "overwrite".to_string(),
             z_index: 0,
+            clip: None,
         };
 
         let layer2 = PluginMapLayer {
@@ -282,11 +290,62 @@ mod tests {
             visible: true,
             blend_mode: "overwrite".to_string(),
             z_index: 1000,
+            clip: None,
         };
 
         let grid = build_occupancy_grid_from_layers(&[&layer1, &layer2]).unwrap();
         assert_eq!(grid.width, 10);
         assert_eq!(grid.height, 10);
         assert_eq!(grid.resolution, 0.1);
+    }
+
+    #[test]
+    fn test_build_occupancy_grid_uses_only_the_clipped_part_of_a_layer() {
+        use crate::map::blending::ClipRect;
+        use image::Rgba;
+        use std::io::Read;
+
+        // A 10x10 all-obstacle map at 0.1 m/px, clipped to its left half (x < 0.5 m).
+        let mut img = image::RgbaImage::new(10, 10);
+        for pixel in img.pixels_mut() {
+            *pixel = Rgba([0, 0, 0, 255]);
+        }
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        let layer = PluginMapLayer {
+            image_base64: general_purpose::STANDARD.encode(&png),
+            info: Some(serde_json::json!({
+                "resolution": 0.1,
+                "origin": [0.0, 0.0, 0.0],
+                "negate": 0,
+                "occupied_thresh": 0.65,
+                "free_thresh": 0.196
+            })),
+            visible: true,
+            blend_mode: "overwrite".to_string(),
+            z_index: 0,
+            clip: Some(LayerClip {
+                rects: vec![ClipRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.5,
+                    height: 1.0,
+                }],
+            }),
+        };
+
+        let grid = build_occupancy_grid_from_layers(&[&layer]).unwrap();
+
+        let compressed = general_purpose::STANDARD.decode(&grid.data).unwrap();
+        let mut raw = Vec::new();
+        flate2::read::ZlibDecoder::new(&compressed[..])
+            .read_to_end(&mut raw)
+            .unwrap();
+        let cells: Vec<i8> = raw.iter().map(|&b| b as i8).collect();
+        let row = |r: usize| &cells[r * 10..(r + 1) * 10];
+        assert!(row(0)[..5].iter().all(|&c| c == 100), "left half is kept");
+        assert!(row(0)[5..].iter().all(|&c| c == -1), "right half is left unknown");
     }
 }

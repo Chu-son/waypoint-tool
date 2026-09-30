@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '../common/ContextMenu';
 import {
   Eye,
@@ -14,8 +14,11 @@ import {
   Palette,
   Bookmark,
   Code2,
+  Copy,
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { useResolvedMapLayers } from '../../../hooks/useResolvedMapLayers';
+import { stackEntries } from '../../../utils/layerStack';
 import { DialogAPI, BackendAPI } from '../../../api';
 import { Button } from '../common/Button';
 import { FieldLabel } from '../common/FieldLabel';
@@ -27,18 +30,22 @@ import { CustomLayerCard } from './CustomLayerCard';
 import { MapLayerCard } from './MapLayerCard';
 import { GeoMapCard } from './GeoMapCard';
 import { RegionCard } from './RegionCard';
+import { LayerVisibilitySetBar } from './LayerVisibilitySetBar';
 
 export function LayerPanel() {
-  const mapLayers = useAppStore((state) => state.mapLayers);
+  const mapLayers = useResolvedMapLayers();
+  const mapInstances = useAppStore((state) => state.mapLayers);
   const updateMapLayer = useAppStore((state) => state.updateMapLayer);
+  const updateMapSource = useAppStore((state) => state.updateMapSource);
+  const duplicateMapLayer = useAppStore((state) => state.duplicateMapLayer);
   const removeMapLayer = useAppStore((state) => state.removeMapLayer);
-  const reorderMapLayers = useAppStore((state) => state.reorderMapLayers);
   const addMapLayer = useAppStore((state) => state.addMapLayer);
 
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const updateCustomLayer = useAppStore((state) => state.updateCustomLayer);
   const removeCustomLayer = useAppStore((state) => state.removeCustomLayer);
-  const reorderCustomLayers = useAppStore((state) => state.reorderCustomLayers);
+  const layerOrder = useAppStore((state) => state.layerOrder);
+  const reorderLayers = useAppStore((state) => state.reorderLayers);
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const setActiveCustomLayerId = useAppStore((state) => state.setActiveCustomLayerId);
 
@@ -66,6 +73,7 @@ export function LayerPanel() {
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
   const [isExportRegionsOpen, setIsExportRegionsOpen] = useState(true);
+  const [renamingMapLayerId, setRenamingMapLayerId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     type: 'custom' | 'map';
     id: string;
@@ -106,18 +114,23 @@ export function LayerPanel() {
     }
   };
 
-  const moveUpMap = (index: number) => {
-    if (index > 0) reorderMapLayers(index, index - 1);
-  };
-  const moveDownMap = (index: number) => {
-    if (index < mapLayers.length - 1) reorderMapLayers(index, index + 1);
-  };
+  // One list for every layer, top of the stack first; maps and custom layers can be interleaved.
+  const entries = useMemo(
+    () => stackEntries({ mapLayers: mapInstances, customLayers, layerOrder }),
+    [mapInstances, customLayers, layerOrder],
+  );
+  const resolvedMapById = useMemo(() => new Map(mapLayers.map((l) => [l.id, l])), [mapLayers]);
+  const sharedCountBySource = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const l of mapInstances) counts.set(l.sourceId, (counts.get(l.sourceId) ?? 0) + 1);
+    return counts;
+  }, [mapInstances]);
 
-  const moveUpCustom = (index: number) => {
-    if (index > 0) reorderCustomLayers(index, index - 1);
+  const moveUp = (index: number) => {
+    if (index > 0) reorderLayers(index, index - 1);
   };
-  const moveDownCustom = (index: number) => {
-    if (index < customLayers.length - 1) reorderCustomLayers(index, index + 1);
+  const moveDown = (index: number) => {
+    if (index < entries.length - 1) reorderLayers(index, index + 1);
   };
 
   return (
@@ -147,6 +160,8 @@ export function LayerPanel() {
       {/* Layer List Scroll Area */}
       <div className="flex-1 overflow-y-auto w-full p-4 space-y-4">
         <GeoMapCard />
+
+        <LayerVisibilitySetBar />
 
         {/* Global Composite Preview & Highlight Controls (Above Custom Layers) */}
         {(mapLayers.length > 0 || customLayers.length > 0) && (
@@ -198,102 +213,95 @@ export function LayerPanel() {
           </div>
         )}
 
-        {/* Custom Layers Section */}
-        {customLayers.length > 0 && (
+        {/* Layer Stack: maps and custom layers, top of the stack first */}
+        {entries.length === 0 ? (
+          <EmptyState message="No maps or custom layers. Click above to add." />
+        ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-2 ml-1">
               <FieldLabel className="flex items-center gap-2 flex-1">
-                Custom Layers
+                Layers
                 <div className="h-px flex-1 bg-border-base/20" />
               </FieldLabel>
             </div>
-            {customLayers.map((layer, index) => {
-              const isActive = activeCustomLayerId === layer.id;
-              const isEditing = isMapEditMode && isActive && layer.type === 'manual';
-              return (
-                <CustomLayerCard
-                  key={layer.id}
-                  layer={layer}
-                  index={index}
-                  isFirst={index === 0}
-                  isLast={index === customLayers.length - 1}
-                  isActive={isActive}
-                  isEditing={isEditing}
-                  onSelect={() => {
-                    selectNodes([]);
-                    setActiveCustomLayerId(layer.id);
-                    setRightPanelActiveTab('inspector');
-                    setRightPanelOpen(true);
-                  }}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    selectNodes([]);
-                    setActiveCustomLayerId(layer.id);
-                    setContextMenu({ type: 'custom', id: layer.id, x: e.clientX, y: e.clientY });
-                  }}
-                  onToggleEdit={() => {
-                    if (layer.type === 'manual') {
-                      if (isEditing) {
-                        setMapEditMode(false);
-                      } else {
-                        selectNodes([]);
-                        setActiveCustomLayerId(layer.id);
-                        setMapEditMode(true);
-                        setRightPanelActiveTab('inspector');
-                        setRightPanelOpen(true);
+            {entries.map((entry, index) => {
+              if (entry.kind === 'custom') {
+                const layer = entry.layer;
+                const isActive = activeCustomLayerId === layer.id;
+                const isEditing = isMapEditMode && isActive && layer.type === 'manual';
+                return (
+                  <CustomLayerCard
+                    key={layer.id}
+                    layer={layer}
+                    index={index}
+                    isFirst={index === 0}
+                    isLast={index === entries.length - 1}
+                    isActive={isActive}
+                    isEditing={isEditing}
+                    onSelect={() => {
+                      selectNodes([]);
+                      setActiveCustomLayerId(layer.id);
+                      setRightPanelActiveTab('inspector');
+                      setRightPanelOpen(true);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      selectNodes([]);
+                      setActiveCustomLayerId(layer.id);
+                      setContextMenu({ type: 'custom', id: layer.id, x: e.clientX, y: e.clientY });
+                    }}
+                    onToggleEdit={() => {
+                      if (layer.type === 'manual') {
+                        if (isEditing) {
+                          setMapEditMode(false);
+                        } else {
+                          selectNodes([]);
+                          setActiveCustomLayerId(layer.id);
+                          setMapEditMode(true);
+                          setRightPanelActiveTab('inspector');
+                          setRightPanelOpen(true);
+                        }
                       }
-                    }
-                  }}
-                  onOpenInspector={() => {
-                    selectNodes([]);
-                    setActiveCustomLayerId(layer.id);
-                    setRightPanelActiveTab('inspector');
-                    setRightPanelOpen(true);
-                  }}
-                  onMoveUp={() => moveUpCustom(index)}
-                  onMoveDown={() => moveDownCustom(index)}
-                  onToggleVisible={() => updateCustomLayer(layer.id, { visible: !layer.visible })}
-                  onRemove={async () => {
-                    const confirmed = await DialogAPI.ask(`Remove custom layer '${layer.name}'?`, {
-                      title: 'Remove Custom Layer',
-                      kind: 'warning',
-                    });
-                    if (confirmed) {
-                      removeCustomLayer(layer.id);
-                      if (activeCustomLayerId === layer.id) {
-                        setActiveCustomLayerId(null);
-                        setMapEditMode(false);
+                    }}
+                    onOpenInspector={() => {
+                      selectNodes([]);
+                      setActiveCustomLayerId(layer.id);
+                      setRightPanelActiveTab('inspector');
+                      setRightPanelOpen(true);
+                    }}
+                    onMoveUp={() => moveUp(index)}
+                    onMoveDown={() => moveDown(index)}
+                    onToggleVisible={() => updateCustomLayer(layer.id, { visible: !layer.visible })}
+                    onRemove={async () => {
+                      const confirmed = await DialogAPI.ask(`Remove custom layer '${layer.name}'?`, {
+                        title: 'Remove Custom Layer',
+                        kind: 'warning',
+                      });
+                      if (confirmed) {
+                        removeCustomLayer(layer.id);
+                        if (activeCustomLayerId === layer.id) {
+                          setActiveCustomLayerId(null);
+                          setMapEditMode(false);
+                        }
                       }
-                    }
-                  }}
-                  onUpdateLayer={(updates) => updateCustomLayer(layer.id, updates)}
-                />
-              );
-            })}
-          </div>
-        )}
+                    }}
+                    onUpdateLayer={(updates) => updateCustomLayer(layer.id, updates)}
+                  />
+                );
+              }
 
-        {/* Loaded Map Layers Section */}
-        {mapLayers.length === 0 && customLayers.length === 0 ? (
-          <EmptyState message="No maps or custom layers. Click above to add." />
-        ) : mapLayers.length > 0 ? (
-          <div className={cn('space-y-4', customLayers.length > 0 && 'pt-4 border-t border-border-base/20')}>
-            <div className="flex items-center gap-2 ml-1">
-              <FieldLabel className="flex items-center gap-2 flex-1">
-                Map Layers
-                <div className="h-px flex-1 bg-border-base/20" />
-              </FieldLabel>
-            </div>
-            {mapLayers.map((layer, index) => {
+              const layer = resolvedMapById.get(entry.layer.id);
+              if (!layer) return null;
               const isActiveTargetMap = activeMapLayerId === layer.id;
               return (
                 <MapLayerCard
                   key={layer.id}
                   layer={layer}
+                  sharedCount={sharedCountBySource.get(layer.sourceId) ?? 1}
                   index={index}
                   isFirst={index === 0}
-                  isLast={index === mapLayers.length - 1}
+                  isLast={index === entries.length - 1}
                   isActiveTargetMap={isActiveTargetMap}
                   isMapEditMode={isMapEditMode}
                   onSelect={() => {
@@ -304,8 +312,8 @@ export function LayerPanel() {
                     e.stopPropagation();
                     setContextMenu({ type: 'map', id: layer.id, x: e.clientX, y: e.clientY });
                   }}
-                  onMoveUp={() => moveUpMap(index)}
-                  onMoveDown={() => moveDownMap(index)}
+                  onMoveUp={() => moveUp(index)}
+                  onMoveDown={() => moveDown(index)}
                   onToggleVisible={() => updateMapLayer(layer.id, { visible: !layer.visible })}
                   onRemove={async () => {
                     const confirmed = await DialogAPI.ask(`Remove map layer '${layer.name}'?`, {
@@ -319,12 +327,21 @@ export function LayerPanel() {
                       }
                     }
                   }}
+                  onDuplicate={() => duplicateMapLayer(layer.id)}
                   onUpdateLayer={(updates) => updateMapLayer(layer.id, updates)}
+                  onUpdateSource={(updates) => updateMapSource(layer.sourceId, updates)}
+                  isRenaming={renamingMapLayerId === layer.id}
+                  onStartRename={() => setRenamingMapLayerId(layer.id)}
+                  onRename={(name) => {
+                    updateMapLayer(layer.id, { name });
+                    setRenamingMapLayerId(null);
+                  }}
+                  onCancelRename={() => setRenamingMapLayerId(null)}
                 />
               );
             })}
           </div>
-        ) : null}
+        )}
 
         {/* Export Regions Section */}
         {(exportRegions || []).length > 0 && (
@@ -495,6 +512,18 @@ export function LayerPanel() {
                     onSelect={() => setActiveMapLayerId(layer.id)}
                   >
                     編集対象マップに設定
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Pencil size={13} className="text-text-muted" />}
+                    onSelect={() => setRenamingMapLayerId(layer.id)}
+                  >
+                    名前を変更
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    icon={<Copy size={13} className="text-text-muted" />}
+                    onSelect={() => duplicateMapLayer(layer.id)}
+                  >
+                    複製（別の領域を使う）
                   </ContextMenuItem>
                   <ContextMenuItem
                     icon={

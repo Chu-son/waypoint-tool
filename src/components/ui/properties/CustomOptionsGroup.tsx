@@ -1,10 +1,8 @@
 import { useAppStore } from '../../../stores/appStore';
-import { Input } from '../common/Input';
-import { Select } from '../common/Select';
-import { Checkbox } from '../common/Checkbox';
-import { OptionDef, WaypointNode } from '../../../types/store';
-import { cn } from '../../../utils/cn';
+import { OptionDef, OptionValue, WaypointNode } from '../../../types/store';
 import { PropertySectionHeader } from './PropertySectionHeader';
+import { OptionValueEditor, ValueEditTransactionContext, ValueEditTransactions } from './OptionValueEditor';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 
 interface CustomOptionsGroupProps {
   isMultiSelection: boolean;
@@ -12,8 +10,17 @@ interface CustomOptionsGroupProps {
   handleUpdate: (id: string, updates: any) => void;
 }
 
+/** ウェイポイントの Inspector で使う、ストアの Undo 履歴と連動したトランザクション実装。 */
+const storeValueEditTransactions: ValueEditTransactions = {
+  begin: () => useAppStore.getState().beginHistoryTransaction(),
+  end: () => useAppStore.getState().endHistoryTransaction(),
+  run: (fn) => useAppStore.getState().runInHistoryTransaction(fn),
+};
+
 export function CustomOptionsGroup({ isMultiSelection, node, handleUpdate }: CustomOptionsGroupProps) {
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  // 値の表示・編集は ref を解決した実効スキーマで行う。定義そのものの編集は設定画面の役目。
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const visibleAttributes = useAppStore((state) => state.visibleAttributes);
   const toggleAttributeVisibility = useAppStore((state) => state.toggleAttributeVisibility);
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
@@ -27,121 +34,62 @@ export function CustomOptionsGroup({ isMultiSelection, node, handleUpdate }: Cus
           No schema loaded. Load a schema (YAML) from the Toolbar.
         </div>
       ) : (
-        <div className="space-y-2 pt-2">
-          {optionsSchema.options.map((opt: OptionDef) => {
-            const nodeOptVal = isMultiSelection ? '' : (node?.options?.[opt.name] ?? opt.default ?? '');
-
-            const handleChange = (val: string | number | boolean | Array<string | number | boolean>) => {
-              useAppStore.getState().runInHistoryTransaction(() => {
+        <ValueEditTransactionContext.Provider value={storeValueEditTransactions}>
+          <div className="space-y-2 pt-2">
+            {optionsSchema.options.map((opt: OptionDef) => {
+              const handleChange = (val: OptionValue | undefined) => {
                 const currentState = useAppStore.getState();
+                const applyTo = (id: string) => {
+                  const n = currentState.nodes[id];
+                  if (!n) return;
+                  const next = { ...(n.options || {}) };
+                  if (val === undefined) delete next[opt.name];
+                  else next[opt.name] = val;
+                  handleUpdate(id, { options: next });
+                };
                 if (isMultiSelection) {
                   selectedNodeIds.forEach((id) => {
                     const n = currentState.nodes[id];
-                    if (n && n.type === 'manual') {
-                      handleUpdate(id, {
-                        options: { ...(n.options || {}), [opt.name]: val },
-                      });
-                    }
+                    if (n && n.type === 'manual') applyTo(id);
                   });
-                } else {
-                  if (!node) return;
-                  const n = currentState.nodes[node.id];
-                  handleUpdate(node.id, {
-                    options: { ...(n.options || {}), [opt.name]: val },
-                  });
+                } else if (node) {
+                  applyTo(node.id);
                 }
-              });
-            };
+              };
 
-            return (
-              <div key={opt.name}>
-                <PropertySectionHeader
-                  title={
-                    <>
-                      {opt.label || opt.name}
-                      <span className="opacity-50 text-[10px] ml-1 uppercase font-normal">({opt.type})</span>
-                    </>
-                  }
-                  isVisible={visibleAttributes.includes(`options.${opt.name}`)}
-                  onToggleVisible={() => toggleAttributeVisibility(`options.${opt.name}`)}
-                  toggleTitle={`Toggle ${opt.name} on Canvas`}
-                  className="mb-1"
-                />
-
-                {opt.type === 'list' ? (
-                  <Input
-                    type="text"
-                    value={Array.isArray(nodeOptVal) ? nodeOptVal.join(', ') : String(nodeOptVal || '')}
-                    placeholder={
-                      isMultiSelection
-                        ? 'Mixed'
-                        : opt.default !== undefined
-                          ? Array.isArray(opt.default)
-                            ? opt.default.join(', ')
-                            : String(opt.default)
-                          : 'csv'
+              return (
+                <div key={`${isMultiSelection ? selectedNodeIds.join(',') : node?.id}:${opt.name}`}>
+                  <PropertySectionHeader
+                    title={
+                      <>
+                        {opt.label || opt.name}
+                        {opt.required && (
+                          <span className="text-danger-base ml-0.5" title="必須項目">
+                            *
+                          </span>
+                        )}
+                        <span className="opacity-50 text-[10px] ml-1 uppercase font-normal">({opt.type})</span>
+                      </>
                     }
-                    onFocus={() => useAppStore.getState().beginHistoryTransaction()}
-                    onBlur={() => useAppStore.getState().endHistoryTransaction()}
-                    onChange={(e) => {
-                      const rawArr = e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter((s) => s.length > 0);
-                      let parsedArr: any[] = rawArr;
-                      if (opt.item_type === 'float') {
-                        parsedArr = rawArr.map((s) => parseFloat(s)).filter((n) => !isNaN(n));
-                      } else if (opt.item_type === 'integer') {
-                        parsedArr = rawArr.map((s) => parseInt(s, 10)).filter((n) => !isNaN(n));
-                      } else if (opt.item_type === 'boolean') {
-                        parsedArr = rawArr.map((s) => s === 'true' || s === '1');
-                      }
-                      handleChange(parsedArr);
-                    }}
+                    isVisible={visibleAttributes.includes(`options.${opt.name}`)}
+                    onToggleVisible={() => toggleAttributeVisibility(`options.${opt.name}`)}
+                    toggleTitle={`Toggle ${opt.name} on Canvas`}
+                    className="mb-1"
                   />
-                ) : opt.type === 'string' && opt.enum_values && opt.enum_values.length > 0 ? (
-                  <Select value={String(nodeOptVal)} onChange={(e) => handleChange(e.target.value)}>
-                    {isMultiSelection && (
-                      <option value="" disabled hidden>
-                        Mixed
-                      </option>
-                    )}
-                    {opt.enum_values.map((v: string) => (
-                      <option key={v} value={v}>
-                        {v}
-                      </option>
-                    ))}
-                  </Select>
-                ) : opt.type === 'integer' || opt.type === 'float' ? (
-                  <Input
-                    type="number"
-                    step={opt.type === 'float' ? '0.1' : '1'}
-                    value={String(nodeOptVal)}
-                    placeholder={isMultiSelection ? 'Mixed' : String(opt.default || '')}
-                    onFocus={() => useAppStore.getState().beginHistoryTransaction()}
-                    onBlur={() => useAppStore.getState().endHistoryTransaction()}
-                    onChange={(e) => {
-                      const val = opt.type === 'float' ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
-                      if (!isNaN(val)) handleChange(val);
-                    }}
+                  <OptionValueEditor
+                    spec={opt}
+                    value={node?.options?.[opt.name]}
+                    defaultValue={opt.default}
+                    defaultGlobal={opt.default_global}
+                    mixed={isMultiSelection}
+                    onChange={handleChange}
+                    name={opt.name}
                   />
-                ) : opt.type === 'boolean' ? (
-                  <Checkbox checked={Boolean(nodeOptVal)} onChange={(e) => handleChange(e.target.checked)} />
-                ) : (
-                  <Input
-                    type="text"
-                    value={String(nodeOptVal)}
-                    placeholder={isMultiSelection ? 'Mixed' : String(opt.default || '')}
-                    onFocus={() => useAppStore.getState().beginHistoryTransaction()}
-                    onBlur={() => useAppStore.getState().endHistoryTransaction()}
-                    onChange={(e) => handleChange(e.target.value)}
-                    className={cn(String(nodeOptVal).trim() === '' && !isMultiSelection && 'border-status-warning/50')}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+                </div>
+              );
+            })}
+          </div>
+        </ValueEditTransactionContext.Provider>
       )}
     </div>
   );

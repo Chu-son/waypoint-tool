@@ -1,7 +1,14 @@
 import type { OptionsSchema } from './options';
 import type { WaypointNode } from './waypoint';
 import type { AnnotationGroup, AnnotationObject } from './annotation';
-import type { CustomLayer, ExportRegion, OccupancySettings, ProjectMapLayer } from './layer';
+import type {
+  CustomLayer,
+  ExportRegion,
+  LayerVisibilitySet,
+  MapSource,
+  OccupancySettings,
+  ProjectMapLayer,
+} from './layer';
 import type { DefaultExportFormat, ExportProfile, ExportTemplate } from './export';
 import type { RobotFootprint } from './footprint';
 import type { ConditionalStyleRule } from './style';
@@ -21,7 +28,11 @@ export interface ProjectData {
   version?: number;
   root_node_ids?: string[];
   nodes?: Record<string, WaypointNode>;
-  map_layers?: ProjectMapLayer[];
+  /** Loaded maps. Absent in files saved before a map could have several instances. */
+  map_sources?: MapSource[];
+  /** Map instances; in files without `map_sources` these are whole maps carrying their own image and info. */
+  map_layers?: any[];
+  layer_order?: string[];
   custom_layers?: CustomLayer[];
   annotation_objects?: AnnotationObject[];
   annotation_groups?: Record<string, AnnotationGroup>;
@@ -32,6 +43,9 @@ export interface ProjectData {
   export_templates?: any;
   default_export_formats?: DefaultExportFormat[] | string[];
   export_regions?: any[];
+  /** Files saved before layer visibility sets existed have neither field. */
+  layer_visibility_sets?: unknown;
+  active_layer_visibility_set_id?: unknown;
   robot_footprint?: RobotFootprint;
   occupancy_settings?: OccupancySettings;
   default_map_opacity?: number;
@@ -62,12 +76,17 @@ export interface StrictProjectData {
   version: number;
   root_node_ids: string[];
   nodes: Record<string, WaypointNode>;
+  map_sources: MapSource[];
   map_layers: ProjectMapLayer[];
+  /** Ids of every map instance and custom layer, top of the stack first. */
+  layer_order: string[];
   custom_layers: CustomLayer[];
   annotation_objects: AnnotationObject[];
   annotation_groups: Record<string, AnnotationGroup>;
   root_annotation_ids: string[];
   export_regions: ExportRegion[];
+  layer_visibility_sets: LayerVisibilitySet[];
+  active_layer_visibility_set_id: string | null;
   options_schema: OptionsSchema | null;
   export_templates: ExportTemplate[];
   default_export_formats: DefaultExportFormat[];

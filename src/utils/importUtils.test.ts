@@ -87,13 +87,14 @@ describe('buildWaypointsFromImport', () => {
     expect(errors[0]).toContain('#1');
   });
 
-  it('coerces options according to the schema and fills in defaults', () => {
+  it('coerces options present in the source according to the schema', () => {
     const schema: OptionsSchema = {
       options: [
         { name: 'speed', label: 'Speed', type: 'float', default: 1.0 },
         { name: 'wait', label: 'Wait', type: 'integer', default: 0 },
         { name: 'dock', label: 'Dock', type: 'boolean', default: false },
       ],
+      globals: [],
     };
 
     const raw = [
@@ -105,6 +106,16 @@ describe('buildWaypointsFromImport', () => {
 
     expect(errors).toHaveLength(0);
     expect(nodes[0].options).toEqual({ speed: 2.5, wait: 10, dock: true });
-    expect(nodes[1].options).toEqual({ speed: 1.0, wait: 0, dock: false });
+    // 未入力のフィールドに既定値を補完しない: 受け側の defaults を活かせる形式を re-export できるようにするため。
+    expect(nodes[1].options).toEqual({});
+  });
+
+  it('passes through unknown keys not declared in the schema untouched', () => {
+    const schema: OptionsSchema = { options: [{ name: 'speed', label: 'Speed', type: 'float' }], globals: [] };
+    const raw = [{ id: 'wp1', x: 1, y: 2, options: { speed: '2.5', extra_key: 'kept' } }];
+
+    const { nodes } = buildWaypointsFromImport(raw, DEFAULT_IMPORT_MAPPING, schema);
+
+    expect(nodes[0].options).toEqual({ speed: 2.5, extra_key: 'kept' });
   });
 });

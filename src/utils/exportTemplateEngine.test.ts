@@ -4,6 +4,8 @@ import {
   resolveExportPattern,
   resolveExportFiles,
   buildExportTreePreview,
+  findDuplicateOutputPaths,
+  type ResolvedExportFile,
 } from './exportTemplateEngine';
 import { ExportTargetItem } from '../types/store';
 
@@ -172,6 +174,41 @@ describe('exportTemplateEngine', () => {
       ];
       const files = resolveExportFiles(customItems, context);
       expect(files.length).toBe(0);
+    });
+  });
+
+  describe('{{set}} in a map path', () => {
+    const now = new Date(2026, 0, 2, 3, 4, 5);
+
+    it('becomes the name of the layer visibility set, or "current" when no set is named', () => {
+      expect(resolveExportPattern('Map/{{name}}_{{set}}.pgm', { now, name: 'north', setName: 'Nav / Full' })).toBe(
+        'Map/north_Nav _ Full.pgm',
+      );
+      expect(resolveExportPattern('Map/{{name}}_{{SET}}.pgm', { now, name: 'north' })).toBe('Map/north_current.pgm');
+    });
+  });
+
+  describe('findDuplicateOutputPaths', () => {
+    const file = (fullPath: string): ResolvedExportFile => ({
+      item: { id: fullPath, type: 'map_region', sourceId: 'r', relativePathPattern: '', enabled: true },
+      relativePath: fullPath,
+      fullPath,
+      fileName: fullPath,
+      sourceLabel: '',
+    });
+
+    it('lists every path that more than one file would be written to, once', () => {
+      expect(
+        findDuplicateOutputPaths([file('/o/a.pgm'), file('/o/b.pgm'), file('/o/a.pgm'), file('/o/a.pgm')]),
+      ).toEqual(['/o/a.pgm']);
+    });
+
+    it('treats paths that differ only by case as the same file', () => {
+      expect(findDuplicateOutputPaths([file('/o/Map.pgm'), file('/o/map.pgm')])).toEqual(['/o/Map.pgm']);
+    });
+
+    it('reports nothing when every file has its own path', () => {
+      expect(findDuplicateOutputPaths([file('/o/a.pgm'), file('/o/b.pgm')])).toEqual([]);
     });
   });
 });

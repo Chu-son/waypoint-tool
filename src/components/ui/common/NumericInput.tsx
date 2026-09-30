@@ -99,6 +99,20 @@ export function NumericInput({
         if (e.key === 'Enter') {
           commit();
           (e.target as HTMLInputElement).blur();
+          return;
+        }
+        // ArrowUp / ArrowDown step the value; Shift = ×10, Alt = ×0.1
+        const stepSize = Number(step);
+        if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && Number.isFinite(stepSize) && stepSize > 0) {
+          e.preventDefault();
+          const multiplier = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
+          const base = parseFloat(text);
+          let next = (isNaN(base) ? value : base) + (e.key === 'ArrowUp' ? 1 : -1) * stepSize * multiplier;
+          if (min !== undefined) next = Math.max(min, next);
+          if (max !== undefined) next = Math.min(max, next);
+          next = parseFloat(next.toFixed(precision));
+          setText(formatNum(next, precision));
+          onChange(next);
         }
       }}
     />

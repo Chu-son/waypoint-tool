@@ -10,6 +10,7 @@ import {
 } from '../types/store';
 import { quaternionToYaw } from './transformUtils';
 import { hexStringToNumber } from './colorUtils';
+import { resolveWithDefaults } from './optionValues';
 
 // ============================================================================
 // Types
@@ -133,17 +134,14 @@ export function resolvePropertyValue(
     return context?.index !== undefined ? context.index : undefined;
   }
 
-  // 2. Options property (e.g. "options.speed")
+  // 2. Options property (e.g. "options.speed", object フィールドへは "options.navigation.is_through_point")
   if (propPath.startsWith('options.')) {
-    const optKey = propPath.slice(8);
-    let val = target.options?.[optKey];
-    if (val === undefined && optionsSchema?.options) {
-      const optDef = optionsSchema.options.find((o) => o.name === optKey);
-      if (optDef && optDef.default !== undefined) {
-        val = optDef.default;
-      }
-    }
-    return val;
+    const [optKey, ...rest] = propPath.slice(8).split('.');
+    const optDef = optionsSchema?.options?.find((o) => o.name === optKey);
+    // resolveWithDefaults が object/union の中のフィールドまで再帰的に既定値を補ってくれるため、
+    // 残りのドットパスはその結果をたどるだけでよい。
+    const resolved = optDef ? resolveWithDefaults(optDef, target.options?.[optKey]) : target.options?.[optKey];
+    return rest.reduce((cur: any, seg: string) => (cur === undefined || cur === null ? undefined : cur[seg]), resolved);
   }
 
   // 3. Transform properties (e.g. "transform.x", "transform.yaw")
@@ -171,6 +169,26 @@ export function resolvePropertyValue(
   return current;
 }
 
+/** 未設定・空文字・空配列・空オブジェクトを「空」として扱う（object/union/map 値も対象）。 */
+function isEmptyValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === '') return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+}
+
+/**
+ * `contains` 演算子の一致判定。値が object/array（list<union> 等）の場合は、
+ * その中の値（union の判別キーの値も含む）を再帰的に辿って部分一致を探す。
+ */
+function valueContainsText(value: unknown, targetLower: string): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).some((v) => valueContainsText(v, targetLower));
+  }
+  return String(value).toLowerCase().includes(targetLower);
+}
+
 // ============================================================================
 // Condition Evaluation Engine
 // ============================================================================
@@ -191,20 +209,10 @@ export function evaluateRule(
 
   switch (rule.operator) {
     case 'is_empty':
-      return (
-        actualValue === undefined ||
-        actualValue === null ||
-        actualValue === '' ||
-        (Array.isArray(actualValue) && actualValue.length === 0)
-      );
+      return isEmptyValue(actualValue);
 
     case 'is_not_empty':
-      return (
-        actualValue !== undefined &&
-        actualValue !== null &&
-        actualValue !== '' &&
-        (!Array.isArray(actualValue) || actualValue.length > 0)
-      );
+      return !isEmptyValue(actualValue);
 
     case 'equals': {
       if (actualValue === undefined || actualValue === null) {
@@ -270,10 +278,7 @@ export function evaluateRule(
 
     case 'contains': {
       if (actualValue === undefined || actualValue === null) return false;
-      if (Array.isArray(actualValue)) {
-        return actualValue.some((item) => String(item).toLowerCase().includes(String(targetValue).toLowerCase()));
-      }
-      return String(actualValue).toLowerCase().includes(String(targetValue).toLowerCase());
+      return valueContainsText(actualValue, String(targetValue).toLowerCase());
     }
 
     case 'in': {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { contentBounds, fitViewport, screenToWorld, zoomAt, type Viewport } from './viewport';
-import { makeMapLayer } from '../../../test/fixtures';
+import { makeResolvedMapLayer } from '../../../test/fixtures';
 
 const identity: Viewport = { scale: 1, position: { x: 0, y: 0 } };
 const worldToScreen = (x: number, y: number, { scale, position }: Viewport) => ({
@@ -16,7 +16,7 @@ describe('screenToWorld', () => {
 
 describe('contentBounds', () => {
   it('covers a map layer from its origin by width/height × resolution', () => {
-    const layer = makeMapLayer('m', {
+    const layer = makeResolvedMapLayer('m', {
       width: 200,
       height: 100,
       info: { resolution: 0.1, origin: [-5, 2, 0] },
@@ -25,7 +25,11 @@ describe('contentBounds', () => {
   });
 
   it('accounts for a rotated map origin', () => {
-    const layer = makeMapLayer('m', { width: 10, height: 10, info: { resolution: 1, origin: [0, 0, Math.PI / 2] } });
+    const layer = makeResolvedMapLayer('m', {
+      width: 10,
+      height: 10,
+      info: { resolution: 1, origin: [0, 0, Math.PI / 2] },
+    });
     const b = contentBounds([layer], [])!;
     expect(b.minX).toBeCloseTo(-10);
     expect(b.maxX).toBeCloseTo(0);

@@ -80,8 +80,18 @@
 ### レイヤーの操作
 - **表示 / 非表示**: レイヤーカードの目のアイコンをクリックしてトグルします。
 - **不透明度調整**: スライダー（0〜100%）で透過度を滑らかに変更できます。
-- **重ね合わせ順序**: レイヤーカードを上下にドラッグ＆ドロップして描画順序を変更できます。
+- **重ね合わせ順序**: レイヤーカードの上下ボタンで順序を変更できます。マップとカスタムレイヤーは 1 本のスタックにまとまっており、「マップ A の上・マップ B の下」にカスタムレイヤーを挟むこともできます（上にあるレイヤーが後から合成されます）。
 - **アクティブマップ設定**: 複数マップ存在時、基準とするアクティブマップを選択できます。
+
+### マップの一部だけを使う（複製と「Use Area」）
+「map1 の右半分と map2 の左半分だけを使う」といった合成ができます。
+1. マップのレイヤーカードで **複製（コピーアイコン）** を押すと、同じマップを指すレイヤーが直上に追加されます（画像は複製されず、位置合わせ・占有閾値は同じマップの全レイヤーで共有されます。カードに `Shared ×N` と表示されます）。
+2. 設定（スライダーアイコン）を開き、**Use Area** をオンにします。次のいずれかで領域を決めます（座標はワールド座標 m）。
+   - **Draw on canvas**: キャンバス上をドラッグして矩形を描きます（既存の領域は置き換わります。Shift+ドラッグで領域を追加）。領域の 8 つのハンドルをドラッグして大きさを変えられます。描画中は対象のマップを切り抜かずに全体を表示します。**Done drawing**、`V` キー、Esc で終了します。ドラッグ全体が Undo 1 回で、ドラッグ中の Esc で取り消せます。
+   - `Left half` / `Right half` / `Top half` / `Bottom half` で半分を選ぶ。
+   - `X / Y / W / H` で矩形を直接指定する。
+3. **Add area**（または Shift+ドラッグ）で矩形を足すと、和集合の形（L 字など）を作れます。複数の矩形を 1 レイヤーにまとめる代わりに、複製したレイヤーごとに別の領域を割り当てても構いません。
+4. 領域外は合成に参加せず、通常表示・Merged プレビュー・統合エクスポート・プラグインへ渡す占有格子のすべてに反映されます。Use Area をオフにするとマップ全体に戻ります。
 
 ### 3色占有ハイライト表示 (Occupancy Highlight Filter)
 `Settings > Appearance` で「Occupancy Highlight」を有効にすると、PixiJS GPU GLSL シェーダーによりマップ画像がリアルタイムに3色色分け表示されます：
@@ -232,8 +242,121 @@ Waypoint やパス、フットプリント、アノテーションの属性値�
 Waypoint にロボット独自のカスタム属性を付加できます。
 
 1. `Settings > Option Schema` タブを開きます。
-2. **「Add Field」** をクリックし、フィールド名、表示ラベル、型（`string`, `float`, `integer`, `boolean`, `list`）、デフォルト値を設定します。
-3. 「Apply Schema」を押すと、全 Waypoint の Inspector 内に専用の入力フォーム（スライダー、セレクトボックス、トグルスイッチ等）が動的に生成されます。
+2. **「Add Field」** をクリックし、フィールド名、表示ラベル、型を設定します。
+3. 「Apply」を押すと、全 Waypoint の Inspector 内の「Custom Options」セクションに専用の入力フォームが動的に生成されます。
+
+### サポートする型
+
+| 型        | 説明                                                   | Inspector での編集                       |
+| --------- | ------------------------------------------------------ | ----------------------------------------- |
+| `string`  | 文字列。**Choices** を設定するとプルダウンになる。      | テキスト入力 / プルダウン                 |
+| `float` / `integer` | 数値。                                        | 数値入力                                  |
+| `boolean` | 真偽値。                                                | トグルスイッチ                            |
+| `list`    | 配列。要素の型を選べる。                                | 要素がスカラーなら1件ずつの入力欄（カンマ区切りテキストからの一括貼り付けも可）、`object`/`union` 等の構造体なら追加・削除・並べ替えできるカード一覧 |
+| `object`  | 固定フィールドを持つ入れ子オブジェクト。                | フィールドごとの入力欄                    |
+| `map`     | 自由なキーと、共通の値の型を持つ辞書。                  | キーの追加・リネーム・削除 + 値の入力  |
+| `union`   | 判別キー (`Discriminator Key`) の値ごとにフィールド構成が変わるタグ付きバリアント。 | バリアント選択 + 選択中バリアントのフィールド入力（バリアントを切り替えると、同名のフィールドは値を引き継ぎ、新しいバリアントに無いフィールドは破棄される） |
+| `any`     | 構造を規定しない自由な JSON 値。                        | JSON テキスト入力                         |
+| `Ref`     | `Definitions`（後述）で定義した型を参照する。           | 参照先の型と同じ編集 UI                   |
+
+`list`/`object`/`map`/`union` は GUI 上で自由な深さに入れ子にできます（例: `object` のフィールドがさらに `list<union>` を持つ、といった構成も組み立てられます）。
+
+各フィールドには、任意で **Required**（値も既定値も未設定だと Inspector で警告し、エクスポート前に件数を示して確認する）と **Description**（Inspector にツールチップとして表示される補足説明）を設定できます。また、`Ref` 以外のどの型にも **Presets**（名前付きの値の候補）を定義できます。詳しくは後述の「プリセット」を参照してください。
+
+**例: 到達時に実行するアクションの一覧**（`type` によって必要なフィールドが変わる）
+
+同じ構造を複数のフィールドから使い回したい場合は、`Settings > Option Schema` の **Definitions** セクションで名前付きの型を定義し、フィールドの型を `Ref` にしてその名前を選びます。例えば「到達時アクション」を `action` という名前で1つ定義しておけば、`on_reached_actions` と `on_departure_actions` の両方から同じ `action` 型を参照できます。
+
+```yaml
+options:
+  - name: on_reached_actions
+    label: "到達時アクション"
+    type: list
+    item: { type: ref, ref: action }
+definitions:
+  - name: action
+    type: union
+    discriminator: type
+    variants:
+      - value: wait
+        label: "待機"
+        fields:
+          - { name: countdown_ms, label: "待機時間(ms)", type: integer, default: 3000 }
+      - value: service
+        label: "サービス呼び出し"
+        fields:
+          - { name: service, label: "サービス名", type: string, required: true }
+          - { name: request, label: "リクエスト", type: map }
+      - value: amcl_reset
+        label: "AMCLリセット"
+        fields: []
+```
+
+この YAML を `Settings > Option Schema` の **Import** から読み込むと、`on_reached_actions` オプションが定義され、各 Waypoint の Inspector でアクションを1件ずつ追加し、種類（`wait` / `service` / `amcl_reset`）を選んでフィールドを入力できるようになります。`service` フィールドは `required: true` なので、未入力のままだと Inspector に必須マーク（`*`）が表示されます。
+
+### プリセット（名前付きの値の候補）
+
+「tolerance は実際には小/大の2種類しか使わない」「同じサービスを呼ぶアクションを何度も同じ内容で入力するのは大変」といった場合は、フィールドの型に **Presets** を定義しておくと、Inspector からは値を直接入力する代わりに名前で選べるようになります。プリセットの値を後から変更すると、それを参照している全ての Waypoint に一括で反映されます。
+
+1. `Settings > Option Schema` で、フィールド（Option / Global / `object` のフィールド / `union` のバリアントフィールド / Definitions）の型編集欄にある **「Presets」** で **「Add Preset」** をクリックし、名前・表示ラベル・値（既定値と同じ、型付きの入力欄）を設定します。
+2. 「プリセットからのみ選択可能にする」にチェックすると、そのフィールドは自由な値を入力できなくなり、プリセットからの選択に限定されます（チェックしない場合は、プリセットを選ぶこともカスタム値を入力することもできます）。
+3. Apply 後、Inspector の対象フィールドにプリセットのプルダウンが現れます。プリセットを選ぶと、値はそのプリセットへの参照になり、下の入力欄は参照先の値を読み取り専用で表示します。「カスタム値」を選ぶと、参照していた値をコピーして編集を続けられます。
+
+`union` 型そのものにプリセットを付けると、「定型のアクション一式」を丸ごと再利用できます。`definitions` に定義した型のプリセットは、その型を `ref` で参照している全箇所で共有されます。
+
+```yaml
+options:
+  - name: through_tolerance
+    label: "通過判定半径 [m]"
+    type: float
+    default: 3.0
+    presets:
+      - { name: small, label: "小 (1.5m)", value: 1.5 }
+      - { name: large, label: "大 (3.0m)", value: 3.0 }
+definitions:
+  - name: action
+    type: union
+    discriminator: type
+    presets:
+      - name: front_lidar_on
+        label: "前方LiDAR 有効化"
+        value: { type: service, service: /front_lidar/enable, srv_module: std_srvs.srv, srv_class: SetBool, request: { data: true } }
+    variants:
+      - value: service
+        fields:
+          - { name: service, label: "サービス名", type: string, required: true }
+          - { name: srv_module, label: "モジュール", type: string, required: true }
+          - { name: srv_class, label: "クラス名", type: string, required: true }
+          - { name: request, label: "リクエスト", type: map }
+```
+
+**既存の値をプリセットへまとめて置き換える**: すでに入力済みの値（インポートした値を含む）が、あるプリセットと完全に一致していても、自動では参照に変わりません。`Settings > Option Schema` の該当プリセットに「使用中: N件」「一致する未参照の値: M件」という表示が出るので（Apply 済みで未適用の編集が無いときだけ表示されます）、「一致する値を参照に置換」をクリックすると、一致する全ての値を一括で参照に置き換えます（Undo 可能）。
+
+**プリセットの名前変更・削除**: プリセットの名前を変えると、既存の参照は「未定義のプリセット」として警告されます（Inspector から選び直せます）。プリセット自体を削除して Apply すると、それを参照していた値は自動的に削除前の実際の値へ展開され（エクスポート結果が変わらないように）、件数を示して確認されます。
+
+### 未設定の値とスキーマ既定値の違い
+
+フィールドに何も入力しなければ、その値は「未設定」としてプロジェクトファイルに保存されません（`default` を書いても、それはあくまで Inspector の表示や、エクスポート時の補完に使われるだけです）。この区別は、「フィールドを省略すると受け側のデフォルトが使われる」形式の外部フォーマットへ書き出す際に重要です。
+
+- 値を明示的に入力したフィールドには、Inspector に「既定値に戻す」ボタン（↺）が表示され、クリックすると未設定に戻ります。
+- 未設定のフィールドには、既定値がプレースホルダとグレーの「既定」バッジで示されます（実際の値としては保存されません）。
+- エクスポートテンプレートからは、次の2種類の値を参照できます。
+  - `options.*`: スキーマの既定値を補った実効値（既存のテンプレートと同じ、これまでどおりの参照方法）
+  - `raw_options.*`: 明示的に入力された値だけ（未入力のフィールドは含まれない）
+
+### グローバルフィールド（プロジェクト全体の変数）
+
+Waypoint ごとではなく、プロジェクト全体で1つの値を持つ変数を定義できます。エクスポートするファイルに「デフォルト速度」のような全体設定の項目がある場合に使います。ウェイポイント属性と同じ型（`object`/`union` 等も含む）を利用できます。
+
+1. `Settings > Option Schema` タブの **「Global Fields」** で **「Add Global」** をクリックし、フィールド名、表示ラベル、型、**値（Value）** を設定して「Apply」を押します。値はプロジェクト（`.wptroj`）に保存されます。
+2. `Settings > Export Templates` のテンプレート編集欄に **Global Fields** のチップが表示されます。クリックすると、選択中のテンプレートエンジンに応じた参照式（Handlebars なら `{{@root.globals.フィールド名}}`、Jinja なら `{{ globals.フィールド名 }}`）が挿入されます。
+3. エクスポート時、テンプレート内でグローバルフィールドの値に置き換わります。
+
+- 値が未入力のフィールドは出力に含まれず、テンプレート上では空になります。
+- 既定のYAML/JSON出力（テンプレートを使わない形式）にはグローバルフィールドは含まれません。
+
+
+**フィールドの既定値をグローバルに連動させる**: 出力の `defaults:` にグローバル値を書き、ウェイポイントでは省略したフィールドを受信側に任せる運用では、フィールドの既定値とグローバル値が食い違うと、Inspector の表示と実際の挙動がずれてしまいます。これを避けるには、`Settings > Option Schema` のフィールドの **Default** 欄で「グローバル変数に連動」を選び、参照するグローバルを指定します。以後、そのフィールドの既定値はグローバルの現在値になり（Inspector には「既定: true（グローバル default_is_through_point）」のように出所が表示されます）、グローバルの値を変えて Apply するだけで両方が揃います。グローバル側には、連動しているフィールドの一覧が表示されます。
 
 ---
 
@@ -268,9 +391,44 @@ Waypoint にロボット独自のカスタム属性を付加できます。
 
 ## 12. インポート・エクスポート & プロファイル
 
-### Handlebars テンプレートによる自由出力
+### カスタムテンプレートによる自由出力
 `File > Export Waypoints...`（または `Ctrl + E`）から実行します。
-`Settings > Export Templates` で定義した Handlebars テンプレートにより、標準の YAML だけでなく、JSON、CSV、ROS2 Nav2 XML 形式など任意のフォーマットで出力可能です。
+`Settings > Export Templates` で定義したテンプレートにより、標準の YAML だけでなく、JSON、CSV、ROS2 Nav2 XML 形式など任意のフォーマットで出力可能です。テンプレートごとに **Engine**（`Jinja` または `Handlebars`）を選べます。
+
+- **Jinja**（新規テンプレートの既定）: MiniJinja による Jinja2 互換のテンプレートエンジン。`{% for %}`/`{% if %}` による反復・分岐、四則演算・比較・論理演算、`tojson`（コンパクトな JSON 断片）、`toyaml`（ブロック形式の YAML 断片。`toyaml(2)` のように字下げ幅を指定できる）、`round`/`default`/`length` 等の標準フィルタが使えます。未定義の変数を出力・反復・属性アクセスしようとするとエラーになり typo を早期に検出できますが、`is defined` による存在チェックはエラーになりません。
+- **Handlebars**: 既存プロジェクトとの後方互換のために残しています。`{{#each waypoints}}...{{/each}}` で反復し、ループの外の値は `{{@root.変数名}}` で参照します。
+
+いずれのエンジンでも、各ウェイポイントについて次の値を参照できます。
+
+| 変数 | 内容 |
+| --- | --- |
+| `index`, `id`, `type` | 連番インデックス、ノードID、種別 |
+| `x`, `y`, `z`, `yaw`, `qx`, `qy`, `qz`, `qw` | 座標・姿勢 |
+| `options.*` | カスタム属性（スキーマの既定値を補った実効値） |
+| `raw_options.*` | カスタム属性（明示的に入力された値だけ） |
+
+**例: mg_robot 形式の `on_reached_actions` を Jinja + `toyaml` で出力する**
+
+```jinja
+version: "2.0"
+defaults:
+  is_through_point: true
+waypoints:
+{% for wp in waypoints %}
+  - index: {{ wp.index }}
+    pose:
+      position: {x: {{ wp.x }}, y: {{ wp.y }}, z: {{ wp.z }}}
+      orientation: {x: {{ wp.qx }}, y: {{ wp.qy }}, z: {{ wp.qz }}, w: {{ wp.qw }}}
+    navigation:
+      is_through_point: {{ wp.options.is_through_point | tojson }}
+{% if wp.raw_options.on_reached_actions is defined %}
+    on_reached_actions:
+{{ wp.raw_options.on_reached_actions | toyaml(6) }}
+{% endif %}
+{% endfor %}
+```
+
+`raw_options.on_reached_actions` を使っているのは、アクションを設定していないウェイポイントでは `on_reached_actions` フィールド自体を出力しないためです（`options.on_reached_actions` を使うと、スキーマの既定値まで書き出されてしまいます）。実際に動く完全なサンプルは `docs/sample/option_schemas/` にあります。
 
 ### テンプレートインポート
 `File > Import Waypoints...` から、外部ファイルを読み込めます。テンプレート内容からカラムマッピングが自動推論（`infer_import_mapping`）されるため、CSV 等のデータも手軽に取り込めます。
@@ -278,6 +436,7 @@ Waypoint にロボット独自のカスタム属性を付加できます。
 ### 一括エクスポートプロファイル (Export Profiles)
 複数のエクスポート処理（例: ゴール地点YAML、通過点JSON、切り出しマップ画像PNG）を1つの「プロファイル」として保存し、ワンクリックで全ファイルを一括生成できます。
 - 出力先ファイルの既存ファイル衝突を事前に検知し、「上書き（Overwrite）」または「自動バックアップ（Backup）」を安全に選択できます。
+- Option Schema で `required` を設定したフィールドが未入力（既定値も無い）のウェイポイントがある場合、あるいは値の型がスキーマと合わない場合は、件数を示す確認ダイアログが表示されます。エクスポート自体はブロックされないため、意図的に空のまま出力したい場合は「続行」を選べます。
 
 ### マップ切り出しエクスポート
 ツールバーの **「Add Export Region」** でキャンバス上に領域枠を作成し、`File > Export Maps...` から指定範囲のマップ画像のみを高解像度ラスタライズして保存できます。

@@ -1,4 +1,5 @@
 use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellValue {
@@ -73,6 +74,30 @@ pub fn apply_blend_cell(current: CellValue, incoming: CellValue, blend_mode: &st
     }
 }
 
+/// ワールド座標 (m) の矩形。`x`/`y` は最小コーナー (Y 上向き)。
+/// 半開区間 [x, x+width) × [y, y+height) を表すため、辺を共有する 2 つの矩形は重ならず隙間も生じない。
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub struct ClipRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// レイヤーのうち合成に参加する範囲 (矩形の和集合)。
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LayerClip {
+    pub rects: Vec<ClipRect>,
+}
+
+impl LayerClip {
+    pub fn contains(&self, world_x: f64, world_y: f64) -> bool {
+        self.rects
+            .iter()
+            .any(|r| world_x >= r.x && world_x < r.x + r.width && world_y >= r.y && world_y < r.y + r.height)
+    }
+}
+
 pub struct LayerInput<'a> {
     pub id: &'a str,
     pub image: &'a DynamicImage,
@@ -80,6 +105,8 @@ pub struct LayerInput<'a> {
     pub origin: [f64; 3],
     pub blend_mode: &'a str,
     pub z_index: i32,
+    /// `None` はレイヤー全体を使う。
+    pub clip: Option<&'a LayerClip>,
 }
 
 pub struct RectRegion {
@@ -115,6 +142,12 @@ pub fn blend_layers_to_image(layers: &[LayerInput], region: &RectRegion, output_
             for c in 0..out_w {
                 let world_x = region.x + (c as f64) * output_resolution;
                 let world_y = region.y + ((out_h - 1 - r) as f64) * output_resolution;
+
+                if let Some(clip) = layer.clip {
+                    if !clip.contains(world_x, world_y) {
+                        continue;
+                    }
+                }
 
                 let dx = world_x - layer.origin[0];
                 let dy = world_y - layer.origin[1];
@@ -233,6 +266,7 @@ mod tests {
             origin: [0.0, 0.0, PI / 2.0],
             blend_mode: "overwrite",
             z_index: 0,
+            clip: None,
         };
 
         let region = RectRegion {
@@ -250,5 +284,132 @@ mod tests {
         // Check pixel at (c=1, r=1) which is world (-1.0, 0.0) -> top-left of original image (Obstacle)
         let px = result.get_pixel(1, 1).0;
         assert_eq!(classify_pixel(px), CellValue::Obstacle);
+    }
+
+    fn solid_image(size: u32, cell: CellValue) -> DynamicImage {
+        DynamicImage::ImageRgba8(RgbaImage::from_pixel(size, size, cell.to_rgba()))
+    }
+
+    fn cell_at(img: &RgbaImage, col: u32, row: u32) -> CellValue {
+        classify_pixel(img.get_pixel(col, row).0)
+    }
+
+    fn clip_of(x: f64, y: f64, width: f64, height: f64) -> LayerClip {
+        LayerClip {
+            rects: vec![ClipRect { x, y, width, height }],
+        }
+    }
+
+    #[test]
+    fn clipped_layers_contribute_only_inside_their_clip() {
+        // 4x4 m region at 1 m/px. map1 (all obstacle) keeps only the left half,
+        // map2 (all free) keeps only the right half.
+        let obstacles = solid_image(4, CellValue::Obstacle);
+        let free = solid_image(4, CellValue::Free);
+        let left = clip_of(0.0, 0.0, 2.0, 4.0);
+        let right = clip_of(2.0, 0.0, 2.0, 4.0);
+        let layers = [
+            LayerInput {
+                id: "map1",
+                image: &obstacles,
+                resolution: 1.0,
+                origin: [0.0, 0.0, 0.0],
+                blend_mode: "overwrite",
+                z_index: 0,
+                clip: Some(&left),
+            },
+            LayerInput {
+                id: "map2",
+                image: &free,
+                resolution: 1.0,
+                origin: [0.0, 0.0, 0.0],
+                blend_mode: "overwrite",
+                z_index: 1,
+                clip: Some(&right),
+            },
+        ];
+        let region = RectRegion {
+            x: 0.0,
+            y: 0.0,
+            width: 4.0,
+            height: 4.0,
+        };
+
+        let out = blend_layers_to_image(&layers, &region, 1.0);
+
+        for row in 0..4 {
+            assert_eq!(cell_at(&out, 0, row), CellValue::Obstacle);
+            assert_eq!(cell_at(&out, 1, row), CellValue::Obstacle);
+            assert_eq!(cell_at(&out, 2, row), CellValue::Free);
+            assert_eq!(cell_at(&out, 3, row), CellValue::Free);
+        }
+    }
+
+    #[test]
+    fn clip_of_several_rects_forms_an_l_shape() {
+        let obstacles = solid_image(4, CellValue::Obstacle);
+        let l_shape = LayerClip {
+            rects: vec![
+                ClipRect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 2.0,
+                    height: 4.0,
+                },
+                ClipRect {
+                    x: 2.0,
+                    y: 0.0,
+                    width: 2.0,
+                    height: 2.0,
+                },
+            ],
+        };
+        let layers = [LayerInput {
+            id: "map",
+            image: &obstacles,
+            resolution: 1.0,
+            origin: [0.0, 0.0, 0.0],
+            blend_mode: "overwrite",
+            z_index: 0,
+            clip: Some(&l_shape),
+        }];
+        let region = RectRegion {
+            x: 0.0,
+            y: 0.0,
+            width: 4.0,
+            height: 4.0,
+        };
+
+        let out = blend_layers_to_image(&layers, &region, 1.0);
+
+        // Row 0 is the top of the region (world y = 3), row 3 the bottom (world y = 0).
+        assert_eq!(cell_at(&out, 0, 0), CellValue::Obstacle); // upper left: inside the tall rect
+        assert_eq!(cell_at(&out, 3, 0), CellValue::Unknown); // upper right: outside the L
+        assert_eq!(cell_at(&out, 3, 3), CellValue::Obstacle); // lower right: inside the short rect
+    }
+
+    #[test]
+    fn layers_without_a_clip_use_the_whole_layer() {
+        let obstacles = solid_image(2, CellValue::Obstacle);
+        let layers = [LayerInput {
+            id: "map",
+            image: &obstacles,
+            resolution: 1.0,
+            origin: [0.0, 0.0, 0.0],
+            blend_mode: "overwrite",
+            z_index: 0,
+            clip: None,
+        }];
+        let region = RectRegion {
+            x: 0.0,
+            y: 0.0,
+            width: 2.0,
+            height: 2.0,
+        };
+
+        let out = blend_layers_to_image(&layers, &region, 1.0);
+
+        assert_eq!(cell_at(&out, 0, 0), CellValue::Obstacle);
+        assert_eq!(cell_at(&out, 1, 1), CellValue::Obstacle);
     }
 }

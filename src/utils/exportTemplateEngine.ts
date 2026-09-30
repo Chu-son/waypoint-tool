@@ -4,7 +4,11 @@ export interface ExportVariableContext {
   now?: Date;
   projectName?: string;
   name?: string; // テンプレート名やマップ領域名
+  setName?: string; // マップ出力に使うレイヤー表示セット名
 }
+
+/** `{{set}}` が指すもの: 表示セットを指定しない項目（現在の表示で出力）の呼び名。 */
+export const CURRENT_DISPLAY_SET_NAME = 'current';
 
 /**
  * 相対パスを正規化し、先頭スラッシュの除去およびパストラバーサル（..）の排除を行う
@@ -90,6 +94,7 @@ export function resolveExportPattern(pattern: string, context: ExportVariableCon
   result = result.replace(/\{\{project_name\}\}/gi, projectName);
   result = result.replace(/\{\{projectName\}\}/gi, projectName);
   result = result.replace(/\{\{name\}\}/gi, name);
+  result = result.replace(/\{\{set\}\}/gi, sanitizeFilenamePart(context.setName || CURRENT_DISPLAY_SET_NAME));
 
   return normalizeRelativePath(result);
 }
@@ -130,12 +135,16 @@ export function resolveExportFiles(
     projectName: string;
     rootDir: string;
     availableRegions: { id: string; name: string }[];
+    /** Layer visibility sets that map items can name; `{{set}}` in a map path becomes the item's set name. */
+    availableVisibilitySets?: { id: string; name: string }[];
     templates: { id: string; name: string; extension: string }[];
     defaultFormats: { id: string; name: string; extension: string }[];
   },
 ): ResolvedExportFile[] {
   const result: ResolvedExportFile[] = [];
   const normalizedRoot = context.rootDir.replace(/\\/g, '/').replace(/\/+$/, '');
+  const setNameOf = (item: ExportTargetItem) =>
+    context.availableVisibilitySets?.find((s) => s.id === item.visibilitySetId)?.name;
 
   for (const item of items) {
     if (item.type === 'map_all_regions') {
@@ -161,6 +170,7 @@ export function resolveExportFiles(
           now: context.now,
           projectName: context.projectName,
           name: reg.name,
+          setName: setNameOf(item),
         });
 
         // 拡張子調整
@@ -201,6 +211,7 @@ export function resolveExportFiles(
         now: context.now,
         projectName: context.projectName,
         name: reg.name,
+        setName: setNameOf(item),
       });
       const ext = item.mapFormat === 'png_only' ? 'png' : 'pgm';
       const baseWithoutExt = resolvedRelPath.replace(/\.(pgm|png|yaml)$/i, '');
@@ -286,6 +297,22 @@ export function resolveExportFiles(
   }
 
   return result;
+}
+
+/**
+ * Output paths that more than one file would be written to (compared without regard to case, since
+ * Windows file names are). The later file would silently replace the earlier one.
+ */
+export function findDuplicateOutputPaths(files: ResolvedExportFile[]): string[] {
+  const seen = new Map<string, string>();
+  const duplicates = new Set<string>();
+  for (const file of files) {
+    const key = file.fullPath.toLowerCase();
+    const first = seen.get(key);
+    if (first === undefined) seen.set(key, file.fullPath);
+    else duplicates.add(first);
+  }
+  return [...duplicates];
 }
 
 /**

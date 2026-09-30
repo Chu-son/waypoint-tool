@@ -503,7 +503,6 @@ describe('pluginSlice - executePipeline', () => {
           info: { resolution: 0.05, origin: [0, 0, 0], width: 5, height: 5 },
           visible: true,
           opacity: 0.7,
-          z_index: 0,
           pipeline_metadata: {
             pipeline_id: 'sample_pipeline',
             pipeline_execution_id: existingExecId,
@@ -521,7 +520,6 @@ describe('pluginSlice - executePipeline', () => {
           info: { resolution: 0.05, origin: [0, 0, 0], width: 5, height: 5 },
           visible: true,
           opacity: 0.7,
-          z_index: 1,
           pipeline_metadata: {
             pipeline_id: 'sample_pipeline',
             pipeline_execution_id: existingExecId,

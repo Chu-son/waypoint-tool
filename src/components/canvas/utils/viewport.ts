@@ -6,7 +6,7 @@
  *   screenX = worldX * scale + position.x + 400
  *   screenY = -worldY * scale + position.y + 400
  */
-import type { ProjectMapLayer } from '../../../types/store';
+import type { ResolvedMapLayer } from '../../../types/store';
 
 export const VIEWPORT_ORIGIN_OFFSET = 400;
 export const MIN_SCALE = 0.01;
@@ -25,7 +25,7 @@ export function screenToWorld(screenX: number, screenY: number, { scale, positio
 }
 
 /** World-space bounding box of map layers (respecting their origin yaw) and extra points. */
-export function contentBounds(mapLayers: ProjectMapLayer[], points: Array<{ x: number; y: number }>): Bounds | null {
+export function contentBounds(mapLayers: ResolvedMapLayer[], points: Array<{ x: number; y: number }>): Bounds | null {
   let minX = Infinity,
     minY = Infinity,
     maxX = -Infinity,

@@ -35,7 +35,7 @@ my_plugin/
     - `max_points`: 最大点数（省略可、デフォルト 50）。
     - `allow_yaw`: 各点に向き（Yaw）を持たせるか（デフォルト `false`）。
   - `type: "rectangle"`: 範囲をドラッグで指定。
-  - `type: "waypoint"`: 既存のウェイポイントを選択。プラグインには `{ id, name, transform, options }` の正規化ペイロードが渡されます（参照先ノードが削除されていた場合は `null` となり事前バリデーションで検知可能）。
+  - `type: "waypoint"`: 既存のウェイポイントを選択。プラグインには `{ id, name, transform, options }` の正規化ペイロードが渡されます（参照先ノードが削除されていた場合は `null` となり事前バリデーションで検知可能）。`options` は Option Schema で定義された型（`object`/`map`/`union` を含む）に応じて、スカラー・配列だけでなく入れ子の JSON オブジェクトを持つ場合があります。プラグイン側では、想定するキー以外はそのまま無視してください。
   - `type: "annotation"`: プロジェクト内の参照用アノテーションオブジェクトを選択。
     - `object_type`: 受け付けたいアノテーションの種類（`"point"`, `"oriented_point"`, `"line"`, `"rect"`, `"circle"`, `"any"`。デフォルト `"any"`）。
     - `multiple`: 複数選択を許可するか（`true` の場合は配列、`false` の場合は単一オブジェクト）。

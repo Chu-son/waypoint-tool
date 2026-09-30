@@ -8,9 +8,13 @@ import {
   CircularFootprint,
   ConditionalStyleRule,
   ExportProfile,
+  LayerVisibilitySet,
+  OptionsSchema,
 } from '../../types/store';
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { normalizeGeoMap } from './geoMapNormalization';
+import { normalizeMapStack } from './mapStackNormalization';
+import { normalizeOptionsSchema } from '../../utils/optionSchema';
 import { v4 as uuidv4 } from 'uuid';
 
 export const DEFAULT_ROBOT_FOOTPRINT: CircularFootprint = {
@@ -198,70 +202,40 @@ export function normalizeV1(raw: any): StrictProjectData {
         ? data.defaultMapOpacity
         : DEFAULT_MAP_OPACITY;
 
-  // 3. マップレイヤー
-  const rawMapLayers = data.map_layers ?? data.mapLayers;
-  const mapLayersList = Array.isArray(rawMapLayers) ? rawMapLayers : [];
-  const mapLayers = mapLayersList.map((layer: any, index: number) => {
-    const rawInfo = layer?.info && typeof layer.info === 'object' ? layer.info : {};
-    const rawOrigin = rawInfo.origin;
-    const origin: [number, number, number] =
-      Array.isArray(rawOrigin) && rawOrigin.length >= 2
-        ? [Number(rawOrigin[0]) || 0, Number(rawOrigin[1]) || 0, Number(rawOrigin[2]) || 0]
-        : [0, 0, 0];
-    const initial_origin: [number, number, number] =
-      Array.isArray(rawInfo.initial_origin) && rawInfo.initial_origin.length >= 2
-        ? [
-            Number(rawInfo.initial_origin[0]) || 0,
-            Number(rawInfo.initial_origin[1]) || 0,
-            Number(rawInfo.initial_origin[2]) || 0,
-          ]
-        : [...origin];
-    const info = {
-      ...rawInfo,
-      origin,
-      initial_origin,
-    };
-    return {
-      id: layer?.id || uuidv4(),
-      name: layer?.name || `Map Layer ${index + 1}`,
-      info,
-      image_base64: layer?.image_base64 || layer?.imageBase64 || '',
-      width: typeof layer?.width === 'number' ? layer.width : 1000,
-      height: typeof layer?.height === 'number' ? layer.height : 1000,
-      visible: typeof layer?.visible === 'boolean' ? layer.visible : true,
-      opacity: typeof layer?.opacity === 'number' ? layer.opacity : defaultMapOpacity,
-      z_index: typeof layer?.z_index === 'number' ? layer.z_index : index,
-      blend_mode: layer?.blend_mode || 'overwrite',
-    };
-  });
-
-  // 4. カスタムレイヤー (edit_layers / generated_layers の吸収)
+  // 3. カスタムレイヤー (edit_layers / generated_layers の吸収)
+  // 旧形式は各レイヤーが z_index を持つ。積み順は layer_order に一本化したため、
+  // ここでは z_index の昇順（= 配列の上から下）に並べてからフィールドを除去する。
+  const legacyZIndex = new Map<string, number>();
   let customLayers: CustomLayer[] = [];
   const rawCustomLayers = data.custom_layers ?? data.customLayers;
   if (Array.isArray(rawCustomLayers)) {
-    customLayers = rawCustomLayers.map((l: any, i: number) => ({
-      ...l,
-      id: l?.id || uuidv4(),
-      is_reference: l?.is_reference ?? false,
-      z_index: typeof l?.z_index === 'number' ? l.z_index : i,
-      editObjects:
-        l?.type === 'manual'
-          ? Array.isArray(l.editObjects ?? l.edit_objects)
-            ? (l.editObjects ?? l.edit_objects).map((o: any) => ({ ...o, id: o?.id || uuidv4() }))
-            : []
-          : undefined,
-    }));
+    customLayers = rawCustomLayers.map((l: any, i: number) => {
+      const id = l?.id || uuidv4();
+      legacyZIndex.set(id, typeof l?.z_index === 'number' ? l.z_index : i);
+      return {
+        ...l,
+        id,
+        is_reference: l?.is_reference ?? false,
+        editObjects:
+          l?.type === 'manual'
+            ? Array.isArray(l.editObjects ?? l.edit_objects)
+              ? (l.editObjects ?? l.edit_objects).map((o: any) => ({ ...o, id: o?.id || uuidv4() }))
+              : []
+            : undefined,
+      };
+    });
   } else {
     const rawEdit = data.edit_layers ?? data.editLayers;
     if (Array.isArray(rawEdit)) {
       rawEdit.forEach((el: any) => {
+        const id = el?.id || uuidv4();
+        legacyZIndex.set(id, typeof el?.z_index === 'number' ? el.z_index : customLayers.length);
         customLayers.push({
-          id: el?.id || uuidv4(),
+          id,
           name: el?.name || 'Manual Layer',
           type: 'manual',
           visible: el?.visible ?? true,
           opacity: typeof el?.opacity === 'number' ? el.opacity : 1.0,
-          z_index: typeof el?.z_index === 'number' ? el.z_index : customLayers.length,
           blend_mode: el?.blend_mode || 'overwrite',
           is_reference: el?.is_reference ?? false,
           editObjects: Array.isArray(el?.editObjects ?? el?.edit_objects)
@@ -273,8 +247,10 @@ export function normalizeV1(raw: any): StrictProjectData {
     const rawGen = data.generated_layers ?? data.generatedLayers;
     if (Array.isArray(rawGen)) {
       rawGen.forEach((gl: any) => {
+        const id = gl?.id || uuidv4();
+        legacyZIndex.set(id, typeof gl?.z_index === 'number' ? gl.z_index : customLayers.length);
         customLayers.push({
-          id: gl?.id || uuidv4(),
+          id,
           name: gl?.name || 'Generated Layer',
           type: 'plugin',
           plugin_id: gl?.plugin_id || '',
@@ -284,15 +260,21 @@ export function normalizeV1(raw: any): StrictProjectData {
           info: gl?.info || {},
           visible: gl?.visible ?? true,
           opacity: typeof gl?.opacity === 'number' ? gl.opacity : 0.7,
-          z_index: typeof gl?.z_index === 'number' ? gl.z_index : customLayers.length,
           blend_mode: gl?.blend_mode || 'overwrite',
           is_reference: gl?.is_reference ?? false,
         });
       });
     }
   }
-  customLayers.sort((a, b) => a.z_index - b.z_index);
-  customLayers = customLayers.map((l, i) => ({ ...l, z_index: i }));
+  customLayers = customLayers
+    .map((layer): CustomLayer => {
+      const { z_index: _legacyZIndex, ...rest } = layer as CustomLayer & { z_index?: number };
+      return rest as CustomLayer;
+    })
+    .sort((a, b) => (legacyZIndex.get(a.id) ?? 0) - (legacyZIndex.get(b.id) ?? 0));
+
+  // 4. マップレイヤー（ソース / インスタンス / 積み順）
+  const { mapSources, mapLayers, layerOrder } = normalizeMapStack(data, customLayers, defaultMapOpacity);
 
   // 5. アノテーション
   const rawAnnotations = data.annotation_objects ?? data.annotationObjects;
@@ -325,8 +307,11 @@ export function normalizeV1(raw: any): StrictProjectData {
   const rawExportRegions = data.export_regions ?? data.exportRegions;
   const exportRegions = Array.isArray(rawExportRegions) ? rawExportRegions : [];
 
+  // スキーマ未定義（null）と、フィールド0件の空スキーマは意味が異なるため区別する。
+  // 旧形式（list の item_type がフラットに置かれた形等）は normalizeOptionsSchema が吸収する。
   const rawOptionsSchema = data.options_schema ?? data.optionsSchema;
-  const optionsSchema = rawOptionsSchema && typeof rawOptionsSchema === 'object' ? rawOptionsSchema : null;
+  const optionsSchema: OptionsSchema | null =
+    rawOptionsSchema && typeof rawOptionsSchema === 'object' ? normalizeOptionsSchema(rawOptionsSchema) : null;
 
   const rawExportTemplates = data.export_templates ?? data.exportTemplates;
   const exportTemplates = Array.isArray(rawExportTemplates) ? rawExportTemplates : [];
@@ -477,6 +462,9 @@ export function normalizeV1(raw: any): StrictProjectData {
                 mapFormat:
                   item.mapFormat === 'png_only' || item.map_format === 'png_only' ? 'png_only' : 'ros_standard',
                 includeMapImage: Boolean(item.includeMapImage ?? item.include_map_image),
+                ...(typeof (item.visibilitySetId ?? item.visibility_set_id) === 'string'
+                  ? { visibilitySetId: item.visibilitySetId ?? item.visibility_set_id }
+                  : {}),
                 enabled: item.enabled !== false,
               }))
             : [],
@@ -487,11 +475,35 @@ export function normalizeV1(raw: any): StrictProjectData {
   const activeExportProfileId: string | null =
     typeof rawActiveProfileId === 'string' ? rawActiveProfileId : (exportProfiles[0]?.id ?? null);
 
+  // レイヤー表示セット。存在しないレイヤーのエントリは、ここで取り除く。
+  const existingLayerIds = new Set([...mapLayers.map((l) => l.id), ...customLayers.map((l) => l.id)]);
+  const rawVisibilitySets = data.layer_visibility_sets ?? data.layerVisibilitySets;
+  const layerVisibilitySets: LayerVisibilitySet[] = Array.isArray(rawVisibilitySets)
+    ? rawVisibilitySets
+        .filter((s: any) => s && typeof s === 'object')
+        .map((s: any) => ({
+          id: typeof s.id === 'string' ? s.id : uuidv4(),
+          name: typeof s.name === 'string' && s.name.trim() ? s.name : 'Layer Set',
+          visibility: Object.fromEntries(
+            Object.entries(s.visibility && typeof s.visibility === 'object' ? s.visibility : {}).filter(
+              ([layerId, visible]) => typeof visible === 'boolean' && existingLayerIds.has(layerId),
+            ),
+          ) as Record<string, boolean>,
+        }))
+    : [];
+
+  const rawActiveVisibilitySetId = data.active_layer_visibility_set_id ?? data.activeLayerVisibilitySetId;
+  const activeLayerVisibilitySetId: string | null = layerVisibilitySets.some((s) => s.id === rawActiveVisibilitySetId)
+    ? rawActiveVisibilitySetId
+    : null;
+
   return {
     version: 1,
     root_node_ids: rootNodeIds,
     nodes,
+    map_sources: mapSources,
     map_layers: mapLayers,
+    layer_order: layerOrder,
     custom_layers: customLayers,
     annotation_objects: annotationObjects,
     annotation_groups: annotationGroups,
@@ -518,6 +530,8 @@ export function normalizeV1(raw: any): StrictProjectData {
     conditional_styles_enabled: conditionalStylesEnabled,
     export_profiles: exportProfiles,
     active_export_profile_id: activeExportProfileId,
+    layer_visibility_sets: layerVisibilitySets,
+    active_layer_visibility_set_id: activeLayerVisibilitySetId,
     geo_map: normalizeGeoMap(data.geo_map),
     custom_ui_data: customUiData,
   };

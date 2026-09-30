@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { RobotFootprint } from '../../../types/store';
 import { quaternionToYaw } from '../../../utils/transformUtils';
 import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { CANVAS_FOOTPRINT_SELECTED_COLOR, CANVAS_MUTED_COLOR } from '../canvasConstants';
 import {
   parseColorSafe,
@@ -20,7 +21,8 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
   const nodes = useAppStore((state) => state.nodes);
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const conditionalStyles = useAppStore((state) => state.conditionalStyles);
   const conditionalStylesEnabled = useAppStore((state) => state.conditionalStylesEnabled);
 

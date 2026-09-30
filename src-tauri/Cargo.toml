@@ -1,6 +1,6 @@
 [package]
 name = "waypoint-tool"
-version = "0.0.1"
+version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -34,6 +34,7 @@ flate2 = "1.1.9"
 semver = "1.0"
 tempfile = "3.25.0"
 ureq = "2"
+minijinja = { version = "2.24.0", features = ["json", "loop_controls"] }
 
 [dev-dependencies]
 

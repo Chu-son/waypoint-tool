@@ -1,11 +1,24 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, type SyntheticEvent } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
 import { v4 as uuidv4 } from 'uuid';
 import { ExportProfile, ExportTargetItem, ExportTargetType } from '../../../types/store';
-import { resolveExportFiles, buildExportTreePreview } from '../../../utils/exportTemplateEngine';
-import { extractWaypointsForExport } from '../../../utils/exportWaypointUtils';
-import { buildExportPackageItems, formatSessionTimestamp } from '../../../utils/exportPackage';
+import {
+  resolveExportFiles,
+  buildExportTreePreview,
+  findDuplicateOutputPaths,
+} from '../../../utils/exportTemplateEngine';
+import {
+  extractGlobalsForExport,
+  extractWaypointsForExport,
+  countWaypointsWithInvalidOptions,
+} from '../../../utils/exportWaypointUtils';
+import {
+  buildExportPackageItems,
+  findMapVisibilityProblems,
+  formatSessionTimestamp,
+} from '../../../utils/exportPackage';
+import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
 import { confirmAction, notify } from '../../../services/notify';
@@ -18,23 +31,54 @@ interface UseExportPlanOptions {
 /** State and actions behind the export dialog: profile/item editing, file preview, conflict check and execution. */
 export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const rawExportProfiles = useAppStore((state) => state.exportProfiles);
-  const exportProfiles =
+  const storeProfiles =
     Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0 ? rawExportProfiles : DEFAULT_EXPORT_PROFILES;
-  const activeExportProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
-  const addExportProfile = useAppStore((state) => state.addExportProfile);
-  const updateExportProfile = useAppStore((state) => state.updateExportProfile);
-  const removeExportProfile = useAppStore((state) => state.removeExportProfile);
-  const setActiveExportProfileId = useAppStore((state) => state.setActiveExportProfileId);
-  const duplicateExportProfile = useAppStore((state) => state.duplicateExportProfile);
+  const storeActiveProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
+  const replaceExportProfiles = useAppStore((state) => state.replaceExportProfiles);
+
+  // Edits are kept in a draft and only reach the store on save; cancelling discards them.
+  const [draft, setDraft] = useState<{ profiles: ExportProfile[]; activeId: string } | null>(null);
+  useEffect(() => {
+    setDraft(isOpen ? { profiles: storeProfiles, activeId: storeActiveProfileId } : null);
+    // Re-seed only when the dialog is opened or closed, not on every store change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+  const exportProfiles = draft?.profiles ?? storeProfiles;
+  const activeExportProfileId = draft?.activeId ?? storeActiveProfileId;
+
+  const updateExportProfile = (id: string, updates: Partial<ExportProfile>) =>
+    setDraft((d) => d && { ...d, profiles: d.profiles.map((p) => (p.id === id ? { ...p, ...updates } : p)) });
+  const setActiveExportProfileId = (id: string) => setDraft((d) => d && { ...d, activeId: id });
+  const addExportProfile = (profile: ExportProfile) =>
+    setDraft((d) => d && { profiles: [...d.profiles, profile], activeId: profile.id });
+  const removeExportProfile = (id: string) =>
+    setDraft((d) => {
+      if (!d) return d;
+      const profiles = d.profiles.filter((p) => p.id !== id);
+      return { profiles, activeId: d.activeId === id ? (profiles[0]?.id ?? d.activeId) : d.activeId };
+    });
+  const duplicateExportProfile = (id: string) =>
+    setDraft((d) => {
+      const source = d?.profiles.find((p) => p.id === id);
+      if (!d || !source) return d;
+      const copy: ExportProfile = {
+        ...source,
+        id: uuidv4(),
+        name: `${source.name} (Copy)`,
+        items: source.items.map((item) => ({ ...item, id: uuidv4() })),
+      };
+      return { profiles: [...d.profiles, copy], activeId: copy.id };
+    });
 
   const exportTemplates = useAppStore((state) => state.exportTemplates) || [];
   const defaultExportFormats = useAppStore((state) => state.defaultExportFormats) || [];
   const exportRegions = useAppStore((state) => state.exportRegions) || [];
-  const mapLayers = useAppStore((state) => state.mapLayers) || [];
-  const customLayers = useAppStore((state) => state.customLayers) || [];
+  const layerVisibilitySets = useAppStore((state) => state.layerVisibilitySets);
   const rootNodeIds = useAppStore((state) => state.rootNodeIds) || [];
   const nodes = useAppStore((state) => state.nodes) || {};
-  const optionsSchema = useAppStore((state) => state.optionsSchema);
+  const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
+  // エクスポート内容の構築（既定値の補完・globals の抽出）は ref を解決した実効スキーマで行う。
+  const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
@@ -43,6 +87,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
 
   // Variable chip inserter input ref (must be called unconditionally before early returns)
   const inputRef = useRef<HTMLInputElement>(null);
+  const selectionRef = useRef<{ start: number; end: number } | null>(null);
 
   // Active profile fallback
   const activeProfile = useMemo(() => {
@@ -88,6 +133,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
       projectName,
       rootDir,
       availableRegions: exportRegions.map((r) => ({ id: r.id, name: r.name })),
+      availableVisibilitySets: layerVisibilitySets,
       templates: exportTemplates.map((t) => ({
         id: t.id,
         name: t.name,
@@ -99,7 +145,16 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
         extension: f.extension,
       })),
     });
-  }, [activeProfile.items, sessionDate, projectName, rootDir, exportRegions, exportTemplates, defaultExportFormats]);
+  }, [
+    activeProfile.items,
+    sessionDate,
+    projectName,
+    rootDir,
+    exportRegions,
+    layerVisibilitySets,
+    exportTemplates,
+    defaultExportFormats,
+  ]);
 
   // Build tree from resolved files
   const treeNodes = useMemo(() => {
@@ -222,20 +277,37 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     if (!selectedItem) return;
     const currentPattern = selectedItem.relativePathPattern;
     const input = inputRef.current;
-    if (input) {
-      const start = input.selectionStart || currentPattern.length;
-      const end = input.selectionEnd || currentPattern.length;
-      const newPattern = currentPattern.substring(0, start) + varName + currentPattern.substring(end);
-      handleUpdateItem(selectedItem.id, { relativePathPattern: newPattern });
-      setTimeout(() => {
-        input.focus();
-        input.setSelectionRange(start + varName.length, start + varName.length);
-      }, 0);
-    } else {
-      handleUpdateItem(selectedItem.id, {
-        relativePathPattern: currentPattern + varName,
-      });
+    const remembered = selectionRef.current;
+    const start = Math.min(remembered?.start ?? currentPattern.length, currentPattern.length);
+    const end = Math.min(remembered?.end ?? start, currentPattern.length);
+    const newPattern = currentPattern.substring(0, start) + varName + currentPattern.substring(end);
+    handleUpdateItem(selectedItem.id, { relativePathPattern: newPattern });
+    const caret = start + varName.length;
+    selectionRef.current = { start: caret, end: caret };
+    setTimeout(() => {
+      input?.focus();
+      input?.setSelectionRange(caret, caret);
+    }, 0);
+  };
+
+  // Remember the caret so chip clicks (which blur the input) still insert where the user left off
+  const handlePatternSelect = (e: SyntheticEvent<HTMLInputElement>) => {
+    const { selectionStart, selectionEnd } = e.currentTarget;
+    if (selectionStart !== null && selectionEnd !== null) {
+      selectionRef.current = { start: selectionStart, end: selectionEnd };
     }
+  };
+
+  const commitDraft = () => replaceExportProfiles(exportProfiles, activeProfile.id);
+
+  const handleSaveOnly = () => {
+    commitDraft();
+    onClose();
+  };
+
+  const handleSaveAndExport = async () => {
+    commitDraft();
+    await handleExecuteExport();
   };
 
   // Execute export
@@ -249,6 +321,39 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     if (!rootDir) {
       void notify('出力先ルートフォルダを指定してください。');
       return;
+    }
+
+    const invalidCount = countWaypointsWithInvalidOptions(rootNodeIds, nodes, optionsSchema);
+    if (invalidCount > 0) {
+      const proceed = await confirmAction(
+        `${invalidCount} 件のウェイポイントで、必須項目が未入力、または値の型がスキーマと一致していません。このままエクスポートを続けますか？`,
+      );
+      if (!proceed) return;
+    }
+
+    const mapProblems = findMapVisibilityProblems(enabledItems, layerVisibilitySets, useAppStore.getState());
+    if (mapProblems.missingSetPatterns.length > 0) {
+      void notify(
+        `マップ出力が参照するレイヤー表示セットが削除されています。出力項目の表示セットを選び直してください。\n${mapProblems.missingSetPatterns.join('\n')}`,
+      );
+      return;
+    }
+
+    const mapFiles = resolvedFiles.filter((f) => f.item.enabled && f.item.type.startsWith('map'));
+    const duplicatePaths = findDuplicateOutputPaths(mapFiles);
+    if (duplicatePaths.length > 0) {
+      void notify(
+        `同じ出力先に複数のマップが書き込まれます。出力パスパターンに {{set}} や {{name}} を含めて、ファイル名が重ならないようにしてください。\n${duplicatePaths.join('\n')}`,
+      );
+      return;
+    }
+
+    if (mapProblems.undecided.length > 0) {
+      const detail = mapProblems.undecided.map((u) => `「${u.setName}」: ${u.count} 件`).join('\n');
+      const proceed = await confirmAction(
+        `セットの保存後に追加されたレイヤーがあります。これらは現在の表示状態のまま出力されます。このままエクスポートを続けますか？\n${detail}`,
+      );
+      if (!proceed) return;
     }
 
     try {
@@ -265,7 +370,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           // 1. Prepare map raster layers if map export is required
           let preparedLayers: any[] = [];
           if (hasMapItems) {
-            preparedLayers = await prepareLayersForExport(mapLayers, customLayers);
+            // Hidden layers are prepared too: each map item chooses its layers with its own visibility.
+            preparedLayers = await prepareLayersForExport(useAppStore.getState(), { includeHidden: true });
           }
 
           // 2. Extract map shot canvas if requested
@@ -285,6 +391,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             projectName,
             rootDir,
             availableRegions: exportRegions.map((r) => ({ id: r.id, name: r.name })),
+            availableVisibilitySets: layerVisibilitySets,
             templates: exportTemplates.map((t) => ({
               id: t.id,
               name: t.name,
@@ -302,6 +409,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             resolvedFiles: resolvedTargetFiles,
             templates: exportTemplates,
             regions: exportRegions,
+            visibilitySets: layerVisibilitySets,
+            layerStack: useAppStore.getState(),
             waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
             mapLayers: preparedLayers,
             mapImageB64: imageDataB64,
@@ -312,6 +421,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             root_dir: rootDir,
             conflict_resolution: activeProfile.conflictResolution,
             session_timestamp: formatSessionTimestamp(sessionDate),
+            globals: extractGlobalsForExport(optionsSchema),
             waypoint_items: waypointItems,
             map_items: mapItems,
           });
@@ -337,14 +447,17 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     conflictFiles,
     exportProfiles,
     exportRegions,
+    layerVisibilitySets,
     handleAddItem,
     handleAddProfile,
     handleDeleteItem,
     handleDeleteProfile,
     handleDuplicateProfile,
-    handleExecuteExport,
     handleInsertVariable,
+    handlePatternSelect,
     handleRootDirChange,
+    handleSaveAndExport,
+    handleSaveOnly,
     handleToggleItemEnabled,
     handleUpdateItem,
     inputRef,

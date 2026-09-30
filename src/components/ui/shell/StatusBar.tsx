@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../../../stores/appStore';
+import { useResolvedMapLayers } from '../../../hooks/useResolvedMapLayers';
 import {
   MousePointer2,
   MapPin,
@@ -89,7 +90,7 @@ export const StatusBar: React.FC = () => {
   const isInitialLaunch = useAppStore((state) => state.isInitialLaunch);
   const pluginDataModalState = useAppStore((state) => state.pluginDataModalState);
   const customLayers = useAppStore((state) => state.customLayers);
-  const mapLayers = useAppStore((state) => state.mapLayers);
+  const mapLayers = useResolvedMapLayers();
   const enableSnapping = useAppStore((state) => state.enableSnapping);
   const setEnableSnapping = useAppStore((state) => state.setEnableSnapping);
   const isDirty = useAppStore((state) => state.isDirty);

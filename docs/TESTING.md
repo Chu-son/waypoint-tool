@@ -62,7 +62,7 @@ it('Delete removes the selected waypoints', () => {
 | `setup.ts` | jest-dom 拡張、pointer capture のポリフィル |
 | `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
 | `render.tsx` | `renderWithStore(ui, state)` → `{ user, ...render結果 }` |
-| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMapLayer` / `makeManualCustomLayer` / `makePlugin` |
+| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップとカスタムレイヤーを上から順に並べたスタックのストア状態）/ `makeManualCustomLayer` / `makePlugin` |
 | `mocks/pixi.tsx` | PixiJS スタブ、描画呼び出しを記録する `createGraphicsRecorder()` |
 
 テストデータはファクトリで作り、**テストの意図に関係するフィールドだけ** を上書きする。
