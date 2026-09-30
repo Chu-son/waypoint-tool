@@ -3,13 +3,21 @@ import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
 import { v4 as uuidv4 } from 'uuid';
 import { ExportProfile, ExportTargetItem, ExportTargetType } from '../../../types/store';
-import { resolveExportFiles, buildExportTreePreview } from '../../../utils/exportTemplateEngine';
+import {
+  resolveExportFiles,
+  buildExportTreePreview,
+  findDuplicateOutputPaths,
+} from '../../../utils/exportTemplateEngine';
 import {
   extractGlobalsForExport,
   extractWaypointsForExport,
   countWaypointsWithInvalidOptions,
 } from '../../../utils/exportWaypointUtils';
-import { buildExportPackageItems, formatSessionTimestamp } from '../../../utils/exportPackage';
+import {
+  buildExportPackageItems,
+  findMapVisibilityProblems,
+  formatSessionTimestamp,
+} from '../../../utils/exportPackage';
 import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
@@ -65,6 +73,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const exportTemplates = useAppStore((state) => state.exportTemplates) || [];
   const defaultExportFormats = useAppStore((state) => state.defaultExportFormats) || [];
   const exportRegions = useAppStore((state) => state.exportRegions) || [];
+  const layerVisibilitySets = useAppStore((state) => state.layerVisibilitySets);
   const rootNodeIds = useAppStore((state) => state.rootNodeIds) || [];
   const nodes = useAppStore((state) => state.nodes) || {};
   const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -124,6 +133,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
       projectName,
       rootDir,
       availableRegions: exportRegions.map((r) => ({ id: r.id, name: r.name })),
+      availableVisibilitySets: layerVisibilitySets,
       templates: exportTemplates.map((t) => ({
         id: t.id,
         name: t.name,
@@ -135,7 +145,16 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
         extension: f.extension,
       })),
     });
-  }, [activeProfile.items, sessionDate, projectName, rootDir, exportRegions, exportTemplates, defaultExportFormats]);
+  }, [
+    activeProfile.items,
+    sessionDate,
+    projectName,
+    rootDir,
+    exportRegions,
+    layerVisibilitySets,
+    exportTemplates,
+    defaultExportFormats,
+  ]);
 
   // Build tree from resolved files
   const treeNodes = useMemo(() => {
@@ -312,6 +331,31 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
       if (!proceed) return;
     }
 
+    const mapProblems = findMapVisibilityProblems(enabledItems, layerVisibilitySets, useAppStore.getState());
+    if (mapProblems.missingSetPatterns.length > 0) {
+      void notify(
+        `マップ出力が参照するレイヤー表示セットが削除されています。出力項目の表示セットを選び直してください。\n${mapProblems.missingSetPatterns.join('\n')}`,
+      );
+      return;
+    }
+
+    const mapFiles = resolvedFiles.filter((f) => f.item.enabled && f.item.type.startsWith('map'));
+    const duplicatePaths = findDuplicateOutputPaths(mapFiles);
+    if (duplicatePaths.length > 0) {
+      void notify(
+        `同じ出力先に複数のマップが書き込まれます。出力パスパターンに {{set}} や {{name}} を含めて、ファイル名が重ならないようにしてください。\n${duplicatePaths.join('\n')}`,
+      );
+      return;
+    }
+
+    if (mapProblems.undecided.length > 0) {
+      const detail = mapProblems.undecided.map((u) => `「${u.setName}」: ${u.count} 件`).join('\n');
+      const proceed = await confirmAction(
+        `セットの保存後に追加されたレイヤーがあります。これらは現在の表示状態のまま出力されます。このままエクスポートを続けますか？\n${detail}`,
+      );
+      if (!proceed) return;
+    }
+
     try {
       const hasMapItems = enabledItems.some((i) => i.type === 'map_region' || i.type === 'map_all_regions');
       const hasMapShot = enabledItems.some((i) => i.includeMapImage);
@@ -326,7 +370,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           // 1. Prepare map raster layers if map export is required
           let preparedLayers: any[] = [];
           if (hasMapItems) {
-            preparedLayers = await prepareLayersForExport(useAppStore.getState());
+            // Hidden layers are prepared too: each map item chooses its layers with its own visibility.
+            preparedLayers = await prepareLayersForExport(useAppStore.getState(), { includeHidden: true });
           }
 
           // 2. Extract map shot canvas if requested
@@ -346,6 +391,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             projectName,
             rootDir,
             availableRegions: exportRegions.map((r) => ({ id: r.id, name: r.name })),
+            availableVisibilitySets: layerVisibilitySets,
             templates: exportTemplates.map((t) => ({
               id: t.id,
               name: t.name,
@@ -363,6 +409,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             resolvedFiles: resolvedTargetFiles,
             templates: exportTemplates,
             regions: exportRegions,
+            visibilitySets: layerVisibilitySets,
+            layerStack: useAppStore.getState(),
             waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
             mapLayers: preparedLayers,
             mapImageB64: imageDataB64,
@@ -399,6 +447,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     conflictFiles,
     exportProfiles,
     exportRegions,
+    layerVisibilitySets,
     handleAddItem,
     handleAddProfile,
     handleDeleteItem,

@@ -350,14 +350,21 @@ export type PreparedExportLayer = {
  * Prepares the visible map instances and custom layers (manual & plugin) of the layer stack for
  * export or preview. `z_index` follows the stack order, bottom first, so blending honours the order
  * the user arranged across map and custom layers alike.
+ *
+ * With `includeHidden`, hidden layers are prepared as well, for callers that decide per export which
+ * layers to draw (see `layerVisibility` of an export region). Reference layers are never included.
  */
-export async function prepareLayersForExport(stack: LayerStack): Promise<PreparedExportLayer[]> {
+export async function prepareLayersForExport(
+  stack: LayerStack,
+  options: { includeHidden?: boolean } = {},
+): Promise<PreparedExportLayer[]> {
   const { customLayers, layerOrder } = stack;
+  const includeHidden = options.includeHidden === true;
   const zIndexes = stackZIndexes(layerOrder);
   const zOf = (id: string) => zIndexes.get(id) ?? 0;
 
   const mappedMapLayers: PreparedExportLayer[] = orderedMapLayers(stack)
-    .filter((l) => l.visible)
+    .filter((l) => includeHidden || l.visible)
     .map((l) => ({
       id: l.id,
       name: l.name,
@@ -374,7 +381,7 @@ export async function prepareLayersForExport(stack: LayerStack): Promise<Prepare
 
   const customLayerExports = await Promise.all(
     customLayers
-      .filter((l) => l.visible && !l.is_reference)
+      .filter((l) => (includeHidden || l.visible) && !l.is_reference)
       .map(async (cl): Promise<PreparedExportLayer | null> => {
         const zIndex = zOf(cl.id);
 
