@@ -1,7 +1,7 @@
 import { Plus, Save, Upload, Download, Database, Globe, BookMarked } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { DefinitionDef, GlobalFieldDef, OptionDef, OptionsSchema, OptionValue } from '../../../types/store';
+import { DefinitionDef, GlobalFieldDef, OptionDef } from '../../../types/store';
 import { Button } from '../common/Button';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
@@ -9,8 +9,9 @@ import { FieldEditor } from './optionSchema/FieldEditor';
 import { SchemaGlobalsContext } from './optionSchema/SchemaGlobalsContext';
 import { DefinitionListEditor } from './optionSchema/DefinitionListEditor';
 import { confirmAction, notify } from '../../../services/notify';
-import { collectGlobalDefaultLinks, normalizeOptionsSchema, validateSchema } from '../../../utils/optionSchema';
-import { collectPresetScopes, inlineRemovedPresets } from '../../../utils/optionPresets';
+import { applyOptionsSchema } from '../../../services/optionSchemaApply';
+import { collectGlobalDefaultLinks } from '../../../utils/optionSchema';
+import { deepEqual } from '../../../utils/optionValues';
 
 // `optionsSchema.definitions` が無いスキーマでは `?? []` の代わりにこの安定した参照を使う。
 // 呼び出しの度に新しい配列を作ってしまうと、`isAppliedAndUnchanged` の参照比較が常に偽になる。
@@ -29,13 +30,7 @@ function uniqueFieldName(base: string, fields: { name: string }[]) {
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
-  const setGlobalOptionsSchema = useAppStore((state) => state.setOptionsSchema);
-  const lastDirectory = useAppStore((state) => state.lastDirectory);
-  const nodes = useAppStore((state) => state.nodes);
-  const annotationObjects = useAppStore((state) => state.annotationObjects);
-  const updateNodes = useAppStore((state) => state.updateNodes);
-  const updateAnnotationObject = useAppStore((state) => state.updateAnnotationObject);
-  const runInHistoryTransaction = useAppStore((state) => state.runInHistoryTransaction);
+  const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
 
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
   const [localGlobals, setLocalGlobals] = useState<GlobalFieldDef[]>([]);
@@ -65,74 +60,12 @@ export function OptionSchemaTab() {
     localDefinitions === (globalOptionsSchema.definitions ?? EMPTY_DEFINITIONS);
 
   const handleSaveOptions = async () => {
-    // トップレベルのキー重複・空欄、既定値・グローバル値の型不一致、union のバリアント重複や
-    // 判別キーとの名前衝突、ref の未定義・循環参照まで、すべて validateSchema が再帰的に検証する。
-    const schemaErrors = validateSchema({
+    const applied = await applyOptionsSchema({
       options: localOptions,
       globals: localGlobals,
       definitions: localDefinitions,
     });
-
-    if (schemaErrors.length > 0) {
-      void notify(`スキーマの定義に誤りがあります。\n${schemaErrors[0].message} (${schemaErrors[0].path})`);
-      return;
-    }
-
-    // 構造を常に正規形（discriminator の既定値補完、item の既定 {type: 'string'} 補完等）で保存する。
-    const normalized = normalizeOptionsSchema({
-      options: localOptions,
-      globals: localGlobals,
-      definitions: localDefinitions,
-    });
-
-    // 直前に Apply されていたスキーマと比べて、消えたプリセット（フィールド自体の削除・改名を含む）が
-    // あれば、それを参照している値をプリセットの実際の値に展開する。展開しないまま Apply すると、
-    // 値が `$preset` を指したままになり、そのプリセットの定義が無くなってエクスポート結果が壊れてしまう。
-    if (globalOptionsSchema) {
-      const oldScopes = collectPresetScopes(globalOptionsSchema);
-      const newScopes = collectPresetScopes(normalized);
-      const removals: { scope: string; name: string; value: OptionValue }[] = [];
-      oldScopes.forEach((oldPresets, scope) => {
-        const newNames = new Set((newScopes.get(scope) ?? []).map((p) => p.name));
-        oldPresets.forEach((p) => {
-          if (!newNames.has(p.name)) removals.push({ scope, name: p.name, value: p.value });
-        });
-      });
-
-      if (removals.length > 0) {
-        const nodeIds = Object.keys(nodes);
-        const annotationIds = Object.keys(annotationObjects);
-        const optionValuesList = [
-          ...nodeIds.map((id) => nodes[id].options ?? {}),
-          ...annotationIds.map((id) => annotationObjects[id].options ?? {}),
-        ];
-        const oldGlobalValues = Object.fromEntries(globalOptionsSchema.globals.map((g) => [g.name, g.value]));
-        const result = inlineRemovedPresets(globalOptionsSchema, optionValuesList, oldGlobalValues, removals);
-
-        if (result.count > 0) {
-          const proceed = await confirmAction(
-            `削除されたプリセットへの参照が ${result.count} 件あります。実際の値に展開してから保存しますか？`,
-          );
-          if (!proceed) return;
-
-          runInHistoryTransaction(() => {
-            const nodeUpdates: Record<string, { options: (typeof result.optionValuesList)[number] }> = {};
-            nodeIds.forEach((id, i) => {
-              nodeUpdates[id] = { options: result.optionValuesList[i] };
-            });
-            if (Object.keys(nodeUpdates).length > 0) updateNodes(nodeUpdates);
-            annotationIds.forEach((id, i) => {
-              updateAnnotationObject(id, { options: result.optionValuesList[nodeIds.length + i] });
-            });
-          });
-          normalized.globals = normalized.globals.map((g) => ({ ...g, value: result.globalValues[g.name] }));
-        }
-      }
-    }
-
-    setGlobalOptionsSchema(normalized);
-    useAppStore.setState({ isDirty: true });
-    void notify('オプションスキーマを保存しました。');
+    if (applied) void notify('オプションスキーマを保存しました。');
   };
 
   const handleAddOption = () => {
@@ -176,58 +109,24 @@ export function OptionSchemaTab() {
     }
   };
 
+  // Apply していない編集があるか。インポートはストアのスキーマへ直接反映するので、この編集は上書きされる。
+  const hasUnappliedEdits = !deepEqual(
+    { options: localOptions, globals: localGlobals, definitions: localDefinitions },
+    {
+      options: globalOptionsSchema?.options ?? [],
+      globals: globalOptionsSchema?.globals ?? [],
+      definitions: globalOptionsSchema?.definitions ?? [],
+    },
+  );
+
   const handleImportSchema = async () => {
-    try {
-      const { DialogAPI, BackendAPI } = await import('../../../api');
-      const selectedPath = await DialogAPI.open({
-        multiple: false,
-        defaultPath: lastDirectory || undefined,
-        filters: [
-          {
-            name: 'Options Schema',
-            extensions: ['json', 'yaml', 'yml'],
-          },
-        ],
-      });
-      if (!selectedPath) return;
-
-      const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
-      if (!pathStr) return;
-
-      const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
-      const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
-      useAppStore.getState().setLastDirectory(dir);
-
-      let rawSchema: any;
-
-      if (pathStr.endsWith('.yaml') || pathStr.endsWith('.yml')) {
-        rawSchema = await BackendAPI.loadOptionsSchema(pathStr);
-      } else {
-        const fileContent = await BackendAPI.readTextFile(pathStr);
-        let parsed: any;
-        try {
-          parsed = JSON.parse(fileContent);
-        } catch {
-          void notify('ファイルの形式が不正です（JSONではありません）。');
-          return;
-        }
-        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.options)) {
-          void notify('有効な Options Schema ファイルではありません。');
-          return;
-        }
-        rawSchema = parsed;
-      }
-
-      // 旧形式（item_type がフラットに置かれた list 等）を含む可能性があるため、必ず正規化を通す。
-      const schema: OptionsSchema = normalizeOptionsSchema(rawSchema);
-      setLocalOptions(schema.options);
-      setLocalGlobals(schema.globals);
-      setLocalDefinitions(schema.definitions || []);
-      void notify('オプションスキーマをインポートしました。');
-    } catch (err) {
-      console.error('Failed to import options schema:', err);
-      void notify(`インポートに失敗しました。\n詳細: ${String(err)}`);
+    if (hasUnappliedEdits) {
+      const proceed = await confirmAction(
+        '適用していない編集内容があります。インポートすると、この編集内容は破棄されます。続けますか？',
+      );
+      if (!proceed) return;
     }
+    setImportModalOpen(true, 'optionSchema');
   };
 
   return (

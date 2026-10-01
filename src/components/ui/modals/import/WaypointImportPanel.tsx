@@ -1,25 +1,22 @@
-import { Upload, Wand2 } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useAppStore } from '../../../stores/appStore';
-import { BackendAPI, DialogAPI } from '../../../api';
-import { Modal, ModalHeader, ModalContent, ModalFooter } from '../common/Modal';
-import { Button } from '../common/Button';
-import { Label } from '../common/Label';
-import { Input } from '../common/Input';
-import { Select } from '../common/Select';
-import { OptionCard } from '../common/OptionCard';
-import { FieldLabel } from '../common/FieldLabel';
-import { BrowseInput } from '../common/BrowseInput';
-import { AlertBox } from '../common/AlertBox';
-import { ExportTemplate, ImportFieldMapping } from '../../../types/store';
-import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from '../../../utils/importUtils';
-import { resolveOptionsSchema } from '../../../utils/optionSchema';
-import { notify } from '../../../services/notify';
-
-interface ImportModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+import { useAppStore } from '../../../../stores/appStore';
+import { BackendAPI } from '../../../../api';
+import { ModalContent, ModalFooter } from '../../common/Modal';
+import { Button } from '../../common/Button';
+import { Label } from '../../common/Label';
+import { Input } from '../../common/Input';
+import { Select } from '../../common/Select';
+import { OptionCard } from '../../common/OptionCard';
+import { FieldLabel } from '../../common/FieldLabel';
+import { BrowseInput } from '../../common/BrowseInput';
+import { AlertBox } from '../../common/AlertBox';
+import { ExportTemplate, ImportFieldMapping } from '../../../../types/store';
+import { buildWaypointsFromImport, DEFAULT_IMPORT_MAPPING } from '../../../../utils/importUtils';
+import { resolveOptionsSchema } from '../../../../utils/optionSchema';
+import { IMPORT_FILE_FILTERS, pickImportFile } from '../../../../services/importFiles';
+import { notify } from '../../../../services/notify';
+import type { ImportPanelProps } from './types';
 
 type PreviewState = {
   count: number;
@@ -43,10 +40,10 @@ const MAPPING_FIELDS: { key: keyof ImportFieldMapping; label: string; hint: stri
   },
 ];
 
-export function ImportModal({ isOpen, onClose }: ImportModalProps) {
+/** 外部のウェイポイントファイル（yaml / json）を、書式とフィールドの対応づけを指定して取り込む。 */
+export function WaypointImportPanel({ onClose }: ImportPanelProps) {
   const exportTemplates = useAppStore((state) => state.exportTemplates);
-  const lastDirectory = useAppStore((state) => state.lastDirectory);
-  const setLastDirectory = useAppStore((state) => state.setLastDirectory);
+  const defaultExportFormats = useAppStore((state) => state.defaultExportFormats);
   const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
   const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const addNode = useAppStore((state) => state.addNode);
@@ -62,8 +59,6 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
 
   const selectedTemplate = useMemo(() => exportTemplates.find((t) => t.id === formatId), [exportTemplates, formatId]);
   const isCustomTemplate = !!selectedTemplate;
-
-  if (!isOpen) return null;
 
   const autoDetectMapping = async (t: ExportTemplate) => {
     setMappingError(null);
@@ -93,21 +88,10 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
   };
 
   const handleSelectFile = async () => {
-    const selected = await DialogAPI.open({
-      multiple: false,
-      defaultPath: lastDirectory || undefined,
-      filters: [{ name: 'Waypoint File', extensions: ['yaml', 'yml', 'json'] }],
-    });
-    if (selected) {
-      const pathStr = typeof selected === 'string' ? selected : (selected as any).path;
-      if (!pathStr) return;
-      setFilePath(pathStr);
-      setPreview(null);
-      if (lastDirectory !== pathStr) {
-        const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
-        if (lastSlash > -1) setLastDirectory(pathStr.substring(0, lastSlash));
-      }
-    }
+    const path = await pickImportFile(IMPORT_FILE_FILTERS.waypoints);
+    if (!path) return;
+    setFilePath(path);
+    setPreview(null);
   };
 
   const runParse = async () => {
@@ -157,13 +141,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="3xl" className="h-[85vh]">
-      <ModalHeader
-        onClose={onClose}
-        icon={<Upload size={20} className="text-primary-base" />}
-        title="Import Waypoints"
-      />
-
+    <>
       <ModalContent className="p-0">
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           <div className="space-y-3">
@@ -174,9 +152,8 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
           <div className="space-y-3">
             <FieldLabel>File Format / Template</FieldLabel>
             <Select value={formatId} onChange={(e) => void handleSelectFormat(e.target.value)}>
-              {useAppStore
-                .getState()
-                .defaultExportFormats.filter((f) => f.enabled)
+              {defaultExportFormats
+                .filter((f) => f.enabled)
                 .map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name} (.{f.extension})
@@ -261,6 +238,6 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
           Import
         </Button>
       </ModalFooter>
-    </Modal>
+    </>
   );
 }

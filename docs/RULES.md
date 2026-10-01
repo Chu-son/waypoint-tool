@@ -40,7 +40,7 @@
 - **`ui/`**: 画面を構成するUIコンポーネント全般。**`ui/` 直下にはファイルを置かず**、必ず以下のいずれかのサブディレクトリに配置する。
   - **`ui/common/`**: ボタン、入力欄、モーダル枠など、汎用・再利用可能な純粋な表示要素（2ファイル以上で共通利用）。
   - **`ui/shell/`**: アプリの外枠（TopMenu, ToolPanel, StatusBar, PanelContainer/PanelRegistry, ThemeInjector 等）。
-  - **`ui/modals/`**: モーダルダイアログ（Export, Import, Settings, Welcome, KeyboardShortcuts 等）。
+  - **`ui/modals/`**: モーダルダイアログ（Export, Import, Settings, Welcome, KeyboardShortcuts 等）。インポートは入口（`ImportHubModal`）と取り込み対象ごとのパネルから成るため、親名のサブディレクトリ `ui/modals/import/` に置く。
   - **`ui/trees/`**: 階層ツリー（WaypointTree, AnnotationTree とそのパネル）。
   - **`ui/layers/`**: マップ・カスタムレイヤー・エクスポート領域の一覧パネル。
   - **`ui/plugins/`**: プラグイン一覧・パラメータ・入力エディタ。
@@ -156,6 +156,8 @@
 - **ローカルでの Escape 握りつぶし禁止**:
   個別の UI コンポーネントや Canvas イベントハンドラが `e.stopPropagation()` 等を用いて Escape キーイベントを無秩序に消費（握りつぶし）してはならない。
   局所的な過渡状態の中断は、後述の `registerCanvasAbortHandler` または DOM フォーカスの `blur()` を介してパイプラインから適切に起動されなければならない。
+- **モーダルの Escape は最前面の 1 つだけ**:
+  共通 `Modal` は開いているインスタンスの積み順を持ち、Escape には最前面の `Modal` だけが応答する（`stopPropagation` は使わない）。モーダルの上にモーダルを重ねる実装（設定画面 → インポート画面など）は、この仕組みに任せ、独自の Escape ハンドラを足してはならない。
 
 ### 5.4 過渡ジェスチャーのアトミック性とポインタ喪失保護 (Gesture Atomicity & Pointer Loss Protection Rule)
 - **Abort ハンドラーの登録義務とロールバック保証**:

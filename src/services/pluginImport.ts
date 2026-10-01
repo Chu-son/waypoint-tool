@@ -24,14 +24,16 @@ function registerCustomPlugins(added: PluginInstance[]) {
 /**
  * Ask for one or more folders and import every plugin found in them (a plugin folder itself, or a
  * parent folder containing several plugins).
+ *
+ * @returns whether any plugin was imported (false when cancelled, nothing was found or loading failed).
  */
-export async function importPluginFolders(defaultPath?: string | null): Promise<void> {
-  if (!(await confirmUntrustedCode())) return;
+export async function importPluginFolders(defaultPath?: string | null): Promise<boolean> {
+  if (!(await confirmUntrustedCode())) return false;
   try {
     const targetPaths = toPathList(
       await DialogAPI.open({ multiple: true, directory: true, defaultPath: defaultPath || undefined }),
     );
-    if (targetPaths.length === 0) return;
+    if (targetPaths.length === 0) return false;
 
     const scanned: PluginInstance[] = [];
     for (const path of targetPaths) {
@@ -46,7 +48,7 @@ export async function importPluginFolders(defaultPath?: string | null): Promise<
     const found = dedupePluginsById(scanned);
     if (found.length === 0) {
       void notify('指定されたディレクトリに有効なプラグイン (manifest.json) が見つかりませんでした。');
-      return;
+      return false;
     }
 
     registerCustomPlugins(found);
@@ -57,9 +59,11 @@ export async function importPluginFolders(defaultPath?: string | null): Promise<
       const names = found.map((p) => p.manifest?.name || p.id).join(', ');
       void notify(`${found.length} 個のプラグインを一括インポートしました:\n${names}`);
     }
+    return true;
   } catch (err) {
     console.error('Failed to load custom plugin:', err);
     void notify(`Custom Plugin の読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
+    return false;
   }
 }
 

@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
+import { makeAnnotationGroup } from '../../test/fixtures';
+import { getAppState, resetAppStore } from '../../test/store';
 
 describe('HistorySlice (Undo/Redo)', () => {
   beforeEach(() => {
@@ -141,6 +143,20 @@ describe('HistorySlice (Undo/Redo)', () => {
     // Redo should restore insertionTarget after wp-2 was added
     useAppStore.getState().redo();
     expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
+  });
+
+  it('undoes and redoes an annotation group together with its top-level id', () => {
+    resetAppStore();
+    getAppState().addAnnotationGroup(makeAnnotationGroup('grp', []));
+    expect(getAppState().rootAnnotationIds).toEqual(['grp']);
+
+    getAppState().undo();
+    expect(getAppState().annotationGroups).toEqual({});
+    expect(getAppState().rootAnnotationIds).toEqual([]);
+
+    getAppState().redo();
+    expect(Object.keys(getAppState().annotationGroups)).toEqual(['grp']);
+    expect(getAppState().rootAnnotationIds).toEqual(['grp']);
   });
 
   it('invokes abortCanvasGestures before executing undo and redo', () => {

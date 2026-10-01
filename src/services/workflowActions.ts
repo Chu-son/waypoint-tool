@@ -1,7 +1,7 @@
 import { AppState, useAppStore } from '../stores/appStore';
-import { DialogAPI, BackendAPI } from '../api';
 import type { AnnotationToolType } from '../types/ui';
 import { v4 as uuidv4 } from 'uuid';
+import { importMapFromDialog } from './mapImport';
 import { notify } from './notify';
 
 export type WorkflowActionHandler = (store: AppState, args?: any) => Promise<void> | void;
@@ -125,32 +125,8 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     }
   },
 
-  open_map_dialog: async (store) => {
-    try {
-      const selected = await DialogAPI.open({
-        filters: [
-          { name: 'ROS Map (*.yaml, *.yml)', extensions: ['yaml', 'yml'] },
-          { name: 'Image Map (*.png, *.jpg, *.jpeg, *.pgm)', extensions: ['png', 'jpg', 'jpeg', 'pgm'] },
-        ],
-      });
-      if (selected && typeof selected === 'string') {
-        const fileName = selected.split(/[/\\]/).pop() || 'Map';
-        await store.runWithLoading(
-          {
-            message: 'マップを読み込み中...',
-            detail: fileName,
-            blocking: true,
-          },
-          async () => {
-            const mapData = await BackendAPI.loadROSMap(selected);
-            store.addMapLayer(fileName, mapData.info, mapData.image_data_b64, mapData.width, mapData.height);
-            store.triggerFitToMaps();
-          },
-        );
-      }
-    } catch (err) {
-      console.error('Failed to open map in workflow action:', err);
-    }
+  open_map_dialog: async () => {
+    await importMapFromDialog({ fitToMaps: true });
   },
 
   open_export_modal: () => {
@@ -161,8 +137,8 @@ export const workflowActionRegistry: Record<string, WorkflowActionHandler> = {
     useAppStore.setState({ isExportMapsModalOpen: true });
   },
 
-  open_import_modal: () => {
-    useAppStore.setState({ isImportModalOpen: true });
+  open_import_modal: (store) => {
+    store.setImportModalOpen(true);
   },
 
   open_settings_modal: (store, args) => {

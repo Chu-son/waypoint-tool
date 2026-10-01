@@ -591,3 +591,35 @@ describe('OptionSchemaTab default linked to a global', () => {
     expect(getAppState().optionsSchema?.options[0].default).toBe(true);
   });
 });
+
+describe('OptionSchemaTab import', () => {
+  it('opens the import dialog on the option schema screen', async () => {
+    const { user } = renderWithStore(<OptionSchemaTab />);
+
+    await user.click(screen.getByRole('button', { name: /Import/ }));
+
+    expect(getAppState().isImportModalOpen).toBe(true);
+    expect(getAppState().importModalCategory).toBe('optionSchema');
+  });
+
+  it('asks before importing over edits that were not applied, and stays put when declined', async () => {
+    const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+    const { user } = renderWithStore(<OptionSchemaTab />);
+    await user.click(screen.getByRole('button', { name: /Add Global/ }));
+
+    await user.click(screen.getByRole('button', { name: /Import/ }));
+
+    expect(ask).toHaveBeenCalled();
+    expect(getAppState().isImportModalOpen).toBe(false);
+  });
+
+  it('opens the import dialog when the user accepts losing the unapplied edits', async () => {
+    vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+    const { user } = renderWithStore(<OptionSchemaTab />);
+    await user.click(screen.getByRole('button', { name: /Add Global/ }));
+
+    await user.click(screen.getByRole('button', { name: /Import/ }));
+
+    expect(getAppState().isImportModalOpen).toBe(true);
+  });
+});

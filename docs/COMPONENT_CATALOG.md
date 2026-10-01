@@ -35,7 +35,7 @@
   - **概要**: マップ編集モード時にキャンバス上部に表示されるフローティングアクションバナー（直線・矩形・円形・ブラシのサブツール切り替え、塗りつぶし値設定、ブラシサイズ、削除、完了）。
   - **主要Props**: なし
 - **`Modal`** ([`src/components/ui/common/Modal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Modal.tsx))
-  - **概要**: 汎用モーダルダイアログコンテナ（アニメーション背景・ヘッダー・フッター標準化）。
+  - **概要**: 汎用モーダルダイアログコンテナ（アニメーション背景・ヘッダー・フッター標準化）。開いている `Modal` は内部のスタック（モジュール変数）で積み順を管理し、Escape は**最前面の 1 つだけ**が `onClose` する（設定画面の上にインポート画面を重ねても、1 回の Escape で両方が閉じない）。
   - **主要Props**: `isOpen`, `onClose`, `title`, `children`, `footer`
 - **`Button`** ([`src/components/ui/common/Button.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/Button.tsx))
   - **概要**: デザインシステムに準拠したボタン要素 (`variant`: primary / secondary / outline / danger / ghost 等)。デスクトップ高密度（32px: `default`、28px: `sm`、24px: `xs`）および `rounded-md` 準拠。
@@ -81,6 +81,12 @@
 - **`ContextMenu`** / **`ContextMenuItem`** / **`ContextMenuSeparator`** ([`src/components/ui/common/ContextMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/ContextMenu.tsx))
   - **概要**: 右クリックメニュー。指定座標に固定表示し、外側クリックで閉じる。項目は選択後に自動でメニューを閉じる（`role="menu"` / `menuitem`）。ツリー・レイヤーパネルのメニューはすべてこれを使うこと。
   - **主要Props**: `ContextMenu`: `x`, `y`, `onClose` / `ContextMenuItem`: `icon`, `onSelect`, `tone` (`default` | `danger`), `emphasis` (`normal` | `strong`)
+- **`TextDiffView`** ([`src/components/ui/common/TextDiffView.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/TextDiffView.tsx))
+  - **概要**: 行単位の差分（`utils/diff/lineDiff.ts` の `DiffLine[]`）を、追加（緑）・削除（赤）で色分けして表示する。変更行の前後だけを残し、それ以外の変更なし行は「N lines unchanged」に畳む。`role="group"` で `aria-label` を持つ。
+  - **主要Props**: `lines`, `contextLines`, `aria-label`
+- **`ItemDiffList`** ([`src/components/ui/common/ItemDiffList.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/ItemDiffList.tsx))
+  - **概要**: 項目ごとの差分（New / Changed / Only here / Same）を一覧し、取り込む項目をチェックボックスで選ぶ汎用リスト。変更のある行は展開すると `TextDiffView` で行差分が見られる。変更の無い行は既定で隠し、チェックもできない。「Select all / Clear」付き。ドメインには依存せず、行は呼び出し側が `ItemDiffRow`（`id` / `label` / `status` / `lines` / `actionLabel`）で渡す（インポート画面では `modals/import/diffRows.ts` が作る）。
+  - **主要Props**: `rows`, `accepted`（チェックされた行の id 集合）, `onChange`, `statusLabels`
 
 ### 共通 Hooks (`src/hooks/`)
 - **`useClickOutside(ref, onOutside, enabled?)`**: 要素の外側でマウスが押されたときにコールバック（ドロップダウン・メニューのクローズ）。
@@ -190,6 +196,10 @@
   - **主要Props**: `inputDef`, `value`, `onChange`
 - **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/modals/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/ExportModal.tsx))
   - **概要**: Handlebars/Jinja テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。マップ出力の項目には、レイヤー表示セットの選択欄（`ExportVisibilitySetField`）があり、未選択なら現在の表示状態で出力する。パスパターンでは `{{set}}`（項目の表示セット名。未選択は `current`）が使える。
+  - **主要Props**: `isOpen`, `onClose`
+- **`ImportHubModal`** ([`src/components/ui/modals/import/ImportHubModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/import/ImportHubModal.tsx))
+  - **概要**: あらゆるインポートの入口（左ツールバーの Import ボタン / File > Import... / Ctrl+I / ワークフローの `open_import_modal`）。最初に取り込む対象の種類（`importCategories.ts`）を選び、その種類の取り込み画面（パネル）へ進む。ヘッダーの「戻る」で種類の選択に戻れる。設定画面など別の場所からは `setImportModalOpen(true, category)` で種類を指定して選択を飛ばせる（`uiSlice.importModalCategory`。開くたびに初期化される）。
+  - **構成ファイル** (`ui/modals/import/`): `WaypointImportPanel`（外部ファイルのウェイポイント。書式・フィールドマッピングを指定）, `OptionSchemaImportPanel`（スキーマファイル。項目単位の差分を見て採否を選ぶ。マージ結果は `validateSchema` で検証し、不正なら取り込めない）, `TemplateImportPanel`（`.wpt_template`。同名テンプレートがあれば内容の差分を見せ、上書き／別テンプレートとして追加を選ぶ）, `ProjectImportPanel` + `ProjectImportCategoryRow` + `useProjectImport`（他のプロジェクト `.wptroj` から、設定とデータをカテゴリ単位で選んで取り込む。設定は今のプロジェクトとの差分を見て採否を決め、データは新しい ID で追加する）, `LaunchImportPanels`（マップ・プラグイン。既存サービスにファイル選択から任せる）, `diffRows`（差分を `ItemDiffRow` にする関数）。
   - **主要Props**: `isOpen`, `onClose`
 - **`SettingsModal`** ([`src/components/ui/modals/SettingsModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/SettingsModal.tsx))
   - **概要**: アプリ設定ダイアログ。`GeneralTab`（Waypoint Index Start / Decimal Precision / Export Integers as Float（整数も float で出力。`ToggleSwitch`）/ Python パス）, `AppearanceTab`, `OptionSchemaTab`（Waypoint Options / Global Fields / Definitions の3セクション。行 UI は `optionSchema/FieldEditor` を共用）, `ConditionalStylesTab`, `RobotFootprintTab`, `ExportTemplatesTab`（テンプレートごとに Engine (`Handlebars`/`Jinja`) を選択できる。変数チップは Core / Global / Geo Origin（位置合わせ後のマップ原点 `geo.*`）/ Custom Options / Raw Options）, `PluginsTab` の7タブを保持。
@@ -332,10 +342,11 @@
 - **`useAppStore`** ([`src/stores/appStore.ts`](file:///home/chuson/develop/waypoint-tool/src/stores/appStore.ts))
   - **概要**: 全状態とアクション（`nodeSlice`, `mapSlice`, `pluginSlice`, `pathCalculatorSlice`, `projectSlice`, `uiSlice` ほか）を提供するメインフック。
 - **Services** (`src/services/`): ストアと API を組み合わせるユースケース
-  - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `mapRasterize`（レイヤーのラスタライズ）, `workflowActions`（カスタム UI ワークフロー）
+  - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `importFiles`（インポート対象ファイルの選択と、スキーマ・テンプレート・プロジェクトの読み込み時の検証・正規化。`ImportFileError` はそのまま利用者に見せてよい）, `optionSchemaApply`（スキーマの検証・正規化・消えたプリセットの値への展開・適用。設定画面の Apply とインポートが共用）, `templateImport`（テンプレートの上書き／追加）, `projectImport`（取り込み計画の適用。スキーマを先に適用し、断られたら何も変えない）, `mapImport`（ファイルを選んでマップレイヤーとして追加。レイヤーパネル・ワークフロー・インポートが共用）, `mapRasterize`（レイヤーのラスタライズ）, `workflowActions`（カスタム UI ワークフロー）
 - **API アダプタ** (`src/api/`): `BackendAPI`（Tauri IPC）, `DialogAPI`（ファイル／確認／メッセージダイアログ）, `AppAPI`（バージョン・終了・ウィンドウ操作）。いずれも jsdom / ブラウザでは Mock 実装に自動切替。
 - **プラグイン出力・設定の純粋関数** (`src/utils/`): `pluginResult`（出力の正規化）, `pluginBindings`（パイプラインのバインディング解決）, `pluginRegistry`（カスタムプラグイン登録）, `pythonPath`（インタプリタ解決）, `exportPackage`（エクスポート要求の構築）, `footprint`（フットプリント幅）
 - **背景地図の純粋関数** (`src/utils/geo/`): `utm`（WGS84 ⇔ UTM）, `webMercator`（XYZ タイル座標・ズーム選択）, `geoTransform`（緯度経度 ⇔ ワールド座標・タイル配置・表示タイル列挙・エクスポート用のマップ原点 `mapOriginGeo`）, `basemapPresets`（OSM / Esri 衛星 / 地理院 / カスタムのプリセットとタイル URL 生成）, `alignDrag`（ドラッグによる移動・回転量の算出）
+- **差分・取り込みの純粋関数** (`src/utils/diff/`, `src/utils/import/`): `diff/lineDiff`（行単位の LCS 差分・変更の前後だけを残す折りたたみ）, `diff/itemDiff`（キーで突き合わせた項目単位の差分 `diffByKey`・キー順に依存しない表示用テキスト）, `import/optionSchemaMerge`（スキーマを options / globals / definitions の項目名で突き合わせ、採否に応じてマージ）, `import/idRemap`（取り込むデータの ID 振り直しと、子・親・ソース・レイヤー順・表示セット・実行 ID の参照の付け替え）, `import/projectImportPlan`（取り込みカテゴリの定義・テンプレート／プロファイルの突き合わせ・取り込み計画 `buildProjectImportPlan`）
 - **`transformUtils`** ([`src/utils/transformUtils.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/transformUtils.ts))
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
   - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`

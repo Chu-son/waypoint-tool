@@ -311,7 +311,7 @@ export function TopMenu() {
           { divider: true, label: '' },
           {
             id: 'file_import_waypoints',
-            label: 'Import Maps / Waypoints...',
+            label: 'Import...',
             action: () => setImportModalOpen(true),
             shortcut: 'Ctrl+I',
           },
