@@ -3,6 +3,7 @@ import type { AppState } from '../appStore';
 import {
   WaypointNode,
   CustomLayer,
+  AnnotationGroup,
   AnnotationObject,
   InsertionTarget,
   MapLayerClip,
@@ -34,6 +35,9 @@ export type HistorySnapshot = {
   layerOrder: string[];
   annotationObjects: Record<string, AnnotationObject>;
   annotationOrder: string[];
+  /** Groups and the top-level ids are part of the snapshot so that undoing never leaves a group without its members (or the reverse). */
+  annotationGroups: Record<string, AnnotationGroup>;
+  rootAnnotationIds: string[];
   insertionTarget: InsertionTarget | null;
   geoAlignment: GeoAlignment;
 };
@@ -100,6 +104,8 @@ const captureSnapshot = (state: AppState, includeMapVisibility = false): History
   layerOrder: [...state.layerOrder],
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
   annotationOrder: [...(state.annotationOrder ?? [])],
+  annotationGroups: structuredClone(state.annotationGroups ?? {}),
+  rootAnnotationIds: [...(state.rootAnnotationIds ?? [])],
   insertionTarget: state.insertionTarget ? { ...state.insertionTarget } : null,
   geoAlignment: state.geoMap.alignment,
 });
@@ -176,6 +182,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         layerOrder: restoredLayerOrder(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
+        annotationGroups: snapshot.annotationGroups ?? state.annotationGroups,
+        rootAnnotationIds: snapshot.rootAnnotationIds ?? state.rootAnnotationIds,
         insertionTarget: restoredTarget,
         geoMap: { ...state.geoMap, alignment: snapshot.geoAlignment ?? state.geoMap.alignment },
         isDirty: true,
@@ -215,6 +223,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         layerOrder: restoredLayerOrder(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
+        annotationGroups: snapshot.annotationGroups ?? state.annotationGroups,
+        rootAnnotationIds: snapshot.rootAnnotationIds ?? state.rootAnnotationIds,
         insertionTarget: restoredTarget,
         geoMap: { ...state.geoMap, alignment: snapshot.geoAlignment ?? state.geoMap.alignment },
         isDirty: true,
