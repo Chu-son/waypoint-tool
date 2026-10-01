@@ -19,13 +19,13 @@ import {
 import { useAppStore } from '../../../stores/appStore';
 import { useResolvedMapLayers } from '../../../hooks/useResolvedMapLayers';
 import { stackEntries } from '../../../utils/layerStack';
-import { DialogAPI, BackendAPI } from '../../../api';
+import { DialogAPI } from '../../../api';
 import { Button } from '../common/Button';
 import { FieldLabel } from '../common/FieldLabel';
 import { EmptyState } from '../common/EmptyState';
 import { NewCustomLayerModal } from '../modals/NewCustomLayerModal';
 import { cn } from '../../../utils/cn';
-import { notifyError } from '../../../services/notify';
+import { importMapFromDialog } from '../../../services/mapImport';
 import { CustomLayerCard } from './CustomLayerCard';
 import { MapLayerCard } from './MapLayerCard';
 import { GeoMapCard } from './GeoMapCard';
@@ -39,7 +39,6 @@ export function LayerPanel() {
   const updateMapSource = useAppStore((state) => state.updateMapSource);
   const duplicateMapLayer = useAppStore((state) => state.duplicateMapLayer);
   const removeMapLayer = useAppStore((state) => state.removeMapLayer);
-  const addMapLayer = useAppStore((state) => state.addMapLayer);
 
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const updateCustomLayer = useAppStore((state) => state.updateCustomLayer);
@@ -54,8 +53,6 @@ export function LayerPanel() {
   const activeMapLayerId = useAppStore((state) => state.activeMapLayerId);
   const setActiveMapLayerId = useAppStore((state) => state.setActiveMapLayerId);
 
-  const lastDirectory = useAppStore((state) => state.lastDirectory);
-  const setLastDirectory = useAppStore((state) => state.setLastDirectory);
   const exportRegions = useAppStore((state) => state.exportRegions);
   const updateExportRegion = useAppStore((state) => state.updateExportRegion);
   const removeExportRegion = useAppStore((state) => state.removeExportRegion);
@@ -69,7 +66,6 @@ export function LayerPanel() {
 
   const showOccupancyHighlight = useAppStore((state) => state.showOccupancyHighlight);
   const setShowOccupancyHighlight = useAppStore((state) => state.setShowOccupancyHighlight);
-  const runWithLoading = useAppStore((state) => state.runWithLoading);
 
   const [isNewCustomLayerModalOpen, setIsNewCustomLayerModalOpen] = useState(false);
   const [isExportRegionsOpen, setIsExportRegionsOpen] = useState(true);
@@ -81,38 +77,7 @@ export function LayerPanel() {
     y: number;
   } | null>(null);
 
-  const handleLoadMap = async () => {
-    try {
-      const selectedPath = await DialogAPI.open({
-        multiple: false,
-        defaultPath: lastDirectory || undefined,
-        filters: [{ name: 'ROS Map YAML', extensions: ['yaml'] }],
-      });
-      if (selectedPath) {
-        const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
-        if (!pathStr) return;
-        const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
-        const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
-        setLastDirectory(dir);
-
-        await runWithLoading(
-          {
-            message: 'マップを読み込み中...',
-            detail: pathStr.split(/[/\\]/).pop() || pathStr,
-            blocking: true,
-          },
-          async () => {
-            const result = await BackendAPI.loadROSMap(pathStr);
-            const filename = pathStr.split(/[/\\]/).pop() || 'Map';
-            addMapLayer(filename, result.info, result.image_data_b64, result.width, result.height);
-          },
-        );
-      }
-    } catch (err) {
-      console.error('Failed to load map:', err);
-      void notifyError(`マップの読み込みに失敗しました。\nエラー詳細: ${String(err)}`);
-    }
-  };
+  const handleLoadMap = () => importMapFromDialog();
 
   // One list for every layer, top of the stack first; maps and custom layers can be interleaved.
   const entries = useMemo(
