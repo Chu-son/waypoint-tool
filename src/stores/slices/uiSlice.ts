@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
 import { DEFAULT_PANEL_LAYOUT } from '../migrations/storageMigration';
 import type { ElementCopyState, PanelLayout } from '../../types/ui';
+import type { ImportCategory } from '../../types/modal';
 
 export interface TreeRevealTarget {
   type: 'node' | 'annotation';
@@ -68,6 +69,7 @@ export type UISlice = {
   isSettingsModalOpen: boolean;
   isExportModalOpen: boolean;
   isImportModalOpen: boolean;
+  importModalCategory: ImportCategory | null;
   isExportMapsModalOpen: boolean;
   isShortcutsModalOpen: boolean;
   isWelcomeModalOpen: boolean;
@@ -123,7 +125,8 @@ export type UISlice = {
     tab?: 'general' | 'appearance' | 'options' | 'robot' | 'export' | 'plugins' | 'conditional_styles',
   ) => void;
   setExportModalOpen: (open: boolean) => void;
-  setImportModalOpen: (open: boolean) => void;
+  /** `category` を渡すと、種類の選択を飛ばしてその取り込み画面から始める。 */
+  setImportModalOpen: (open: boolean, category?: ImportCategory) => void;
   setExportMapsModalOpen: (open: boolean) => void;
   setShortcutsModalOpen: (open: boolean) => void;
   setWelcomeModalOpen: (open: boolean) => void;
@@ -248,6 +251,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   settingsModalTab: 'general',
   isExportModalOpen: false,
   isImportModalOpen: false,
+  importModalCategory: null,
   isExportMapsModalOpen: false,
   isShortcutsModalOpen: false,
   isWelcomeModalOpen: true,
@@ -536,9 +540,13 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     if (open) get().pushModal?.('export');
     else get().closeModal?.('export');
   },
-  setImportModalOpen: (open) => {
-    if (open) get().pushModal?.('import');
-    else get().closeModal?.('import');
+  setImportModalOpen: (open, category) => {
+    if (open) {
+      set({ importModalCategory: category ?? null });
+      get().pushModal?.('import');
+    } else {
+      get().closeModal?.('import');
+    }
   },
   setExportMapsModalOpen: (open) => {
     if (open) get().pushModal?.('export_maps');

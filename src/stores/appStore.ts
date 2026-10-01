@@ -15,6 +15,7 @@ import { InteractionSlice, createInteractionSlice } from './slices/interactionSl
 import { MeasureSlice, createMeasureSlice } from './slices/measureSlice';
 import { GeoMapSlice, createGeoMapSlice } from './slices/geoMapSlice';
 import { LayerVisibilitySlice, createLayerVisibilitySlice } from './slices/layerVisibilitySlice';
+import { ImportSlice, createImportSlice } from './slices/importSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 
 export type AppState = NodeSlice &
@@ -30,7 +31,8 @@ export type AppState = NodeSlice &
   InteractionSlice &
   MeasureSlice &
   GeoMapSlice &
-  LayerVisibilitySlice;
+  LayerVisibilitySlice &
+  ImportSlice;
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -49,6 +51,7 @@ export const useAppStore = create<AppState>()(
       ...createMeasureSlice(set, get, api),
       ...createGeoMapSlice(set, get, api),
       ...createLayerVisibilitySlice(set, get, api),
+      ...createImportSlice(set, get, api),
     }),
     {
       name: 'waypoint-tool-storage',
