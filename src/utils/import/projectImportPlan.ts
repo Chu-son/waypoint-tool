@@ -338,7 +338,7 @@ export function buildProjectImportPlan(
   });
 
   // 2. オプションスキーマ
-  if (has('optionSchema') && incoming.options_schema) {
+  if (has('optionSchema') && incoming.options_schema && selection.schemaAccepted.size > 0) {
     const diffs = diffOptionsSchema(current.options_schema, incoming.options_schema);
     plan.optionsSchema = mergeOptionsSchema(diffs, selection.schemaAccepted);
   }

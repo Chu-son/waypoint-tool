@@ -6,7 +6,7 @@ import { PanelContainer, PanelTab } from './components/ui/shell/PanelContainer';
 import { MapCanvas } from './components/canvas/MapCanvas';
 import { SettingsModal } from './components/ui/modals/SettingsModal';
 import { ExportModal } from './components/ui/modals/ExportModal';
-import { ImportModal } from './components/ui/modals/ImportModal';
+import { ImportHubModal } from './components/ui/modals/import/ImportHubModal';
 import { KeyboardShortcutsModal } from './components/ui/modals/KeyboardShortcutsModal';
 import { ExportMapsModal } from './components/ui/modals/ExportMapsModal';
 import { WelcomeModal } from './components/ui/modals/WelcomeModal';
@@ -404,7 +404,7 @@ function App() {
         <ExportModal isOpen={isExportModalOpen} onClose={() => setExportModalOpen(false)} />
       </ErrorBoundary>
       <ErrorBoundary fallbackTitle="インポート画面の表示中にエラーが発生しました">
-        <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} />
+        <ImportHubModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} />
       </ErrorBoundary>
       <ExportMapsModal />
       <KeyboardShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => setShortcutsModalOpen(false)} />

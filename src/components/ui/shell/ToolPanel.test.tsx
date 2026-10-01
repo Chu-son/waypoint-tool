@@ -16,6 +16,15 @@ describe('ToolPanel', () => {
     expect(getAppState().activeTool).toBe('measure');
   });
 
+  it('opens the import dialog at the list of import types', () => {
+    renderWithStore(<ToolPanel />, PAST_WELCOME);
+
+    fireEvent.click(screen.getByTitle('Import'));
+
+    expect(getAppState().isImportModalOpen).toBe(true);
+    expect(getAppState().importModalCategory).toBeNull();
+  });
+
   it('opens the export dialog and the settings dialog', () => {
     renderWithStore(<ToolPanel />, PAST_WELCOME);
 

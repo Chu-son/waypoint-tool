@@ -1,16 +1,17 @@
 import { Plus, Save, Upload, Download, Database, Globe, BookMarked } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
-import { DefinitionDef, GlobalFieldDef, OptionDef, OptionsSchema } from '../../../types/store';
+import { DefinitionDef, GlobalFieldDef, OptionDef } from '../../../types/store';
 import { Button } from '../common/Button';
 import { TabSectionHeader } from './TabSectionHeader';
 import { EmptyState } from '../common/EmptyState';
 import { FieldEditor } from './optionSchema/FieldEditor';
 import { SchemaGlobalsContext } from './optionSchema/SchemaGlobalsContext';
 import { DefinitionListEditor } from './optionSchema/DefinitionListEditor';
-import { notify } from '../../../services/notify';
+import { confirmAction, notify } from '../../../services/notify';
 import { applyOptionsSchema } from '../../../services/optionSchemaApply';
-import { collectGlobalDefaultLinks, normalizeOptionsSchema } from '../../../utils/optionSchema';
+import { collectGlobalDefaultLinks } from '../../../utils/optionSchema';
+import { deepEqual } from '../../../utils/optionValues';
 
 // `optionsSchema.definitions` が無いスキーマでは `?? []` の代わりにこの安定した参照を使う。
 // 呼び出しの度に新しい配列を作ってしまうと、`isAppliedAndUnchanged` の参照比較が常に偽になる。
@@ -29,7 +30,7 @@ function uniqueFieldName(base: string, fields: { name: string }[]) {
 
 export function OptionSchemaTab() {
   const globalOptionsSchema = useAppStore((state) => state.optionsSchema);
-  const lastDirectory = useAppStore((state) => state.lastDirectory);
+  const setImportModalOpen = useAppStore((state) => state.setImportModalOpen);
 
   const [localOptions, setLocalOptions] = useState<OptionDef[]>([]);
   const [localGlobals, setLocalGlobals] = useState<GlobalFieldDef[]>([]);
@@ -108,58 +109,24 @@ export function OptionSchemaTab() {
     }
   };
 
+  // Apply していない編集があるか。インポートはストアのスキーマへ直接反映するので、この編集は上書きされる。
+  const hasUnappliedEdits = !deepEqual(
+    { options: localOptions, globals: localGlobals, definitions: localDefinitions },
+    {
+      options: globalOptionsSchema?.options ?? [],
+      globals: globalOptionsSchema?.globals ?? [],
+      definitions: globalOptionsSchema?.definitions ?? [],
+    },
+  );
+
   const handleImportSchema = async () => {
-    try {
-      const { DialogAPI, BackendAPI } = await import('../../../api');
-      const selectedPath = await DialogAPI.open({
-        multiple: false,
-        defaultPath: lastDirectory || undefined,
-        filters: [
-          {
-            name: 'Options Schema',
-            extensions: ['json', 'yaml', 'yml'],
-          },
-        ],
-      });
-      if (!selectedPath) return;
-
-      const pathStr = typeof selectedPath === 'string' ? selectedPath : (selectedPath as any).path;
-      if (!pathStr) return;
-
-      const lastSlash = Math.max(pathStr.lastIndexOf('/'), pathStr.lastIndexOf('\\'));
-      const dir = lastSlash > -1 ? pathStr.substring(0, lastSlash) : pathStr;
-      useAppStore.getState().setLastDirectory(dir);
-
-      let rawSchema: any;
-
-      if (pathStr.endsWith('.yaml') || pathStr.endsWith('.yml')) {
-        rawSchema = await BackendAPI.loadOptionsSchema(pathStr);
-      } else {
-        const fileContent = await BackendAPI.readTextFile(pathStr);
-        let parsed: any;
-        try {
-          parsed = JSON.parse(fileContent);
-        } catch {
-          void notify('ファイルの形式が不正です（JSONではありません）。');
-          return;
-        }
-        if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.options)) {
-          void notify('有効な Options Schema ファイルではありません。');
-          return;
-        }
-        rawSchema = parsed;
-      }
-
-      // 旧形式（item_type がフラットに置かれた list 等）を含む可能性があるため、必ず正規化を通す。
-      const schema: OptionsSchema = normalizeOptionsSchema(rawSchema);
-      setLocalOptions(schema.options);
-      setLocalGlobals(schema.globals);
-      setLocalDefinitions(schema.definitions || []);
-      void notify('オプションスキーマをインポートしました。');
-    } catch (err) {
-      console.error('Failed to import options schema:', err);
-      void notify(`インポートに失敗しました。\n詳細: ${String(err)}`);
+    if (hasUnappliedEdits) {
+      const proceed = await confirmAction(
+        '適用していない編集内容があります。インポートすると、この編集内容は破棄されます。続けますか？',
+      );
+      if (!proceed) return;
     }
+    setImportModalOpen(true, 'optionSchema');
   };
 
   return (

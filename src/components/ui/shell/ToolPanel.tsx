@@ -49,7 +49,7 @@ export function ToolPanel() {
     setExportModalOpen(true);
   };
 
-  const handleImportWaypointsClick = () => {
+  const handleImportClick = () => {
     setImportModalOpen(true);
   };
 
@@ -97,8 +97,8 @@ export function ToolPanel() {
         <div className="mt-auto mb-2 border-t border-border-base pt-2 flex flex-col items-center w-full gap-2">
           {allowImport && (
             <Button
-              onClick={handleImportWaypointsClick}
-              title="Import Waypoints"
+              onClick={handleImportClick}
+              title="Import"
               variant="icon"
               size="icon"
               className="rounded-md"
