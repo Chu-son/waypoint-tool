@@ -1,12 +1,27 @@
 import { describe, it, expect } from 'vitest';
 import {
   collectIntegerOptionKeys,
+  extractGeoForExport,
   extractGlobalsForExport,
   extractWaypointsForExport,
   countWaypointsWithInvalidOptions,
 } from './exportWaypointUtils';
 import type { WaypointNode, OptionsSchema } from '../types/store';
 import { normalizeOptionsSchema } from './optionSchema';
+
+describe('extractGeoForExport', () => {
+  it('describes the aligned map origin in lat/lon, UTM and heading', () => {
+    const geo = extractGeoForExport({
+      origin: { kind: 'utm', zone: 54, hemisphere: 'N', easting: 500000, northing: 3950000 },
+      alignment: { dx: 0, dy: 0, yawDeg: 90 },
+    });
+
+    expect(geo.utm).toEqual({ zone: 54, hemisphere: 'N', easting: 500000, northing: 3950000 });
+    expect(geo.lon).toBeCloseTo(141, 6); // ゾーン 54 の中央子午線
+    expect(geo.heading_deg).toBeCloseTo(-90, 9);
+    expect(geo.heading).toBeCloseTo(-Math.PI / 2, 9);
+  });
+});
 
 describe('extractGlobalsForExport', () => {
   it('maps each global field name to its value and leaves out fields without a value', () => {

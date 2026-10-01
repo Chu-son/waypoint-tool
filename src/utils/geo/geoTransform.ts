@@ -57,24 +57,47 @@ export function geoToWorld(
   };
 }
 
-export function worldToGeo(
-  x: number,
-  y: number,
-  origin: GeoOrigin,
-  alignment: GeoAlignment,
-): { lat: number; lon: number } {
+/** ワールド座標を、原点と同じ帯の UTM 座標へ写す。 */
+function worldToUtm(x: number, y: number, origin: GeoOrigin, alignment: GeoAlignment): UtmCoord {
   const o = originToUtm(origin);
   const yaw = alignment.yawDeg * DEG;
   const cos = Math.cos(yaw);
   const sin = Math.sin(yaw);
   const rx = x - alignment.dx;
   const ry = y - alignment.dy;
-  return utmToLatLon({
+  return {
     zone: o.zone,
     hemisphere: o.hemisphere,
     easting: o.easting + cos * rx + sin * ry,
     northing: o.northing - sin * rx + cos * ry,
-  });
+  };
+}
+
+export function worldToGeo(
+  x: number,
+  y: number,
+  origin: GeoOrigin,
+  alignment: GeoAlignment,
+): { lat: number; lon: number } {
+  return utmToLatLon(worldToUtm(x, y, origin, alignment));
+}
+
+/** 角度を (-180, 180] に正規化する。 */
+function normalizeDeg(deg: number): number {
+  const wrapped = ((((deg + 180) % 360) + 360) % 360) - 180;
+  return wrapped === -180 ? 180 : wrapped;
+}
+
+/**
+ * 位置合わせ後のマップ原点（ワールド座標 (0,0) が当たる地点）の地理座標と、
+ * ワールド +X 軸が UTM グリッドの東から反時計回りに何度回っているか（`headingDeg`）。
+ */
+export function mapOriginGeo(
+  origin: GeoOrigin,
+  alignment: GeoAlignment,
+): { lat: number; lon: number; utm: UtmCoord; headingDeg: number } {
+  const utm = worldToUtm(0, 0, origin, alignment);
+  return { ...utmToLatLon(utm), utm, headingDeg: normalizeDeg(-alignment.yawDeg) };
 }
 
 /**

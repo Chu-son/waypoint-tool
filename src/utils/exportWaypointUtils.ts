@@ -1,7 +1,9 @@
 import type { WaypointNode, OptionsSchema, OptionValue } from '../types/store';
 import type { FieldDef, TypeSpec } from '../types/options';
 import { getFlattenedWaypointIds } from './treeUtils';
+import type { GeoMapSettings } from '../types/geo';
 import { quaternionToYaw } from './transformUtils';
+import { mapOriginGeo } from './geo/geoTransform';
 import { resolvePresets, resolveWithDefaults, validateField } from './optionValues';
 
 export interface ExportedWaypointItem {
@@ -35,6 +37,29 @@ export function extractGlobalsForExport(optionsSchema: OptionsSchema | null): Re
     if (resolved !== undefined) globals[field.name] = resolved;
   });
   return globals;
+}
+
+/** テンプレートの `geo` 変数。位置合わせ後のマップ原点（ワールド座標 (0,0)）の地理座標と向き。 */
+export interface ExportGeoOrigin {
+  lat: number;
+  lon: number;
+  utm: { zone: number; hemisphere: 'N' | 'S'; easting: number; northing: number };
+  /** ワールド +X 軸が UTM グリッドの東から反時計回りに何度回っているか（度）。 */
+  heading_deg: number;
+  /** `heading_deg` のラジアン表記。 */
+  heading: number;
+}
+
+/** 背景地図の位置合わせ設定から、テンプレートへ渡す `geo` 変数を作る。背景地図の有効／無効には依存しない。 */
+export function extractGeoForExport(geoMap: Pick<GeoMapSettings, 'origin' | 'alignment'>): ExportGeoOrigin {
+  const { lat, lon, utm, headingDeg } = mapOriginGeo(geoMap.origin, geoMap.alignment);
+  return {
+    lat,
+    lon,
+    utm: { zone: utm.zone, hemisphere: utm.hemisphere, easting: utm.easting, northing: utm.northing },
+    heading_deg: headingDeg,
+    heading: (headingDeg * Math.PI) / 180,
+  };
 }
 
 /** 値が整数だけで構成される型か（integer、および integer の list / map）。 */

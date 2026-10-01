@@ -356,6 +356,12 @@ Waypoint ごとではなく、プロジェクト全体で1つの値を持つ変�
 - 既定のYAML/JSON出力（テンプレートを使わない形式）にはグローバルフィールドは含まれません。
 
 
+**マップ原点の緯度経度・UTM を出力する**: 背景地図で位置合わせをしたプロジェクトでは、位置合わせ後のマップ原点（ワールド座標 (0, 0) が当たる地点）をテンプレートから参照できます。`Settings > Export Templates` の **Geo Origin** のチップをクリックすると、`geo.lat`・`geo.lon`・`geo.utm.zone`・`geo.utm.hemisphere`・`geo.utm.easting`・`geo.utm.northing`・`geo.heading_deg`・`geo.heading`（Handlebars なら `{{@root.geo.lat}}`、Jinja なら `{{ geo.lat }}`）が挿入されます。`geo.heading_deg` / `geo.heading` は、マップの X 軸が UTM グリッドの東から反時計回りに何度（rad）回っているかです。背景地図の表示を OFF にしていても出力され、「Export Integers as Float」が有効でも `geo.utm.zone` は整数のままです。例（navsat_transform の datum）:
+
+```
+datum: [{{ geo.lat }}, {{ geo.lon }}, {{ geo.heading }}]
+```
+
 **フィールドの既定値をグローバルに連動させる**: 出力の `defaults:` にグローバル値を書き、ウェイポイントでは省略したフィールドを受信側に任せる運用では、フィールドの既定値とグローバル値が食い違うと、Inspector の表示と実際の挙動がずれてしまいます。これを避けるには、`Settings > Option Schema` のフィールドの **Default** 欄で「グローバル変数に連動」を選び、参照するグローバルを指定します。以後、そのフィールドの既定値はグローバルの現在値になり（Inspector には「既定: true（グローバル default_is_through_point）」のように出所が表示されます）、グローバルの値を変えて Apply するだけで両方が揃います。グローバル側には、連動しているフィールドの一覧が表示されます。
 
 ---

@@ -33,6 +33,22 @@ function globalFieldChip(engine: TemplateEngine, name: string): string {
   return engine === 'jinja' ? `{{ globals.${name} }}` : `{{@root.globals.${name}}}`;
 }
 
+/** マップ原点（位置合わせ後のワールド座標 (0,0)）の地理座標を参照する `geo` 変数のチップ。 */
+const GEO_FIELD_PATHS = [
+  'lat',
+  'lon',
+  'utm.zone',
+  'utm.hemisphere',
+  'utm.easting',
+  'utm.northing',
+  'heading_deg',
+  'heading',
+];
+
+function geoFieldChips(engine: TemplateEngine): string[] {
+  return GEO_FIELD_PATHS.map((path) => (engine === 'jinja' ? `{{ geo.${path} }}` : `{{@root.geo.${path}}}`));
+}
+
 function optionChip(engine: TemplateEngine, name: string): string {
   return engine === 'jinja' ? `{{ wp.options.${name} }}` : `{{options.${name}}}`;
 }
@@ -640,6 +656,23 @@ export function ExportTemplatesTab() {
                     })}
                   </div>
                 )}
+                <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
+                  <FieldLabel
+                    className="mr-2"
+                    title="位置合わせ後のマップ原点（ワールド座標 (0,0)）の緯度経度・UTM。heading はワールド X 軸が東から反時計回りに何度回っているか"
+                  >
+                    Geo Origin
+                  </FieldLabel>
+                  {geoFieldChips(template.engine || 'handlebars').map((chip) => (
+                    <button
+                      key={chip}
+                      onClick={() => insertTemplateVar(template.id, chip)}
+                      className="bg-surface-base hover:bg-surface-hover hover:scale-105 active:scale-95 px-2 py-1 rounded-md text-[10px] font-mono text-accent-automation border border-border-base/50 transition-all font-bold shadow-sm"
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
                 {globalOptionsSchema?.options && globalOptionsSchema.options.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 items-center pt-1 border-t border-border-base/20">
                     <FieldLabel className="mr-2">Custom Options</FieldLabel>

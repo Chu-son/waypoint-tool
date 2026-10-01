@@ -106,6 +106,7 @@ describe('ExportModal UI', () => {
       conflict_resolution: 'backup_file',
       session_timestamp: expect.stringMatching(/^\d{8}_\d{6}$/),
       globals: {},
+      geo: expect.objectContaining({ lat: expect.any(Number), lon: expect.any(Number) }),
       float_numbers: true,
       integer_keys: [],
       waypoint_items: [
@@ -122,6 +123,30 @@ describe('ExportModal UI', () => {
       ],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
+  });
+
+  it('passes the aligned map origin to templates as geo, even when the background map is hidden', async () => {
+    useAppStore.setState({
+      geoMap: {
+        ...useAppStore.getState().geoMap,
+        enabled: false,
+        origin: { kind: 'utm', zone: 54, hemisphere: 'N', easting: 500000, northing: 3950000 },
+        alignment: { dx: 0, dy: 0, yawDeg: 90 },
+      },
+    });
+    const mockOnClose = vi.fn();
+    render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+
+    expect(BackendAPI.executeExportPackage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        geo: expect.objectContaining({
+          utm: { zone: 54, hemisphere: 'N', easting: 500000, northing: 3950000 },
+          heading_deg: -90,
+        }),
+      }),
+    );
   });
 
   it('asks the backend to write integers as floats unless the setting is turned off', async () => {
