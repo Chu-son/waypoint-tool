@@ -21,20 +21,36 @@ const sizeVariants = {
   full: 'max-w-[95vw] w-full',
 };
 
+/**
+ * 開いている Modal の積み順（末尾が最前面）。Escape は最前面の Modal だけが処理する。
+ * 全インスタンスが window の keydown を受けるため、これが無いと重なったモーダルが 1 回の Escape で全部閉じる。
+ */
+const openModalStack: string[] = [];
+
 export function Modal({ isOpen, onClose, size = 'md', children, className, ...props }: ModalProps) {
+  const instanceId = React.useId();
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   React.useEffect(() => {
     if (!isOpen) return;
 
+    openModalStack.push(instanceId);
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
+      if (e.key !== 'Escape') return;
+      if (openModalStack[openModalStack.length - 1] !== instanceId) return;
+      onCloseRef.current();
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      const index = openModalStack.lastIndexOf(instanceId);
+      if (index >= 0) openModalStack.splice(index, 1);
+    };
+  }, [isOpen, instanceId]);
 
   if (!isOpen) return null;
 
