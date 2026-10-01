@@ -163,6 +163,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       path_opacity: 0.85,
       sync_path_width_with_footprint: true,
       index_start_index: 1,
+      export_integers_as_float: false,
       decimal_precision: 4,
       conditional_styles: [],
       conditional_styles_enabled: true,
@@ -231,6 +232,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'path_opacity',
       'sync_path_width_with_footprint',
       'index_start_index',
+      'export_integers_as_float',
       'decimal_precision',
       'conditional_styles',
       'conditional_styles_enabled',
@@ -271,6 +273,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.path_opacity).toBe(0.85);
     expect(saved.sync_path_width_with_footprint).toBe(true);
     expect(saved.index_start_index).toBe(1);
+    expect(saved.export_integers_as_float).toBe(false);
     expect(saved.decimal_precision).toBe(4);
     expect(saved.conditional_styles).toEqual(fullProjectData.conditional_styles);
     expect(saved.conditional_styles_enabled).toBe(fullProjectData.conditional_styles_enabled);
@@ -311,6 +314,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     // Modify settings away from default
     useAppStore.getState().setProjectData({
       index_start_index: 1,
+      export_integers_as_float: false,
       decimal_precision: 2,
       default_map_opacity: 0.9,
       geo_map: { enabled: true, alignment: { dx: 5, dy: 6, yawDeg: 7 } },
@@ -325,6 +329,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
     });
 
     expect(useAppStore.getState().indexStartIndex).toBe(1);
+    expect(useAppStore.getState().exportIntegersAsFloat).toBe(false);
     expect(useAppStore.getState().decimalPrecision).toBe(2);
     expect(useAppStore.getState().defaultMapOpacity).toBe(0.9);
     expect(useAppStore.getState().geoMap.enabled).toBe(true);
@@ -336,6 +341,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
 
     const state = useAppStore.getState();
     expect(state.indexStartIndex).toBe(0);
+    expect(state.exportIntegersAsFloat).toBe(true);
     expect(state.decimalPrecision).toBe(6);
     expect(state.defaultMapOpacity).toBe(DEFAULT_MAP_OPACITY);
     expect(state.geoMap).toEqual(DEFAULT_GEO_MAP);
@@ -463,6 +469,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
       path_opacity: 0.7,
       sync_path_width_with_footprint: false,
       index_start_index: 0,
+      export_integers_as_float: true,
       decimal_precision: 6,
       conditional_styles: [],
       conditional_styles_enabled: true,

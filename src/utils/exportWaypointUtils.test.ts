@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  collectIntegerOptionKeys,
   extractGlobalsForExport,
   extractWaypointsForExport,
   countWaypointsWithInvalidOptions,
@@ -24,6 +25,49 @@ describe('extractGlobalsForExport', () => {
 
   it('returns no globals when the project has no option schema', () => {
     expect(extractGlobalsForExport(null)).toEqual({});
+  });
+});
+
+describe('collectIntegerOptionKeys', () => {
+  it('collects integer fields, including nested, list, map and union ones, but not float fields', () => {
+    const schema: OptionsSchema = {
+      options: [
+        { name: 'countdown_ms', label: 'Countdown', type: 'integer' },
+        { name: 'speed', label: 'Speed', type: 'float' },
+        { name: 'ids', label: 'Ids', type: 'list', item: { type: 'integer' } },
+        { name: 'names', label: 'Names', type: 'list', item: { type: 'string' } },
+        { name: 'counts', label: 'Counts', type: 'map', value_type: { type: 'integer' } },
+        {
+          name: 'actions',
+          label: 'Actions',
+          type: 'list',
+          item: {
+            type: 'union',
+            variants: [{ value: 'wait', fields: [{ name: 'retries', label: 'Retries', type: 'integer' }] }],
+          },
+        },
+        {
+          name: 'limits',
+          label: 'Limits',
+          type: 'object',
+          fields: [{ name: 'max_count', label: 'Max', type: 'integer' }],
+        },
+      ],
+      globals: [{ name: 'default_retries', label: 'Retries', type: 'integer', value: 3 }],
+    };
+
+    expect(collectIntegerOptionKeys(schema)).toEqual([
+      'countdown_ms',
+      'counts',
+      'default_retries',
+      'ids',
+      'max_count',
+      'retries',
+    ]);
+  });
+
+  it('returns nothing when the project has no option schema', () => {
+    expect(collectIntegerOptionKeys(null)).toEqual([]);
   });
 });
 

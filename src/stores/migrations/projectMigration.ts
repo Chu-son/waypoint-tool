@@ -381,6 +381,8 @@ export function normalizeV1(raw: any): StrictProjectData {
   const rawIndex = data.index_start_index ?? data.indexStartIndex;
   const indexStartIndex: 0 | 1 = Number(rawIndex) === 1 ? 1 : 0;
 
+  const exportIntegersAsFloat = (data.export_integers_as_float ?? data.exportIntegersAsFloat) !== false;
+
   const decimalPrecision =
     typeof (data.decimal_precision ?? data.decimalPrecision) === 'number'
       ? (data.decimal_precision ?? data.decimalPrecision)
@@ -525,6 +527,7 @@ export function normalizeV1(raw: any): StrictProjectData {
     path_opacity: pathOpacity,
     sync_path_width_with_footprint: syncPathWidthWithFootprint,
     index_start_index: indexStartIndex,
+    export_integers_as_float: exportIntegersAsFloat,
     decimal_precision: decimalPrecision,
     conditional_styles: conditionalStyles,
     conditional_styles_enabled: conditionalStylesEnabled,

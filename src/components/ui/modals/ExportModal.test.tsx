@@ -106,6 +106,8 @@ describe('ExportModal UI', () => {
       conflict_resolution: 'backup_file',
       session_timestamp: expect.stringMatching(/^\d{8}_\d{6}$/),
       globals: {},
+      float_numbers: true,
+      integer_keys: [],
       waypoint_items: [
         expect.objectContaining({
           path: expect.stringMatching(/^\/mock\/export\/dir\/waypoints\/\d{8}_waypoints\.yaml$/),
@@ -120,6 +122,43 @@ describe('ExportModal UI', () => {
       ],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
+  });
+
+  it('asks the backend to write integers as floats unless the setting is turned off', async () => {
+    const mockOnClose = vi.fn();
+    const { unmount } = render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+    expect(BackendAPI.executeExportPackage).toHaveBeenLastCalledWith(expect.objectContaining({ float_numbers: true }));
+    unmount();
+
+    useAppStore.setState({ exportIntegersAsFloat: false });
+    const secondClose = vi.fn();
+    render(<ExportModal isOpen={true} onClose={secondClose} />);
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+    await waitFor(() => expect(secondClose).toHaveBeenCalled());
+    expect(BackendAPI.executeExportPackage).toHaveBeenLastCalledWith(expect.objectContaining({ float_numbers: false }));
+  });
+
+  it('tells the backend which schema options are integers so they stay integers', async () => {
+    useAppStore.setState({
+      optionsSchema: {
+        options: [
+          { name: 'countdown_ms', label: 'Countdown', type: 'integer' },
+          { name: 'speed', label: 'Speed', type: 'float' },
+        ],
+        globals: [],
+      },
+    });
+    const mockOnClose = vi.fn();
+    render(<ExportModal isOpen={true} onClose={mockOnClose} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+    expect(BackendAPI.executeExportPackage).toHaveBeenCalledWith(
+      expect.objectContaining({ integer_keys: ['countdown_ms'] }),
+    );
   });
 
   it('hands the project global fields to the backend so templates can use them', async () => {

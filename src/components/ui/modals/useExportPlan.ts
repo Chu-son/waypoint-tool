@@ -9,6 +9,7 @@ import {
   findDuplicateOutputPaths,
 } from '../../../utils/exportTemplateEngine';
 import {
+  collectIntegerOptionKeys,
   extractGlobalsForExport,
   extractWaypointsForExport,
   countWaypointsWithInvalidOptions,
@@ -80,6 +81,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   // エクスポート内容の構築（既定値の補完・globals の抽出）は ref を解決した実効スキーマで行う。
   const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
+  const exportIntegersAsFloat = useAppStore((state) => state.exportIntegersAsFloat);
   const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
@@ -422,6 +424,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             conflict_resolution: activeProfile.conflictResolution,
             session_timestamp: formatSessionTimestamp(sessionDate),
             globals: extractGlobalsForExport(optionsSchema),
+            float_numbers: exportIntegersAsFloat,
+            integer_keys: collectIntegerOptionKeys(optionsSchema),
             waypoint_items: waypointItems,
             map_items: mapItems,
           });

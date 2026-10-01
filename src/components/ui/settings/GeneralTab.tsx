@@ -3,6 +3,7 @@ import { Select } from '../common/Select';
 import { FormField } from '../common/FormField';
 import { Slider } from '../common/Slider';
 import { BrowseInput } from '../common/BrowseInput';
+import { ToggleSwitch } from '../common/ToggleSwitch';
 import { Sliders, Terminal, Settings2 } from 'lucide-react';
 import { TabSectionHeader } from './TabSectionHeader';
 import { SettingsSection } from './SettingsSection';
@@ -13,7 +14,10 @@ export function GeneralTab() {
   const decimalPrecision = useAppStore((state) => state.decimalPrecision);
   const globalPythonPath = useAppStore((state) => state.globalPythonPath);
 
+  const exportIntegersAsFloat = useAppStore((state) => state.exportIntegersAsFloat);
+
   const setIndexStartIndex = useAppStore((state) => state.setIndexStartIndex);
+  const setExportIntegersAsFloat = useAppStore((state) => state.setExportIntegersAsFloat);
   const setGlobalPythonPath = useAppStore((state) => state.setGlobalPythonPath);
 
   return (
@@ -64,6 +68,17 @@ export function GeneralTab() {
             />
           </FormField>
         </div>
+
+        <FormField
+          label="Export Integers as Float"
+          description="Writes whole numbers as floats (e.g. 0 as 0.0) in exported files. Waypoint index and integer-typed options stay integers."
+        >
+          <ToggleSwitch
+            checked={exportIntegersAsFloat}
+            onChange={setExportIntegersAsFloat}
+            title="Export Integers as Float"
+          />
+        </FormField>
 
         <FormField
           label="Last Used Directory"

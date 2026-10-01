@@ -131,6 +131,7 @@ graph TD
 5. **バックエンド (Tauri / Rust Core)**:
    - ファイルシステムの直接アクセス、テンプレートエンジンによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
    - テンプレートのレンダリングは `src-tauri/src/templating.rs` に集約されており、`TemplateEngine`（`handlebars` / `jinja`）に応じて Handlebars（後方互換）または MiniJinja（`{% for %}`/`{% if %}`、四則演算、`toyaml`/`deg`/`rad` 等のカスタムフィルタを追加した Jinja2 互換エンジン）でレンダリングする。`io::export_waypoints` / `io::infer_import_mapping` / `commands::export_pipeline::execute_export_package` の3箇所が共通してこれを呼ぶ。
+   - `execute_export_package` は、テンプレートのレンダリングや YAML/JSON 直列化の前に、ウェイポイントと `globals` の整数を f64 に正規化する（`floatify`）。JS の `0.0` は IPC（JSON）で `0` になり整数として届くため、フロントエンドでは float を表現できないことによる。フロントエンドは一般設定 `exportIntegersAsFloat`（既定 `true`、localStorage とプロジェクトファイル `export_integers_as_float` の両方に保存）を `float_numbers` として、スキーマ上 integer 型のオプション名を `integer_keys`（`collectIntegerOptionKeys`）として渡す。`index` と `options`/`raw_options` 配下の `integer_keys` は整数のまま出力する。
    - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。Option Schema の YAML 読み込み（`load_options_schema`）も同様に、型の正規化・検証はフロントエンド（`src/utils/optionSchema.ts`）を Single Source of Truth とし、Rust 側は「壊れた YAML を早期に弾く」構造チェックのみを行い、検証済みの生 JSON を返す。
    - 外部 Python プラグインプロセスを標準入出力 (`stdin` / `stdout`) で起動・同期通信します。
 

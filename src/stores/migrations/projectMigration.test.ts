@@ -227,7 +227,7 @@ describe('projectMigration', () => {
     expect(normalized.root_annotation_ids).toEqual(['ann-1', 'ann-2']);
   });
 
-  it('fully populates all 32 StrictProjectData fields when input is { version: 1 } without crashing', () => {
+  it('fully populates all 33 StrictProjectData fields when input is { version: 1 } without crashing', () => {
     const incompleteV1 = { version: 1 };
     let normalized: any;
     expect(() => {
@@ -264,6 +264,7 @@ describe('projectMigration', () => {
       'path_opacity',
       'sync_path_width_with_footprint',
       'index_start_index',
+      'export_integers_as_float',
       'decimal_precision',
       'conditional_styles',
       'conditional_styles_enabled',
@@ -364,6 +365,13 @@ describe('projectMigration', () => {
     expect(migrateAndNormalizeProjectData({ index_start_index: 0 }).index_start_index).toBe(0);
     expect(migrateAndNormalizeProjectData({ index_start_index: 99 }).index_start_index).toBe(0);
     expect(migrateAndNormalizeProjectData({ indexStartIndex: 1 }).index_start_index).toBe(1);
+  });
+
+  it('defaults export_integers_as_float to true for projects saved before the setting existed', () => {
+    expect(migrateAndNormalizeProjectData({}).export_integers_as_float).toBe(true);
+    expect(migrateAndNormalizeProjectData({ export_integers_as_float: true }).export_integers_as_float).toBe(true);
+    expect(migrateAndNormalizeProjectData({ export_integers_as_float: false }).export_integers_as_float).toBe(false);
+    expect(migrateAndNormalizeProjectData({ exportIntegersAsFloat: false }).export_integers_as_float).toBe(false);
   });
 
   it('safely handles non-array values for array properties without throwing', () => {

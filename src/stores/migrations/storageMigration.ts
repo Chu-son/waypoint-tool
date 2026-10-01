@@ -22,6 +22,7 @@ export interface PersistedStorageState {
   exportTemplates?: any[];
   defaultExportFormats?: DefaultExportFormat[];
   indexStartIndex?: 0 | 1;
+  exportIntegersAsFloat?: boolean;
   showPaths?: boolean;
   showGrid?: boolean;
   showFootprints?: boolean;
@@ -52,6 +53,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   exportTemplates: [],
   defaultExportFormats: DEFAULT_EXPORT_FORMATS,
   indexStartIndex: 0,
+  exportIntegersAsFloat: true,
   showPaths: true,
   showGrid: true,
   showFootprints: true,
@@ -161,6 +163,7 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
       : DEFAULT_STORAGE_STATE.defaultExportFormats,
     pluginSettings: Array.isArray(state.pluginSettings) ? state.pluginSettings : DEFAULT_STORAGE_STATE.pluginSettings,
     indexStartIndex: state.indexStartIndex === 1 ? 1 : 0,
+    exportIntegersAsFloat: state.exportIntegersAsFloat !== false,
     decimalPrecision: typeof state.decimalPrecision === 'number' ? Math.max(0, Math.floor(state.decimalPrecision)) : 6,
     themeMode: state.themeMode === 'dark' ? 'dark' : 'light',
     themePreset: (() => {

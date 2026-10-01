@@ -1,4 +1,5 @@
 import type { WaypointNode, OptionsSchema, OptionValue } from '../types/store';
+import type { FieldDef, TypeSpec } from '../types/options';
 import { getFlattenedWaypointIds } from './treeUtils';
 import { quaternionToYaw } from './transformUtils';
 import { resolvePresets, resolveWithDefaults, validateField } from './optionValues';
@@ -34,6 +35,40 @@ export function extractGlobalsForExport(optionsSchema: OptionsSchema | null): Re
     if (resolved !== undefined) globals[field.name] = resolved;
   });
   return globals;
+}
+
+/** 値が整数だけで構成される型か（integer、および integer の list / map）。 */
+function isIntegerSpec(spec: TypeSpec | undefined): boolean {
+  if (!spec) return false;
+  if (spec.type === 'integer') return true;
+  if (spec.type === 'list') return isIntegerSpec(spec.item);
+  if (spec.type === 'map') return isIntegerSpec(spec.value_type);
+  return false;
+}
+
+function collectFromSpec(spec: TypeSpec | undefined, keys: Set<string>): void {
+  if (!spec) return;
+  spec.fields?.forEach((field) => collectFromField(field, keys));
+  spec.variants?.forEach((variant) => variant.fields.forEach((field) => collectFromField(field, keys)));
+  collectFromSpec(spec.item, keys);
+  collectFromSpec(spec.value_type, keys);
+}
+
+function collectFromField(field: FieldDef, keys: Set<string>): void {
+  if (isIntegerSpec(field)) keys.add(field.name);
+  collectFromSpec(field, keys);
+}
+
+/**
+ * スキーマ上 integer 型（およびその list / map）のフィールド名を集める。
+ * 「整数も float で出力する」設定が有効でも、これらの値は整数のまま出力するためバックエンドへ渡す。
+ */
+export function collectIntegerOptionKeys(optionsSchema: OptionsSchema | null): string[] {
+  const keys = new Set<string>();
+  optionsSchema?.options.forEach((field) => collectFromField(field, keys));
+  optionsSchema?.globals.forEach((field) => collectFromField(field, keys));
+  optionsSchema?.definitions?.forEach((definition) => collectFromSpec(definition, keys));
+  return [...keys].sort();
 }
 
 export function extractWaypointsForExport(
