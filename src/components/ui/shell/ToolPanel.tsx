@@ -96,13 +96,7 @@ export function ToolPanel() {
       {hasBottomActions && (
         <div className="mt-auto mb-2 border-t border-border-base pt-2 flex flex-col items-center w-full gap-2">
           {allowImport && (
-            <Button
-              onClick={handleImportClick}
-              title="Import"
-              variant="icon"
-              size="icon"
-              className="rounded-md"
-            >
+            <Button onClick={handleImportClick} title="Import" variant="icon" size="icon" className="rounded-md">
               <Upload size={16} className="text-primary-base" />
             </Button>
           )}
