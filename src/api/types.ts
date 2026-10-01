@@ -1,4 +1,5 @@
 import { PluginInstance, MapLayerClip, ImportFieldMapping, TemplateEngine } from '../types/store';
+import type { ExportGeoOrigin } from '../utils/exportWaypointUtils';
 
 export type MapLoadResult = {
   info: {
@@ -126,6 +127,8 @@ export type ExecuteExportPackageOptions = {
   session_timestamp: string;
   /** Project-wide values exposed to waypoint templates as `globals`. */
   globals: Record<string, any>;
+  /** Aligned map origin (lat/lon, UTM, heading) exposed to waypoint templates as `geo`. */
+  geo: ExportGeoOrigin;
   /** true の場合、整数値も float 形式（0 → 0.0）で出力する（`index` と `integer_keys` を除く）。 */
   float_numbers: boolean;
   /** float 化から除外する、スキーマ上 integer 型のオプション名。 */

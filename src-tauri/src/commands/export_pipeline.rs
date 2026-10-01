@@ -16,6 +16,9 @@ pub struct ExportPackageOptions {
     /// プロジェクト全体の変数。テンプレートから `globals` として参照できる。
     #[serde(default)]
     pub globals: serde_json::Map<String, serde_json::Value>,
+    /// 位置合わせ後のマップ原点の緯度経度・UTM・向き。テンプレートから `geo` として参照できる。
+    #[serde(default)]
+    pub geo: Option<serde_json::Value>,
     /// true の場合、整数値も float（`0` → `0.0`）で出力する。受け側フォーマットが float 型を要求するため既定は有効。
     #[serde(default = "default_float_numbers")]
     pub float_numbers: bool,
@@ -146,6 +149,11 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
     if options.float_numbers {
         floatify(&mut globals, &integer_keys);
     }
+    // geo は UTM ゾーン番号だけを整数のまま残し、それ以外の数値は float にそろえる。
+    let mut geo = options.geo.clone().unwrap_or(serde_json::Value::Null);
+    if options.float_numbers {
+        floatify(&mut geo, &HashSet::from(["zone"]));
+    }
 
     // 1. Waypoint アイテムのエクスポート処理
     for mut wp_item in options.waypoint_items {
@@ -172,7 +180,7 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             templating::render(
                 wp_item.engine,
                 &tmpl,
-                &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": globals }),
+                &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": globals, "geo": geo }),
             )
             .map_err(|e| format!("Template render error for {}: {}", wp_item.path, e))?
         } else if wp_item.path.to_lowercase().ends_with(".yaml") || wp_item.path.to_lowercase().ends_with(".yml") {
@@ -357,6 +365,7 @@ mod tests {
             conflict_resolution: "backup_file".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            geo: None,
             float_numbers: false,
             integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
@@ -394,6 +403,7 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals,
+            geo: None,
             float_numbers: false,
             integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
@@ -426,6 +436,7 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            geo: None,
             float_numbers: false,
             integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
@@ -455,6 +466,7 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            geo: None,
             float_numbers: false,
             integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
@@ -494,6 +506,7 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            geo: None,
             float_numbers: false,
             integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
@@ -636,6 +649,49 @@ mod tests {
             serde_json::json!({}),
         );
         assert_eq!(handlebars, "0 0.0 1.0 1.0");
+    }
+
+    fn sample_geo() -> serde_json::Value {
+        serde_json::json!({
+            "lat": 35.5,
+            "lon": 141,
+            "utm": { "zone": 54, "hemisphere": "N", "easting": 500000, "northing": 3930000 },
+            "heading_deg": -90,
+            "heading": -1.25
+        })
+    }
+
+    #[test]
+    fn test_export_templates_can_reference_geo() {
+        let jinja = export_one(
+            "wp.txt",
+            Some((
+                "jinja",
+                "{{ geo.lat }} {{ geo.utm.zone }}{{ geo.utm.hemisphere }} {{ geo.utm.easting }} {{ geo.heading_deg }}",
+            )),
+            serde_json::json!({ "geo": sample_geo() }),
+        );
+        assert_eq!(jinja, "35.5 54N 500000.0 -90.0");
+
+        let handlebars = export_one(
+            "wp.txt",
+            Some((
+                "handlebars",
+                "{{@root.geo.lon}} {{#each waypoints}}{{@root.geo.utm.zone}} {{@root.geo.utm.northing}}{{/each}}",
+            )),
+            serde_json::json!({ "geo": sample_geo() }),
+        );
+        assert_eq!(handlebars, "141.0 54 3930000.0");
+    }
+
+    #[test]
+    fn test_export_keeps_geo_values_as_given_when_float_numbers_is_off() {
+        let out = export_one(
+            "wp.txt",
+            Some(("jinja", "{{ geo.utm.easting }} {{ geo.utm.zone }}")),
+            serde_json::json!({ "geo": sample_geo(), "float_numbers": false }),
+        );
+        assert_eq!(out, "500000 54");
     }
 
     #[test]

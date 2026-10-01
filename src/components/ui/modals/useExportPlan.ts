@@ -11,6 +11,7 @@ import {
 import {
   collectIntegerOptionKeys,
   extractGlobalsForExport,
+  extractGeoForExport,
   extractWaypointsForExport,
   countWaypointsWithInvalidOptions,
 } from '../../../utils/exportWaypointUtils';
@@ -82,6 +83,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   const optionsSchema = resolveOptionsSchema(rawOptionsSchema);
   const indexStartIndex = useAppStore((state) => state.indexStartIndex);
   const exportIntegersAsFloat = useAppStore((state) => state.exportIntegersAsFloat);
+  const geoMap = useAppStore((state) => state.geoMap);
   const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const lastDirectory = useAppStore((state) => state.lastDirectory);
   const setLastDirectory = useAppStore((state) => state.setLastDirectory);
@@ -424,6 +426,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             conflict_resolution: activeProfile.conflictResolution,
             session_timestamp: formatSessionTimestamp(sessionDate),
             globals: extractGlobalsForExport(optionsSchema),
+            geo: extractGeoForExport(geoMap),
             float_numbers: exportIntegersAsFloat,
             integer_keys: collectIntegerOptionKeys(optionsSchema),
             waypoint_items: waypointItems,

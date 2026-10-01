@@ -4,6 +4,7 @@ import {
   convertOrigin,
   geoToWorld,
   IDENTITY_ALIGNMENT,
+  mapOriginGeo,
   originToLatLon,
   tilePlacement,
   visibleTiles,
@@ -75,6 +76,38 @@ describe('geo ⇔ world transform', () => {
     const p = geoToWorld(35, 144.0005, origin, IDENTITY_ALIGNMENT);
     expect(p.x).toBeGreaterThan(80);
     expect(p.x).toBeLessThan(100);
+  });
+});
+
+describe('mapOriginGeo', () => {
+  it('is the origin itself when the map is unaligned', () => {
+    const geo = mapOriginGeo(ORIGIN, IDENTITY_ALIGNMENT);
+    expect(geo.lat).toBeCloseTo(35.681236, 8);
+    expect(geo.lon).toBeCloseTo(139.767125, 8);
+    expect(geo.headingDeg).toBeCloseTo(0, 9);
+  });
+
+  it('is the place that the world origin lands on once the alignment is applied', () => {
+    const alignment: GeoAlignment = { dx: 30, dy: -12, yawDeg: 25 };
+    const geo = mapOriginGeo(ORIGIN, alignment);
+    const back = geoToWorld(geo.lat, geo.lon, ORIGIN, alignment);
+    expect(back.x).toBeCloseTo(0, 5);
+    expect(back.y).toBeCloseTo(0, 5);
+  });
+
+  it('reports the direction of the map X axis counter-clockwise from east', () => {
+    expect(mapOriginGeo(ORIGIN, { dx: 0, dy: 0, yawDeg: 90 }).headingDeg).toBeCloseTo(-90, 9);
+    expect(mapOriginGeo(ORIGIN, { dx: 0, dy: 0, yawDeg: -30 }).headingDeg).toBeCloseTo(30, 9);
+    expect(mapOriginGeo(ORIGIN, { dx: 0, dy: 0, yawDeg: 180 }).headingDeg).toBeCloseTo(180, 9);
+  });
+
+  it('keeps the zone and hemisphere of a UTM origin', () => {
+    const utmOrigin: GeoOrigin = { kind: 'utm', zone: 54, hemisphere: 'N', easting: 500000, northing: 3950000 };
+    const geo = mapOriginGeo(utmOrigin, { dx: 10, dy: 5, yawDeg: 0 });
+    expect(geo.utm.zone).toBe(54);
+    expect(geo.utm.hemisphere).toBe('N');
+    expect(geo.utm.easting).toBeCloseTo(499990, 6);
+    expect(geo.utm.northing).toBeCloseTo(3949995, 6);
   });
 });
 

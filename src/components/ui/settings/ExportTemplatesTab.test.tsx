@@ -69,6 +69,22 @@ describe('ExportTemplatesTab engine selection', () => {
     );
   });
 
+  it('inserts the map origin (geo) variables with the syntax of the template engine', async () => {
+    const { user } = renderWithStore(<ExportTemplatesTab />, {
+      exportTemplates: [
+        { id: 't1', name: 'Handlebars', extension: 'yaml', suffix: '', content: '', engine: 'handlebars' },
+        { id: 't2', name: 'Jinja', extension: 'yaml', suffix: '', content: '', engine: 'jinja' },
+      ],
+    });
+
+    await user.click(screen.getAllByRole('button', { name: '{{@root.geo.lat}}' })[0]);
+    await user.click(screen.getAllByRole('button', { name: '{{ geo.utm.zone }}' })[0]);
+
+    const [handlebars, jinja] = getAppState().exportTemplates;
+    expect(handlebars.content).toBe('{{@root.geo.lat}}');
+    expect(jinja.content).toBe('{{ geo.utm.zone }}');
+  });
+
   it('copying a template preserves its source engine without asking again', async () => {
     const { user } = renderWithStore(<ExportTemplatesTab />, {
       exportTemplates: [
