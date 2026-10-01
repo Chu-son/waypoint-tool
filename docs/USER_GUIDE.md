@@ -391,6 +391,9 @@ Waypoint ごとではなく、プロジェクト全体で1つの値を持つ変�
 
 ## 12. インポート・エクスポート & プロファイル
 
+### 数値の float 出力
+`Settings > General` の **Export Integers as Float**（既定: オン）がオンのとき、エクスポートされる数値は `0` ではなく `0.0` のように float 形式で出力されます（例: mg_robot のように `z` が float 型であることを要求する受け側向け）。`index` と、Option Schema で `integer` 型にしたオプション（例: `countdown_ms: 3000`）は整数のままです。従来どおりの出力に戻したい場合はオフにしてください。
+
 ### カスタムテンプレートによる自由出力
 `File > Export Waypoints...`（または `Ctrl + E`）から実行します。
 `Settings > Export Templates` で定義したテンプレートにより、標準の YAML だけでなく、JSON、CSV、ROS2 Nav2 XML 形式など任意のフォーマットで出力可能です。テンプレートごとに **Engine**（`Jinja` または `Handlebars`）を選べます。

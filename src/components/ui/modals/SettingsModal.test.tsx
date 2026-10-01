@@ -138,6 +138,22 @@ describe('SettingsModal UI', () => {
     expect(useAppStore.getState().globalPythonPath).toBe('/usr/bin/python3');
   });
 
+  it('lets the user turn off writing integers as floats on the General tab', async () => {
+    useAppStore.setState({ exportIntegersAsFloat: true });
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const toggle = screen.getByRole('switch', { name: 'Export Integers as Float' });
+    expect(toggle).toBeChecked();
+
+    act(() => {
+      fireEvent.click(toggle);
+    });
+
+    expect(toggle).not.toBeChecked();
+    expect(useAppStore.getState().exportIntegersAsFloat).toBe(false);
+    expect(useAppStore.getState().isDirty).toBe(true);
+  });
+
   it('allows switching color theme between dark and light on the Appearance tab', async () => {
     useAppStore.setState({ themeMode: 'dark', isCustomUiMode: false, customUiConfig: null });
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);

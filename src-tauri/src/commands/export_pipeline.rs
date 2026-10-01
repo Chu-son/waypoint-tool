@@ -4,6 +4,7 @@ use crate::templating::{self, TemplateEngine};
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -15,6 +16,12 @@ pub struct ExportPackageOptions {
     /// プロジェクト全体の変数。テンプレートから `globals` として参照できる。
     #[serde(default)]
     pub globals: serde_json::Map<String, serde_json::Value>,
+    /// true の場合、整数値も float（`0` → `0.0`）で出力する。受け側フォーマットが float 型を要求するため既定は有効。
+    #[serde(default = "default_float_numbers")]
+    pub float_numbers: bool,
+    /// float 化から除外するオプション名（スキーマ上 integer 型のもの）。
+    #[serde(default)]
+    pub integer_keys: Vec<String>,
     pub waypoint_items: Vec<PackageWaypointItem>,
     pub map_items: Vec<PackageMapItem>,
 }
@@ -60,6 +67,56 @@ fn strip_raw_options(value: &serde_json::Value) -> serde_json::Value {
     v
 }
 
+fn default_float_numbers() -> bool {
+    true
+}
+
+/// f64 で正確に表せる整数の上限（2^53）。これを超える値は精度が落ちるため変換しない。
+const MAX_SAFE_INTEGER: i64 = 1 << 53;
+
+/// 値の中のすべての整数を f64 に置き換える。`integer_keys` に含まれるキーの値は配下ごと変更しない。
+fn floatify(value: &mut serde_json::Value, integer_keys: &HashSet<&str>) {
+    match value {
+        serde_json::Value::Number(n) => {
+            let convertible = if let Some(i) = n.as_i64() {
+                i.abs() <= MAX_SAFE_INTEGER
+            } else {
+                n.as_u64().is_some_and(|u| u <= MAX_SAFE_INTEGER as u64)
+            };
+            if convertible {
+                if let Some(f) = n.as_f64().and_then(serde_json::Number::from_f64) {
+                    *n = f;
+                }
+            }
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(|v| floatify(v, integer_keys)),
+        serde_json::Value::Object(map) => {
+            for (key, v) in map.iter_mut() {
+                if !integer_keys.contains(key.as_str()) {
+                    floatify(v, integer_keys);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// ウェイポイント 1 件の数値を float 化する。`index` は整数のまま。
+/// 名前の衝突で姿勢（x, y, z ...）が除外されないよう、`integer_keys` は `options` / `raw_options` 配下にだけ適用する。
+fn floatify_waypoint(waypoint: &mut serde_json::Value, integer_keys: &HashSet<&str>) {
+    let Some(obj) = waypoint.as_object_mut() else {
+        return;
+    };
+    let no_exclusions = HashSet::new();
+    for (key, v) in obj.iter_mut() {
+        match key.as_str() {
+            "index" => {}
+            "options" | "raw_options" => floatify(v, integer_keys),
+            _ => floatify(v, &no_exclusions),
+        }
+    }
+}
+
 fn backup_file_if_exists(path_str: &str, timestamp: &str, backed_up: &mut Vec<String>) -> Result<(), String> {
     let path = Path::new(path_str);
     if !path.exists() {
@@ -84,8 +141,20 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
     let mut exported_count = 0;
     let is_backup = options.conflict_resolution == "backup_file";
 
+    let integer_keys: HashSet<&str> = options.integer_keys.iter().map(String::as_str).collect();
+    let mut globals = serde_json::Value::Object(options.globals.clone());
+    if options.float_numbers {
+        floatify(&mut globals, &integer_keys);
+    }
+
     // 1. Waypoint アイテムのエクスポート処理
-    for wp_item in options.waypoint_items {
+    for mut wp_item in options.waypoint_items {
+        if options.float_numbers {
+            wp_item
+                .waypoints
+                .iter_mut()
+                .for_each(|wp| floatify_waypoint(wp, &integer_keys));
+        }
         let target_path = Path::new(&wp_item.path);
         if let Some(parent) = target_path.parent() {
             if !parent.exists() {
@@ -103,7 +172,7 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             templating::render(
                 wp_item.engine,
                 &tmpl,
-                &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": options.globals }),
+                &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": globals }),
             )
             .map_err(|e| format!("Template render error for {}: {}", wp_item.path, e))?
         } else if wp_item.path.to_lowercase().ends_with(".yaml") || wp_item.path.to_lowercase().ends_with(".yml") {
@@ -288,6 +357,8 @@ mod tests {
             conflict_resolution: "backup_file".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            float_numbers: false,
+            integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
@@ -323,6 +394,8 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals,
+            float_numbers: false,
+            integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({ "id": "wp1" }), serde_json::json!({ "id": "wp2" })],
@@ -353,6 +426,8 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            float_numbers: false,
+            integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({ "id": "wp1", "options": {"speed": 1.5}, "raw_options": {} })],
@@ -380,6 +455,8 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            float_numbers: false,
+            integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
                 // options は既定値が補完された実効値、raw_options は明示的に入力された値だけを持つ、
@@ -417,6 +494,8 @@ mod tests {
             conflict_resolution: "overwrite".to_string(),
             session_timestamp: "20260912_110000".to_string(),
             globals: serde_json::Map::new(),
+            float_numbers: false,
+            integer_keys: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
                 waypoints: vec![serde_json::json!({
@@ -462,5 +541,108 @@ mod tests {
         assert_eq!(parsed["waypoints"][0]["on_reached_actions"][0]["type"], "wait");
         assert_eq!(parsed["waypoints"][0]["on_reached_actions"][0]["countdown_ms"], 3000);
         assert_eq!(parsed["waypoints"][0]["on_reached_actions"][1]["type"], "amcl_reset");
+    }
+
+    /// フロントエンドから届く JSON と同じ形でエクスポートを実行し、出力ファイルの内容を返す。
+    /// `extra` は `float_numbers` / `integer_keys` などオプションの追加フィールド。
+    fn export_one(file_name: &str, template: Option<(&str, &str)>, extra: serde_json::Value) -> String {
+        let tmp = TempDir::new().unwrap();
+        let wp_path = tmp.path().join(file_name);
+        let mut item = serde_json::json!({
+            "path": wp_path.to_string_lossy(),
+            "waypoints": [{
+                "index": 0,
+                "x": 0, "y": 2, "z": 0, "yaw": 0,
+                "qx": 0, "qy": 0, "qz": 0, "qw": 1,
+                "options": {"countdown_ms": 3000, "speed": 1, "nested": {"countdown_ms": 10, "z": 5}},
+                "raw_options": {"speed": 1}
+            }],
+        });
+        if let Some((engine, tmpl)) = template {
+            item["engine"] = engine.into();
+            item["template"] = tmpl.into();
+        }
+        let mut options = serde_json::json!({
+            "root_dir": tmp.path().to_string_lossy(),
+            "conflict_resolution": "overwrite",
+            "session_timestamp": "20260912_110000",
+            "globals": {"tolerance": 1},
+            "waypoint_items": [item],
+            "map_items": [],
+        });
+        options
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let options: ExportPackageOptions = serde_json::from_value(options).unwrap();
+        execute_export_package(options).unwrap();
+        fs::read_to_string(&wp_path).unwrap()
+    }
+
+    #[test]
+    fn test_export_writes_integers_as_float_by_default() {
+        // float_numbers を省略した場合（既定）は、0 のような整数も 0.0 として出力する（index は整数のまま）。
+        let yaml = export_one("wp.yaml", None, serde_json::json!({}));
+        let parsed: serde_yaml::Value = serde_yaml::from_str(&yaml).unwrap();
+        assert!(yaml.contains("z: 0.0"), "z must be a float: {yaml}");
+        assert!(yaml.contains("qw: 1.0"), "qw must be a float: {yaml}");
+        assert!(yaml.contains("index: 0\n"), "index must stay an integer: {yaml}");
+        assert!(parsed[0]["x"].is_f64() && parsed[0]["index"].is_i64());
+
+        let json = export_one("wp.json", None, serde_json::json!({}));
+        assert!(json.contains("\"z\": 0.0"), "z must be a float: {json}");
+        assert!(json.contains("\"index\": 0,"), "index must stay an integer: {json}");
+    }
+
+    #[test]
+    fn test_export_keeps_integers_when_float_numbers_is_off() {
+        let yaml = export_one("wp.yaml", None, serde_json::json!({ "float_numbers": false }));
+        assert!(yaml.contains("z: 0\n"), "z must stay an integer: {yaml}");
+        assert!(!yaml.contains("0.0"), "no float expected: {yaml}");
+    }
+
+    #[test]
+    fn test_export_integer_keys_are_excluded_only_within_options() {
+        // integer_keys は options 配下だけに効く。姿勢の z は、同名のキーが指定されていても float のまま。
+        let json = export_one(
+            "wp.json",
+            None,
+            serde_json::json!({ "integer_keys": ["countdown_ms", "z"] }),
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let wp = &parsed[0];
+        assert!(wp["z"].is_f64());
+        assert!(wp["options"]["countdown_ms"].is_i64(), "{json}");
+        assert!(wp["options"]["nested"]["countdown_ms"].is_i64(), "{json}");
+        assert!(wp["options"]["nested"]["z"].is_i64(), "{json}");
+        assert!(wp["options"]["speed"].is_f64(), "{json}");
+    }
+
+    #[test]
+    fn test_export_templates_receive_floats() {
+        let jinja = export_one(
+            "wp.txt",
+            Some(("jinja", "{% for wp in waypoints %}{{ wp.index }} {{ wp.z }} {{ wp.raw_options.speed }} {{ globals.tolerance }}{% endfor %}")),
+            serde_json::json!({}),
+        );
+        assert_eq!(jinja, "0 0.0 1.0 1.0");
+
+        let handlebars = export_one(
+            "wp.txt",
+            Some((
+                "handlebars",
+                "{{#each waypoints}}{{index}} {{z}} {{raw_options.speed}} {{@root.globals.tolerance}}{{/each}}",
+            )),
+            serde_json::json!({}),
+        );
+        assert_eq!(handlebars, "0 0.0 1.0 1.0");
+    }
+
+    #[test]
+    fn test_floatify_leaves_integers_beyond_f64_precision_untouched() {
+        let mut value = serde_json::json!({ "small": 3, "big": 9_007_199_254_740_993_i64, "neg": -2 });
+        floatify(&mut value, &HashSet::new());
+        assert!(value["small"].is_f64() && value["neg"].is_f64());
+        assert!(value["big"].is_i64());
     }
 }

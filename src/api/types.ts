@@ -126,6 +126,10 @@ export type ExecuteExportPackageOptions = {
   session_timestamp: string;
   /** Project-wide values exposed to waypoint templates as `globals`. */
   globals: Record<string, any>;
+  /** true の場合、整数値も float 形式（0 → 0.0）で出力する（`index` と `integer_keys` を除く）。 */
+  float_numbers: boolean;
+  /** float 化から除外する、スキーマ上 integer 型のオプション名。 */
+  integer_keys: string[];
   waypoint_items: PackageExportWaypointItem[];
   map_items: PackageExportMapItem[];
 };

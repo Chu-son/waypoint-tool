@@ -57,6 +57,14 @@ describe('storageMigration', () => {
     expect(corruptIndex.indexStartIndex).toBe(0);
   });
 
+  it('writes integers as floats unless the stored setting is explicitly off', () => {
+    expect(migrateStorage({}, 0).exportIntegersAsFloat).toBe(true);
+    expect(migrateStorage({}, 3).exportIntegersAsFloat).toBe(true);
+    expect(migrateStorage({ exportIntegersAsFloat: true }, 3).exportIntegersAsFloat).toBe(true);
+    expect(migrateStorage({ exportIntegersAsFloat: false }, 3).exportIntegersAsFloat).toBe(false);
+    expect(migrateStorage({ exportIntegersAsFloat: 'nope' }, 3).exportIntegersAsFloat).toBe(true);
+  });
+
   it('normalizes themeMode to dark or light correctly', () => {
     expect(migrateStorage({ themeMode: 'light' }, 2).themeMode).toBe('light');
     expect(migrateStorage({ themeMode: 'dark' }, 2).themeMode).toBe('dark');

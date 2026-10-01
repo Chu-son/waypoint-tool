@@ -53,6 +53,7 @@ export function buildProjectData(state: AppState): StrictProjectData {
     path_opacity: state.pathOpacity,
     sync_path_width_with_footprint: state.syncPathWidthWithFootprint,
     index_start_index: state.indexStartIndex,
+    export_integers_as_float: state.exportIntegersAsFloat,
     decimal_precision: state.decimalPrecision,
     conditional_styles: state.conditionalStyles,
     conditional_styles_enabled: state.conditionalStylesEnabled,

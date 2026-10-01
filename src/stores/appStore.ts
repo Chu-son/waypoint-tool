@@ -62,6 +62,7 @@ export const useAppStore = create<AppState>()(
         exportTemplates: state.exportTemplates.filter((t) => t.scope !== 'local'), // Treat undefined as global by default
         defaultExportFormats: state.defaultExportFormats,
         indexStartIndex: state.indexStartIndex,
+        exportIntegersAsFloat: state.exportIntegersAsFloat,
         showPaths: state.showPaths,
         showGrid: state.showGrid,
         showFootprints: state.showFootprints,

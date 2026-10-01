@@ -59,6 +59,7 @@ export interface ProjectData {
   path_opacity?: number;
   sync_path_width_with_footprint?: boolean;
   index_start_index?: 0 | 1;
+  export_integers_as_float?: boolean;
   decimal_precision?: number;
   workflow_state?: any; // Legacy
   custom_ui_data?: any;
@@ -103,6 +104,7 @@ export interface StrictProjectData {
   path_opacity: number;
   sync_path_width_with_footprint: boolean;
   index_start_index: 0 | 1;
+  export_integers_as_float: boolean;
   decimal_precision: number;
   conditional_styles: ConditionalStyleRule[];
   conditional_styles_enabled: boolean;
