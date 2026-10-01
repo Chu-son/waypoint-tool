@@ -97,6 +97,13 @@ describe('workflowActions', () => {
     expect(useAppStore.getState().settingsModalTab).toBe('robot');
   });
 
+  it('opens the import dialog through the modal stack', async () => {
+    await executeWorkflowAction('open_import_modal');
+
+    expect(useAppStore.getState().isImportModalOpen).toBe(true);
+    expect(useAppStore.getState().modalStack).toContain('import');
+  });
+
   it('handles set_active_plugin and run_plugin', async () => {
     const mockExecute = vi.fn().mockResolvedValue({ success: true });
     const mockPlugin: any = {

@@ -329,7 +329,7 @@ flowchart TD
 
 1. **Tier 1: 最前面モーダル（Modal Stack Top）**
    - 判定: `modalStack.length > 0` または各モーダルの開閉フラグが true。
-   - 動作: 最前面のモーダル1つのみをスタックからポップ（`popModal()`）して閉じます。
+   - 動作: 最前面のモーダル1つのみをスタックからポップ（`popModal()`）して閉じます。共通 `Modal` コンポーネント側も、開いているインスタンスの積み順を持ち、最前面の 1 つだけが `onClose` します（重ねたモーダルが 1 回の Escape で全部閉じることはありません）。
    - 例外: 初回起動時の Welcome モーダル（`isInitialLaunch: true`）は Escape では閉じず、処理を終了（`return true`）します。
 2. **Tier 2: DOM テキストフォーカス（DOM Text Editing Focus）**
    - 判定: `document.activeElement` が `<input>`, `<textarea>`, `<select>`, または `isContentEditable`。

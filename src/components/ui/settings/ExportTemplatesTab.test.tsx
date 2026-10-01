@@ -101,4 +101,13 @@ describe('ExportTemplatesTab engine selection', () => {
     expect(templates).toHaveLength(2);
     expect(templates[1].engine).toBe('jinja');
   });
+
+  it('sends Import to the import dialog, already on the template import screen', async () => {
+    const { user } = renderWithStore(<ExportTemplatesTab />);
+
+    await user.click(screen.getByRole('button', { name: /Import/ }));
+
+    expect(getAppState().isImportModalOpen).toBe(true);
+    expect(getAppState().importModalCategory).toBe('template');
+  });
 });
