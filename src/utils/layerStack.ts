@@ -76,8 +76,14 @@ export function stackEntries({ mapLayers, customLayers, layerOrder }: Omit<Layer
  */
 export function reconcileLayerOrder(order: string[], existingIds: string[]): string[] {
   const existing = new Set(existingIds);
-  const kept = order.filter((id, index) => existing.has(id) && order.indexOf(id) === index);
-  const keptSet = new Set(kept);
+  const kept: string[] = [];
+  const keptSet = new Set<string>();
+  for (const id of order) {
+    if (existing.has(id) && !keptSet.has(id)) {
+      kept.push(id);
+      keptSet.add(id);
+    }
+  }
   const missing = existingIds.filter((id) => !keptSet.has(id));
   return [...missing, ...kept];
 }

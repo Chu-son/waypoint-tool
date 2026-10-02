@@ -143,8 +143,9 @@ export function remapMaps(
   const importedIds = new Set([...newLayers.map((l) => l.id), ...newCustomLayers.map((l) => l.id)]);
   const order = layerOrder.map((id) => layerIdMap.get(id)).filter((id): id is string => !!id && importedIds.has(id));
   // layer_order に載っていないレイヤーも、取りこぼさないよう末尾に足す。
+  const ordered = new Set(order);
   importedIds.forEach((id) => {
-    if (!order.includes(id)) order.push(id);
+    if (!ordered.has(id)) order.push(id);
   });
 
   const visibilitySetIdMap = new Map<string, string>();

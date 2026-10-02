@@ -66,13 +66,41 @@ export function getFlattenedAnnotationIds(
 }
 
 /**
+ * 子ID → 親ID（ルートは null）の索引。`findNodeParentId` を同じ入力で繰り返し呼ぶ箇所で使う。
+ */
+export type ParentIndex = Map<string, string | null>;
+
+/**
+ * `findNodeParentId` と同じ結果を O(1) で引ける索引を作る。
+ * ルートを最優先し、複数の親に含まれる子は `Object.entries` の順で最初の親を採用する。
+ */
+export function buildParentIndex(
+  rootIds: string[],
+  nodesOrGroups: Record<string, { children_ids?: string[] }>,
+): ParentIndex {
+  const index: ParentIndex = new Map();
+  for (const id of rootIds) index.set(id, null);
+  for (const [parentId, item] of Object.entries(nodesOrGroups)) {
+    if (!item.children_ids) continue;
+    for (const childId of item.children_ids) {
+      if (!index.has(childId)) index.set(childId, parentId);
+    }
+  }
+  return index;
+}
+
+/**
  * 指定されたノード/グループの親IDを探索する（ルートに存在する場合は null を返す）。
+ * `parentIndex` を渡すと、同じ `rootIds`/`nodesOrGroups` から作った索引で引く。
  */
 export function findNodeParentId(
   id: string,
   rootIds: string[],
   nodesOrGroups: Record<string, { children_ids?: string[] }>,
+  parentIndex?: ParentIndex,
 ): string | null {
+  if (parentIndex) return parentIndex.get(id) ?? null;
+
   if (rootIds.includes(id)) {
     return null;
   }
@@ -141,6 +169,7 @@ export function getNodeDepth(
   id: string,
   rootIds: string[],
   nodesOrGroups: Record<string, { children_ids?: string[] }>,
+  parentIndex?: ParentIndex,
 ): number {
   let depth = 0;
   let currentId: string | null = id;
@@ -150,11 +179,12 @@ export function getNodeDepth(
     if (visited.has(currentId)) break; // 循環参照防止
     visited.add(currentId);
 
-    if (rootIds.includes(currentId)) {
+    // 索引ではルートは null、未登録は undefined（どちらも下の分岐で現在の depth を返す）
+    if (parentIndex ? parentIndex.get(currentId) === null : rootIds.includes(currentId)) {
       return depth;
     }
 
-    const parentId = findNodeParentId(currentId, rootIds, nodesOrGroups);
+    const parentId = findNodeParentId(currentId, rootIds, nodesOrGroups, parentIndex);
     if (!parentId) {
       // ルートにも親にも見つからない場合は現在のdepthを返す
       return depth;
@@ -191,6 +221,59 @@ export function collectDescendantIds(id: string, nodesOrGroups: Record<string, {
 }
 
 /**
+ * `orderedIds` を順に見て、`selected` に含まれ、かつそれまでに採用したIDの子孫でないものを返す
+ * （親が選択されていれば子孫は親と一緒に動くため、トップレベルだけを残す）。
+ */
+export function collectTopLevelInOrder(
+  orderedIds: string[],
+  selected: Set<string>,
+  nodesOrGroups: Record<string, { children_ids?: string[] }>,
+): string[] {
+  const result: string[] = [];
+  const covered = new Set<string>();
+  for (const id of orderedIds) {
+    if (!selected.has(id) || covered.has(id)) continue;
+    result.push(id);
+    for (const descendantId of collectDescendantIds(id, nodesOrGroups)) covered.add(descendantId);
+  }
+  return result;
+}
+
+/**
+ * `ids` から、`ids` 内の自分以外のIDの子孫であるものと重複を除き、元の順序で返す。
+ */
+export function excludeDescendantsOfOthers(
+  ids: string[],
+  nodesOrGroups: Record<string, { children_ids?: string[] }>,
+): string[] {
+  // 子孫ID → それを子孫に持つ ids 内のID
+  const ancestorsInIds = new Map<string, Set<string>>();
+  for (const ancestorId of new Set(ids)) {
+    for (const descendantId of collectDescendantIds(ancestorId, nodesOrGroups)) {
+      let ancestors = ancestorsInIds.get(descendantId);
+      if (!ancestors) {
+        ancestors = new Set();
+        ancestorsInIds.set(descendantId, ancestors);
+      }
+      ancestors.add(ancestorId);
+    }
+  }
+
+  const result: string[] = [];
+  const added = new Set<string>();
+  for (const id of ids) {
+    const ancestors = ancestorsInIds.get(id);
+    // 循環していると自分自身も子孫に含まれるため、自分以外の祖先があるかで判定する
+    const isDescendantOfOther = ancestors !== undefined && ancestors.size > (ancestors.has(id) ? 1 : 0);
+    if (!isDescendantOfOther && !added.has(id)) {
+      added.add(id);
+      result.push(id);
+    }
+  }
+  return result;
+}
+
+/**
  * 複数選択されたアイテム群の中で、最も浅い階層（最上位階層）を特定し、
  * その親IDと新規グループを挿入すべきインデックス位置を決定する。
  */
@@ -204,9 +287,10 @@ export function findHighestLevelParent(
   }
 
   // 1. 各対象ノードの depth と 親ID を計算
+  const parentIndex = buildParentIndex(rootIds, nodesOrGroups);
   const itemsWithDepth = targetIds.map((id) => {
-    const depth = getNodeDepth(id, rootIds, nodesOrGroups);
-    const parentId = findNodeParentId(id, rootIds, nodesOrGroups);
+    const depth = getNodeDepth(id, rootIds, nodesOrGroups, parentIndex);
+    const parentId = findNodeParentId(id, rootIds, nodesOrGroups, parentIndex);
     return { id, depth, parentId };
   });
 

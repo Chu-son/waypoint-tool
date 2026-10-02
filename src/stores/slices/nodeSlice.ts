@@ -13,6 +13,7 @@ import {
   isInsertableContainer,
   expandSelectionWithDescendants,
   mapInsertionTarget,
+  collectTopLevelInOrder,
 } from '../../utils/treeUtils';
 import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { WaypointClipboardPayload } from '../../utils/mapElementClipboard';
@@ -214,22 +215,8 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
       // 3. 選択されたアイテム群の順序をツリー全体の走査順でソート
       const flatNodeIds = getFlattenedNodeIds(state.rootNodeIds, state.nodes);
-      const selectedSet = new Set(selectedIds);
-
       // 親が選択されている場合、その子孫は children_ids 内に既に含まれているため、トップレベル選択ノードのみをグループ直下に入れる
-      const directMovingIds: string[] = [];
-      flatNodeIds.forEach((id) => {
-        if (selectedSet.has(id)) {
-          // すでに movingIds のいずれかの子孫であれば除外
-          const isDescendantOfSelected = directMovingIds.some((parentId) => {
-            const descendants = collectDescendantIds(parentId, state.nodes);
-            return descendants.includes(id);
-          });
-          if (!isDescendantOfSelected) {
-            directMovingIds.push(id);
-          }
-        }
-      });
+      const directMovingIds = collectTopLevelInOrder(flatNodeIds, new Set(selectedIds), state.nodes);
 
       if (directMovingIds.length === 0) return state;
 
@@ -392,20 +379,7 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
       // 2. 移動対象のトップレベルノードのみを順序を維持して抽出
       const flatNodeIds = getFlattenedNodeIds(state.rootNodeIds, state.nodes);
-      const movingSet = new Set(movingIds);
-      const directMovingIds: string[] = [];
-
-      flatNodeIds.forEach((id) => {
-        if (movingSet.has(id)) {
-          const isDescendant = directMovingIds.some((pId) => {
-            const desc = collectDescendantIds(pId, state.nodes);
-            return desc.includes(id);
-          });
-          if (!isDescendant) {
-            directMovingIds.push(id);
-          }
-        }
-      });
+      const directMovingIds = collectTopLevelInOrder(flatNodeIds, new Set(movingIds), state.nodes);
 
       if (directMovingIds.length === 0) return state;
 
@@ -463,8 +437,6 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
     get().pushHistorySnapshot();
     set((state) => {
       const newNodes = { ...state.nodes };
-      let newRootIds = [...state.rootNodeIds];
-
       const idsToRemove = new Set<string>();
       ids.forEach((id) => {
         idsToRemove.add(id);
@@ -474,8 +446,8 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
       idsToRemove.forEach((id) => {
         delete newNodes[id];
-        newRootIds = newRootIds.filter((rid) => rid !== id);
       });
+      const newRootIds = state.rootNodeIds.filter((rid) => !idsToRemove.has(rid));
 
       Object.keys(newNodes).forEach((nid) => {
         const node = newNodes[nid];
