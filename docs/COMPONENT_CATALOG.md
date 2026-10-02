@@ -195,7 +195,7 @@
   - **概要**: プラグインが必要とする入力（座標 `point`、点群 `points`、領域 `rectangle`、参照 `waypoint`、アノテーション `annotation`、カスタムレイヤー `custom_layer`）の定義・編集エディタ。
   - **主要Props**: `inputDef`, `value`, `onChange`
 - **`ExportModal`** / **`ExportMapsModal`** ([`src/components/ui/modals/ExportModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/ExportModal.tsx))
-  - **概要**: Handlebars/Jinja テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。マップ出力の項目には、レイヤー表示セットの選択欄（`ExportVisibilitySetField`）があり、未選択なら現在の表示状態で出力する。パスパターンでは `{{set}}`（項目の表示セット名。未選択は `current`）が使える。
+  - **概要**: Handlebars/Jinja テンプレートによる Waypoint エクスポート画面、および切り出しマップ画像の単体エクスポートモーダル。`ExportModal` の編集はドラフトとして保持され、「保存のみ」「保存してエクスポート」でのみプロジェクトへ反映（キャンセル/Esc で破棄）。マップ出力の項目には、レイヤー表示セットの選択欄（`ExportVisibilitySetField`）があり、未選択なら現在の表示状態で出力する。パスパターンでは `{{set}}`（項目の表示セット名。未選択は `current`）が使える。マップ出力の項目には、マップ一覧ファイル（map_list.txt）の出力と既存ファイルの扱い（重複を除いて追記／競合設定に従う）を選ぶ欄（`ExportMapListField`）もあり、同じフォルダに出る項目をまたいで 1 つの一覧にまとめる。
   - **主要Props**: `isOpen`, `onClose`
 - **`ImportHubModal`** ([`src/components/ui/modals/import/ImportHubModal.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/modals/import/ImportHubModal.tsx))
   - **概要**: あらゆるインポートの入口（左ツールバーの Import ボタン / File > Import... / Ctrl+I / ワークフローの `open_import_modal`）。最初に取り込む対象の種類（`importCategories.ts`）を選び、その種類の取り込み画面（パネル）へ進む。ヘッダーの「戻る」で種類の選択に戻れる。設定画面など別の場所からは `setImportModalOpen(true, category)` で種類を指定して選択を飛ばせる（`uiSlice.importModalCategory`。開くたびに初期化される）。
