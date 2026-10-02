@@ -757,8 +757,12 @@ export function MapCanvas() {
     prevMapCount.current = mapLayers.length;
   }, [mapLayers.length, fitToMaps]);
 
+  // `fitToMaps` is rebuilt whenever a layer changes (e.g. while its pose is adjusted), so remember
+  // which request was served: only a new request may move the view.
+  const handledFitRequest = useRef(0);
   useEffect(() => {
-    if (shouldFitToMaps > 0) {
+    if (shouldFitToMaps > handledFitRequest.current) {
+      handledFitRequest.current = shouldFitToMaps;
       fitToMaps();
     }
   }, [shouldFitToMaps, fitToMaps]);
