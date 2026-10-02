@@ -16,6 +16,8 @@ import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { PipelineInspector } from './PipelineInspector';
 import { Play, RefreshCcw, Sparkles, X, Trash2, Pencil, Bookmark } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { BLEND_MODE_OPTIONS } from '../../../utils/blendModes';
+import type { MapBlendMode } from '../../../types/store';
 import { InternalPropertiesSection } from './InternalPropertiesSection';
 
 export function CustomLayerInspector() {
@@ -58,7 +60,7 @@ export function CustomLayerInspector() {
   const [params, setParams] = useState<Record<string, any>>({});
   const [layerName, setLayerName] = useState<string>('');
   const [layerOpacity, setLayerOpacity] = useState<number>(1.0);
-  const [blendMode, setBlendMode] = useState<'overwrite' | 'merge_obstacles' | 'merge_free'>('overwrite');
+  const [blendMode, setBlendMode] = useState<MapBlendMode>('overwrite');
   const [isReference, setIsReference] = useState<boolean>(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
@@ -450,20 +452,22 @@ export function CustomLayerInspector() {
                 value={blendMode}
                 disabled={isReference}
                 onChange={(e) => {
-                  const val = e.target.value as any;
+                  const val = e.target.value as MapBlendMode;
                   setBlendMode(val);
                   if (existingLayer) {
                     updateCustomLayer(existingLayer.id, { blend_mode: val });
                   }
                 }}
                 className={cn(
-                  'h-7 text-xs bg-surface-base border-border-base/50 w-36',
+                  'h-7 text-xs bg-surface-base border-border-base/50 w-52',
                   isReference && 'opacity-50 cursor-not-allowed bg-surface-base/30',
                 )}
               >
-                <option value="overwrite">Overwrite</option>
-                <option value="merge_obstacles">Merge Obstacles</option>
-                <option value="merge_free">Merge Free Space</option>
+                {BLEND_MODE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </Select>
             </div>
             {isReference && (

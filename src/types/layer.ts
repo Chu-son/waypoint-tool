@@ -124,7 +124,12 @@ export interface MapLayerClip {
   rects: ClipRect[];
 }
 
-export type MapBlendMode = 'overwrite' | 'merge_obstacles' | 'merge_free';
+/**
+ * `overwrite` takes the layer's known cells and keeps the cells below where the layer is unknown;
+ * `replace` takes every cell the layer has data for, unknown ones included. Pixels the layer has no
+ * data for (transparent, outside its image or clip) never take part in blending in any mode.
+ */
+export type MapBlendMode = 'overwrite' | 'replace' | 'merge_obstacles' | 'merge_free';
 
 /**
  * One use of a `MapSource` in the layer stack (stack order lives in `layerOrder`). Duplicating a map

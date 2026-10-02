@@ -187,6 +187,16 @@ describe('LayerPanel', () => {
       });
     });
 
+    it('lets a map layer replace the cells below it, unknown ones included', () => {
+      renderWithStore(<LayerPanel />, twoMaps());
+
+      fireEvent.click(screen.getAllByTitle(EDIT_MAP_LAYER)[0]);
+      fireEvent.change(screen.getByDisplayValue('Overwrite (Ignore Unknown)'), { target: { value: 'replace' } });
+
+      expect(getAppState().mapLayers.find((l) => l.id === 'l1')?.blend_mode).toBe('replace');
+      expect(getAppState().mapLayers.find((l) => l.id === 'l2')?.blend_mode).toBe('overwrite');
+    });
+
     it('resets the pose to the origin from the YAML file', () => {
       renderWithStore(<LayerPanel />, rotatedMap([15, 25, Math.PI / 4]));
 

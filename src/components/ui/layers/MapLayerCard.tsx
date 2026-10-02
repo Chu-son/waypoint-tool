@@ -8,7 +8,8 @@ import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { FieldLabel } from '../common/FieldLabel';
 import { InlineNameInput } from '../common/InlineNameInput';
 import { PoseAdjuster } from '../common/PoseAdjuster';
-import { ProjectMapLayer, ResolvedMapLayer } from '../../../types/store';
+import { MapBlendMode, ProjectMapLayer, ResolvedMapLayer } from '../../../types/store';
+import { BLEND_MODE_OPTIONS } from '../../../utils/blendModes';
 import { LayerCardShell } from './LayerCardShell';
 import { MapClipEditor } from './MapClipEditor';
 
@@ -316,13 +317,15 @@ export function MapLayerCard({
           <FieldLabel>Blend Mode</FieldLabel>
           <Select
             value={layer.blend_mode || 'overwrite'}
-            onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
+            onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as MapBlendMode })}
             onClick={(e) => e.stopPropagation()}
             className="text-xs border-border-base/50 h-7"
           >
-            <option value="overwrite">Overwrite (Ignore Unknown)</option>
-            <option value="merge_obstacles">Merge Obstacles</option>
-            <option value="merge_free">Merge Free Space</option>
+            {BLEND_MODE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </Select>
         </div>
       </div>

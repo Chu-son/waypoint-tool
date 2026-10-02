@@ -7,10 +7,9 @@
  * source plus one instance per map, and ordered as before: custom layers above all maps.
  */
 import { v4 as uuidv4 } from 'uuid';
-import type { ClipRect, CustomLayer, MapBlendMode, MapLayerClip, MapSource, ProjectMapLayer } from '../../types/store';
+import type { ClipRect, CustomLayer, MapLayerClip, MapSource, ProjectMapLayer } from '../../types/store';
+import { BLEND_MODES } from '../../utils/blendModes';
 import { reconcileLayerOrder } from '../../utils/layerStack';
-
-const BLEND_MODES: readonly MapBlendMode[] = ['overwrite', 'merge_obstacles', 'merge_free'];
 
 export type NormalizedMapStack = {
   mapSources: MapSource[];

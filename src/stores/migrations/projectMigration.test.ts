@@ -535,6 +535,14 @@ describe('projectMigration', () => {
       expect(normalized.map_layers[0]).not.toHaveProperty('z_index');
     });
 
+    it('keeps the replace blend mode and falls back to overwrite for an unknown one', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_layers: [legacyMap('m1', { blend_mode: 'replace' }), legacyMap('m2', { blend_mode: 'bogus' })],
+      });
+
+      expect(normalized.map_layers.map((l) => l.blend_mode)).toEqual(['replace', 'overwrite']);
+    });
+
     it('keeps custom layers above every map when reading an older project', () => {
       const normalized = migrateAndNormalizeProjectData({
         map_layers: [legacyMap('m1'), legacyMap('m2')],

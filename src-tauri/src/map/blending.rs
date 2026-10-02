@@ -63,6 +63,8 @@ pub fn apply_blend_cell(current: CellValue, incoming: CellValue, blend_mode: &st
                 CellValue::Unknown
             }
         }
+        // Unknown from the layer replaces the cell as well; a layer without data at a cell never reaches here.
+        "replace" => incoming,
         _ => {
             // "overwrite"
             if incoming != CellValue::Unknown {
@@ -166,6 +168,11 @@ pub fn blend_layers_to_image(layers: &[LayerInput], region: &RectRegion, output_
                 }
 
                 let px = layer.image.get_pixel(c_l as u32, r_l as u32).0;
+                // Transparent pixels carry no data (custom layers are rasterized on a transparent
+                // background), so they never take part in blending, whatever the blend mode.
+                if px[3] < 128 {
+                    continue;
+                }
                 let incoming = classify_pixel(px);
 
                 let idx = (r * out_w + c) as usize;
@@ -204,6 +211,16 @@ mod tests {
         );
         assert_eq!(
             apply_blend_cell(CellValue::Obstacle, CellValue::Free, "overwrite"),
+            CellValue::Free
+        );
+
+        // replace
+        assert_eq!(
+            apply_blend_cell(CellValue::Obstacle, CellValue::Unknown, "replace"),
+            CellValue::Unknown
+        );
+        assert_eq!(
+            apply_blend_cell(CellValue::Obstacle, CellValue::Free, "replace"),
             CellValue::Free
         );
 
@@ -386,6 +403,93 @@ mod tests {
         assert_eq!(cell_at(&out, 0, 0), CellValue::Obstacle); // upper left: inside the tall rect
         assert_eq!(cell_at(&out, 3, 0), CellValue::Unknown); // upper right: outside the L
         assert_eq!(cell_at(&out, 3, 3), CellValue::Obstacle); // lower right: inside the short rect
+    }
+
+    fn layer_with<'a>(
+        id: &'a str,
+        image: &'a DynamicImage,
+        blend_mode: &'a str,
+        z_index: i32,
+        clip: Option<&'a LayerClip>,
+    ) -> LayerInput<'a> {
+        LayerInput {
+            id,
+            image,
+            resolution: 1.0,
+            origin: [0.0, 0.0, 0.0],
+            blend_mode,
+            z_index,
+            clip,
+        }
+    }
+
+    fn region_of(size: f64) -> RectRegion {
+        RectRegion {
+            x: 0.0,
+            y: 0.0,
+            width: size,
+            height: size,
+        }
+    }
+
+    #[test]
+    fn replace_layer_overwrites_cells_below_with_its_unknown_cells() {
+        let obstacles = solid_image(2, CellValue::Obstacle);
+        let unknown = solid_image(2, CellValue::Unknown);
+        let layers = [
+            layer_with("base", &obstacles, "overwrite", 0, None),
+            layer_with("top", &unknown, "replace", 1, None),
+        ];
+
+        let out = blend_layers_to_image(&layers, &region_of(2.0), 1.0);
+
+        assert_eq!(cell_at(&out, 0, 0), CellValue::Unknown);
+        assert_eq!(cell_at(&out, 1, 1), CellValue::Unknown);
+    }
+
+    #[test]
+    fn overwrite_layer_keeps_cells_below_where_it_is_unknown() {
+        let obstacles = solid_image(2, CellValue::Obstacle);
+        let unknown = solid_image(2, CellValue::Unknown);
+        let layers = [
+            layer_with("base", &obstacles, "overwrite", 0, None),
+            layer_with("top", &unknown, "overwrite", 1, None),
+        ];
+
+        let out = blend_layers_to_image(&layers, &region_of(2.0), 1.0);
+
+        assert_eq!(cell_at(&out, 0, 0), CellValue::Obstacle);
+    }
+
+    #[test]
+    fn transparent_pixels_leave_cells_below_untouched_even_when_replacing() {
+        let obstacles = solid_image(2, CellValue::Obstacle);
+        let transparent = DynamicImage::ImageRgba8(RgbaImage::from_pixel(2, 2, Rgba([0, 0, 0, 0])));
+        let layers = [
+            layer_with("base", &obstacles, "overwrite", 0, None),
+            layer_with("top", &transparent, "replace", 1, None),
+        ];
+
+        let out = blend_layers_to_image(&layers, &region_of(2.0), 1.0);
+
+        assert_eq!(cell_at(&out, 0, 0), CellValue::Obstacle);
+        assert_eq!(cell_at(&out, 1, 1), CellValue::Obstacle);
+    }
+
+    #[test]
+    fn replace_layer_leaves_cells_outside_its_clip_untouched() {
+        let obstacles = solid_image(4, CellValue::Obstacle);
+        let unknown = solid_image(4, CellValue::Unknown);
+        let left = clip_of(0.0, 0.0, 2.0, 4.0);
+        let layers = [
+            layer_with("base", &obstacles, "overwrite", 0, None),
+            layer_with("top", &unknown, "replace", 1, Some(&left)),
+        ];
+
+        let out = blend_layers_to_image(&layers, &region_of(4.0), 1.0);
+
+        assert_eq!(cell_at(&out, 0, 0), CellValue::Unknown);
+        assert_eq!(cell_at(&out, 3, 0), CellValue::Obstacle);
     }
 
     #[test]
