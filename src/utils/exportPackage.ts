@@ -74,42 +74,28 @@ export interface ExportPackageInput {
   /** Sets that map items may name, and the layers they apply to (for the visibility of the current display). */
   visibilitySets: LayerVisibilitySet[];
   layerStack: StackLayers;
-  waypoints: Record<string, any>[];
-  /** Every layer a map item might draw, hidden ones included; each item picks its own with its visibility. */
-  mapLayers: PackageExportMapItem['layers'];
-  /** Canvas screenshot (base64 PNG) for items with `includeMapImage`. */
-  mapImageB64?: string;
 }
 
 const mapItemFor = (
   item: ExportTargetItem,
   region: ExportRegion,
   file: ResolvedExportFile,
-  layers: PackageExportMapItem['layers'],
   layerVisibility: Record<string, boolean>,
 ): PackageExportMapItem => ({
   save_path: file.fullPath.replace(/\.(pgm|png)$/i, ''),
   format: item.mapFormat || 'ros_standard',
   region: { name: region.name, rect: region.rect, layerVisibility },
-  layers,
 });
 
-/** Turns enabled profile items into the waypoint files and map region exports the backend writes. */
+/**
+ * Turns enabled profile items into the waypoint files and map region exports the backend writes.
+ * The items only reference the waypoints, screenshot and layers, which the request carries once.
+ */
 export function buildExportPackageItems(input: ExportPackageInput): {
   waypointItems: PackageExportWaypointItem[];
   mapItems: PackageExportMapItem[];
 } {
-  const {
-    enabledItems,
-    resolvedFiles,
-    templates,
-    regions,
-    visibilitySets,
-    layerStack,
-    waypoints,
-    mapLayers,
-    mapImageB64,
-  } = input;
+  const { enabledItems, resolvedFiles, templates, regions, visibilitySets, layerStack } = input;
   const waypointItems: PackageExportWaypointItem[] = [];
   const mapItems: PackageExportMapItem[] = [];
   const primaryFileOf = (item: ExportTargetItem) =>
@@ -123,26 +109,22 @@ export function buildExportPackageItems(input: ExportPackageInput): {
         item.type === 'waypoint_template' ? templates.find((t) => t.id === item.sourceId) : undefined;
       waypointItems.push({
         path: file.fullPath,
-        waypoints,
         template: matchedTemplate?.content,
         engine: matchedTemplate?.engine,
-        image_data_b64: item.includeMapImage ? mapImageB64 : undefined,
+        include_map_image: !!item.includeMapImage,
       });
     } else if (item.type === 'map_all_regions') {
       for (const region of regions) {
         const file = resolvedFiles.find(
           (f) => f.item.id === item.id && !f.isPairSecondary && f.fileName.startsWith(region.name),
         );
-        if (file)
-          mapItems.push(
-            mapItemFor(item, region, file, mapLayers, layerVisibilityFor(item, visibilitySets, layerStack)),
-          );
+        if (file) mapItems.push(mapItemFor(item, region, file, layerVisibilityFor(item, visibilitySets, layerStack)));
       }
     } else if (item.type === 'map_region') {
       const region = regions.find((r) => r.id === item.sourceId);
       const file = primaryFileOf(item);
       if (region && file) {
-        mapItems.push(mapItemFor(item, region, file, mapLayers, layerVisibilityFor(item, visibilitySets, layerStack)));
+        mapItems.push(mapItemFor(item, region, file, layerVisibilityFor(item, visibilitySets, layerStack)));
       }
     }
   }

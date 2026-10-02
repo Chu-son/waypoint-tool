@@ -440,9 +440,6 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             regions: exportRegions,
             visibilitySets: layerVisibilitySets,
             layerStack: useAppStore.getState(),
-            waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
-            mapLayers: preparedLayers,
-            mapImageB64: imageDataB64,
           });
 
           // 4. Invoke Backend API
@@ -455,6 +452,9 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             geo: extractGeoForExport(geoMap),
             float_numbers: exportIntegersAsFloat,
             integer_keys: collectIntegerOptionKeys(optionsSchema),
+            waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
+            map_image_b64: imageDataB64,
+            layers: preparedLayers,
             waypoint_items: waypointItems,
             map_items: mapItems,
             map_lists: mapLists.map((l) => ({ path: l.file.fullPath, entries: l.entries, append: l.append })),

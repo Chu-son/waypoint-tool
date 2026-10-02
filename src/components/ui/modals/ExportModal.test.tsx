@@ -137,10 +137,13 @@ describe('ExportModal UI', () => {
       geo: expect.objectContaining({ lat: expect.any(Number), lon: expect.any(Number) }),
       float_numbers: true,
       integer_keys: [],
+      waypoints: [expect.objectContaining({ id: 'wp1', x: 1, y: 2 })],
+      map_image_b64: undefined,
+      layers: [],
       waypoint_items: [
         expect.objectContaining({
           path: expect.stringMatching(/^\/mock\/export\/dir\/waypoints\/\d{8}_waypoints\.yaml$/),
-          waypoints: [expect.objectContaining({ id: 'wp1', x: 1, y: 2 })],
+          include_map_image: false,
         }),
       ],
       map_items: [
@@ -305,13 +308,13 @@ describe('ExportModal UI', () => {
       const onClose = await exportNow();
 
       await waitFor(() => expect(onClose).toHaveBeenCalled());
-      const { map_items } = vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0];
+      const { map_items, layers } = vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0];
       expect(map_items.map((m) => [m.save_path, m.region.layerVisibility])).toEqual([
         ['/mock/export/dir/Map/area_1_Localization', { base: true, obstacles: false }],
         ['/mock/export/dir/Map/area_1_Navigation', { base: true, obstacles: true }],
       ]);
       // Layers hidden on the canvas are still handed over for the items whose set shows them.
-      expect(map_items[1].layers.map((l) => l.id).sort()).toEqual(['base', 'obstacles']);
+      expect(layers.map((l) => l.id).sort()).toEqual(['base', 'obstacles']);
     });
 
     it('draws the layers shown on the canvas for an item that names no set', async () => {

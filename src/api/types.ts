@@ -92,15 +92,28 @@ export interface IBackendAPI {
   fetchMapTile(url: string): Promise<string>;
 }
 
+/** Writes the package's `waypoints` to one file. */
 export type PackageExportWaypointItem = {
   path: string;
-  waypoints: Record<string, any>[];
   template?: string;
   /** 省略時はバックエンド側で 'handlebars' として扱われる。 */
   engine?: TemplateEngine;
-  image_data_b64?: string;
+  /** true: also write the package's `map_image_b64` next to the file (same name, `.png`). */
+  include_map_image: boolean;
 };
 
+export type PackageExportLayer = {
+  id: string;
+  name: string;
+  image_base64?: string;
+  info?: any;
+  opacity: number;
+  blend_mode: string;
+  z_index: number;
+  clip?: MapLayerClip | null;
+};
+
+/** Blends the package's `layers` that `region.layerVisibility` shows into one map file. */
 export type PackageExportMapItem = {
   save_path: string;
   format: 'ros_standard' | 'png_only';
@@ -109,16 +122,6 @@ export type PackageExportMapItem = {
     rect: { x: number; y: number; width: number; height: number };
     layerVisibility: Record<string, boolean>;
   };
-  layers: {
-    id: string;
-    name: string;
-    image_base64?: string;
-    info?: any;
-    opacity: number;
-    blend_mode: string;
-    z_index: number;
-    clip?: MapLayerClip | null;
-  }[];
 };
 
 export type PackageExportMapListItem = {
@@ -142,6 +145,14 @@ export type ExecuteExportPackageOptions = {
   float_numbers: boolean;
   /** float 化から除外する、スキーマ上 integer 型のオプション名。 */
   integer_keys: string[];
+  // Large data is sent once and shared by the items: an item repeating it would multiply the request
+  // (every layer image per map region) that the IPC has to serialize and the backend to decode.
+  /** Waypoints every waypoint item writes. */
+  waypoints: Record<string, any>[];
+  /** Canvas screenshot (base64 PNG) for waypoint items with `include_map_image`. */
+  map_image_b64?: string;
+  /** Every layer a map item might draw, hidden ones included; each item picks its own with its visibility. */
+  layers: PackageExportLayer[];
   waypoint_items: PackageExportWaypointItem[];
   map_items: PackageExportMapItem[];
   map_lists: PackageExportMapListItem[];
