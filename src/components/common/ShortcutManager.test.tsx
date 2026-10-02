@@ -135,6 +135,32 @@ describe('ShortcutManager', () => {
     input.remove();
   });
 
+  it('ignores shortcuts other than Escape while a blocking task is running, and acts again once it ends', () => {
+    renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
+    let taskId = '';
+    act(() => {
+      taskId = getAppState().startLoading({ message: 'エクスポートを実行中...', blocking: true });
+    });
+
+    press('Delete');
+    expect(getAppState().rootNodeIds).toEqual(['node-1', 'node-2']);
+
+    act(() => getAppState().stopLoading(taskId));
+    press('Delete');
+    expect(getAppState().rootNodeIds).toEqual(['node-2']);
+  });
+
+  it('keeps shortcuts working while a non-blocking task runs in the background', () => {
+    renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
+    act(() => {
+      getAppState().startLoading({ message: '経路を計算中...', blocking: false });
+    });
+
+    press('Delete');
+
+    expect(getAppState().rootNodeIds).toEqual(['node-2']);
+  });
+
   it('ignores shortcuts other than Escape while a modal is open', () => {
     renderShortcuts({
       ...twoWaypoints(),

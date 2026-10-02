@@ -89,6 +89,15 @@ export function ShortcutManager() {
         return;
       }
 
+      // A blocking task (export, save, map load…) covers the app with its overlay until it ends.
+      // Its backend work no longer freezes the main thread, so keys would otherwise act mid-task.
+      const hasBlockingTask = Object.values(currentState.activeLoadingTasks ?? {}).some(
+        (task: any) => task.blocking !== false,
+      );
+      if (hasBlockingTask && e.key !== 'Escape') {
+        return;
+      }
+
       // Basic Actions
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedEditObjectId && activeCustomLayerId) {

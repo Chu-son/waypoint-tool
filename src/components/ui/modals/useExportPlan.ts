@@ -176,6 +176,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
       return;
     }
 
+    // The check runs off the main thread, so an older answer can arrive after a newer one.
+    let stale = false;
     const timer = setTimeout(async () => {
       try {
         // A list that is appended to is not replaced, so an existing one is no conflict.
@@ -184,13 +186,16 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           ...mapLists.filter((l) => !l.append).map((l) => l.file.fullPath),
         ];
         const existing = await BackendAPI.checkExportConflicts(fullPaths);
-        setConflictFiles(new Set(existing));
+        if (!stale) setConflictFiles(new Set(existing));
       } catch (err) {
         console.error('Failed to check export conflicts:', err);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
   }, [isOpen, resolvedFiles, mapLists, rootDir]);
 
   // Select first item if none selected

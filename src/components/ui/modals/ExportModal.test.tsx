@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExportModal } from './ExportModal';
 import { LoadingOverlay } from '../common/LoadingOverlay';
@@ -478,6 +478,26 @@ describe('ExportModal UI', () => {
       setUp([mapItem('m1', 'Map/{{name}}.pgm', list('conflict_setting'))]);
       render(<ExportModal isOpen={true} onClose={vi.fn()} />);
       expect(await screen.findByText(/1 件の同名ファイルが存在/)).toBeInTheDocument();
+    });
+
+    it('shows the conflicts of the current paths even when an older check answers last', async () => {
+      let answerFirstCheck: () => void = () => {};
+      vi.mocked(BackendAPI.checkExportConflicts).mockImplementationOnce(
+        (files) =>
+          new Promise((resolve) => {
+            answerFirstCheck = () => resolve(files); // every file of the old paths "exists"
+          }),
+      );
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+      await waitFor(() => expect(BackendAPI.checkExportConflicts).toHaveBeenCalledTimes(1));
+
+      fireEvent.change(screen.getByDisplayValue('waypoints/{{yyyymmdd}}_waypoints.yaml'), {
+        target: { value: 'renamed/{{yyyymmdd}}_waypoints.yaml' },
+      });
+      await waitFor(() => expect(BackendAPI.checkExportConflicts).toHaveBeenCalledTimes(2));
+      await act(async () => answerFirstCheck());
+
+      expect(screen.queryByText(/件の同名ファイルが存在/)).not.toBeInTheDocument();
     });
 
     it('lets a map item turn the list on, rename it and choose how an existing one is treated, and keeps it once saved', () => {
