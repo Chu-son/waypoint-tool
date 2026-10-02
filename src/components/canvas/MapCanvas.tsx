@@ -1,7 +1,8 @@
 import { useMeasureAltSnap } from './hooks/useMeasureAltSnap';
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend, useApplication } from '@pixi/react';
-import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
+import { Container, Sprite, Graphics, Texture, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
+import type { ClipHandle } from '../../utils/mapClip';
 import { useAppStore } from '../../stores/appStore';
 import { useResolvedMapLayers } from '../../hooks/useResolvedMapLayers';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,6 +45,7 @@ import {
 } from './utils/viewport';
 import { createViewportStore } from './utils/viewportStore';
 import { registerCanvasCapture } from './canvasCapture';
+import { useStableCallback } from '../../hooks/useStableCallback';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { getFallbackGridColors } from './utils/canvasTheme';
@@ -501,151 +503,136 @@ function MapCanvasView() {
     handleTransformAnnotationEnd,
   } = useAnnotationEdit();
 
-  const handleAnnotationPointerDown = useCallback(
-    (e: import('pixi.js').FederatedPointerEvent, id: string) => {
-      if (useAppStore.getState().isMapEditMode) return;
-      if (e.button === 2) return;
-      if (activeTool === 'measure') {
-        const isAlt = (e.nativeEvent as any)?.altKey;
-        if (isAlt) {
-          isPixiHandledRef.current = true;
-          if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
-            (e.nativeEvent as any).stopPropagation();
-          }
-          e.stopPropagation();
-          const annot = useAppStore.getState().annotationObjects[id];
-          if (annot) {
-            const center = getAnnotationCenter(annot);
-            commitMeasurePoint({
-              x: center.x,
-              y: center.y,
-              objectId: id,
-              objectName: annot.name || id,
-              objectType: 'annotation',
-            });
-          }
-          return;
+  const handleAnnotationPointerDown = useStableCallback((e: import('pixi.js').FederatedPointerEvent, id: string) => {
+    if (useAppStore.getState().isMapEditMode) return;
+    if (e.button === 2) return;
+    if (activeTool === 'measure') {
+      const isAlt = (e.nativeEvent as any)?.altKey;
+      if (isAlt) {
+        isPixiHandledRef.current = true;
+        if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+          (e.nativeEvent as any).stopPropagation();
         }
-        // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+        e.stopPropagation();
+        const annot = useAppStore.getState().annotationObjects[id];
+        if (annot) {
+          const center = getAnnotationCenter(annot);
+          commitMeasurePoint({
+            x: center.x,
+            y: center.y,
+            objectId: id,
+            objectName: annot.name || id,
+            objectType: 'annotation',
+          });
+        }
         return;
       }
-      e.stopPropagation();
-      selectAnnotationObjects([id], (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey);
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (rect && e.nativeEvent instanceof PointerEvent) {
-        const mouseX = e.nativeEvent.clientX - rect.left;
-        const mouseY = e.nativeEvent.clientY - rect.top;
-        const worldPos = screenToWorld(mouseX, mouseY);
-        handleStartMoveAnnotation(id, worldPos);
-        interactionMode.current = 'move_annotation' as any;
-        containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
-      }
-    },
-    [selectAnnotationObjects, screenToWorld, handleStartMoveAnnotation],
-  );
+      // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+      return;
+    }
+    e.stopPropagation();
+    selectAnnotationObjects([id], (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect && e.nativeEvent instanceof PointerEvent) {
+      const mouseX = e.nativeEvent.clientX - rect.left;
+      const mouseY = e.nativeEvent.clientY - rect.top;
+      const worldPos = screenToWorld(mouseX, mouseY);
+      handleStartMoveAnnotation(id, worldPos);
+      interactionMode.current = 'move_annotation' as any;
+      containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
+    }
+  });
 
-  const handleAnnotationContextMenu = useCallback(
-    (e: import('pixi.js').FederatedPointerEvent, id: string) => {
-      if (useAppStore.getState().isMapEditMode) return;
-      e.stopPropagation();
-      (e.nativeEvent as Event)?.stopPropagation?.();
+  const handleAnnotationContextMenu = useStableCallback((e: import('pixi.js').FederatedPointerEvent, id: string) => {
+    if (useAppStore.getState().isMapEditMode) return;
+    e.stopPropagation();
+    (e.nativeEvent as Event)?.stopPropagation?.();
 
-      const now = Date.now();
-      if (now - lastContextMenuTime.current < 100) return;
-      lastContextMenuTime.current = now;
+    const now = Date.now();
+    if (now - lastContextMenuTime.current < 100) return;
+    lastContextMenuTime.current = now;
 
-      const currentSelected = useAppStore.getState().selectedAnnotationIds;
-      if (!currentSelected.includes(id)) {
-        selectAnnotationObjects([id]);
-      }
+    const currentSelected = useAppStore.getState().selectedAnnotationIds;
+    if (!currentSelected.includes(id)) {
+      selectAnnotationObjects([id]);
+    }
 
-      const objects = useAppStore.getState().annotationObjects;
-      const groups = useAppStore.getState().annotationGroups;
-      const targetObj = objects[id];
-      const parentId = targetObj?.group_id ?? null;
-      const parentGroup = parentId ? groups[parentId] : null;
+    const objects = useAppStore.getState().annotationObjects;
+    const groups = useAppStore.getState().annotationGroups;
+    const targetObj = objects[id];
+    const parentId = targetObj?.group_id ?? null;
+    const parentGroup = parentId ? groups[parentId] : null;
 
-      let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
-      let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
-      if (
-        (clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) &&
-        containerRef.current
-      ) {
-        const rect = containerRef.current.getBoundingClientRect();
-        clientX = rect.left + (e.global?.x ?? 0);
-        clientY = rect.top + (e.global?.y ?? 0);
-      }
+    let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
+    let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
+    if ((clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      clientX = rect.left + (e.global?.x ?? 0);
+      clientY = rect.top + (e.global?.y ?? 0);
+    }
 
-      setCanvasContextMenu({
-        x: clientX ?? 0,
-        y: clientY ?? 0,
-        target: {
-          type: 'annotation',
-          id,
-          name: targetObj?.name || undefined,
-          parentContainerId: parentId,
-          parentContainerKind: parentGroup ? 'group' : null,
-          parentContainerName: parentGroup?.name || 'Group',
-        },
-      });
-    },
-    [selectAnnotationObjects],
-  );
+    setCanvasContextMenu({
+      x: clientX ?? 0,
+      y: clientY ?? 0,
+      target: {
+        type: 'annotation',
+        id,
+        name: targetObj?.name || undefined,
+        parentContainerId: parentId,
+        parentContainerKind: parentGroup ? 'group' : null,
+        parentContainerName: parentGroup?.name || 'Group',
+      },
+    });
+  });
 
-  const handleNodeContextMenu = useCallback(
-    (e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
-      if (isMapEditMode) return;
-      e.stopPropagation();
-      (e.nativeEvent as Event)?.stopPropagation?.();
+  const handleNodeContextMenu = useStableCallback((e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
+    if (isMapEditMode) return;
+    e.stopPropagation();
+    (e.nativeEvent as Event)?.stopPropagation?.();
 
-      const now = Date.now();
-      if (now - lastContextMenuTime.current < 100) return;
-      lastContextMenuTime.current = now;
+    const now = Date.now();
+    if (now - lastContextMenuTime.current < 100) return;
+    lastContextMenuTime.current = now;
 
-      const currentSelected = useAppStore.getState().selectedNodeIds;
-      if (!currentSelected.includes(nodeId)) {
-        selectNodes([nodeId]);
-      }
+    const currentSelected = useAppStore.getState().selectedNodeIds;
+    if (!currentSelected.includes(nodeId)) {
+      selectNodes([nodeId]);
+    }
 
-      const allNodes = useAppStore.getState().nodes;
-      const targetNode = allNodes[nodeId];
-      const rootIds = useAppStore.getState().rootNodeIds;
-      const parentId = findNodeParentId(nodeId, rootIds, allNodes);
-      const parentNode = parentId ? allNodes[parentId] : null;
+    const allNodes = useAppStore.getState().nodes;
+    const targetNode = allNodes[nodeId];
+    const rootIds = useAppStore.getState().rootNodeIds;
+    const parentId = findNodeParentId(nodeId, rootIds, allNodes);
+    const parentNode = parentId ? allNodes[parentId] : null;
 
-      let parentContainerKind: 'generator' | 'group' | null = null;
-      if (parentNode) {
-        parentContainerKind = parentNode.type === 'generator' ? 'generator' : 'group';
-      }
+    let parentContainerKind: 'generator' | 'group' | null = null;
+    if (parentNode) {
+      parentContainerKind = parentNode.type === 'generator' ? 'generator' : 'group';
+    }
 
-      let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
-      let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
-      if (
-        (clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) &&
-        containerRef.current
-      ) {
-        const rect = containerRef.current.getBoundingClientRect();
-        clientX = rect.left + (e.global?.x ?? 0);
-        clientY = rect.top + (e.global?.y ?? 0);
-      }
+    let clientX = (e.nativeEvent as MouseEvent)?.clientX ?? e.clientX;
+    let clientY = (e.nativeEvent as MouseEvent)?.clientY ?? e.clientY;
+    if ((clientX === undefined || clientY === undefined || (clientX === 0 && clientY === 0)) && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      clientX = rect.left + (e.global?.x ?? 0);
+      clientY = rect.top + (e.global?.y ?? 0);
+    }
 
-      setCanvasContextMenu({
-        x: clientX ?? 0,
-        y: clientY ?? 0,
-        target: {
-          type: 'node',
-          id: nodeId,
-          name: targetNode?.name || undefined,
-          parentContainerId: parentId,
-          parentContainerKind,
-          parentContainerName: parentNode?.name || (parentContainerKind === 'generator' ? 'Generator' : 'Group'),
-        },
-      });
-    },
-    [isMapEditMode, selectNodes],
-  );
+    setCanvasContextMenu({
+      x: clientX ?? 0,
+      y: clientY ?? 0,
+      target: {
+        type: 'node',
+        id: nodeId,
+        name: targetNode?.name || undefined,
+        parentContainerId: parentId,
+        parentContainerKind,
+        parentContainerName: parentNode?.name || (parentContainerKind === 'generator' ? 'Generator' : 'Group'),
+      },
+    });
+  });
 
-  const handleAnnotationHandlePointerDown = useCallback(
+  const handleAnnotationHandlePointerDown = useStableCallback(
     (e: import('pixi.js').FederatedPointerEvent, id: string, handleType: string) => {
       if (useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
@@ -659,7 +646,6 @@ function MapCanvasView() {
         containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [screenToWorld, handleStartTransformAnnotation],
   );
 
   const movingEditObject = useRef<{
@@ -677,7 +663,7 @@ function MapCanvasView() {
     startWorldPos: { x: number; y: number };
   } | null>(null);
 
-  const handleEditObjectPointerDown = useCallback(
+  const handleEditObjectPointerDown = useStableCallback(
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
@@ -714,10 +700,9 @@ function MapCanvasView() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [setSelectedEditObjectId, setActiveCustomLayerId, screenToWorld],
   );
 
-  const handleEditObjectHandlePointerDown = useCallback(
+  const handleEditObjectHandlePointerDown = useStableCallback(
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
@@ -732,10 +717,9 @@ function MapCanvasView() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [handleRotateStart],
   );
 
-  const handleEditObjectResizeHandlePointerDown = useCallback(
+  const handleEditObjectResizeHandlePointerDown = useStableCallback(
     (e: import('pixi.js').FederatedPointerEvent, layerId: string, objId: string, handle: string) => {
       if (!useAppStore.getState().isMapEditMode) return;
       e.stopPropagation();
@@ -764,7 +748,6 @@ function MapCanvasView() {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
     },
-    [screenToWorld],
   );
 
   // Fallback grid texture if no maps are loaded
@@ -1932,6 +1915,185 @@ function MapCanvasView() {
     [],
   );
 
+  // Handlers for the canvas layers. Stable, so the memoized layers do not re-render for them.
+  const handleNodePointerDown = useStableCallback((e: FederatedPointerEvent, nodeId: string) => {
+    if (isMapEditMode) return;
+    if (e.button === 2) return;
+    if (activeTool === 'measure') {
+      const isAlt = (e.nativeEvent as any)?.altKey;
+      if (isAlt) {
+        isPixiHandledRef.current = true;
+        if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+          (e.nativeEvent as any).stopPropagation();
+        }
+        e.stopPropagation();
+        const node = useAppStore.getState().nodes[nodeId];
+        if (node?.transform) {
+          commitMeasurePoint({
+            x: node.transform.x,
+            y: node.transform.y,
+            objectId: nodeId,
+            objectName: node.name || nodeId,
+            objectType: 'node',
+          });
+        }
+        return;
+      }
+      // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
+      return;
+    }
+    if (activeTool === 'select') {
+      e.stopPropagation();
+      const isModifier =
+        (e.nativeEvent as any)?.shiftKey || (e.nativeEvent as any)?.metaKey || (e.nativeEvent as any)?.ctrlKey;
+      const currentSelected = useAppStore.getState().selectedNodeIds;
+      let targetIds: string[];
+
+      if (currentSelected.includes(nodeId)) {
+        if (isModifier) {
+          targetIds = currentSelected.filter((id) => id !== nodeId);
+          selectNodes(targetIds);
+        } else {
+          targetIds = currentSelected;
+        }
+      } else {
+        if (isModifier) {
+          targetIds = [...currentSelected, nodeId];
+          selectNodes(targetIds);
+        } else {
+          targetIds = [nodeId];
+          selectNodes([nodeId]);
+        }
+      }
+
+      useAppStore.getState().beginHistoryTransaction();
+      interactionMode.current = 'drag_node';
+      activeNodeId.current = nodeId;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      const mouseX = rect ? e.nativeEvent.clientX - rect.left : e.nativeEvent.clientX;
+      const mouseY = rect ? e.nativeEvent.clientY - rect.top : e.nativeEvent.clientY;
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      const initialTransforms: Record<string, any> = {};
+      const allNodes = useAppStore.getState().nodes;
+      const collectTransforms = (id: string) => {
+        const n = allNodes[id];
+        if (!n) return;
+        if (n.transform) {
+          initialTransforms[id] = { ...n.transform };
+        }
+        if (n.children_ids) {
+          n.children_ids.forEach(collectTransforms);
+        }
+      };
+      targetIds.forEach(collectTransforms);
+
+      if (!initialTransforms[nodeId] && allNodes[nodeId]?.transform) {
+        initialTransforms[nodeId] = { ...allNodes[nodeId].transform };
+      }
+
+      movingNodesState.current = {
+        activeId: nodeId,
+        startWorldPos: worldPos,
+        initialTransforms,
+      };
+
+      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    }
+  });
+
+  const handleNodeHandlePointerDown = useStableCallback((e: FederatedPointerEvent, nodeId: string) => {
+    if (isMapEditMode) return;
+    e.stopPropagation();
+    const existingNode = useAppStore.getState().nodes[nodeId];
+    initialYawTransform.current = existingNode?.transform ? { ...existingNode.transform } : null;
+    isCreatingNewNodeOnYaw.current = false;
+    useAppStore.getState().beginHistoryTransaction();
+    interactionMode.current = 'set_yaw';
+    activeNodeId.current = nodeId;
+    if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+      containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+    }
+  });
+
+  const handleRectDragCornerDown = useStableCallback(
+    (e: FederatedPointerEvent, key: string, corner: 'min' | 'max' | 'topRight' | 'bottomLeft') => {
+      e.stopPropagation();
+      rectInputKey.current = key;
+      rectDragCorner.current = corner;
+      interactionMode.current = 'drag_rect_corner';
+      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+  );
+
+  const handleRectRotationDown = useStableCallback((e: FederatedPointerEvent, key: string) => {
+    e.stopPropagation();
+    rectInputKey.current = key;
+    interactionMode.current = 'set_rect_rotation';
+    if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+      containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+    }
+  });
+
+  const handleRegionDragDown = useStableCallback((e: FederatedPointerEvent, regionId: string) => {
+    if (activeTool === 'add_export_region') {
+      e.stopPropagation();
+      if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+        (e.nativeEvent as any).stopPropagation();
+      }
+      const region = useAppStore.getState().exportRegions.find((r) => r.id === regionId);
+      if (region) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect && e.nativeEvent instanceof PointerEvent) {
+          const mouseX = e.nativeEvent.clientX - rect.left;
+          const mouseY = e.nativeEvent.clientY - rect.top;
+          const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
+          regionDragOffset.current = { x: worldX - region.rect.x, y: worldY - region.rect.y };
+          interactionMode.current = 'move_export_region';
+          activeNodeId.current = regionId;
+          containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
+        }
+      }
+    }
+  });
+
+  const handleRegionResizeDown = useStableCallback(
+    (e: FederatedPointerEvent, regionId: string, handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w') => {
+      if (activeTool === 'add_export_region') {
+        e.stopPropagation();
+        if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+          (e.nativeEvent as any).stopPropagation();
+        }
+        interactionMode.current = 'resize_export_region';
+        activeNodeId.current = regionId;
+        rectDragCorner.current = handle;
+        if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+          containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+        }
+      }
+    },
+  );
+
+  const handleClipHandleDown = useStableCallback(
+    (e: FederatedPointerEvent, layerId: string, index: number, handle: ClipHandle) => {
+      e.stopPropagation();
+      if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
+        (e.nativeEvent as any).stopPropagation();
+      }
+      if (interactionMode.current !== 'none') return;
+      mapClipEdit.startResize(layerId, index, handle);
+      interactionMode.current = 'map_clip_drag';
+      if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
+        containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
+      }
+    },
+  );
+
   return (
     <div
       ref={containerRef}
@@ -2037,193 +2199,26 @@ function MapCanvasView() {
             textStyle={textStyle}
             lockedWaypointId={snapState.lockedWaypointId}
             onNodeContextMenu={handleNodeContextMenu}
-            onNodePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
-              if (isMapEditMode) return;
-              if (e.button === 2) return;
-              if (activeTool === 'measure') {
-                const isAlt = (e.nativeEvent as any)?.altKey;
-                if (isAlt) {
-                  isPixiHandledRef.current = true;
-                  if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
-                    (e.nativeEvent as any).stopPropagation();
-                  }
-                  e.stopPropagation();
-                  const node = useAppStore.getState().nodes[nodeId];
-                  if (node?.transform) {
-                    commitMeasurePoint({
-                      x: node.transform.x,
-                      y: node.transform.y,
-                      objectId: nodeId,
-                      objectName: node.name || nodeId,
-                      objectType: 'node',
-                    });
-                  }
-                  return;
-                }
-                // When Alt is not pressed, do not capture so the canvas pointer down records the exact clicked location
-                return;
-              }
-              if (activeTool === 'select') {
-                e.stopPropagation();
-                const isModifier =
-                  (e.nativeEvent as any)?.shiftKey ||
-                  (e.nativeEvent as any)?.metaKey ||
-                  (e.nativeEvent as any)?.ctrlKey;
-                const currentSelected = useAppStore.getState().selectedNodeIds;
-                let targetIds: string[];
-
-                if (currentSelected.includes(nodeId)) {
-                  if (isModifier) {
-                    targetIds = currentSelected.filter((id) => id !== nodeId);
-                    selectNodes(targetIds);
-                  } else {
-                    targetIds = currentSelected;
-                  }
-                } else {
-                  if (isModifier) {
-                    targetIds = [...currentSelected, nodeId];
-                    selectNodes(targetIds);
-                  } else {
-                    targetIds = [nodeId];
-                    selectNodes([nodeId]);
-                  }
-                }
-
-                useAppStore.getState().beginHistoryTransaction();
-                interactionMode.current = 'drag_node';
-                activeNodeId.current = nodeId;
-
-                const rect = containerRef.current?.getBoundingClientRect();
-                const mouseX = rect ? e.nativeEvent.clientX - rect.left : e.nativeEvent.clientX;
-                const mouseY = rect ? e.nativeEvent.clientY - rect.top : e.nativeEvent.clientY;
-                const worldPos = screenToWorld(mouseX, mouseY);
-
-                const initialTransforms: Record<string, any> = {};
-                const allNodes = useAppStore.getState().nodes;
-                const collectTransforms = (id: string) => {
-                  const n = allNodes[id];
-                  if (!n) return;
-                  if (n.transform) {
-                    initialTransforms[id] = { ...n.transform };
-                  }
-                  if (n.children_ids) {
-                    n.children_ids.forEach(collectTransforms);
-                  }
-                };
-                targetIds.forEach(collectTransforms);
-
-                if (!initialTransforms[nodeId] && allNodes[nodeId]?.transform) {
-                  initialTransforms[nodeId] = { ...allNodes[nodeId].transform };
-                }
-
-                movingNodesState.current = {
-                  activeId: nodeId,
-                  startWorldPos: worldPos,
-                  initialTransforms,
-                };
-
-                if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                  containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                }
-              }
-            }}
-            onNodeHandlePointerDown={(e: import('pixi.js').FederatedPointerEvent, nodeId: string) => {
-              if (isMapEditMode) return;
-              e.stopPropagation();
-              const existingNode = useAppStore.getState().nodes[nodeId];
-              initialYawTransform.current = existingNode?.transform ? { ...existingNode.transform } : null;
-              isCreatingNewNodeOnYaw.current = false;
-              useAppStore.getState().beginHistoryTransaction();
-              interactionMode.current = 'set_yaw';
-              activeNodeId.current = nodeId;
-              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-              }
-            }}
+            onNodePointerDown={handleNodePointerDown}
+            onNodeHandlePointerDown={handleNodeHandlePointerDown}
           />
 
           {/* Render Active Plugin Interaction Previews (Points + Rectangles) */}
           <PluginLayer
             scale={scale}
-            onRectDragCornerDown={(
-              e: import('pixi.js').FederatedPointerEvent,
-              key: string,
-              corner: 'min' | 'max' | 'topRight' | 'bottomLeft',
-            ) => {
-              e.stopPropagation();
-              rectInputKey.current = key;
-              rectDragCorner.current = corner;
-              interactionMode.current = 'drag_rect_corner';
-              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-              }
-            }}
-            onRectRotationDown={(e: import('pixi.js').FederatedPointerEvent, key: string) => {
-              e.stopPropagation();
-              rectInputKey.current = key;
-              interactionMode.current = 'set_rect_rotation';
-              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-              }
-            }}
+            onRectDragCornerDown={handleRectDragCornerDown}
+            onRectRotationDown={handleRectRotationDown}
           />
 
           <ExportRegionLayer
             scale={scale}
             textStyle={textStyle}
-            onRegionDragDown={(e, regionId) => {
-              if (activeTool === 'add_export_region') {
-                e.stopPropagation();
-                if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
-                  (e.nativeEvent as any).stopPropagation();
-                }
-                const region = useAppStore.getState().exportRegions.find((r) => r.id === regionId);
-                if (region) {
-                  const rect = containerRef.current?.getBoundingClientRect();
-                  if (rect && e.nativeEvent instanceof PointerEvent) {
-                    const mouseX = e.nativeEvent.clientX - rect.left;
-                    const mouseY = e.nativeEvent.clientY - rect.top;
-                    const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
-                    regionDragOffset.current = { x: worldX - region.rect.x, y: worldY - region.rect.y };
-                    interactionMode.current = 'move_export_region';
-                    activeNodeId.current = regionId;
-                    containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
-                  }
-                }
-              }
-            }}
-            onRegionResizeDown={(e, regionId, handle) => {
-              if (activeTool === 'add_export_region') {
-                e.stopPropagation();
-                if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
-                  (e.nativeEvent as any).stopPropagation();
-                }
-                interactionMode.current = 'resize_export_region';
-                activeNodeId.current = regionId;
-                rectDragCorner.current = handle;
-                if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                  containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-                }
-              }
-            }}
+            onRegionDragDown={handleRegionDragDown}
+            onRegionResizeDown={handleRegionResizeDown}
           />
 
           {/* Use area of the map layer being edited, with resize handles */}
-          <MapClipEditLayer
-            scale={scale}
-            onHandleDown={(e, layerId, index, handle) => {
-              e.stopPropagation();
-              if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
-                (e.nativeEvent as any).stopPropagation();
-              }
-              if (interactionMode.current !== 'none') return;
-              mapClipEdit.startResize(layerId, index, handle);
-              interactionMode.current = 'map_clip_drag';
-              if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
-                containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
-              }
-            }}
-          />
+          <MapClipEditLayer scale={scale} onHandleDown={handleClipHandleDown} />
 
           {/* Render Measure Layer */}
           <MeasureLayer scale={scale} snappedTarget={snappedMeasureTarget} isAltPressed={isAltPressed} />

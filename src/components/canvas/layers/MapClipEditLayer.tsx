@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import type { FederatedPointerEvent } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
@@ -18,7 +18,7 @@ const cursorFor = ({ hx, hy }: ClipHandle) =>
  * The use area of the map layer being edited: each rectangle with a resize handle on every corner and
  * edge. New areas are drawn by dragging on the empty canvas (see `useMapClipEdit`).
  */
-export function MapClipEditLayer({ scale, onHandleDown }: MapClipEditLayerProps) {
+export const MapClipEditLayer = memo(function MapClipEditLayer({ scale, onHandleDown }: MapClipEditLayerProps) {
   const layerId = useAppStore((state) => (state.appMode.mode === 'map_clip_edit' ? state.appMode.layerId : null));
   const rects = useAppStore((state) => state.mapLayers.find((l) => l.id === layerId)?.clip?.rects);
 
@@ -68,4 +68,4 @@ export function MapClipEditLayer({ scale, onHandleDown }: MapClipEditLayerProps)
       )}
     </pixiContainer>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent } from 'pixi.js';
 import { CanvasHandle } from '../common/CanvasHandle';
@@ -21,7 +22,11 @@ interface PluginLayerProps {
   onRectRotationDown: (e: FederatedPointerEvent, key: string) => void;
 }
 
-export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }: PluginLayerProps) {
+export const PluginLayer = memo(function PluginLayer({
+  scale,
+  onRectDragCornerDown,
+  onRectRotationDown,
+}: PluginLayerProps) {
   const activeTool = useAppStore((state) => state.activeTool);
   const selectedNodeIds = useAppStore((state) => state.selectedNodeIds);
   const nodes = useAppStore((state) => state.nodes);
@@ -357,4 +362,4 @@ export function PluginLayer({ scale, onRectDragCornerDown, onRectRotationDown }:
       })}
     </>
   );
-}
+});

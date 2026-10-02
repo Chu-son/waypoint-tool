@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import * as PIXI from 'pixi.js';
 import { getFlattenedWaypointIds, getNodesAfterInsertionTarget } from '../../../utils/treeUtils';
@@ -8,7 +8,7 @@ import { resolvePathConditionalStyle, parseColorSafe, drawDashedLine } from '../
 import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { CANVAS_MUTED_COLOR } from '../canvasConstants';
 
-export function PathLayer({ scale }: { scale: number }) {
+export const PathLayer = memo(function PathLayer({ scale }: { scale: number }) {
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
   const nodes = useAppStore((state) => state.nodes);
   const insertionTarget = useAppStore((state) => state.insertionTarget);
@@ -195,4 +195,4 @@ export function PathLayer({ scale }: { scale: number }) {
       }}
     />
   );
-}
+});

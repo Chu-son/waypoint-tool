@@ -121,6 +121,7 @@ export function WaypointTree() {
     () => getHighlightedContainerIds(selectedNodeIds, getWaypointParentId),
     [selectedNodeIds, getWaypointParentId],
   );
+  const selectedIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
   const { flashingId } = useTreeReveal({
     treeType: 'node',
@@ -405,7 +406,7 @@ export function WaypointTree() {
                 const node = item.node;
                 if (!node) return null;
 
-                const isSelected = selectedNodeIds.includes(item.id);
+                const isSelected = selectedIdSet.has(item.id);
                 const hasSelectedChild = !isSelected && highlightedContainerIds.has(item.id);
                 const isFlashing = flashingId === item.id;
                 const isAnchor = anchorNodeId === item.id;

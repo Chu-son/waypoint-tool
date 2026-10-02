@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { FederatedPointerEvent, TextStyle } from 'pixi.js';
@@ -15,7 +15,12 @@ interface ExportRegionLayerProps {
   ) => void;
 }
 
-export function ExportRegionLayer({ scale, textStyle, onRegionDragDown, onRegionResizeDown }: ExportRegionLayerProps) {
+export const ExportRegionLayer = memo(function ExportRegionLayer({
+  scale,
+  textStyle,
+  onRegionDragDown,
+  onRegionResizeDown,
+}: ExportRegionLayerProps) {
   const exportRegions = useAppStore((state) => state.exportRegions);
   const activeTool = useAppStore((state) => state.activeTool);
 
@@ -106,4 +111,4 @@ export function ExportRegionLayer({ scale, textStyle, onRegionDragDown, onRegion
         })}
     </>
   );
-}
+});

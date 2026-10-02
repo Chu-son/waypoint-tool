@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { FederatedPointerEvent, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import {
@@ -36,7 +36,7 @@ export function parseHexColor(colorStr?: string, fallback = CANVAS_ACCENT_COLOR)
   return isNaN(parsed) ? fallback : parsed;
 }
 
-export function AnnotationLayer({
+export const AnnotationLayer = memo(function AnnotationLayer({
   scale,
   previewObject,
   onAnnotationPointerDown,
@@ -70,6 +70,7 @@ export function AnnotationLayer({
     onAnnotationContextMenu?.(e, id);
   };
 
+  const selectedAnnotations = useMemo(() => new Set(selectedAnnotationIds), [selectedAnnotationIds]);
   const safeScale = Math.max(scale, 0.001);
   const isPlacing = isAnnotationEditMode && activeAnnotationSubTool !== 'select';
 
@@ -106,7 +107,7 @@ export function AnnotationLayer({
       return null;
     }
 
-    const isSelected = !isPreview && selectedAnnotationIds.includes(obj.id);
+    const isSelected = !isPreview && selectedAnnotations.has(obj.id);
     const baseColorHex = parseHexColor(obj.color, CANVAS_ACCENT_COLOR);
 
     const strokeColorHex = condStyle?.strokeColor ? parseColorSafe(condStyle.strokeColor, baseColorHex) : baseColorHex;
@@ -546,4 +547,4 @@ export function AnnotationLayer({
       {previewObject && renderSingleAnnotation(previewObject, true)}
     </pixiContainer>
   );
-}
+});

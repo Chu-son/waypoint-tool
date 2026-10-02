@@ -1,8 +1,8 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { CANVAS_AXIS_X_COLOR, CANVAS_AXIS_Y_COLOR } from '../canvasConstants';
 
-export function GridLayer({ scale }: { scale: number }) {
+export const GridLayer = memo(function GridLayer({ scale }: { scale: number }) {
   const drawAxes = useCallback(
     (g: PIXI.Graphics) => {
       g.clear();
@@ -25,4 +25,4 @@ export function GridLayer({ scale }: { scale: number }) {
   );
 
   return <pixiGraphics draw={drawAxes} />;
-}
+});

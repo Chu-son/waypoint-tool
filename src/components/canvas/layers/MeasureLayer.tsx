@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { TextStyle } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { computeDistance } from '../../../stores/slices/measureSlice';
@@ -15,7 +15,7 @@ interface MeasureLayerProps {
   isAltPressed?: boolean;
 }
 
-export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLayerProps) {
+export const MeasureLayer = memo(function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLayerProps) {
   const activeTool = useAppStore((state) => state.activeTool);
   const appMode = useAppStore((state) => state.appMode);
   const measureStartPoint = useAppStore((state) => state.measureStartPoint);
@@ -246,4 +246,4 @@ export function MeasureLayer({ scale, snappedTarget, isAltPressed }: MeasureLaye
       )}
     </pixiContainer>
   );
-}
+});

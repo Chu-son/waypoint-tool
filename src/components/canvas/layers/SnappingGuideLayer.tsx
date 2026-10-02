@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { TextStyle } from 'pixi.js';
 import { CANVAS_ACCENT_COLOR, CANVAS_ACCENT_COLOR_HEX } from '../canvasConstants';
 
@@ -7,7 +8,11 @@ interface SnappingGuideLayerProps {
   snapInput: string;
 }
 
-export function SnappingGuideLayer({ scale, snapState, snapInput }: SnappingGuideLayerProps) {
+export const SnappingGuideLayer = memo(function SnappingGuideLayer({
+  scale,
+  snapState,
+  snapInput,
+}: SnappingGuideLayerProps) {
   if (!snapState.origin || (!snapState.isSnapped && !snapState.forcedAxis)) {
     return null;
   }
@@ -68,20 +73,23 @@ export function SnappingGuideLayer({ scale, snapState, snapInput }: SnappingGuid
           y={ey}
           scale={{ x: 1 / Math.max(scale, 0.001), y: -1 / Math.max(scale, 0.001) }}
         >
-          <pixiText
-            text={`Dist: ${snapInput}`}
-            style={
-              new TextStyle({
-                fill: CANVAS_ACCENT_COLOR_HEX,
-                fontSize: 16,
-                fontFamily: 'Arial',
-                fontWeight: 'bold',
-                stroke: { color: '#000000', width: 3 },
-              })
-            }
-          />
+          <pixiText text={`Dist: ${snapInput}`} style={distanceLabelStyle()} />
         </pixiContainer>
       )}
     </pixiContainer>
   );
+});
+
+let distanceLabel: TextStyle | null = null;
+
+/** Created on first use and then shared, instead of a new style (and text re-layout) on every render. */
+function distanceLabelStyle(): TextStyle {
+  distanceLabel ??= new TextStyle({
+    fill: CANVAS_ACCENT_COLOR_HEX,
+    fontSize: 16,
+    fontFamily: 'Arial',
+    fontWeight: 'bold',
+    stroke: { color: '#000000', width: 3 },
+  });
+  return distanceLabel;
 }

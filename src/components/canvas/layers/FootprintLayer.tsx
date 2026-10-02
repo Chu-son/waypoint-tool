@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
+import type { Graphics } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { RobotFootprint } from '../../../types/store';
 import { quaternionToYaw } from '../../../utils/transformUtils';
@@ -15,7 +16,7 @@ interface FootprintLayerProps {
   scale: number;
 }
 
-export function FootprintLayer({ scale }: FootprintLayerProps) {
+export const FootprintLayer = memo(function FootprintLayer({ scale }: FootprintLayerProps) {
   const robotFootprint = useAppStore((state) => state.robotFootprint);
   const showFootprints = useAppStore((state) => state.showFootprints);
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
@@ -55,6 +56,8 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
     return map;
   }, [renderableNodes, robotFootprint, conditionalStyles, conditionalStylesEnabled, optionsSchema]);
 
+  const selected = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
+
   if (!robotFootprint) return null;
 
   const safeScale = Math.max(scale, 0.001);
@@ -62,7 +65,7 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
   return (
     <>
       {renderableNodes.map(({ node }) => {
-        const isSelected = selectedNodeIds.includes(node.id);
+        const isSelected = selected.has(node.id);
         const condStyle = resolvedFpMap.get(node.id);
 
         const isForceShow = condStyle?.visibleMode === 'force_show';
@@ -84,29 +87,69 @@ export function FootprintLayer({ scale }: FootprintLayerProps) {
           ? parseColorSafe(condStyle.fillColor, CANVAS_MUTED_COLOR)
           : CANVAS_MUTED_COLOR;
 
-        const strokeColor = isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseStroke;
-        const strokeWidth = isSelected ? 1.5 / safeScale : (condStyle?.strokeWidth ?? 1.0) / safeScale;
-        const fillColor = isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseFill;
-        const fillAlpha = isSelected ? 0.18 : (condStyle?.fillAlpha ?? 0.05);
-
         return (
-          <pixiContainer key={`footprint-${node.id}`} x={px} y={py} rotation={yaw} eventMode="none">
-            <pixiGraphics
-              eventMode="none"
-              draw={(g) => {
-                g.clear();
-                g.strokeStyle = { width: strokeWidth, color: strokeColor, alpha: isSelected ? 0.9 : 0.6 };
-                g.fillStyle = { color: fillColor, alpha: fillAlpha };
-
-                drawFootprintShape(g, effectiveFootprint, safeScale, isSelected);
-              }}
-            />
-          </pixiContainer>
+          <Footprint
+            key={`footprint-${node.id}`}
+            px={px}
+            py={py}
+            yaw={yaw}
+            footprint={effectiveFootprint}
+            safeScale={safeScale}
+            isSelected={isSelected}
+            strokeColor={isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseStroke}
+            strokeWidth={isSelected ? 1.5 / safeScale : (condStyle?.strokeWidth ?? 1.0) / safeScale}
+            fillColor={isSelected ? CANVAS_FOOTPRINT_SELECTED_COLOR : baseFill}
+            fillAlpha={isSelected ? 0.18 : (condStyle?.fillAlpha ?? 0.05)}
+          />
         );
       })}
     </>
   );
+});
+
+interface FootprintProps {
+  px: number;
+  py: number;
+  yaw: number;
+  footprint: RobotFootprint;
+  safeScale: number;
+  isSelected: boolean;
+  strokeColor: number;
+  strokeWidth: number;
+  fillColor: number;
+  fillAlpha: number;
 }
+
+/** The footprint of one waypoint; memoized so moving one waypoint redraws only its own. */
+const Footprint = memo(function Footprint({
+  px,
+  py,
+  yaw,
+  footprint,
+  safeScale,
+  isSelected,
+  strokeColor,
+  strokeWidth,
+  fillColor,
+  fillAlpha,
+}: FootprintProps) {
+  const draw = useCallback(
+    (g: Graphics) => {
+      g.clear();
+      g.strokeStyle = { width: strokeWidth, color: strokeColor, alpha: isSelected ? 0.9 : 0.6 };
+      g.fillStyle = { color: fillColor, alpha: fillAlpha };
+
+      drawFootprintShape(g, footprint, safeScale, isSelected);
+    },
+    [strokeWidth, strokeColor, isSelected, fillColor, fillAlpha, footprint, safeScale],
+  );
+
+  return (
+    <pixiContainer x={px} y={py} rotation={yaw} eventMode="none">
+      <pixiGraphics eventMode="none" draw={draw} />
+    </pixiContainer>
+  );
+});
 
 function drawFootprintShape(g: any, footprint: RobotFootprint, safeScale: number, isSelected: boolean) {
   if (footprint.type === 'circular') {
