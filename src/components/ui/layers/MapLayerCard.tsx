@@ -4,17 +4,19 @@ import { useAppStore } from '../../../stores/appStore';
 import { Button } from '../common/Button';
 import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
+import { ToggleSwitch } from '../common/ToggleSwitch';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { FieldLabel } from '../common/FieldLabel';
 import { InlineNameInput } from '../common/InlineNameInput';
 import { PoseAdjuster } from '../common/PoseAdjuster';
-import { ProjectMapLayer, ResolvedMapLayer } from '../../../types/store';
+import { MapBlendMode, ProjectMapLayer, ResolvedMapLayer } from '../../../types/store';
+import { BLEND_MODE_OPTIONS } from '../../../utils/blendModes';
 import { LayerCardShell } from './LayerCardShell';
 import { MapClipEditor } from './MapClipEditor';
 
 interface MapLayerCardProps {
   layer: ResolvedMapLayer;
-  /** How many map instances draw from this layer's source (pose and thresholds are shared between them). */
+  /** How many map instances draw from this layer's source (thresholds, and the pose of linked ones, are shared). */
   sharedCount: number;
   index: number;
   isFirst: boolean;
@@ -28,8 +30,12 @@ interface MapLayerCardProps {
   onToggleVisible: () => void;
   onRemove: () => void;
   onUpdateLayer: (updates: Partial<Omit<ProjectMapLayer, 'id' | 'sourceId'>>) => void;
-  /** Edits map data shared by every instance of this map: pose and occupancy thresholds. */
-  onUpdateSource: (updates: { info: ResolvedMapLayer['info'] }) => void;
+  /** Moves this map. While the pose is linked this moves every linked instance of the map. */
+  onSetOrigin: (origin: [number, number, number]) => void;
+  /** Links the pose to the other instances of this map, or unlinks it so this instance moves alone. */
+  onSetPoseLinked: (linked: boolean) => void;
+  /** Edits occupancy thresholds, which every instance of this map shares. */
+  onUpdateThresholds: (updates: Partial<{ occupied_thresh: number; free_thresh: number; negate: number }>) => void;
   onDuplicate: () => void;
   isRenaming: boolean;
   onStartRename: () => void;
@@ -53,7 +59,9 @@ export function MapLayerCard({
   onToggleVisible,
   onRemove,
   onUpdateLayer,
-  onUpdateSource,
+  onSetOrigin,
+  onSetPoseLinked,
+  onUpdateThresholds,
   onDuplicate,
   isRenaming,
   onStartRename,
@@ -61,6 +69,7 @@ export function MapLayerCard({
   onCancelRename,
 }: MapLayerCardProps) {
   const [showSettings, setShowSettings] = useState(false);
+  const poseUnlinked = layer.origin_override !== null;
   const occupancySettings = useAppStore((state) => state.occupancySettings);
 
   const occThresh = layer.info?.occupied_thresh ?? occupancySettings?.defaultOccupiedThresh ?? 0.65;
@@ -95,24 +104,10 @@ export function MapLayerCard({
     const newOy = initialOrigin[1] + newDy;
     const newOyaw = initialOrigin[2] + newDeltaYawRad;
 
-    onUpdateSource({
-      info: {
-        ...layer.info,
-        origin: [newOx, newOy, newOyaw],
-        initial_origin: initialOrigin,
-      },
-    });
+    onSetOrigin([newOx, newOy, newOyaw]);
   };
 
-  const handleResetPose = () => {
-    onUpdateSource({
-      info: {
-        ...layer.info,
-        origin: [...initialOrigin],
-        initial_origin: initialOrigin,
-      },
-    });
-  };
+  const handleResetPose = () => onSetOrigin([...initialOrigin]);
 
   const handleRotateDelta = (stepDeg: number) => {
     let newDeg = Math.round((deltaYawDeg + stepDeg) / 90) * 90;
@@ -120,29 +115,12 @@ export function MapLayerCard({
     handleUpdateDelta({ deltaYawDeg: newDeg });
   };
 
-  const handleUpdateInfo = (updates: Partial<{ occupied_thresh: number; free_thresh: number; negate: number }>) => {
-    onUpdateSource({
-      info: {
-        ...layer.info,
-        origin,
-        initial_origin: initialOrigin,
-        ...updates,
-      },
+  const handleResetThresholds = () =>
+    onUpdateThresholds({
+      occupied_thresh: occupancySettings?.defaultOccupiedThresh ?? 0.65,
+      free_thresh: occupancySettings?.defaultFreeThresh ?? 0.25,
+      negate: occupancySettings?.defaultNegate ?? 0,
     });
-  };
-
-  const handleResetThresholds = () => {
-    onUpdateSource({
-      info: {
-        ...layer.info,
-        origin,
-        initial_origin: initialOrigin,
-        occupied_thresh: occupancySettings?.defaultOccupiedThresh ?? 0.65,
-        free_thresh: occupancySettings?.defaultFreeThresh ?? 0.25,
-        negate: occupancySettings?.defaultNegate ?? 0,
-      },
-    });
-  };
 
   return (
     <LayerCardShell
@@ -182,9 +160,17 @@ export function MapLayerCard({
           {sharedCount > 1 && (
             <span
               className="text-[9px] font-bold uppercase bg-primary-base/15 text-primary-base px-1 py-0.5 rounded"
-              title="Pose and thresholds are shared with the other layers of this map"
+              title="Image and thresholds are shared with the other layers of this map"
             >
               Shared ×{sharedCount}
+            </span>
+          )}
+          {poseUnlinked && (
+            <span
+              className="text-[9px] font-bold uppercase bg-accent-generator/20 text-accent-generator px-1 py-0.5 rounded"
+              title="This layer's pose is independent of the other layers of this map"
+            >
+              Own pose
             </span>
           )}
           {layer.clip && (
@@ -221,6 +207,25 @@ export function MapLayerCard({
             <span>Reset</span>
           </Button>
         </div>
+
+        {(sharedCount > 1 || poseUnlinked) && (
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className="text-[10px] text-text-muted font-medium"
+              title="On: moving this layer moves the other linked layers of this map. Off: this layer moves alone."
+            >
+              Link pose with other layers
+            </span>
+            <ToggleSwitch
+              checked={!poseUnlinked}
+              onChange={onSetPoseLinked}
+              title={
+                poseUnlinked ? 'Link pose again (returns to the shared pose)' : 'Unlink pose (move this layer alone)'
+              }
+              aria-label="Link pose"
+            />
+          </div>
+        )}
 
         {/* Quick Rotate Buttons */}
         <div className="grid grid-cols-3 gap-1.5">
@@ -316,13 +321,15 @@ export function MapLayerCard({
           <FieldLabel>Blend Mode</FieldLabel>
           <Select
             value={layer.blend_mode || 'overwrite'}
-            onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as any })}
+            onChange={(e) => onUpdateLayer({ blend_mode: e.target.value as MapBlendMode })}
             onClick={(e) => e.stopPropagation()}
             className="text-xs border-border-base/50 h-7"
           >
-            <option value="overwrite">Overwrite (Ignore Unknown)</option>
-            <option value="merge_obstacles">Merge Obstacles</option>
-            <option value="merge_free">Merge Free Space</option>
+            {BLEND_MODE_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
           </Select>
         </div>
       </div>
@@ -383,7 +390,7 @@ export function MapLayerCard({
           value={occThresh}
           onChange={(e) => {
             const val = parseFloat(e.target.value);
-            handleUpdateInfo({ occupied_thresh: Math.max(val, freeThresh) });
+            onUpdateThresholds({ occupied_thresh: Math.max(val, freeThresh) });
           }}
         />
 
@@ -396,7 +403,7 @@ export function MapLayerCard({
           value={freeThresh}
           onChange={(e) => {
             const val = parseFloat(e.target.value);
-            handleUpdateInfo({ free_thresh: Math.min(val, occThresh) });
+            onUpdateThresholds({ free_thresh: Math.min(val, occThresh) });
           }}
         />
 
@@ -404,7 +411,7 @@ export function MapLayerCard({
           <span className="text-[10px] text-text-muted font-medium">Negate</span>
           <Select
             value={negate}
-            onChange={(e) => handleUpdateInfo({ negate: parseInt(e.target.value) as 0 | 1 })}
+            onChange={(e) => onUpdateThresholds({ negate: parseInt(e.target.value) as 0 | 1 })}
             className="h-6 text-[11px] bg-surface-base border-border-base/50 w-32 py-0"
           >
             <option value={0}>0 (Standard)</option>

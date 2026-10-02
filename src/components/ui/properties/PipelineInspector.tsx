@@ -26,6 +26,8 @@ import {
   Bookmark,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { BLEND_MODE_OPTIONS } from '../../../utils/blendModes';
+import type { MapBlendMode } from '../../../types/store';
 import { confirmAction } from '../../../services/notify';
 
 export interface PipelineInspectorProps {
@@ -420,15 +422,17 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                 <Select
                   value={targetLayer.blend_mode || 'overwrite'}
                   disabled={!!targetLayer.is_reference}
-                  onChange={(e) => updateCustomLayer(targetLayer.id, { blend_mode: e.target.value as any })}
+                  onChange={(e) => updateCustomLayer(targetLayer.id, { blend_mode: e.target.value as MapBlendMode })}
                   className={cn(
-                    'h-6 text-[11px] bg-surface-base border-border-base/50 w-32',
+                    'h-6 text-[11px] bg-surface-base border-border-base/50 w-52',
                     targetLayer.is_reference && 'opacity-50 cursor-not-allowed bg-surface-base/30',
                   )}
                 >
-                  <option value="overwrite">Overwrite</option>
-                  <option value="merge_obstacles">Merge Obstacles</option>
-                  <option value="merge_free">Merge Free Space</option>
+                  {BLEND_MODE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
                 </Select>
               </div>
             </div>

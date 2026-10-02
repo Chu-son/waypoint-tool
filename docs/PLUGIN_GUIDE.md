@@ -157,6 +157,8 @@ if __name__ == "__main__":
     DrivableAreaGenerator().run_from_stdin()
 ```
 
+`blend_mode` には `overwrite`（既知セルのみ上書き。既定）/ `replace`（Unknown も含めて下層を置き換える）/ `merge_obstacles` / `merge_free` を指定できる。`bg_rgba` を透明（既定）にした背景はデータなしとして扱われ、`replace` でも下層を消さない。
+
 ### 4) パス計算 (`PathCalculator`)
 ウェイポイント間をA*/ダイクストラ等のアルゴリズムで補間し、各区間のポリラインを出力します。
 ```python

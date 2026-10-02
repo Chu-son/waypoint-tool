@@ -124,7 +124,12 @@ export interface MapLayerClip {
   rects: ClipRect[];
 }
 
-export type MapBlendMode = 'overwrite' | 'merge_obstacles' | 'merge_free';
+/**
+ * `overwrite` takes the layer's known cells and keeps the cells below where the layer is unknown;
+ * `replace` takes every cell the layer has data for, unknown ones included. Pixels the layer has no
+ * data for (transparent, outside its image or clip) never take part in blending in any mode.
+ */
+export type MapBlendMode = 'overwrite' | 'replace' | 'merge_obstacles' | 'merge_free';
 
 /**
  * One use of a `MapSource` in the layer stack (stack order lives in `layerOrder`). Duplicating a map
@@ -139,6 +144,11 @@ export interface ProjectMapLayer {
   blend_mode: MapBlendMode;
   /** `null` uses the whole map. */
   clip: MapLayerClip | null;
+  /**
+   * Pose of this instance alone. `null` follows the source's `info.origin`, so the pose is shared with
+   * every other instance of the map; a value unlinks it, so this instance can be nudged on its own.
+   */
+  origin_override: [number, number, number] | null;
 }
 
 /** A map instance joined with the pixel data and metadata of its source, ready for drawing and export. */

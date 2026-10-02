@@ -38,6 +38,7 @@ export function useBlendedPreview() {
         blend_mode: l.blend_mode,
         visible: l.visible,
         clip: l.clip,
+        origin_override: l.origin_override,
       })),
     );
     const customKey = JSON.stringify(

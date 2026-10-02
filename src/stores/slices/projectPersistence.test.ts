@@ -48,6 +48,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
           opacity: 0.85,
           blend_mode: 'overwrite',
           clip: { rects: [{ x: 0, y: 0, width: 20, height: 30 }] },
+          origin_override: null,
         },
         {
           id: 'map-2',
@@ -57,6 +58,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
           opacity: 0.85,
           blend_mode: 'merge_free',
           clip: null,
+          origin_override: [1.5, -2, 0.5],
         },
       ],
       layer_order: ['cust-1', 'map-2', 'map-1'],

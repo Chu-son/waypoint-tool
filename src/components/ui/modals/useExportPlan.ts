@@ -386,10 +386,13 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           detail: `${enabledItems.length} 件の構成を出力中`,
           blocking: true,
         },
-        async () => {
+        async (report) => {
+          const showStep = (step: string) => report({ detail: `${enabledItems.length} 件の構成を出力中\n${step}` });
+
           // 1. Prepare map raster layers if map export is required
           let preparedLayers: any[] = [];
           if (hasMapItems) {
+            await showStep('マップレイヤーを準備中...');
             // Hidden layers are prepared too: each map item chooses its layers with its own visibility.
             preparedLayers = await prepareLayersForExport(useAppStore.getState(), { includeHidden: true });
           }
@@ -397,6 +400,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           // 2. Extract map shot canvas if requested
           let imageDataB64: string | undefined = undefined;
           if (hasMapShot) {
+            await showStep('マップ画像を取得中...');
             useAppStore.getState().triggerFitToMaps();
             await new Promise((r) => setTimeout(r, 800));
             const canvas = document.querySelector('canvas');
@@ -437,6 +441,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           });
 
           // 4. Invoke Backend API
+          await showStep('ファイルを書き出し中...');
           const result = await BackendAPI.executeExportPackage({
             root_dir: rootDir,
             conflict_resolution: activeProfile.conflictResolution,

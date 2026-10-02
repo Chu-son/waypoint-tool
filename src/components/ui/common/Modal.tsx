@@ -2,6 +2,7 @@ import * as React from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '../../../utils/cn';
+import { useAppStore } from '../../../stores/appStore';
 import { Panel } from './Panel';
 
 export interface ModalProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -41,6 +42,9 @@ export function Modal({ isOpen, onClose, size = 'md', children, className, ...pr
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (openModalStack[openModalStack.length - 1] !== instanceId) return;
+      // Work started from a modal (e.g. an export) keeps it open until the loading overlay is gone.
+      const isBlocked = Object.values(useAppStore.getState().activeLoadingTasks).some((t) => t.blocking !== false);
+      if (isBlocked) return;
       onCloseRef.current();
     };
 

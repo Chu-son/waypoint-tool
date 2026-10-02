@@ -135,10 +135,17 @@ export type UISlice = {
   // Loading Tasks State
   activeLoadingTasks: Record<string, LoadingTask>;
   startLoading: (task: { id?: string; message: string; detail?: string; blocking?: boolean }) => string;
+  /** Changes the text of a running task (e.g. the current step). Does nothing once the task has stopped. */
+  updateLoading: (id: string, update: { message?: string; detail?: string }) => void;
   stopLoading: (id: string) => void;
+  /**
+   * Shows a loading task while `fn` runs and removes it afterwards, even if `fn` throws. `fn` receives
+   * a function to report progress, which changes the task's `detail` (and `message` if given).
+   * Await it so the new text is painted before the next, possibly heavy, step starts.
+   */
   runWithLoading: <T>(
     options: { id?: string; message: string; detail?: string; blocking?: boolean },
-    fn: () => Promise<T>,
+    fn: (report: (update: { message?: string; detail?: string }) => Promise<void>) => Promise<T>,
   ) => Promise<T>;
 
   // Note: setDirty is mapped to setIsDirty in original store
@@ -166,6 +173,23 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     return id;
   },
 
+  updateLoading: (id, update) => {
+    set((state) => {
+      const task = state.activeLoadingTasks[id];
+      if (!task) return state;
+      return {
+        activeLoadingTasks: {
+          ...state.activeLoadingTasks,
+          [id]: {
+            ...task,
+            message: update.message ?? task.message,
+            detail: 'detail' in update ? update.detail : task.detail,
+          },
+        },
+      };
+    });
+  },
+
   stopLoading: (id: string) => {
     set((state) => {
       if (!state.activeLoadingTasks[id]) return state;
@@ -179,7 +203,11 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     // Yield a frame to allow React to commit state and browser to paint the LoadingOverlay
     await new Promise((resolve) => setTimeout(resolve, 30));
     try {
-      return await fn();
+      return await fn(async (update) => {
+        get().updateLoading(id, update);
+        // Let the new text paint before the next (possibly heavy) step starts.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
     } finally {
       get().stopLoading(id);
     }

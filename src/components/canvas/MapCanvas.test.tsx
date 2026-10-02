@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { getFallbackGridColors } from './utils/canvasTheme';
@@ -109,28 +109,59 @@ describe('MapCanvas', () => {
     expect(state.selectedNodeIds).toContain('test-uuid');
   });
 
-  it('performs fitToMaps when triggerFitToMaps is called', async () => {
-    useAppStore.setState({
-      ...layerStackState(
-        makeMap('layer1', {
-          name: 'map.yaml',
-          image_base64: 'data:image/png;base64,mock',
-          info: { resolution: 0.1, origin: [0, 0, 0] },
-          width: 100,
-          height: 100,
-        }),
-      ),
+  describe('framing the maps', () => {
+    const loadMap = () =>
+      useAppStore.setState({
+        ...layerStackState(
+          makeMap('layer1', {
+            name: 'map.yaml',
+            image_base64: 'data:image/png;base64,mock',
+            info: { resolution: 0.1, origin: [0, 0, 0] },
+            width: 100,
+            height: 100,
+          }),
+        ),
+        mapScale: 1,
+        shouldFitToMaps: 0,
+      });
+
+    // Loading a map frames it on its own; wait for that so it cannot interfere with what a test checks.
+    const renderFramed = async () => {
+      loadMap();
+      render(<MapCanvas />);
+      await waitFor(() => expect(useAppStore.getState().mapScale).not.toBe(1));
+    };
+
+    it('fits the view to the maps when a fit is requested', async () => {
+      await renderFramed();
+      act(() => useAppStore.getState().setMapScale(7));
+
+      act(() => useAppStore.setState({ shouldFitToMaps: 1 }));
+
+      await waitFor(() => expect(useAppStore.getState().mapScale).not.toBe(7));
     });
 
-    render(<MapCanvas />);
+    it('keeps the zoom while the pose of a map is adjusted, and fits again only when asked', async () => {
+      await renderFramed();
+      act(() => useAppStore.getState().setMapScale(7));
+      act(() => useAppStore.setState({ shouldFitToMaps: 1 }));
+      await waitFor(() => expect(useAppStore.getState().mapScale).not.toBe(7));
 
-    // triggerFitToMaps increments a counter in the store
-    act(() => {
-      useAppStore.setState({ shouldFitToMaps: 1 });
+      // The user zooms in on their own, then nudges and rotates the map.
+      act(() => useAppStore.getState().setMapScale(0.123));
+      act(() => {
+        useAppStore.getState().updateMapSource('layer1-source', {
+          info: { resolution: 0.1, origin: [5, 3, Math.PI / 4], initial_origin: [0, 0, 0] },
+        });
+      });
+      await act(() => new Promise((resolve) => setTimeout(resolve, 100)));
+
+      expect(useAppStore.getState().mapScale).toBe(0.123);
+
+      act(() => useAppStore.setState({ shouldFitToMaps: 2 }));
+
+      await waitFor(() => expect(useAppStore.getState().mapScale).not.toBe(0.123));
     });
-
-    // We can't easily check the internal state of MapCanvas (position/scale)
-    // but we can verify that the store state was applied.
   });
 
   it('clears selection when clicking empty space in select mode', () => {
