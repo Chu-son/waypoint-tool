@@ -64,6 +64,38 @@ describe('Loading Tasks (uiSlice)', () => {
     expect(useAppStore.getState().activeLoadingTasks['async-task']).toBeUndefined();
   });
 
+  it('changes the text of a running task and keeps the rest', () => {
+    useAppStore.getState().startLoading({ id: 't', message: 'Exporting...', detail: 'Step 1', blocking: true });
+
+    useAppStore.getState().updateLoading('t', { detail: 'Step 2' });
+
+    expect(useAppStore.getState().activeLoadingTasks['t']).toMatchObject({
+      message: 'Exporting...',
+      detail: 'Step 2',
+      blocking: true,
+    });
+  });
+
+  it('ignores an update for a task that has already stopped', () => {
+    useAppStore.getState().updateLoading('gone', { detail: 'late' });
+
+    expect(useAppStore.getState().activeLoadingTasks['gone']).toBeUndefined();
+  });
+
+  it('lets the running work report its progress through runWithLoading', async () => {
+    const seen: Array<string | undefined> = [];
+    await useAppStore
+      .getState()
+      .runWithLoading({ id: 'steps', message: 'Exporting...', detail: 'Preparing' }, async (report) => {
+        seen.push(useAppStore.getState().activeLoadingTasks['steps'].detail);
+        await report({ detail: 'Writing files' });
+        seen.push(useAppStore.getState().activeLoadingTasks['steps'].detail);
+      });
+
+    expect(seen).toEqual(['Preparing', 'Writing files']);
+    expect(useAppStore.getState().activeLoadingTasks['steps']).toBeUndefined();
+  });
+
   it('cleans up task with runWithLoading even when an error occurs', async () => {
     let errorThrown = false;
     try {

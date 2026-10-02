@@ -10,11 +10,15 @@ pub fn check_export_conflicts(files: Vec<String>) -> Vec<String> {
     export_pipeline::check_export_conflicts(files)
 }
 
+// Exports blend and write many files. As synchronous commands they would run on the main thread
+// and freeze the WebView (and the loading overlay) until they finish, so they run on a blocking worker.
 #[command]
-pub fn execute_export_package(
+pub async fn execute_export_package(
     options: export_pipeline::ExportPackageOptions,
 ) -> Result<export_pipeline::ExportResultSummary, String> {
-    export_pipeline::execute_export_package(options)
+    tauri::async_runtime::spawn_blocking(move || export_pipeline::execute_export_package(options))
+        .await
+        .map_err(|e| format!("Export task failed to join: {}", e))?
 }
 
 #[command]
@@ -23,8 +27,10 @@ pub fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
 }
 
 #[command]
-pub fn export_maps(options: map::ExportMapsOptions) -> Result<(), String> {
-    map::export_maps(options)
+pub async fn export_maps(options: map::ExportMapsOptions) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || map::export_maps(options))
+        .await
+        .map_err(|e| format!("Map export task failed to join: {}", e))?
 }
 
 #[command]

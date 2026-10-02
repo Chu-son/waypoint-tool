@@ -20,7 +20,8 @@
   - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`MapLayerCard` と `GeoMapCard` で共用。
   - **主要Props**: `onNudge`, `onEditStart`, `onEditEnd`（押下/キー保持の一連操作を Undo 1 エントリにまとめるために使う）
 - **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
-  - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。
+  - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。`document.body` へポータル描画し、モーダルより前面（`z-[60]`）に出るため、モーダルから開始した処理でも見える。`message` / `detail`（改行可）を表示し、3 秒を超えると経過秒数も出す。
+  - **使い方（長時間処理の共通ルール）**: 時間のかかる処理は `uiSlice` の `runWithLoading({ message, detail, blocking }, async (report) => { ... })` で包む（終了・例外時に自動で解除される）。`blocking: true`（既定）は本コンポーネントで全画面ブロック、`blocking: false` は `BackgroundLoadingBadge` の右上表示。複数ステップの処理は `await report({ detail: '…' })` で現在の工程を更新する（`await` すると次の重い工程の前に表示が更新される）。ブロック中の Modal は Escape で閉じない。Rust 側の重いコマンドは同期 `fn` にせず `async fn` + `tauri::async_runtime::spawn_blocking` にする（同期コマンドはメインスレッドで動き、オーバーレイが描画されなくなる）。
   - **主要Props**: `className`
 - **`BackgroundLoadingBadge`** ([`src/components/ui/common/BackgroundLoadingBadge.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/BackgroundLoadingBadge.tsx))
   - **概要**: 自動経路計算等の非ブロッキングバックグラウンド処理時にキャンバス右上に浮遊表示されるコンパクトなピル型インジケーター。

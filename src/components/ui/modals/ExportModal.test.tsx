@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExportModal } from './ExportModal';
+import { LoadingOverlay } from '../common/LoadingOverlay';
 import { BackendAPI, DialogAPI } from '../../../api';
 import { resetAppStore } from '../../../test/store';
 import { useAppStore } from '../../../stores/appStore';
@@ -88,6 +89,33 @@ describe('ExportModal UI', () => {
   it('does not render when isOpen is false', () => {
     const { container } = render(<ExportModal isOpen={false} onClose={vi.fn()} />);
     expect(container.innerHTML).toBe('');
+  });
+
+  it('shows a progress overlay over the modal while the export runs, then clears it', async () => {
+    let finishExport: (value: any) => void = () => {};
+    vi.spyOn(BackendAPI, 'executeExportPackage').mockReturnValue(
+      new Promise((resolve) => {
+        finishExport = resolve;
+      }),
+    );
+    const mockOnClose = vi.fn();
+    render(
+      <>
+        <ExportModal isOpen={true} onClose={mockOnClose} />
+        <LoadingOverlay />
+      </>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+    const overlay = await screen.findByRole('status', { name: 'エクスポートを実行中...' });
+    await waitFor(() => expect(overlay).toHaveTextContent('ファイルを書き出し中...'));
+    expect(mockOnClose).not.toHaveBeenCalled();
+
+    finishExport({ exported_files_count: 1, backed_up_files: [] });
+
+    await waitFor(() => expect(mockOnClose).toHaveBeenCalled());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('triggers executeExportPackage when clicking the export button', async () => {

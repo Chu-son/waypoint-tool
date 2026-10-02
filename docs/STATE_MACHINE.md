@@ -100,6 +100,7 @@ graph TD
 - **対象モーダル**: `'settings' | 'export' | 'import' | 'export_maps' | 'shortcuts' | 'welcome' | 'plugin_data'`
 - **性質**: 最上位のグローバルオーバーレイです。モーダルが開いている間は、キャンバスのポインタ操作やグローバルショートカットはすべて遮断されます。
 - **例外規則**: 初回起動時の `welcome` モーダル（`isInitialLaunch: true`）は、プロジェクト作成またはマップ読み込みが完了するまで Escape による破棄が禁止されます。
+- **処理中の保護**: ブロッキングなローディングタスク（`activeLoadingTasks` に `blocking !== false` があるとき。`LoadingOverlay` が表示される間）は、`Modal` が Escape を処理せず閉じません。エクスポート等の実行中にモーダルが閉じるのを防ぐためです。
 
 #### Axis 2: DOM テキストフォーカス (DOM Text Focus)
 - **状態定義**: `Unfocused` または `<input>` / `<textarea>` / `<select>` / `contentEditable` 要素へのフォーカス中。

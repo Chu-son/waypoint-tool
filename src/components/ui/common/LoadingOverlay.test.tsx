@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import { LoadingOverlay } from './LoadingOverlay';
+import { Modal, ModalContent } from './Modal';
 import { BackgroundLoadingBadge } from './BackgroundLoadingBadge';
 import { useAppStore } from '../../../stores/appStore';
 
@@ -30,6 +31,52 @@ describe('LoadingOverlay & BackgroundLoadingBadge', () => {
     render(<LoadingOverlay />);
     expect(screen.getByText('プラグインを実行中...')).toBeInTheDocument();
     expect(screen.getByText('Waypoints Generator')).toBeInTheDocument();
+  });
+
+  it('LoadingOverlay is drawn after an open modal so that it covers it', () => {
+    useAppStore.setState({
+      activeLoadingTasks: {
+        'task-1': { id: 'task-1', message: 'エクスポートを実行中...', blocking: true, createdAt: Date.now() },
+      },
+    });
+
+    render(
+      <>
+        <Modal isOpen onClose={() => {}}>
+          <ModalContent>Export settings</ModalContent>
+        </Modal>
+        <LoadingOverlay />
+      </>,
+    );
+
+    const modalBody = screen.getByText('Export settings');
+    const overlay = screen.getByRole('status');
+    expect(modalBody.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(overlay.contains(modalBody)).toBe(false);
+  });
+
+  describe('elapsed time', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('is hidden at first and shown once the task has taken a few seconds', () => {
+      vi.useFakeTimers();
+      useAppStore.setState({
+        activeLoadingTasks: {
+          'task-1': { id: 'task-1', message: 'エクスポートを実行中...', blocking: true, createdAt: Date.now() },
+        },
+      });
+      render(<LoadingOverlay />);
+
+      expect(screen.queryByText(/秒経過/)).not.toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+
+      expect(screen.getByText('5 秒経過')).toBeInTheDocument();
+    });
   });
 
   it('LoadingOverlay does not render when only non-blocking tasks exist', () => {
