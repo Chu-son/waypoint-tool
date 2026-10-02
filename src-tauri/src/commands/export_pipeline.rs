@@ -25,6 +25,17 @@ pub struct ExportPackageOptions {
     /// float 化から除外するオプション名（スキーマ上 integer 型のもの）。
     #[serde(default)]
     pub integer_keys: Vec<String>,
+    // 大きなデータは 1 回だけ受け取り、各アイテムから共有する（アイテムごとに持つとリクエストが
+    // レイヤー画像 × リージョン数に膨らみ、IPC の直列化とデコードがその分だけ重くなる）。
+    /// すべての waypoint アイテムが出力する waypoint。
+    #[serde(default)]
+    pub waypoints: Vec<serde_json::Value>,
+    /// `include_map_image` の waypoint アイテムに添付するキャンバスのスクリーンショット（base64 PNG）。
+    #[serde(default)]
+    pub map_image_b64: Option<String>,
+    /// マップアイテムが描画しうる全レイヤー（非表示を含む）。各アイテムは `region.layer_visibility` で選ぶ。
+    #[serde(default)]
+    pub layers: Vec<ExportLayer>,
     pub waypoint_items: Vec<PackageWaypointItem>,
     pub map_items: Vec<PackageMapItem>,
     /// 同じフォルダに出力したマップ名の一覧ファイル（map_list.txt）。
@@ -43,12 +54,13 @@ pub struct PackageMapListItem {
 #[derive(Debug, Deserialize)]
 pub struct PackageWaypointItem {
     pub path: String, // Absolute target path
-    pub waypoints: Vec<serde_json::Value>,
     pub template: Option<String>,
     /// テンプレートのレンダリングエンジン。省略時は後方互換のため Handlebars。
     #[serde(default)]
     pub engine: TemplateEngine,
-    pub image_data_b64: Option<String>,
+    /// true の場合、`map_image_b64` を同名の `.png` として添付する。
+    #[serde(default)]
+    pub include_map_image: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -56,7 +68,6 @@ pub struct PackageMapItem {
     pub save_path: String, // Absolute base path without extension (e.g. /path/to/maps/warehouse)
     pub format: String,    // "ros_standard" | "png_only"
     pub region: ExportRegion,
-    pub layers: Vec<ExportLayer>,
 }
 
 #[derive(Debug, Serialize)]
@@ -165,6 +176,24 @@ fn backup_file_if_exists(path_str: &str, timestamp: &str, backed_up: &mut Vec<St
     Ok(())
 }
 
+/// レイヤー画像（base64、`data:` URL 可）をデコードする。デコードできないレイヤーは除外する。
+fn decode_layer_images(layers: &[ExportLayer]) -> Vec<(&ExportLayer, image::DynamicImage)> {
+    layers
+        .iter()
+        .filter_map(|layer| {
+            let b64 = layer.image_base64.as_ref()?;
+            let b64_data = if b64.starts_with("data:image") {
+                b64.split(',').nth(1).unwrap_or(b64)
+            } else {
+                b64
+            };
+            let bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
+            let img = image::load_from_memory(&bytes).ok()?;
+            Some((layer, img))
+        })
+        .collect()
+}
+
 pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportResultSummary, String> {
     let mut backed_up_files = Vec::new();
     let mut exported_count = 0;
@@ -181,14 +210,17 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
         floatify(&mut geo, &HashSet::from(["zone"]));
     }
 
+    let mut waypoints = options.waypoints;
+    if options.float_numbers {
+        waypoints.iter_mut().for_each(|wp| floatify_waypoint(wp, &integer_keys));
+    }
+    // テンプレートを使わない既定出力用。最初に必要になったときに 1 回だけ作る。
+    let mut plain_waypoints: Option<Vec<serde_json::Value>> = None;
+    // スクリーンショットのデコード結果。最初に添付するアイテムで 1 回だけデコードする（失敗時のエラーもそのアイテムで出す）。
+    let mut map_image_png: Option<Vec<u8>> = None;
+
     // 1. Waypoint アイテムのエクスポート処理
-    for mut wp_item in options.waypoint_items {
-        if options.float_numbers {
-            wp_item
-                .waypoints
-                .iter_mut()
-                .for_each(|wp| floatify_waypoint(wp, &integer_keys));
-        }
+    for wp_item in options.waypoint_items {
         let target_path = Path::new(&wp_item.path);
         if let Some(parent) = target_path.parent() {
             if !parent.exists() {
@@ -206,24 +238,25 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             templating::render(
                 wp_item.engine,
                 &tmpl,
-                &serde_json::json!({ "waypoints": wp_item.waypoints, "globals": globals, "geo": geo }),
+                &serde_json::json!({ "waypoints": waypoints, "globals": globals, "geo": geo }),
             )
             .map_err(|e| format!("Template render error for {}: {}", wp_item.path, e))?
-        } else if wp_item.path.to_lowercase().ends_with(".yaml") || wp_item.path.to_lowercase().ends_with(".yml") {
-            let plain_waypoints: Vec<serde_json::Value> = wp_item.waypoints.iter().map(strip_raw_options).collect();
-            serde_yaml::to_string(&plain_waypoints)
-                .map_err(|e| format!("YAML serialization error for {}: {}", wp_item.path, e))?
         } else {
-            let plain_waypoints: Vec<serde_json::Value> = wp_item.waypoints.iter().map(strip_raw_options).collect();
-            serde_json::to_string_pretty(&plain_waypoints)
-                .map_err(|e| format!("JSON serialization error for {}: {}", wp_item.path, e))?
+            let plain = plain_waypoints.get_or_insert_with(|| waypoints.iter().map(strip_raw_options).collect());
+            if wp_item.path.to_lowercase().ends_with(".yaml") || wp_item.path.to_lowercase().ends_with(".yml") {
+                serde_yaml::to_string(plain)
+                    .map_err(|e| format!("YAML serialization error for {}: {}", wp_item.path, e))?
+            } else {
+                serde_json::to_string_pretty(plain)
+                    .map_err(|e| format!("JSON serialization error for {}: {}", wp_item.path, e))?
+            }
         };
 
         fs::write(target_path, content).map_err(|e| format!("File write error for {}: {}", wp_item.path, e))?;
         exported_count += 1;
 
         // Image attachment
-        if let Some(b64) = wp_item.image_data_b64 {
+        if let (true, Some(b64)) = (wp_item.include_map_image, options.map_image_b64.as_ref()) {
             let png_path = target_path.with_extension("png");
             let png_path_str = png_path.to_string_lossy().to_string();
 
@@ -231,13 +264,27 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
                 backup_file_if_exists(&png_path_str, &options.session_timestamp, &mut backed_up_files)?;
             }
 
-            let decoded = general_purpose::STANDARD
-                .decode(b64)
-                .map_err(|e| format!("Base64 decode error for {}: {}", png_path_str, e))?;
+            if map_image_png.is_none() {
+                let decoded = general_purpose::STANDARD
+                    .decode(b64)
+                    .map_err(|e| format!("Base64 decode error for {}: {}", png_path_str, e))?;
+                map_image_png = Some(decoded);
+            }
+            let decoded = map_image_png.as_deref().unwrap_or_default();
             fs::write(&png_path, decoded).map_err(|e| format!("Image write error for {}: {}", png_path_str, e))?;
             exported_count += 1;
         }
     }
+
+    // マップアイテムが共有するレイヤー。z_index 順に並べ、画像はマップアイテムがあるときに 1 回だけデコードする。
+    // デコードできない画像のレイヤーは従来どおり黙って除外する。
+    let mut layers = options.layers;
+    layers.sort_by_key(|l| l.z_index);
+    let decoded_layers = if options.map_items.is_empty() {
+        Vec::new()
+    } else {
+        decode_layer_images(&layers)
+    };
 
     // 2. Map アイテムのエクスポート処理
     for map_item in options.map_items {
@@ -246,26 +293,6 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             if !parent.exists() {
                 fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
-            }
-        }
-
-        // Layer decoding and blending
-        let mut layers = map_item.layers;
-        layers.sort_by_key(|l| l.z_index);
-
-        let mut decoded_layers = Vec::new();
-        for layer in &layers {
-            if let Some(b64) = layer.image_base64.as_ref() {
-                let b64_data = if b64.starts_with("data:image") {
-                    b64.split(',').nth(1).unwrap_or(b64)
-                } else {
-                    b64
-                };
-                if let Ok(bytes) = general_purpose::STANDARD.decode(b64_data) {
-                    if let Ok(img) = image::load_from_memory(&bytes) {
-                        decoded_layers.push((layer, img));
-                    }
-                }
             }
         }
 
@@ -419,12 +446,14 @@ mod tests {
             geo: None,
             float_numbers: false,
             integer_keys: vec![],
+            waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
+            map_image_b64: None,
+            layers: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
-                waypoints: vec![serde_json::json!({ "id": "wp1", "x": 1.0, "y": 2.0 })],
                 template: None,
                 engine: TemplateEngine::Handlebars,
-                image_data_b64: None,
+                include_map_image: false,
             }],
             map_items: vec![],
             map_lists: vec![],
@@ -458,15 +487,17 @@ mod tests {
             geo: None,
             float_numbers: false,
             integer_keys: vec![],
+            waypoints: vec![serde_json::json!({ "id": "wp1" }), serde_json::json!({ "id": "wp2" })],
+            map_image_b64: None,
+            layers: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
-                waypoints: vec![serde_json::json!({ "id": "wp1" }), serde_json::json!({ "id": "wp2" })],
                 template: Some(
                     "speed={{globals.default_speed}}\n{{#each waypoints}}{{id}}:{{@root.globals.default_speed}}\n{{/each}}"
                         .to_string(),
                 ),
                 engine: TemplateEngine::Handlebars,
-                image_data_b64: None,
+                include_map_image: false,
             }],
             map_items: vec![],
             map_lists: vec![],
@@ -492,12 +523,14 @@ mod tests {
             geo: None,
             float_numbers: false,
             integer_keys: vec![],
+            waypoints: vec![serde_json::json!({ "id": "wp1", "options": {"speed": 1.5}, "raw_options": {} })],
+            map_image_b64: None,
+            layers: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
-                waypoints: vec![serde_json::json!({ "id": "wp1", "options": {"speed": 1.5}, "raw_options": {} })],
                 template: None,
                 engine: TemplateEngine::Handlebars,
-                image_data_b64: None,
+                include_map_image: false,
             }],
             map_items: vec![],
             map_lists: vec![],
@@ -523,21 +556,23 @@ mod tests {
             geo: None,
             float_numbers: false,
             integer_keys: vec![],
+            // options は既定値が補完された実効値、raw_options は明示的に入力された値だけを持つ、
+            // という2つの見え方の違いをテンプレートから確認する。
+            waypoints: vec![serde_json::json!({
+                "id": "wp1",
+                "options": {"through_tolerance": 3.0},
+                "raw_options": {}
+            })],
+            map_image_b64: None,
+            layers: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
-                // options は既定値が補完された実効値、raw_options は明示的に入力された値だけを持つ、
-                // という2つの見え方の違いをテンプレートから確認する。
-                waypoints: vec![serde_json::json!({
-                    "id": "wp1",
-                    "options": {"through_tolerance": 3.0},
-                    "raw_options": {}
-                })],
                 template: Some(
                     "{{#each waypoints}}{{id}}: options={{options.through_tolerance}} raw={{raw_options.through_tolerance}}\n{{/each}}"
                         .to_string(),
                 ),
                 engine: TemplateEngine::Handlebars,
-                image_data_b64: None,
+                include_map_image: false,
             }],
             map_items: vec![],
             map_lists: vec![],
@@ -564,20 +599,22 @@ mod tests {
             geo: None,
             float_numbers: false,
             integer_keys: vec![],
+            waypoints: vec![serde_json::json!({
+                "index": 0,
+                "x": 1.0, "y": 2.0, "z": 0.0,
+                "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0,
+                "options": {"is_through_point": false},
+                "raw_options": {
+                    "on_reached_actions": [
+                        {"type": "wait", "countdown_ms": 3000},
+                        {"type": "amcl_reset"}
+                    ]
+                }
+            })],
+            map_image_b64: None,
+            layers: vec![],
             waypoint_items: vec![PackageWaypointItem {
                 path: wp_path.to_string_lossy().to_string(),
-                waypoints: vec![serde_json::json!({
-                    "index": 0,
-                    "x": 1.0, "y": 2.0, "z": 0.0,
-                    "qx": 0.0, "qy": 0.0, "qz": 0.0, "qw": 1.0,
-                    "options": {"is_through_point": false},
-                    "raw_options": {
-                        "on_reached_actions": [
-                            {"type": "wait", "countdown_ms": 3000},
-                            {"type": "amcl_reset"}
-                        ]
-                    }
-                })],
                 template: Some(
                     concat!(
                         "waypoints:\n",
@@ -596,7 +633,7 @@ mod tests {
                     .to_string(),
                 ),
                 engine: TemplateEngine::Jinja,
-                image_data_b64: None,
+                include_map_image: false,
             }],
             map_items: vec![],
             map_lists: vec![],
@@ -617,16 +654,7 @@ mod tests {
     fn export_one(file_name: &str, template: Option<(&str, &str)>, extra: serde_json::Value) -> String {
         let tmp = TempDir::new().unwrap();
         let wp_path = tmp.path().join(file_name);
-        let mut item = serde_json::json!({
-            "path": wp_path.to_string_lossy(),
-            "waypoints": [{
-                "index": 0,
-                "x": 0, "y": 2, "z": 0, "yaw": 0,
-                "qx": 0, "qy": 0, "qz": 0, "qw": 1,
-                "options": {"countdown_ms": 3000, "speed": 1, "nested": {"countdown_ms": 10, "z": 5}},
-                "raw_options": {"speed": 1}
-            }],
-        });
+        let mut item = serde_json::json!({ "path": wp_path.to_string_lossy() });
         if let Some((engine, tmpl)) = template {
             item["engine"] = engine.into();
             item["template"] = tmpl.into();
@@ -636,6 +664,13 @@ mod tests {
             "conflict_resolution": "overwrite",
             "session_timestamp": "20260912_110000",
             "globals": {"tolerance": 1},
+            "waypoints": [{
+                "index": 0,
+                "x": 0, "y": 2, "z": 0, "yaw": 0,
+                "qx": 0, "qy": 0, "qz": 0, "qw": 1,
+                "options": {"countdown_ms": 3000, "speed": 1, "nested": {"countdown_ms": 10, "z": 5}},
+                "raw_options": {"speed": 1}
+            }],
             "waypoint_items": [item],
             "map_items": [],
         });
@@ -809,6 +844,110 @@ mod tests {
         );
         assert_eq!(result.backed_up_files.len(), 1);
         assert_eq!(fs::read_to_string(&result.backed_up_files[0]).unwrap(), "old\n");
+    }
+
+    /// 1 m 四方 (0.05 m/px で 20 px) を一色で塗ったレイヤーを、`data:` URL の PNG として作る。
+    fn solid_layer(id: &str, rgb: u8, z_index: i32) -> serde_json::Value {
+        let img = image::RgbaImage::from_pixel(20, 20, image::Rgba([rgb, rgb, rgb, 255]));
+        let mut png = Vec::new();
+        image::DynamicImage::ImageRgba8(img)
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        serde_json::json!({
+            "id": id,
+            "name": id,
+            "image_base64": format!("data:image/png;base64,{}", general_purpose::STANDARD.encode(&png)),
+            "info": { "resolution": 0.05, "origin": [0.0, 0.0, 0.0] },
+            "opacity": 1.0,
+            "blend_mode": "overwrite",
+            "z_index": z_index,
+        })
+    }
+
+    fn map_item(save_path: &Path, layer_visibility: serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "save_path": save_path.to_string_lossy(),
+            "format": "ros_standard",
+            "region": {
+                "name": "area",
+                "rect": { "x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0 },
+                "layerVisibility": layer_visibility,
+            },
+        })
+    }
+
+    fn run_export(dir: &Path, fields: serde_json::Value) -> ExportResultSummary {
+        let mut options = serde_json::json!({
+            "root_dir": dir.to_string_lossy(),
+            "conflict_resolution": "overwrite",
+            "session_timestamp": "20260912_110000",
+            "waypoint_items": [],
+            "map_items": [],
+        });
+        options
+            .as_object_mut()
+            .unwrap()
+            .extend(fields.as_object().unwrap().clone());
+        execute_export_package(serde_json::from_value(options).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn map_items_share_the_layers_and_each_draws_the_ones_its_region_shows() {
+        let tmp = TempDir::new().unwrap();
+        let (obstacles_only, both) = (tmp.path().join("obstacles_only"), tmp.path().join("both"));
+
+        run_export(
+            tmp.path(),
+            serde_json::json!({
+                // A free layer above an obstacle layer: the free one wins where it is drawn.
+                "layers": [solid_layer("free", 255, 1), solid_layer("walls", 0, 0)],
+                "map_items": [
+                    map_item(&obstacles_only, serde_json::json!({ "free": false })),
+                    map_item(&both, serde_json::json!({})),
+                ],
+            }),
+        );
+
+        let pixels_of = |base: &Path| image::open(base.with_extension("pgm")).unwrap().into_luma8().into_raw();
+        let obstacles_pixels = pixels_of(&obstacles_only);
+        let both_pixels = pixels_of(&both);
+        assert_eq!(obstacles_pixels.len(), 20 * 20);
+        assert!(
+            obstacles_pixels.iter().all(|&p| p == 0),
+            "hidden free layer must not be drawn"
+        );
+        assert!(
+            both_pixels.iter().all(|&p| p == 254),
+            "the upper free layer covers the walls"
+        );
+    }
+
+    #[test]
+    fn the_screenshot_is_attached_only_to_waypoint_items_that_ask_for_it() {
+        let tmp = TempDir::new().unwrap();
+        let screenshot = general_purpose::STANDARD.encode(b"png bytes");
+
+        let result = run_export(
+            tmp.path(),
+            serde_json::json!({
+                "waypoints": [{ "id": "wp1" }],
+                "map_image_b64": screenshot,
+                "waypoint_items": [
+                    { "path": tmp.path().join("a.yaml").to_string_lossy(), "include_map_image": true },
+                    { "path": tmp.path().join("b.json").to_string_lossy(), "include_map_image": false },
+                    { "path": tmp.path().join("c.yaml").to_string_lossy(), "include_map_image": true },
+                ],
+            }),
+        );
+
+        assert_eq!(result.exported_files_count, 5);
+        assert_eq!(fs::read(tmp.path().join("a.png")).unwrap(), b"png bytes");
+        assert_eq!(fs::read(tmp.path().join("c.png")).unwrap(), b"png bytes");
+        assert!(!tmp.path().join("b.png").exists());
+        // Every item writes the shared waypoints.
+        for file in ["a.yaml", "b.json", "c.yaml"] {
+            assert!(fs::read_to_string(tmp.path().join(file)).unwrap().contains("wp1"));
+        }
     }
 
     #[test]

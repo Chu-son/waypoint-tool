@@ -25,6 +25,24 @@ describe('ShortcutManager', () => {
     expect(getAppState().nodes['node-1']).toBeUndefined();
   });
 
+  it('acts on the selection made after it started listening', () => {
+    renderShortcuts(twoWaypoints());
+    act(() => getAppState().selectNodes(['node-2']));
+
+    press('Delete');
+
+    expect(getAppState().rootNodeIds).toEqual(['node-1']);
+  });
+
+  it('M toggles the measure tool on and off', () => {
+    renderShortcuts();
+
+    press('m');
+    expect(getAppState().activeTool).toBe('measure');
+    press('m');
+    expect(getAppState().activeTool).toBe('select');
+  });
+
   it('Ctrl+A selects every waypoint', () => {
     renderShortcuts(twoWaypoints());
 
@@ -133,6 +151,47 @@ describe('ShortcutManager', () => {
 
     expect(getAppState().rootNodeIds).toEqual(['node-1', 'node-2']);
     input.remove();
+  });
+
+  it('keeps the dialog that started a blocking task open when Escape is pressed during it', () => {
+    renderShortcuts({ modalStack: ['export'], isExportModalOpen: true });
+    let taskId = '';
+    act(() => {
+      taskId = getAppState().startLoading({ message: 'エクスポートを実行中...', blocking: true });
+    });
+
+    press('Escape');
+    expect(getAppState().isExportModalOpen).toBe(true);
+
+    act(() => getAppState().stopLoading(taskId));
+    press('Escape');
+    expect(getAppState().isExportModalOpen).toBe(false);
+  });
+
+  it('ignores shortcuts while a blocking task is running, and acts again once it ends', () => {
+    renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
+    let taskId = '';
+    act(() => {
+      taskId = getAppState().startLoading({ message: 'エクスポートを実行中...', blocking: true });
+    });
+
+    press('Delete');
+    expect(getAppState().rootNodeIds).toEqual(['node-1', 'node-2']);
+
+    act(() => getAppState().stopLoading(taskId));
+    press('Delete');
+    expect(getAppState().rootNodeIds).toEqual(['node-2']);
+  });
+
+  it('keeps shortcuts working while a non-blocking task runs in the background', () => {
+    renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
+    act(() => {
+      getAppState().startLoading({ message: '経路を計算中...', blocking: false });
+    });
+
+    press('Delete');
+
+    expect(getAppState().rootNodeIds).toEqual(['node-2']);
   });
 
   it('ignores shortcuts other than Escape while a modal is open', () => {

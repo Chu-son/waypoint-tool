@@ -631,12 +631,13 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
 
         // アノテーションのトップレベルIDの抽出
         const topLevelIds: string[] = [];
+        const selectedSet = new Set(state.selectedAnnotationIds);
         state.selectedAnnotationIds.forEach((id) => {
           let isChildOfSelected = false;
           let curr = id;
           while (curr) {
             const parentId = state.annotationObjects[curr]?.group_id || state.annotationGroups[curr]?.parent_id;
-            if (parentId && state.selectedAnnotationIds.includes(parentId)) {
+            if (parentId && selectedSet.has(parentId)) {
               isChildOfSelected = true;
               break;
             }

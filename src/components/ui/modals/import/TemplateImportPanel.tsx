@@ -66,6 +66,17 @@ export function TemplateImportPanel({ onClose }: ImportPanelProps) {
   };
 
   const isIdentical = item?.status === 'unchanged';
+  // 名前やスコープの入力のたびに差分を作り直さない
+  const templateDiff = useMemo(
+    () =>
+      data && match && !isIdentical
+        ? {
+            properties: diffLines(templatePropertiesText(match), templatePropertiesText(data)),
+            content: diffLines(match.content, data.content),
+          }
+        : null,
+    [data, match, isIdentical],
+  );
 
   return (
     <>
@@ -96,15 +107,12 @@ export function TemplateImportPanel({ onClose }: ImportPanelProps) {
               </AlertBox>
             )}
 
-            {match && !isIdentical && (
+            {templateDiff && (
               <div className="space-y-3">
                 <FieldLabel>Properties</FieldLabel>
-                <TextDiffView
-                  lines={diffLines(templatePropertiesText(match), templatePropertiesText(data))}
-                  aria-label="Property changes"
-                />
+                <TextDiffView lines={templateDiff.properties} aria-label="Property changes" />
                 <FieldLabel>Content</FieldLabel>
-                <TextDiffView lines={diffLines(match.content, data.content)} aria-label="Content changes" />
+                <TextDiffView lines={templateDiff.content} aria-label="Content changes" />
               </div>
             )}
 

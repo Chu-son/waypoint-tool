@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, type SyntheticEvent } from 'react';
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, type SyntheticEvent } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
 import { v4 as uuidv4 } from 'uuid';
@@ -25,45 +25,56 @@ import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
 import { confirmAction, notify } from '../../../services/notify';
+import { captureCanvasPng } from '../../canvas/canvasCapture';
 
-interface UseExportPlanOptions {
-  isOpen: boolean;
-  onClose: () => void;
+/** What the dialog keeps while it is closed; it lives in the component that stays mounted. */
+export interface ExportSession {
+  /** The item selected last time, selected again when the dialog reopens. */
+  selectedItemId: string | null;
+  setSelectedItemId: (id: string | null) => void;
+  /** The date and time in output file names and backups; fixed when the app starts. */
+  sessionDate: Date;
 }
 
-/** State and actions behind the export dialog: profile/item editing, file preview, conflict check and execution. */
-export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
+interface UseExportPlanOptions {
+  onClose: () => void;
+  session: ExportSession;
+}
+
+/**
+ * State and actions behind the open export dialog: profile/item editing, file preview, conflict
+ * check and execution. Used only while the dialog is open.
+ */
+export function useExportPlan({ onClose, session }: UseExportPlanOptions) {
   const rawExportProfiles = useAppStore((state) => state.exportProfiles);
   const storeProfiles =
     Array.isArray(rawExportProfiles) && rawExportProfiles.length > 0 ? rawExportProfiles : DEFAULT_EXPORT_PROFILES;
   const storeActiveProfileId = useAppStore((state) => state.activeExportProfileId) || DEFAULT_ACTIVE_EXPORT_PROFILE_ID;
   const replaceExportProfiles = useAppStore((state) => state.replaceExportProfiles);
 
-  // Edits are kept in a draft and only reach the store on save; cancelling discards them.
-  const [draft, setDraft] = useState<{ profiles: ExportProfile[]; activeId: string } | null>(null);
-  useEffect(() => {
-    setDraft(isOpen ? { profiles: storeProfiles, activeId: storeActiveProfileId } : null);
-    // Re-seed only when the dialog is opened or closed, not on every store change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-  const exportProfiles = draft?.profiles ?? storeProfiles;
-  const activeExportProfileId = draft?.activeId ?? storeActiveProfileId;
+  // Edits are kept in a draft, seeded when the dialog opens, and only reach the store on save;
+  // cancelling discards them.
+  const [draft, setDraft] = useState<{ profiles: ExportProfile[]; activeId: string }>(() => ({
+    profiles: storeProfiles,
+    activeId: storeActiveProfileId,
+  }));
+  const exportProfiles = draft.profiles;
+  const activeExportProfileId = draft.activeId;
 
   const updateExportProfile = (id: string, updates: Partial<ExportProfile>) =>
-    setDraft((d) => d && { ...d, profiles: d.profiles.map((p) => (p.id === id ? { ...p, ...updates } : p)) });
-  const setActiveExportProfileId = (id: string) => setDraft((d) => d && { ...d, activeId: id });
+    setDraft((d) => ({ ...d, profiles: d.profiles.map((p) => (p.id === id ? { ...p, ...updates } : p)) }));
+  const setActiveExportProfileId = (id: string) => setDraft((d) => ({ ...d, activeId: id }));
   const addExportProfile = (profile: ExportProfile) =>
-    setDraft((d) => d && { profiles: [...d.profiles, profile], activeId: profile.id });
+    setDraft((d) => ({ profiles: [...d.profiles, profile], activeId: profile.id }));
   const removeExportProfile = (id: string) =>
     setDraft((d) => {
-      if (!d) return d;
       const profiles = d.profiles.filter((p) => p.id !== id);
       return { profiles, activeId: d.activeId === id ? (profiles[0]?.id ?? d.activeId) : d.activeId };
     });
   const duplicateExportProfile = (id: string) =>
     setDraft((d) => {
-      const source = d?.profiles.find((p) => p.id === id);
-      if (!d || !source) return d;
+      const source = d.profiles.find((p) => p.id === id);
+      if (!source) return d;
       const copy: ExportProfile = {
         ...source,
         id: uuidv4(),
@@ -105,9 +116,8 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
   }, [exportProfiles, activeExportProfileId]);
 
   // Local state for UI
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const { selectedItemId, setSelectedItemId, sessionDate } = session;
   const [conflictFiles, setConflictFiles] = useState<Set<string>>(new Set());
-  const [sessionDate] = useState<Date>(() => new Date());
 
   // Derive project name from project path
   const projectName = useMemo(() => {
@@ -171,11 +181,13 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
 
   // Check conflicts with debounce
   useEffect(() => {
-    if (!isOpen || resolvedFiles.length === 0 || !rootDir) {
+    if (resolvedFiles.length === 0 || !rootDir) {
       setConflictFiles(new Set());
       return;
     }
 
+    // The check runs off the main thread, so an older answer can arrive after a newer one.
+    let stale = false;
     const timer = setTimeout(async () => {
       try {
         // A list that is appended to is not replaced, so an existing one is no conflict.
@@ -184,21 +196,25 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
           ...mapLists.filter((l) => !l.append).map((l) => l.file.fullPath),
         ];
         const existing = await BackendAPI.checkExportConflicts(fullPaths);
-        setConflictFiles(new Set(existing));
+        if (!stale) setConflictFiles(new Set(existing));
       } catch (err) {
         console.error('Failed to check export conflicts:', err);
       }
     }, 300);
 
-    return () => clearTimeout(timer);
-  }, [isOpen, resolvedFiles, mapLists, rootDir]);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [resolvedFiles, mapLists, rootDir]);
 
-  // Select first item if none selected
-  useEffect(() => {
+  // Select first item if none selected. A layout effect, so the dialog is never painted without a
+  // selection when it opens.
+  useLayoutEffect(() => {
     if (activeProfile.items.length > 0 && !selectedItemId) {
       setSelectedItemId(activeProfile.items[0].id);
     }
-  }, [activeProfile.items, selectedItemId]);
+  }, [activeProfile.items, selectedItemId, setSelectedItemId]);
 
   // Profile actions
   const handleAddProfile = () => {
@@ -403,10 +419,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             await showStep('マップ画像を取得中...');
             useAppStore.getState().triggerFitToMaps();
             await new Promise((r) => setTimeout(r, 800));
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-              imageDataB64 = canvas.toDataURL('image/png').split(',')[1];
-            }
+            imageDataB64 = captureCanvasPng()?.split(',')[1];
           }
 
           // 3. Resolve the package items (waypoint files and map regions)
@@ -435,9 +448,6 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             regions: exportRegions,
             visibilitySets: layerVisibilitySets,
             layerStack: useAppStore.getState(),
-            waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
-            mapLayers: preparedLayers,
-            mapImageB64: imageDataB64,
           });
 
           // 4. Invoke Backend API
@@ -450,6 +460,9 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             geo: extractGeoForExport(geoMap),
             float_numbers: exportIntegersAsFloat,
             integer_keys: collectIntegerOptionKeys(optionsSchema),
+            waypoints: extractWaypointsForExport(rootNodeIds, nodes, optionsSchema, indexStartIndex),
+            map_image_b64: imageDataB64,
+            layers: preparedLayers,
             waypoint_items: waypointItems,
             map_items: mapItems,
             map_lists: mapLists.map((l) => ({ path: l.file.fullPath, entries: l.entries, append: l.append })),

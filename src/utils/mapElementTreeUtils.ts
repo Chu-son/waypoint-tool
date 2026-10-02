@@ -13,29 +13,25 @@ export function filterTopLevelIds(
 
   const selectedSet = new Set(selectedIds);
   const topLevelIds: string[] = [];
+  const topLevelSet = new Set<string>();
+  // 採用済みの最上位要素の子孫
+  const coveredIds = new Set<string>();
+  const addTopLevel = (id: string) => {
+    topLevelIds.push(id);
+    topLevelSet.add(id);
+    for (const descendantId of getDescendantIds(id)) coveredIds.add(descendantId);
+  };
 
   flatOrderedIds.forEach((id) => {
-    if (selectedSet.has(id)) {
-      const isDescendantOfTopLevel = topLevelIds.some((pId) => {
-        const descendants = getDescendantIds(pId);
-        return descendants.includes(id);
-      });
-      if (!isDescendantOfTopLevel) {
-        topLevelIds.push(id);
-      }
+    if (selectedSet.has(id) && !coveredIds.has(id)) {
+      addTopLevel(id);
     }
   });
 
   // flatOrderedIds に含まれていなかった選択IDがある場合のフォールバック
   selectedIds.forEach((id) => {
-    if (!topLevelIds.includes(id)) {
-      const isDescendantOfTopLevel = topLevelIds.some((pId) => {
-        const descendants = getDescendantIds(pId);
-        return descendants.includes(id);
-      });
-      if (!isDescendantOfTopLevel) {
-        topLevelIds.push(id);
-      }
+    if (!topLevelSet.has(id) && !coveredIds.has(id)) {
+      addTopLevel(id);
     }
   });
 

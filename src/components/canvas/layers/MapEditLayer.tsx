@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { FederatedPointerEvent } from 'pixi.js';
 import { ManualCustomLayer, EditObject } from '../../../types/store';
 import { CanvasHandle } from '../common/CanvasHandle';
@@ -365,7 +366,7 @@ interface ToolOverlayProps {
 /**
  * Renders transient creation previews and brush cursor overlay.
  */
-export function MapEditToolOverlay({
+export const MapEditToolOverlay = memo(function MapEditToolOverlay({
   scale,
   previewObject,
   brushPreviewPos,
@@ -398,4 +399,4 @@ export function MapEditToolOverlay({
       )}
     </>
   );
-}
+});

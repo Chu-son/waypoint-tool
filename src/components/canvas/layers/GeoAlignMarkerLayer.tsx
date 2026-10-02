@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { CANVAS_GEO_ANCHOR_COLOR } from '../canvasConstants';
@@ -7,7 +7,7 @@ import { CANVAS_GEO_ANCHOR_COLOR } from '../canvasConstants';
  * 背景地図の位置合わせ中に、地図の原点（緯度経度/UTM で指定した地点）がワールド上で置かれている位置と、
  * その地図の東方向（回転の向き）を示す。回転はこの点を軸に行う。
  */
-export function GeoAlignMarkerLayer({ scale }: { scale: number }) {
+export const GeoAlignMarkerLayer = memo(function GeoAlignMarkerLayer({ scale }: { scale: number }) {
   const active = useAppStore((state) => state.appMode.mode === 'geo_map_align' && state.geoMap.enabled);
   const alignment = useAppStore((state) => state.geoMap.alignment);
 
@@ -39,4 +39,4 @@ export function GeoAlignMarkerLayer({ scale }: { scale: number }) {
 
   if (!active) return null;
   return <pixiGraphics x={alignment.dx} y={alignment.dy} draw={draw} />;
-}
+});

@@ -30,6 +30,7 @@ import {
   determineMultiDepthDropTarget,
   getAncestorIds,
   getHighlightedContainerIds,
+  buildParentIndex,
 } from '../../../utils/treeUtils';
 import { useTreeItemSelection } from '../../../hooks/useTreeItemSelection';
 import { useTreeInteractionState } from '../../../hooks/useTreeInteractionState';
@@ -112,15 +113,17 @@ export function WaypointTree() {
     return getNodesAfterInsertionTarget(rootNodeIds, nodes, insertionTarget);
   }, [rootNodeIds, nodes, insertionTarget]);
 
+  const parentIndex = useMemo(() => buildParentIndex(rootNodeIds, nodes), [rootNodeIds, nodes]);
   const getWaypointParentId = React.useCallback(
-    (id: string) => findNodeParentId(id, rootNodeIds, nodes),
-    [rootNodeIds, nodes],
+    (id: string) => findNodeParentId(id, rootNodeIds, nodes, parentIndex),
+    [rootNodeIds, nodes, parentIndex],
   );
 
   const highlightedContainerIds = useMemo(
     () => getHighlightedContainerIds(selectedNodeIds, getWaypointParentId),
     [selectedNodeIds, getWaypointParentId],
   );
+  const selectedIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
 
   const { flashingId } = useTreeReveal({
     treeType: 'node',
@@ -187,7 +190,7 @@ export function WaypointTree() {
       const parentDepth =
         parentVisibleIdx !== -1
           ? visibleNodes[parentVisibleIdx].depth
-          : getNodeDepth(insertionTarget.parentId, rootNodeIds, nodes);
+          : getNodeDepth(insertionTarget.parentId, rootNodeIds, nodes, parentIndex);
       insertBarDepth = parentDepth + 1;
 
       let found = false;
@@ -223,7 +226,7 @@ export function WaypointTree() {
             found = true;
             break;
           }
-          ancestorId = findNodeParentId(ancestorId, rootNodeIds, nodes);
+          ancestorId = findNodeParentId(ancestorId, rootNodeIds, nodes, parentIndex);
         }
       }
     }
@@ -250,7 +253,7 @@ export function WaypointTree() {
     }
 
     return result;
-  }, [visibleNodes, insertionTarget, rootNodeIds, nodes]);
+  }, [visibleNodes, insertionTarget, rootNodeIds, nodes, parentIndex]);
 
   const visibleIds = useMemo(() => displayItems.map((n) => n.id), [displayItems]);
   const selectableIds = useMemo(() => displayItems.filter((n) => !n.isInsertionBar).map((n) => n.id), [displayItems]);
@@ -405,7 +408,7 @@ export function WaypointTree() {
                 const node = item.node;
                 if (!node) return null;
 
-                const isSelected = selectedNodeIds.includes(item.id);
+                const isSelected = selectedIdSet.has(item.id);
                 const hasSelectedChild = !isSelected && highlightedContainerIds.has(item.id);
                 const isFlashing = flashingId === item.id;
                 const isAnchor = anchorNodeId === item.id;

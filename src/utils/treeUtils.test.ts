@@ -20,6 +20,9 @@ import {
   getAncestorIds,
   getHighlightedContainerIds,
   getAnnotationParentId,
+  buildParentIndex,
+  collectTopLevelInOrder,
+  excludeDescendantsOfOthers,
 } from './treeUtils';
 import { WaypointNode, AnnotationGroup, AnnotationObject } from '../types/store';
 
@@ -83,6 +86,67 @@ describe('treeUtils', () => {
     const res3 = findHighestLevelParent(['wp-5', 'wp-3'], rootIds, nodes);
     expect(res3.parentId).toBeNull();
     expect(res3.insertIndex).toBe(2);
+  });
+
+  describe('buildParentIndex', () => {
+    // 壊れたツリー: 'shared' が 2 つの親に、ルートの 'r' が別の親にも含まれ、'x' と 'y' は循環している
+    const broken: Record<string, { children_ids?: string[] }> = {
+      a: { children_ids: ['shared', 'r'] },
+      b: { children_ids: ['shared', 'b-child'] },
+      x: { children_ids: ['y'] },
+      y: { children_ids: ['x'] },
+      r: {},
+    };
+    const brokenRoots = ['r', 'a', 'b'];
+    const allIds = ['r', 'a', 'b', 'shared', 'b-child', 'x', 'y', 'missing'];
+
+    it('looks up the same parent as the linear search, on well-formed and broken trees', () => {
+      for (const [roots, tree, ids] of [
+        [rootIds, nodes, [...Object.keys(nodes), 'missing']],
+        [brokenRoots, broken, allIds],
+      ] as const) {
+        const index = buildParentIndex([...roots], tree);
+        for (const id of ids) {
+          expect(findNodeParentId(id, [...roots], tree, index)).toBe(findNodeParentId(id, [...roots], tree));
+          expect(getNodeDepth(id, [...roots], tree, index)).toBe(getNodeDepth(id, [...roots], tree));
+        }
+      }
+    });
+
+    it('resolves a child listed under two parents to the first one, as the linear search does', () => {
+      expect(findHighestLevelParent(['shared', 'b-child'], brokenRoots, broken)).toEqual({
+        parentId: 'a',
+        insertIndex: 0,
+      });
+    });
+  });
+
+  describe('collectTopLevelInOrder', () => {
+    it('keeps selected ids in tree order and drops those under an already kept ancestor', () => {
+      const flat = getFlattenedNodeIds(rootIds, nodes);
+      expect(collectTopLevelInOrder(flat, new Set(['wp-3', 'wp-5', 'group-1', 'wp-1']), nodes)).toEqual([
+        'wp-1',
+        'group-1',
+        'wp-5',
+      ]);
+      expect(collectTopLevelInOrder(flat, new Set(['wp-4', 'wp-2']), nodes)).toEqual(['wp-2', 'wp-4']);
+    });
+  });
+
+  describe('excludeDescendantsOfOthers', () => {
+    it('keeps the given order, drops descendants of other given ids and duplicates', () => {
+      expect(excludeDescendantsOfOthers(['wp-3', 'wp-5', 'group-1', 'wp-5', 'wp-1'], nodes)).toEqual([
+        'wp-5',
+        'group-1',
+        'wp-1',
+      ]);
+    });
+
+    it('does not drop an id only because a cycle makes it its own descendant', () => {
+      const cyclic = { a: { children_ids: ['b'] }, b: { children_ids: ['a'] }, c: {} };
+      expect(excludeDescendantsOfOthers(['a', 'c'], cyclic)).toEqual(['a', 'c']);
+      expect(excludeDescendantsOfOthers(['a', 'b'], cyclic)).toEqual([]);
+    });
   });
 
   describe('computeRangeSelection', () => {

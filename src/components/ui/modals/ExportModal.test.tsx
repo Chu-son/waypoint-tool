@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExportModal } from './ExportModal';
 import { LoadingOverlay } from '../common/LoadingOverlay';
@@ -6,6 +6,7 @@ import { BackendAPI, DialogAPI } from '../../../api';
 import { resetAppStore } from '../../../test/store';
 import { useAppStore } from '../../../stores/appStore';
 import { layerStackState, makeMap } from '../../../test/fixtures';
+import { registerCanvasCapture } from '../../canvas/canvasCapture';
 import type { ExportMapList, LayerVisibilitySet } from '../../../types/store';
 
 describe('ExportModal UI', () => {
@@ -137,10 +138,13 @@ describe('ExportModal UI', () => {
       geo: expect.objectContaining({ lat: expect.any(Number), lon: expect.any(Number) }),
       float_numbers: true,
       integer_keys: [],
+      waypoints: [expect.objectContaining({ id: 'wp1', x: 1, y: 2 })],
+      map_image_b64: undefined,
+      layers: [],
       waypoint_items: [
         expect.objectContaining({
           path: expect.stringMatching(/^\/mock\/export\/dir\/waypoints\/\d{8}_waypoints\.yaml$/),
-          waypoints: [expect.objectContaining({ id: 'wp1', x: 1, y: 2 })],
+          include_map_image: false,
         }),
       ],
       map_items: [
@@ -152,6 +156,30 @@ describe('ExportModal UI', () => {
       map_lists: [],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
+  });
+
+  it('attaches the map canvas to a waypoint item that asks for the map image', async () => {
+    const [profile] = useAppStore.getState().exportProfiles;
+    useAppStore.setState({
+      exportProfiles: [{ ...profile, items: [{ ...profile.items[0], includeMapImage: true }] }],
+    });
+    const unregister = registerCanvasCapture(() => 'data:image/png;base64,Q0FOVkFT');
+    try {
+      const onClose = vi.fn();
+      render(<ExportModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 3000 });
+      expect(BackendAPI.executeExportPackage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          map_image_b64: 'Q0FOVkFT',
+          waypoint_items: [expect.objectContaining({ include_map_image: true })],
+        }),
+      );
+    } finally {
+      unregister();
+    }
   });
 
   it('passes the aligned map origin to templates as geo, even when the background map is hidden', async () => {
@@ -305,13 +333,13 @@ describe('ExportModal UI', () => {
       const onClose = await exportNow();
 
       await waitFor(() => expect(onClose).toHaveBeenCalled());
-      const { map_items } = vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0];
+      const { map_items, layers } = vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0];
       expect(map_items.map((m) => [m.save_path, m.region.layerVisibility])).toEqual([
         ['/mock/export/dir/Map/area_1_Localization', { base: true, obstacles: false }],
         ['/mock/export/dir/Map/area_1_Navigation', { base: true, obstacles: true }],
       ]);
       // Layers hidden on the canvas are still handed over for the items whose set shows them.
-      expect(map_items[1].layers.map((l) => l.id).sort()).toEqual(['base', 'obstacles']);
+      expect(layers.map((l) => l.id).sort()).toEqual(['base', 'obstacles']);
     });
 
     it('draws the layers shown on the canvas for an item that names no set', async () => {
@@ -480,6 +508,26 @@ describe('ExportModal UI', () => {
       expect(await screen.findByText(/1 件の同名ファイルが存在/)).toBeInTheDocument();
     });
 
+    it('shows the conflicts of the current paths even when an older check answers last', async () => {
+      let answerFirstCheck: () => void = () => {};
+      vi.mocked(BackendAPI.checkExportConflicts).mockImplementationOnce(
+        (files) =>
+          new Promise((resolve) => {
+            answerFirstCheck = () => resolve(files); // every file of the old paths "exists"
+          }),
+      );
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+      await waitFor(() => expect(BackendAPI.checkExportConflicts).toHaveBeenCalledTimes(1));
+
+      fireEvent.change(screen.getByDisplayValue('waypoints/{{yyyymmdd}}_waypoints.yaml'), {
+        target: { value: 'renamed/{{yyyymmdd}}_waypoints.yaml' },
+      });
+      await waitFor(() => expect(BackendAPI.checkExportConflicts).toHaveBeenCalledTimes(2));
+      await act(async () => answerFirstCheck());
+
+      expect(screen.queryByText(/件の同名ファイルが存在/)).not.toBeInTheDocument();
+    });
+
     it('lets a map item turn the list on, rename it and choose how an existing one is treated, and keeps it once saved', () => {
       setUp([mapItem('m1', 'Map/{{name}}.pgm')]);
       render(<ExportModal isOpen={true} onClose={vi.fn()} />);
@@ -501,6 +549,51 @@ describe('ExportModal UI', () => {
       render(<ExportModal isOpen={true} onClose={vi.fn()} />);
 
       expect(screen.queryByRole('checkbox', { name: 'マップ一覧ファイルを出力' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('reopening', () => {
+    const exportOnce = async (onClose: () => void) => {
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+    };
+
+    it('shows the item that was selected when the dialog was closed', () => {
+      const onClose = vi.fn();
+      const { rerender } = render(<ExportModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByDisplayValue('waypoints/{{yyyymmdd}}_waypoints.yaml')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('area_1.pgm'));
+      expect(screen.getByDisplayValue('Map/{{name}}.pgm')).toBeInTheDocument();
+
+      rerender(<ExportModal isOpen={false} onClose={onClose} />);
+      rerender(<ExportModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByDisplayValue('Map/{{name}}.pgm')).toBeInTheDocument();
+    });
+
+    it('keeps the date in file names from the first opening, however much later it reopens', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date(2026, 0, 2, 3, 4, 5));
+        const onClose = vi.fn();
+        const { rerender } = render(<ExportModal isOpen={true} onClose={onClose} />);
+        await exportOnce(onClose);
+        rerender(<ExportModal isOpen={false} onClose={onClose} />);
+
+        vi.setSystemTime(new Date(2026, 0, 3, 9, 0, 0));
+        onClose.mockClear();
+        rerender(<ExportModal isOpen={true} onClose={onClose} />);
+        await exportOnce(onClose);
+
+        const calls = vi.mocked(BackendAPI.executeExportPackage).mock.calls.map(([options]) => options);
+        expect(calls.map((o) => o.session_timestamp)).toEqual(['20260102_030405', '20260102_030405']);
+        expect(calls.map((o) => o.waypoint_items[0].path)).toEqual([
+          '/mock/export/dir/waypoints/20260102_waypoints.yaml',
+          '/mock/export/dir/waypoints/20260102_waypoints.yaml',
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

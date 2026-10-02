@@ -1,4 +1,5 @@
-import { useExportPlan } from './useExportPlan';
+import { useState } from 'react';
+import { useExportPlan, type ExportSession } from './useExportPlan';
 import {
   Save,
   FolderOpen,
@@ -27,7 +28,19 @@ interface ExportModalProps {
   onClose: () => void;
 }
 
+/**
+ * Stays mounted while closed so it only holds what the dialog keeps between openings; the content,
+ * which follows the project and builds the file preview, is mounted only while open.
+ */
 export function ExportModal({ isOpen, onClose }: ExportModalProps) {
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [sessionDate] = useState(() => new Date());
+
+  if (!isOpen) return null;
+  return <ExportModalContent onClose={onClose} session={{ selectedItemId, setSelectedItemId, sessionDate }} />;
+}
+
+function ExportModalContent({ onClose, session }: { onClose: () => void; session: ExportSession }) {
   const {
     activeProfile,
     defaultExportFormats,
@@ -56,12 +69,10 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     setSelectedItemId,
     treeNodes,
     updateExportProfile,
-  } = useExportPlan({ isOpen, onClose });
-
-  if (!isOpen) return null;
+  } = useExportPlan({ onClose, session });
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="3xl" className="h-[85vh]">
+    <Modal isOpen onClose={onClose} size="3xl" className="h-[85vh]">
       <ModalHeader
         onClose={onClose}
         icon={<Save size={20} className="text-primary-base" />}

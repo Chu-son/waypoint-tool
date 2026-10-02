@@ -100,6 +100,7 @@ export function AnnotationTree() {
     () => getHighlightedContainerIds(selectedAnnotationIds, getAnnotParentId),
     [selectedAnnotationIds, getAnnotParentId],
   );
+  const selectedIdSet = useMemo(() => new Set(selectedAnnotationIds), [selectedAnnotationIds]);
 
   const { flashingId } = useTreeReveal({
     treeType: 'annotation',
@@ -239,7 +240,7 @@ export function AnnotationTree() {
                   if (!group && !obj) return null;
 
                   const isGroup = !!group;
-                  const isSelected = selectedAnnotationIds.includes(id);
+                  const isSelected = selectedIdSet.has(id);
                   const hasSelectedChild = !isSelected && highlightedContainerIds.has(id);
                   const isFlashing = flashingId === id;
                   const isExpanded = expandedGroups.has(id);

@@ -5,6 +5,7 @@ import { renderWithStore } from '../../../test/render';
 import { DEFAULT_GEO_MAP } from '../../../stores/migrations/geoMapNormalization';
 import type { GeoMapSettings } from '../../../types/geo';
 import { latLonToTileXY } from '../../../utils/geo/webMercator';
+import { createViewportStore } from '../utils/viewportStore';
 import { GeoTileLayer } from './GeoTileLayer';
 
 vi.mock('@pixi/react', () => import('../../../test/mocks/pixi').then((m) => m.pixiReactMock));
@@ -25,15 +26,20 @@ class InstantImage {
   }
 }
 
-/** 描画して、要求されたタイル URL がすべて出そろうまで待つ。 */
-async function renderLayer(settings: GeoMapSettings, scale = 1) {
+const settle = () => new Promise((r) => setTimeout(r, 20));
+
+/** 描画して、要求されたタイル URL が出そろうまで待つ。`requested()` はその時点までに要求された URL。 */
+async function mountLayer(settings: GeoMapSettings, scale = 1) {
   const fetchTile = vi.spyOn(BackendAPI, 'fetchMapTile').mockResolvedValue(PIXEL_PNG);
+  const viewport = createViewportStore({ scale, position: { x: 0, y: 0 } });
   await act(async () => {
-    renderWithStore(<GeoTileLayer scale={scale} position={{ x: 0, y: 0 }} />, { geoMap: settings });
-    await new Promise((r) => setTimeout(r, 20));
+    renderWithStore(<GeoTileLayer viewport={viewport} />, { geoMap: settings });
+    await settle();
   });
-  return fetchTile.mock.calls.map(([url]) => url);
+  return { viewport, requested: () => fetchTile.mock.calls.map(([url]) => url) };
 }
+
+const renderLayer = async (settings: GeoMapSettings, scale = 1) => (await mountLayer(settings, scale)).requested();
 
 const parseTile = (url: string) => {
   const [, z, x, y] = /\/(\d+)\/(\d+)\/(\d+)\.(?:png|jpg)$/.exec(url) ?? [];
@@ -88,6 +94,30 @@ describe('GeoTileLayer', () => {
     vi.restoreAllMocks();
     const near = (await renderLayer(geoMap({ enabled: true, origin: { ...origin, lat: 43.07 } }), 8)).map(parseTile);
     expect(near[0].z).toBeGreaterThan(far[0].z);
+  });
+
+  it('requests the tiles of the area a pan brings into view', async () => {
+    const { viewport, requested } = await mountLayer(
+      geoMap({ enabled: true, origin: { kind: 'latlon', lat: 37.39, lon: 140.39 } }),
+      4,
+    );
+    const before = requested();
+    const z = parseTile(before[0]).z;
+    const eastmost = (urls: string[]) =>
+      Math.max(
+        ...urls
+          .map(parseTile)
+          .filter((t) => t.z === z)
+          .map((t) => t.x),
+      );
+
+    // 地図を左へ 3000px ずらすと、東側が見えてくる
+    await act(async () => {
+      viewport.set({ scale: 4, position: { x: -3000, y: 0 } });
+      await settle();
+    });
+
+    expect(eastmost(requested())).toBeGreaterThan(eastmost(before));
   });
 
   it('does not request anything from an unusable custom tile URL', async () => {

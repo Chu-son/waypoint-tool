@@ -4,7 +4,12 @@ import type { AppState } from '../appStore';
 import { AnnotationObject, AnnotationGroup } from '../../types/store';
 import type { AnnotationToolType } from '../../types/ui';
 import { v4 as uuidv4 } from 'uuid';
-import { findHighestLevelParent, collectDescendantIds, getNextSequentialName } from '../../utils/treeUtils';
+import {
+  findHighestLevelParent,
+  collectDescendantIds,
+  excludeDescendantsOfOthers,
+  getNextSequentialName,
+} from '../../utils/treeUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { AnnotationClipboardPayload } from '../../utils/mapElementClipboard';
@@ -228,18 +233,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       const groupName = getNextSequentialName('Group', existingNames);
 
       // 3. 親が選択されている場合の子孫重複排除
-      const directMovingIds: string[] = [];
-
-      selectedIds.forEach((id) => {
-        const isDescendantOfSelected = selectedIds.some((pId) => {
-          if (pId === id) return false;
-          const descendants = collectDescendantIds(pId, groupMap);
-          return descendants.includes(id);
-        });
-        if (!isDescendantOfSelected && !directMovingIds.includes(id)) {
-          directMovingIds.push(id);
-        }
-      });
+      const directMovingIds = excludeDescendantsOfOthers(selectedIds, groupMap);
 
       if (directMovingIds.length === 0) return state;
 
@@ -405,19 +399,8 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         }
       }
 
-      const directMovingIds: string[] = [];
-
-      // 親が選択されている場合の子孫重複排除
-      movingIds.forEach((id) => {
-        const isDescendant = movingIds.some((pId) => {
-          if (pId === id || !state.annotationGroups[pId]) return false;
-          const desc = collectDescendantIds(pId, state.annotationGroups);
-          return desc.includes(id);
-        });
-        if (!isDescendant && !directMovingIds.includes(id)) {
-          directMovingIds.push(id);
-        }
-      });
+      // 親が選択されている場合の子孫重複排除（グループでないIDは annotationGroups に無いので子孫を持たない）
+      const directMovingIds = excludeDescendantsOfOthers(movingIds, state.annotationGroups);
 
       if (directMovingIds.length === 0) return state;
 
@@ -743,12 +726,13 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
 
       // 親が選択されている場合の子孫要素は直接複製しない（二重複製防止）
       const directIds: string[] = [];
+      const idSet = new Set(ids);
       ids.forEach((id) => {
         let isChildOfSelected = false;
         let curr = id;
         while (curr) {
           const parentId = nextObjects[curr]?.group_id || nextGroups[curr]?.parent_id;
-          if (parentId && ids.includes(parentId)) {
+          if (parentId && idSet.has(parentId)) {
             isChildOfSelected = true;
             break;
           }

@@ -1,51 +1,79 @@
 use crate::{io, map};
 use base64::{engine::general_purpose, Engine as _};
 use std::fs;
+use std::sync::Mutex;
 use tauri::{command, AppHandle, Manager};
 
 pub mod export_pipeline;
 
-#[command]
-pub fn check_export_conflicts(files: Vec<String>) -> Vec<String> {
-    export_pipeline::check_export_conflicts(files)
+/// Serializes the file commands below. Synchronous commands run on the main thread, so they used to
+/// run one at a time by construction; moved to blocking workers they would otherwise overlap (two
+/// saves of the same file, a load during an export).
+///
+/// Only commands the frontend calls inside a blocking loading task (its overlay stops the user from
+/// editing meanwhile) run on a worker. Short commands called outside one (`save_project`,
+/// `read_image_base64`) stay synchronous: the frozen main thread is what keeps the project from
+/// changing while it is written. They still take the lock, after any worker command finishes.
+static IO_LOCK: Mutex<()> = Mutex::new(());
+
+fn with_io_lock<T>(f: impl FnOnce() -> T) -> T {
+    // A panic in an earlier command does not leave any shared state behind, so a poisoned lock is safe to reuse.
+    let _guard = IO_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    f()
 }
 
-// Exports blend and write many files. As synchronous commands they would run on the main thread
-// and freeze the WebView (and the loading overlay) until they finish, so they run on a blocking worker.
+/// Runs heavy work on a blocking worker so the main thread (and with it the WebView) keeps responding.
+async fn run_blocking<T: Send + 'static>(f: impl FnOnce() -> Result<T, String> + Send + 'static) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("Background task failed: {}", e))?
+}
+
+/// Runs file work on a blocking worker, one command at a time (see [`IO_LOCK`]).
+async fn run_blocking_io<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    run_blocking(move || with_io_lock(f)).await
+}
+
+// Read-only: not serialized, so the conflict list stays live while an export is writing.
+#[command]
+pub async fn check_export_conflicts(files: Vec<String>) -> Result<Vec<String>, String> {
+    run_blocking(move || Ok(export_pipeline::check_export_conflicts(files))).await
+}
+
 #[command]
 pub async fn execute_export_package(
     options: export_pipeline::ExportPackageOptions,
 ) -> Result<export_pipeline::ExportResultSummary, String> {
-    tauri::async_runtime::spawn_blocking(move || export_pipeline::execute_export_package(options))
-        .await
-        .map_err(|e| format!("Export task failed to join: {}", e))?
+    run_blocking_io(move || export_pipeline::execute_export_package(options)).await
 }
 
 #[command]
-pub fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
-    map::load_map(&yaml_path)
+pub async fn load_ros_map(yaml_path: String) -> Result<map::MapLoadResult, String> {
+    run_blocking_io(move || map::load_map(&yaml_path)).await
 }
 
 #[command]
 pub async fn export_maps(options: map::ExportMapsOptions) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || map::export_maps(options))
-        .await
-        .map_err(|e| format!("Map export task failed to join: {}", e))?
+    run_blocking_io(move || map::export_maps(options)).await
 }
 
+// Read-only: works on the images it is given, so it is not serialized with the file commands.
 #[command]
 pub async fn blend_map_preview(layers: Vec<map::BlendPreviewLayer>) -> Result<map::BlendPreviewResult, String> {
-    map::blend_map_preview(layers)
+    run_blocking(move || map::blend_map_preview(layers)).await
 }
 
+// Synchronous on purpose (see `IO_LOCK`): an edit made while saving would be marked as saved.
 #[command]
 pub fn save_project(path: String, data: serde_json::Value) -> Result<(), String> {
-    io::save_project(&path, &data)
+    with_io_lock(|| io::save_project(&path, &data))
 }
 
 #[command]
-pub fn load_project(path: String) -> Result<serde_json::Value, String> {
-    io::load_project(&path)
+pub async fn load_project(path: String) -> Result<serde_json::Value, String> {
+    run_blocking_io(move || io::load_project(&path)).await
 }
 
 #[command]
@@ -54,18 +82,18 @@ pub fn load_options_schema(yaml_path: String) -> Result<serde_json::Value, Strin
 }
 
 #[command]
-pub fn export_waypoints(
+pub async fn export_waypoints(
     path: String,
     waypoints: Vec<serde_json::Value>,
     template: Option<String>,
     image_data_b64: Option<String>,
 ) -> Result<(), String> {
-    io::export_waypoints(&path, waypoints, template, image_data_b64)
+    run_blocking_io(move || io::export_waypoints(&path, waypoints, template, image_data_b64)).await
 }
 
 #[command]
-pub fn import_waypoints(path: String) -> Result<serde_json::Value, String> {
-    io::import_waypoints(&path)
+pub async fn import_waypoints(path: String) -> Result<serde_json::Value, String> {
+    run_blocking_io(move || io::import_waypoints(&path)).await
 }
 
 #[command]
@@ -76,12 +104,17 @@ pub fn infer_import_mapping(
     io::infer_import_mapping(&template, engine.unwrap_or_default())
 }
 
+// Synchronous (see `IO_LOCK`): a single small image, read outside any loading task.
 #[command]
 pub fn read_image_base64(path: String) -> Result<String, String> {
-    let bytes = fs::read(&path).map_err(|e| format!("Failed to read image file: {}", e))?;
+    with_io_lock(|| read_image_as_data_url(&path))
+}
+
+fn read_image_as_data_url(path: &str) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|e| format!("Failed to read image file: {}", e))?;
 
     // Determine mime type from extension
-    let mime_type = match std::path::Path::new(&path)
+    let mime_type = match std::path::Path::new(path)
         .extension()
         .and_then(|ext| ext.to_str())
         .map(|s| s.to_lowercase())
@@ -188,7 +221,7 @@ mod tests {
         let file_path = tmp.path().join("test.png");
         fs::write(&file_path, b"fake png data").unwrap();
 
-        let res = read_image_base64(file_path.to_string_lossy().to_string());
+        let res = read_image_as_data_url(&file_path.to_string_lossy());
         assert!(res.is_ok());
         let s = res.unwrap();
         assert!(s.starts_with("data:image/png;base64,"));
@@ -200,7 +233,7 @@ mod tests {
         let file_path = tmp.path().join("test.jpg");
         fs::write(&file_path, b"fake jpg data").unwrap();
 
-        let res = read_image_base64(file_path.to_string_lossy().to_string());
+        let res = read_image_as_data_url(&file_path.to_string_lossy());
         assert!(res.is_ok());
         let s = res.unwrap();
         assert!(s.starts_with("data:image/jpeg;base64,"));
@@ -212,7 +245,7 @@ mod tests {
         let file_path = tmp.path().join("test.unknown");
         fs::write(&file_path, b"data").unwrap();
 
-        let res = read_image_base64(file_path.to_string_lossy().to_string());
+        let res = read_image_as_data_url(&file_path.to_string_lossy());
         assert!(res.is_ok());
         let s = res.unwrap();
         assert!(s.starts_with("data:application/octet-stream;base64,"));
@@ -230,5 +263,32 @@ mod tests {
         let read_res = read_text_file(path_str);
         assert!(read_res.is_ok());
         assert_eq!(read_res.unwrap(), "Hello World");
+    }
+
+    #[test]
+    fn file_commands_never_overlap() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let running = Arc::new(AtomicUsize::new(0));
+        let max_seen = Arc::new(AtomicUsize::new(0));
+        let workers: Vec<_> = (0..4)
+            .map(|_| {
+                let (running, max_seen) = (running.clone(), max_seen.clone());
+                std::thread::spawn(move || {
+                    with_io_lock(|| {
+                        let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+                        max_seen.fetch_max(now, Ordering::SeqCst);
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                        running.fetch_sub(1, Ordering::SeqCst);
+                    })
+                })
+            })
+            .collect();
+        for w in workers {
+            w.join().unwrap();
+        }
+
+        assert_eq!(max_seen.load(Ordering::SeqCst), 1);
     }
 }

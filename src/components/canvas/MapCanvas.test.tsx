@@ -6,14 +6,7 @@ import { useAppStore } from '../../stores/appStore';
 import { layerStackState, makeMap } from '../../test/fixtures';
 
 // Mock PixiJS and @pixi/react
-vi.mock('@pixi/react', () => ({
-  Application: ({ children, background }: any) => (
-    <div data-testid="pixi-app" data-background={background}>
-      {children}
-    </div>
-  ),
-  extend: vi.fn(),
-}));
+vi.mock('@pixi/react', () => import('../../test/mocks/pixi').then((m) => m.pixiReactMock));
 
 vi.mock('pixi.js', () => {
   class MockFilter {

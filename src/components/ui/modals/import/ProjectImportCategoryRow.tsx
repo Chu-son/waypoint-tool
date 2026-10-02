@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '../../../../utils/cn';
 import { diffValues } from '../../../../utils/diff/itemDiff';
@@ -43,7 +43,14 @@ function summarize(id: ProjectImportCategoryId, state: ProjectImportState): stri
 /** 1 つのカテゴリ：取り込むかどうかのチェックと、展開すると見られる差分。 */
 export function ProjectImportCategoryRow({ id, state }: ProjectImportCategoryRowProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { loaded } = state;
+  const { loaded, isAvailable } = state;
+  // 値カテゴリの差分は、展開して表示する間だけ求め、チェックの切り替えなどの再描画では作り直さない。
+  const valueDiffLines = useMemo(() => {
+    if (!loaded || !isOpen || !isAvailable(id)) return null;
+    const category = getProjectImportCategory(id);
+    if (category.mode !== 'value') return null;
+    return diffValues(pickCategoryValue(category, loaded.ctx.current), pickCategoryValue(category, loaded.incoming));
+  }, [loaded, isOpen, isAvailable, id]);
   if (!loaded) return null;
 
   const category = getProjectImportCategory(id);
@@ -122,15 +129,7 @@ export function ProjectImportCategoryRow({ id, state }: ProjectImportCategoryRow
               }}
             />
           )}
-          {category.mode === 'value' && (
-            <TextDiffView
-              lines={diffValues(
-                pickCategoryValue(category, loaded.ctx.current),
-                pickCategoryValue(category, loaded.incoming),
-              )}
-              aria-label={`Changes of ${category.label}`}
-            />
-          )}
+          {valueDiffLines && <TextDiffView lines={valueDiffLines} aria-label={`Changes of ${category.label}`} />}
         </div>
       )}
     </li>

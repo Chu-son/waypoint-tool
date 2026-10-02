@@ -31,7 +31,6 @@ const item = (overrides: Partial<ExportTargetItem>): ExportTargetItem => ({
 
 function build(
   items: ExportTargetItem[],
-  mapImageB64?: string,
   layers: { sets?: LayerVisibilitySet[]; stack?: ReturnType<typeof layerStackState> } = {},
 ) {
   const sets = layers.sets ?? [];
@@ -51,9 +50,6 @@ function build(
     regions,
     visibilitySets: sets,
     layerStack: layers.stack ?? layerStackState(),
-    waypoints: [{ index: 0 }],
-    mapLayers: [],
-    mapImageB64,
   });
 }
 
@@ -71,8 +67,8 @@ describe('buildExportPackageItems', () => {
     ]);
 
     expect(waypointItems).toEqual([
-      { path: '/out/wp.yaml', waypoints: [{ index: 0 }], template: undefined, image_data_b64: undefined },
-      { path: '/out/wp.csv', waypoints: [{ index: 0 }], template: '{{#each}}', image_data_b64: undefined },
+      { path: '/out/wp.yaml', template: undefined, engine: undefined, include_map_image: false },
+      { path: '/out/wp.csv', template: '{{#each}}', engine: undefined, include_map_image: false },
     ]);
   });
 
@@ -87,11 +83,11 @@ describe('buildExportPackageItems', () => {
   });
 
   it('attaches the map screenshot only to items that ask for it', () => {
-    const { waypointItems } = build(
-      [item({ id: 'a', includeMapImage: true }), item({ id: 'b', relativePathPattern: 'b.yaml' })],
-      'IMG',
-    );
-    expect(waypointItems.map((w) => w.image_data_b64)).toEqual(['IMG', undefined]);
+    const { waypointItems } = build([
+      item({ id: 'a', includeMapImage: true }),
+      item({ id: 'b', relativePathPattern: 'b.yaml' }),
+    ]);
+    expect(waypointItems.map((w) => w.include_map_image)).toEqual([true, false]);
   });
 
   it('exports one map per region for "all regions" items, without the image extension', () => {
@@ -137,7 +133,6 @@ describe('buildExportPackageItems', () => {
     it('exports the same region once per set, each drawing only that set’s layers', () => {
       const { mapItems } = build(
         [mapItem({ id: 'a', visibilitySetId: 'loc' }), mapItem({ id: 'b', visibilitySetId: 'nav' })],
-        undefined,
         { sets: [localization, navigation], stack },
       );
 
@@ -148,7 +143,7 @@ describe('buildExportPackageItems', () => {
     });
 
     it('draws the layers shown now for an item that names no set', () => {
-      const { mapItems } = build([mapItem({ id: 'a' })], undefined, { sets: [localization], stack });
+      const { mapItems } = build([mapItem({ id: 'a' })], { sets: [localization], stack });
 
       expect(mapItems[0].save_path).toBe('/out/Map/north_current');
       expect(mapItems[0].region.layerVisibility).toEqual({ map: true, keepout: true, draft: false });
@@ -157,7 +152,7 @@ describe('buildExportPackageItems', () => {
     it('draws a layer the set has no entry for as it is shown now', () => {
       const partial: LayerVisibilitySet = { id: 'p', name: 'Partial', visibility: { map: true } };
 
-      const { mapItems } = build([mapItem({ id: 'a', visibilitySetId: 'p' })], undefined, { sets: [partial], stack });
+      const { mapItems } = build([mapItem({ id: 'a', visibilitySetId: 'p' })], { sets: [partial], stack });
 
       expect(mapItems[0].region.layerVisibility).toEqual({ map: true, keepout: true, draft: false });
     });
