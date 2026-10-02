@@ -1,6 +1,8 @@
 import {
   ConditionalStyleRule,
+  ConditionCollection,
   ConditionGroup,
+  ConditionNode,
   ConditionRule,
   OptionsSchema,
   WaypointNode,
@@ -204,7 +206,41 @@ export function evaluateRule(
 ): boolean {
   if (!rule || !rule.property) return true;
 
-  const actualValue = resolvePropertyValue(target, rule.property, optionsSchema, context);
+  return compareValue(rule, resolvePropertyValue(target, rule.property, optionsSchema, context));
+}
+
+/** 要素スコープのプロパティ解決。要素からの単純なドットパスで、空文字は要素自身を指す。 */
+function resolveElementValue(element: unknown, propPath: string): unknown {
+  if (!propPath) return element;
+  return propPath
+    .split('.')
+    .reduce((cur: any, seg) => (cur === undefined || cur === null ? undefined : cur[seg]), element);
+}
+
+/** list の要素 / map の値を列挙する。それ以外（未設定を含む）は空集合。 */
+function listCollectionElements(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (value && typeof value === 'object') return Object.values(value);
+  return [];
+}
+
+/**
+ * ConditionCollection を評価する。`any`/`all`/`none` の量化子で、各要素へサブ条件を適用する
+ * （`all` と `none` は空集合で真）。
+ */
+function evaluateCollection(
+  node: ConditionCollection,
+  collection: unknown,
+  evaluateElement: (group: ConditionGroup, element: unknown) => boolean,
+): boolean {
+  const elements = listCollectionElements(collection);
+  const matches = (el: unknown) => evaluateElement(node.condition, el);
+  if (node.quantifier === 'all') return elements.every(matches);
+  if (node.quantifier === 'none') return !elements.some(matches);
+  return elements.some(matches);
+}
+
+function compareValue(rule: ConditionRule, actualValue: any): boolean {
   const targetValue = rule.value;
 
   switch (rule.operator) {
@@ -305,26 +341,42 @@ export function evaluateConditionGroup(
   optionsSchema?: OptionsSchema | null,
   context?: { index?: number },
 ): boolean {
+  return evaluateGroupWith(
+    group,
+    (rule) => evaluateRule(rule, target, optionsSchema, context),
+    (node) =>
+      evaluateCollection(node, resolvePropertyValue(target, node.property, optionsSchema, context), (g, el) =>
+        evaluateGroupInElement(g, el),
+      ),
+  );
+}
+
+/** 要素スコープ（`collection` のサブ条件）で ConditionGroup を評価する。 */
+function evaluateGroupInElement(group: ConditionGroup, element: unknown): boolean {
+  return evaluateGroupWith(
+    group,
+    (rule) => (rule.property === undefined ? true : compareValue(rule, resolveElementValue(element, rule.property))),
+    (node) => evaluateCollection(node, resolveElementValue(element, node.property), evaluateGroupInElement),
+  );
+}
+
+/** and/or の畳み込みと子ノードの振り分け。値の取得方法（ルート/要素スコープ）だけを呼び出し側が決める。 */
+function evaluateGroupWith(
+  group: ConditionGroup,
+  evaluateLeaf: (rule: ConditionRule) => boolean,
+  evaluateCollectionNode: (node: ConditionCollection) => boolean,
+): boolean {
   if (!group || !Array.isArray(group.children) || group.children.length === 0) {
     return true;
   }
 
-  if (group.logicalOperator === 'or') {
-    return group.children.some((child) => {
-      if (child.type === 'group') {
-        return evaluateConditionGroup(child, target, optionsSchema, context);
-      }
-      return evaluateRule(child, target, optionsSchema, context);
-    });
-  }
+  const evaluateChild = (child: ConditionNode): boolean => {
+    if (child.type === 'group') return evaluateGroupWith(child, evaluateLeaf, evaluateCollectionNode);
+    if (child.type === 'collection') return evaluateCollectionNode(child);
+    return evaluateLeaf(child);
+  };
 
-  // Default: 'and'
-  return group.children.every((child) => {
-    if (child.type === 'group') {
-      return evaluateConditionGroup(child, target, optionsSchema, context);
-    }
-    return evaluateRule(child, target, optionsSchema, context);
-  });
+  return group.logicalOperator === 'or' ? group.children.some(evaluateChild) : group.children.every(evaluateChild);
 }
 
 // ============================================================================

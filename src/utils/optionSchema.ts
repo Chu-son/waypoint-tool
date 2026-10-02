@@ -620,21 +620,82 @@ export function validateSchema(schema: OptionsSchema): SchemaValidationError[] {
 // パス列挙（条件付き書式のプロパティ選択等）
 // ============================================================================
 
+/** object / union の直下にある名前付きフィールド。union は判別キー（バリアント値が候補）と全バリアントのフィールド。 */
+function listChildSpecs(spec: TypeSpec): Array<{ name: string; spec: TypeSpec }> {
+  if (spec.type === 'object') return (spec.fields ?? []).map((f) => ({ name: f.name, spec: f }));
+  if (spec.type !== 'union') return [];
+  const discriminator = spec.discriminator || 'type';
+  const children = [
+    {
+      name: discriminator,
+      spec: { type: 'string', enum_values: (spec.variants ?? []).map((v) => v.value) } as TypeSpec,
+    },
+  ];
+  (spec.variants ?? []).forEach((variant) =>
+    variant.fields.forEach((f) => {
+      if (!children.some((c) => c.name === f.name)) children.push({ name: f.name, spec: f });
+    }),
+  );
+  return children;
+}
+
 function collectPaths(spec: TypeSpec, prefix: string, out: string[]): void {
   out.push(prefix);
-  if (spec.type === 'object') {
-    (spec.fields ?? []).forEach((f) => collectPaths(f, `${prefix}.${f.name}`, out));
-  }
+  listChildSpecs(spec).forEach((c) => collectPaths(c.spec, `${prefix}.${c.name}`, out));
 }
 
 /**
  * 条件付き書式のプロパティ選択などで使う、スキーマ上のアドレス可能なパス一覧を返す。
  * スカラーだけでなく list/union/map/any もそれ自体が評価対象になりうるため（例: `contains`, `is_empty`）、
- * 末端としてパスに含める。`object` だけは中のフィールドへ展開する。`ref` は解決してから辿る。
+ * 末端としてパスに含める。`object` / `union` は中のフィールド（union は判別キーと各バリアントのフィールド）へも展開する。`ref` は解決してから辿る。
  */
 export function listPropertyPaths(schema: OptionsSchema): string[] {
   const resolved = resolveOptionsSchema(schema) ?? schema;
   const out: string[] = [];
   resolved.options.forEach((opt) => collectPaths(opt, `options.${opt.name}`, out));
   return out;
+}
+
+/** パス（`a.b.c` 形式のセグメント列）の指す型仕様を辿る。`object` / `union` の中のフィールドだけを辿れる。 */
+export function findSpecAtPath(spec: TypeSpec, segments: string[]): TypeSpec | undefined {
+  if (segments.length === 0) return spec;
+  const [head, ...rest] = segments;
+  const child = listChildSpecs(spec).find((c) => c.name === head);
+  return child ? findSpecAtPath(child.spec, rest) : undefined;
+}
+
+/** `options.a.b` 形式のプロパティパスの型仕様を返す。`schema` には `ref` 展開済みの実効スキーマを渡す。 */
+export function findOptionSpecAtPath(schema: OptionsSchema | null, propertyPath: string): TypeSpec | undefined {
+  if (!schema || !propertyPath.startsWith('options.')) return undefined;
+  const [optName, ...rest] = propertyPath.slice('options.'.length).split('.');
+  const opt = schema.options.find((o) => o.name === optName);
+  return opt ? findSpecAtPath(opt, rest) : undefined;
+}
+
+/** `list` の要素型 / `map` の値型。コレクションでなければ undefined。 */
+export function getElementSpec(spec: TypeSpec | undefined): TypeSpec | undefined {
+  if (spec?.type === 'list') return spec.item ?? { type: 'string' };
+  if (spec?.type === 'map') return spec.value_type ?? { type: 'any' };
+  return undefined;
+}
+
+const isCollectionSpec = (spec: TypeSpec | undefined): boolean => spec?.type === 'list' || spec?.type === 'map';
+
+/** 要素条件（`ConditionCollection`）の対象にできる、`list` / `map` 型のプロパティパス一覧。 */
+export function listCollectionPaths(schema: OptionsSchema): string[] {
+  const resolved = resolveOptionsSchema(schema) ?? schema;
+  return listPropertyPaths(resolved).filter((path) => isCollectionSpec(findOptionSpecAtPath(resolved, path)));
+}
+
+/** 要素条件のサブ条件で使える、要素からの相対パス一覧（要素自身は空文字）。 */
+export function listElementPropertyPaths(elementSpec: TypeSpec | undefined): string[] {
+  if (!elementSpec) return [];
+  const out: string[] = [];
+  collectPaths(elementSpec, '', out);
+  return out.map((p) => p.replace(/^\./, ''));
+}
+
+/** 比較値の候補（`string` の `enum_values`。union の判別キーではバリアント値）。 */
+export function listValueCandidates(spec: TypeSpec | undefined): string[] {
+  return spec?.enum_values ?? [];
 }

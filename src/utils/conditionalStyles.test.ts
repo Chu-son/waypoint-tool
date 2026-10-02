@@ -11,7 +11,17 @@ import {
   resolveFootprintConditionalStyle,
   resolveAnnotationConditionalStyle,
 } from './conditionalStyles';
-import { ConditionalStyleRule, OptionsSchema, WaypointNode, AnnotationObject, RobotFootprint } from '../types/store';
+import {
+  ConditionalStyleRule,
+  ConditionCollection,
+  ConditionGroup,
+  ConditionRule,
+  OptionsSchema,
+  WaypointNode,
+  AnnotationObject,
+  RobotFootprint,
+} from '../types/store';
+import type { TypeSpec } from '../types/options';
 
 describe('conditionalStyles utility', () => {
   describe('safe helpers', () => {
@@ -225,6 +235,138 @@ describe('conditionalStyles utility', () => {
           emptyNode,
         ),
       ).toBe(true);
+    });
+  });
+
+  describe('collection conditions (list / map elements)', () => {
+    const actionSpec: TypeSpec = {
+      type: 'union',
+      variants: [
+        {
+          value: 'service',
+          fields: [
+            { name: 'service', label: 'Service', type: 'string' },
+            { name: 'request', label: 'Request', type: 'map', value_type: { type: 'string' } },
+          ],
+        },
+        { value: 'load_map', fields: [{ name: 'localization', label: 'Localization', type: 'string' }] },
+        { value: 'amcl_reset', fields: [] },
+      ],
+      presets: [
+        { name: 'lidar_on', value: { type: 'service', service: '/front_lidar/enable', request: { data: 'true' } } },
+      ],
+    };
+    const schema: OptionsSchema = {
+      options: [
+        { name: 'on_reached_actions', label: 'Actions', type: 'list', item: actionSpec },
+        { name: 'zones', label: 'Zones', type: 'list', item: { type: 'string' } },
+      ],
+      globals: [],
+    };
+    const rule = (property: string, value: string): ConditionRule => ({
+      id: `r_${property}_${value}`,
+      type: 'rule',
+      property,
+      operator: 'equals',
+      value,
+    });
+    const collection = (
+      property: string,
+      quantifier: ConditionCollection['quantifier'],
+      ...children: ConditionRule[] | ConditionCollection[]
+    ): ConditionGroup => ({
+      id: 'root',
+      type: 'group',
+      logicalOperator: 'and',
+      children: [
+        {
+          id: 'c',
+          type: 'collection',
+          property,
+          quantifier,
+          condition: { id: 'g', type: 'group', logicalOperator: 'and', children },
+        },
+      ],
+    });
+    const nodeWith = (options: WaypointNode['options']): WaypointNode => ({ id: 'wp', type: 'manual', options });
+    const evaluate = (group: ConditionGroup, node: WaypointNode) => evaluateConditionGroup(group, node, schema);
+
+    const withMap = nodeWith({
+      on_reached_actions: [
+        { type: 'service', service: '/a' },
+        { type: 'load_map', localization: 'floor1' },
+      ],
+    });
+
+    it('matches when any element satisfies the sub-condition', () => {
+      expect(evaluate(collection('options.on_reached_actions', 'any', rule('type', 'load_map')), withMap)).toBe(true);
+      expect(evaluate(collection('options.on_reached_actions', 'any', rule('type', 'wait')), withMap)).toBe(false);
+    });
+
+    it('does not mix fields of different elements in one sub-condition', () => {
+      const sameElement = collection(
+        'options.on_reached_actions',
+        'any',
+        rule('type', 'service'),
+        rule('localization', 'floor1'),
+      );
+      expect(evaluate(sameElement, withMap)).toBe(false);
+    });
+
+    it('supports all and none, which are true for an empty or unset list', () => {
+      const onlyLoadMap = nodeWith({ on_reached_actions: [{ type: 'load_map' }] });
+      expect(evaluate(collection('options.on_reached_actions', 'all', rule('type', 'load_map')), onlyLoadMap)).toBe(
+        true,
+      );
+      expect(evaluate(collection('options.on_reached_actions', 'all', rule('type', 'load_map')), withMap)).toBe(false);
+      expect(evaluate(collection('options.on_reached_actions', 'none', rule('type', 'load_map')), withMap)).toBe(false);
+      expect(evaluate(collection('options.on_reached_actions', 'none', rule('type', 'wait')), withMap)).toBe(true);
+      for (const quantifier of ['all', 'none'] as const) {
+        const group = collection('options.on_reached_actions', quantifier, rule('type', 'load_map'));
+        expect(evaluate(group, nodeWith({ on_reached_actions: [] }))).toBe(true);
+        expect(evaluate(group, nodeWith({}))).toBe(true);
+      }
+      expect(evaluate(collection('options.on_reached_actions', 'any', rule('type', 'load_map')), nodeWith({}))).toBe(
+        false,
+      );
+    });
+
+    it('compares against the preset value for an element that references a preset', () => {
+      const presetNode = nodeWith({ on_reached_actions: [{ $preset: 'lidar_on' }] });
+      expect(
+        evaluate(collection('options.on_reached_actions', 'any', rule('service', '/front_lidar/enable')), presetNode),
+      ).toBe(true);
+    });
+
+    it('evaluates the values of a map, and a nested collection inside an element', () => {
+      const nested = collection('options.on_reached_actions', 'any', {
+        id: 'inner',
+        type: 'collection',
+        property: 'request',
+        quantifier: 'any',
+        condition: { id: 'ig', type: 'group', logicalOperator: 'and', children: [rule('', 'true')] },
+      });
+      const serviceNode = nodeWith({
+        on_reached_actions: [{ type: 'service', service: '/a', request: { data: 'true' } }],
+      });
+      expect(evaluate(nested, serviceNode)).toBe(true);
+      expect(
+        evaluate(nested, nodeWith({ on_reached_actions: [{ type: 'service', request: { data: 'false' } }] })),
+      ).toBe(false);
+    });
+
+    it('treats an empty property as the element itself for a list of scalars', () => {
+      const zoneNode = nodeWith({ zones: ['dock', 'lobby'] });
+      expect(evaluate(collection('options.zones', 'any', rule('', 'dock')), zoneNode)).toBe(true);
+      expect(evaluate(collection('options.zones', 'all', rule('', 'dock')), zoneNode)).toBe(false);
+    });
+
+    it('can be combined with ordinary rules in the same group', () => {
+      const group = collection('options.on_reached_actions', 'any', rule('type', 'load_map'));
+      group.children.push({ id: 'n', type: 'rule', property: 'id', operator: 'equals', value: 'other' });
+      expect(evaluate(group, withMap)).toBe(false);
+      group.logicalOperator = 'or';
+      expect(evaluate(group, withMap)).toBe(true);
     });
   });
 

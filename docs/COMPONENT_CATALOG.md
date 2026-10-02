@@ -166,7 +166,7 @@
   - **主要Props**: なし
 - **ツリー部品** (`ui/trees/`): `WaypointTree` / `AnnotationTree` 本体と、行コンポーネント `WaypointTreeRow` / `AnnotationTreeRow`、挿入位置バー `InsertionBarItem`
 - **プラグイン入力フォーム** (`ui/plugins/`): `PluginInputEditor` が入力種別ごとに `PointInputForm` / `PointsListInputForm` / `RectangleInputForm` / `WaypointSelectInputForm` / `AnnotationSelectInputForm` / `CustomLayerSelectInputForm` を切り替える
-- **条件付き書式** (`ui/settings/`): `ConditionalStylesTab` が `ConditionEditor`（ネスト可能な条件グループ）と `StyleOverrideEditor`（要素別スタイル上書き）を組み合わせる
+- **条件付き書式** (`ui/settings/`): `ConditionalStylesTab` が `ConditionEditor`（ネスト可能な条件グループと、list / map の各要素に対する要素条件 `ConditionCollectionEditor`。プロパティ候補は `ConditionScope`（ルートは実効スキーマ、要素条件の中は要素型）から導出する）と `StyleOverrideEditor`（要素別スタイル上書き）を組み合わせる
   - **主要Props**: なし
 - **`WaypointTreePanel`** ([`src/components/ui/trees/WaypointTreePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/trees/WaypointTreePanel.tsx))
   - **概要**: ウェイポイントツリー (`WaypointTree`) を単独でフルハイト表示する専用パネルコンポーネント。
@@ -352,11 +352,11 @@
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
   - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`
 - **`conditionalStyles`** ([`src/utils/conditionalStyles.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/conditionalStyles.ts))
-  - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。プロパティパスは `options.navigation.is_through_point` のように `object` フィールドまで辿れる。
+  - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。プロパティパスは `options.navigation.is_through_point` のように `object` フィールドまで辿れる。条件ツリーは rule / group に加え、list の要素・map の値へサブ条件を適用する `collection`（`any` / `all` / `none`、サブ条件は要素からの相対パス）を評価する。
   - **主要関数**: `resolveWaypointConditionalStyle`, `resolvePathConditionalStyle`, `resolveFootprintConditionalStyle`, `resolveAnnotationConditionalStyle`, `evaluateConditionGroup`, `drawDashedLine`, `parseColorSafe`
 - **`optionSchema`** ([`src/utils/optionSchema.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionSchema.ts))
   - **概要**: Option Schema（`OptionsSchema`）の正規化・ref 解決・検証・パス列挙。旧形式（`list` の `item_type` をフラットに持つ形）を現行の再帰形（`item: { type }`）へ変換する。`definitions`/`ref` の展開（`expandSchemaRefs`）と、スキーマのオブジェクト同一性でメモ化した展開結果の取得（`resolveOptionsSchema`）を提供する。保存・スキーマ編集は `ref` を保ったままの生スキーマで行い、値の表示・編集・条件付き書式評価・エクスポートは `resolveOptionsSchema` を経由した実効スキーマを使う。`resolveTypeSpec`/`coerceSpecDefaultsDeep`（内部）は `presets`/`preset_only` も ref 展開・型変換の対象に含める。`validateSchema` はプリセット名の重複・空欄、値の型不一致、値が別のプリセットを参照すること（連鎖）の禁止、`preset_only` なのにプリセットが0件、を検証する。 `applyGlobalDefaultLinks` は `default_global` を持つフィールドの `default` を参照先グローバルの現在値で上書きして実体化する（`normalizeOptionsSchema` の最後と `setOptionsSchema` から呼ばれる）ため、既定値を読む側は連動を意識しない。`validateSchema` は連動先グローバルの存在・型の妥当性・グローバル自身への指定禁止も検証する。`collectGlobalDefaultLinks` はグローバル名ごとの連動フィールド一覧を返す。設定画面の `FieldEditor` は `SchemaGlobalsContext`（編集中のグローバル一覧と連動一覧）を参照して「固定値 / グローバル変数に連動」の切り替えを出す。
-  - **主要関数**: `normalizeOptionsSchema`, `normalizeTypeSpec`, `resolveTypeSpec`, `expandSchemaRefs`, `resolveOptionsSchema`, `validateSchema`, `listPropertyPaths`
+  - **主要関数**: `normalizeOptionsSchema`, `normalizeTypeSpec`, `resolveTypeSpec`, `expandSchemaRefs`, `resolveOptionsSchema`, `validateSchema`, `listPropertyPaths`（`object` / `union` を展開）, `listCollectionPaths`, `findOptionSpecAtPath`, `findSpecAtPath`, `getElementSpec`, `listElementPropertyPaths`, `listValueCandidates`（条件エディタの候補表示用）
 - **`optionValues`** ([`src/utils/optionValues.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/optionValues.ts))
   - **概要**: `TypeSpec`/`FieldDef` に従った値の再帰的な変換・検証・既定値解決・生成・比較を行う純粋関数群。Option Schema の値まわり（インポートの型変換、Inspector の入力、キャンバスラベル、Generator の差分検出、エクスポートの `options`/`raw_options` 分離、エクスポート前の必須チェック）はすべてここに集約する。`validateField` は型検証に加えて `required`（値・既定値のいずれも無い場合はエラー）を見る。`resolvePresets` はプリセット参照 (`{ $preset: name }`) を、list/object/map/union の中に入れ子で現れるものも含めて再帰的に実際の値へ解決する。`resolveWithDefaults` は `resolvePresets` → 既定値の補完の順で解決する。
   - **主要関数**: `coerceValue`, `validateValue`, `validateField`, `resolveWithDefaults`, `resolvePresets`, `isPresetRef`, `findPresetByName`, `findMatchingPreset`, `createValue`, `createUnionVariantValue`, `switchUnionVariant`, `summarizeValue`, `deepEqual`, `toStoredValue`, `isValueValid`, `parseCsvList`
