@@ -1,6 +1,6 @@
 import { useMeasureAltSnap } from './hooks/useMeasureAltSnap';
 import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Application, extend } from '@pixi/react';
+import { Application, extend, useApplication } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
 import { useResolvedMapLayers } from '../../hooks/useResolvedMapLayers';
@@ -43,6 +43,7 @@ import {
   type Viewport,
 } from './utils/viewport';
 import { createViewportStore } from './utils/viewportStore';
+import { registerCanvasCapture } from './canvasCapture';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { getFallbackGridColors } from './utils/canvasTheme';
@@ -55,6 +56,20 @@ extend({
   Graphics,
   Text,
 });
+
+/** Lets exports capture the canvas (see `canvasCapture.ts`). Must be rendered inside `<Application>`. */
+function CanvasCaptureRegistration() {
+  const { app } = useApplication();
+  useEffect(
+    () =>
+      registerCanvasCapture(() => {
+        app.renderer.render(app.stage);
+        return app.canvas.toDataURL('image/png');
+      }),
+    [app],
+  );
+  return null;
+}
 
 /** Calls `run` in every commit of the PixiJS tree, after the display objects before it got their props. */
 function AfterPixiCommit({ run }: { run: () => void }) {
@@ -1947,7 +1962,7 @@ function MapCanvasView() {
       onWheel={handleWheel}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <Application preserveDrawingBuffer={true} background={canvasBackgroundColor} resolution={1} resizeTo={window}>
+      <Application background={canvasBackgroundColor} resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
         {/* x/y are set by `placeWorldContainer`, never by props, so a render cannot undo a pan */}
         <pixiContainer ref={worldContainerRef} scale={{ x: scale, y: -scale }}>
@@ -2223,6 +2238,7 @@ function MapCanvasView() {
           {marqueeBox && <pixiGraphics draw={drawMarquee} zIndex={10000} />}
         </pixiContainer>
         <AfterPixiCommit run={syncWorldContainer} />
+        <CanvasCaptureRegistration />
       </Application>
 
       <GeoAttribution />

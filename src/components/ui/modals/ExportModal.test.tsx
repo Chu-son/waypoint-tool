@@ -6,6 +6,7 @@ import { BackendAPI, DialogAPI } from '../../../api';
 import { resetAppStore } from '../../../test/store';
 import { useAppStore } from '../../../stores/appStore';
 import { layerStackState, makeMap } from '../../../test/fixtures';
+import { registerCanvasCapture } from '../../canvas/canvasCapture';
 import type { ExportMapList, LayerVisibilitySet } from '../../../types/store';
 
 describe('ExportModal UI', () => {
@@ -155,6 +156,30 @@ describe('ExportModal UI', () => {
       map_lists: [],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
+  });
+
+  it('attaches the map canvas to a waypoint item that asks for the map image', async () => {
+    const [profile] = useAppStore.getState().exportProfiles;
+    useAppStore.setState({
+      exportProfiles: [{ ...profile, items: [{ ...profile.items[0], includeMapImage: true }] }],
+    });
+    const unregister = registerCanvasCapture(() => 'data:image/png;base64,Q0FOVkFT');
+    try {
+      const onClose = vi.fn();
+      render(<ExportModal isOpen={true} onClose={onClose} />);
+
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 3000 });
+      expect(BackendAPI.executeExportPackage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          map_image_b64: 'Q0FOVkFT',
+          waypoint_items: [expect.objectContaining({ include_map_image: true })],
+        }),
+      );
+    } finally {
+      unregister();
+    }
   });
 
   it('passes the aligned map origin to templates as geo, even when the background map is hidden', async () => {

@@ -25,6 +25,7 @@ import { resolveOptionsSchema } from '../../../utils/optionSchema';
 import { prepareLayersForExport } from '../../../services/mapRasterize';
 import { DEFAULT_EXPORT_PROFILES, DEFAULT_ACTIVE_EXPORT_PROFILE_ID } from '../../../stores/migrations/projectMigration';
 import { confirmAction, notify } from '../../../services/notify';
+import { captureCanvasPng } from '../../canvas/canvasCapture';
 
 /** What the dialog keeps while it is closed; it lives in the component that stays mounted. */
 export interface ExportSession {
@@ -418,10 +419,7 @@ export function useExportPlan({ onClose, session }: UseExportPlanOptions) {
             await showStep('マップ画像を取得中...');
             useAppStore.getState().triggerFitToMaps();
             await new Promise((r) => setTimeout(r, 800));
-            const canvas = document.querySelector('canvas');
-            if (canvas) {
-              imageDataB64 = canvas.toDataURL('image/png').split(',')[1];
-            }
+            imageDataB64 = captureCanvasPng()?.split(',')[1];
           }
 
           // 3. Resolve the package items (waypoint files and map regions)

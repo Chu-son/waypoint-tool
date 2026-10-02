@@ -6,10 +6,7 @@ import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
 import { layerStackState, makeManualCustomLayer, makeMap } from '../../test/fixtures';
 
 // Mock PixiJS and @pixi/react
-vi.mock('@pixi/react', () => ({
-  Application: ({ children }: any) => <div data-testid="pixi-app">{children}</div>,
-  extend: vi.fn(),
-}));
+vi.mock('@pixi/react', () => import('../../test/mocks/pixi').then((m) => m.pixiReactMock));
 
 vi.mock('pixi.js', () => {
   return {
