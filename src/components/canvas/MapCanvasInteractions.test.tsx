@@ -477,6 +477,43 @@ describe('MapCanvas tools', () => {
     });
   });
 
+  describe('panning and zooming', () => {
+    /** Drags the empty canvas 50 px right and 30 px down with the select tool. */
+    const panRightAndDown = (pointer: ReturnType<typeof renderCanvas>['pointer']) => {
+      pointer.down(0, 0);
+      pointer.move(50, -30);
+      pointer.up(50, -30);
+    };
+    const placeWaypointAt = (pointer: ReturnType<typeof renderCanvas>['pointer'], x: number, y: number) => {
+      selectTool('add_point');
+      pointer.down(x, y);
+      pointer.up(x, y);
+      selectTool('select');
+      const { rootNodeIds, nodes } = getAppState();
+      return nodes[rootNodeIds[rootNodeIds.length - 1]].transform!;
+    };
+
+    it('places a waypoint at the world point under the pointer after the map was dragged', () => {
+      const { pointer } = renderCanvas();
+      panRightAndDown(pointer);
+
+      // Screen (500, 300) showed world (100, 100); the map moved by (+50, +30) px under it.
+      expect(placeWaypointAt(pointer, 100, 100)).toMatchObject({ x: 50, y: 130 });
+    });
+
+    it('zooms about the pointer from where the map was dragged to', () => {
+      const { pointer, viewport } = renderCanvas();
+      panRightAndDown(pointer);
+
+      act(() => void fireEvent.wheel(viewport, { deltaY: -1000, ...toScreen(100, 100) })); // 2x
+
+      // The world point under the pointer stays put, and 100 px to its right is now 50 m away.
+      expect(placeWaypointAt(pointer, 100, 100)).toMatchObject({ x: 50, y: 130 });
+      expect(placeWaypointAt(pointer, 200, 100)).toMatchObject({ x: 100, y: 130 });
+      expect(getAppState().mapScale).toBe(2);
+    });
+  });
+
   describe('select tool', () => {
     // MapCanvas has a "click on empty space clears the selection" branch, but a press in select
     // mode always starts panning, so a real click (down + up) never reaches it. Pending a spec

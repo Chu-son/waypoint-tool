@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useSyncExternalStore } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import type { GeoAlignment, GeoOrigin, TileCoord, TilePlacement } from '../../../types/geo';
 import { buildTileUrl, isValidTileTemplate, resolveBasemap } from '../../../utils/geo/basemapPresets';
@@ -6,6 +6,7 @@ import { tilePlacement, visibleTiles } from '../../../utils/geo/geoTransform';
 import { useTileTextures } from '../hooks/useTileTextures';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { screenToWorld } from '../utils/viewport';
+import type { ViewportStore } from '../utils/viewportStore';
 
 /** 1 画面で同時に扱うタイル枚数の上限。 */
 const MAX_TILES = 256;
@@ -19,7 +20,9 @@ const parentOf = ({ z, x, y }: TileCoord): TileCoord => ({ z: z - 1, x: x >> 1, 
  * 背景地図（OSM / 衛星画像など）のタイル層。ワールドコンテナの一番奥に置く。
  * 原点・位置合わせ（オフセット/回転）を反映してタイルをワールド座標へ配置する。
  */
-export function GeoTileLayer({ scale, position }: { scale: number; position: { x: number; y: number } }) {
+export function GeoTileLayer({ viewport }: { viewport: ViewportStore }) {
+  // パン中も毎回再描画され、見えている範囲のタイルを取り直す（再描画されるのはこの層だけ）
+  const { scale, position } = useSyncExternalStore(viewport.subscribe, viewport.get);
   const geoMap = useAppStore((state) => state.geoMap);
   const { width, height } = useWindowSize();
   const placements = useRef({

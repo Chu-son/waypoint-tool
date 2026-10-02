@@ -1,5 +1,5 @@
 import { useMeasureAltSnap } from './hooks/useMeasureAltSnap';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
@@ -38,9 +38,11 @@ import {
   contentBounds,
   fitViewport,
   screenToWorld as viewportScreenToWorld,
+  VIEWPORT_ORIGIN_OFFSET,
   zoomAt,
   type Viewport,
 } from './utils/viewport';
+import { createViewportStore } from './utils/viewportStore';
 import { quaternionToYaw } from '../../utils/transformUtils';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { getFallbackGridColors } from './utils/canvasTheme';
@@ -53,6 +55,12 @@ extend({
   Graphics,
   Text,
 });
+
+/** Calls `run` in every commit of the PixiJS tree, after the display objects before it got their props. */
+function AfterPixiCommit({ run }: { run: () => void }) {
+  useLayoutEffect(run);
+  return null;
+}
 
 export function MapCanvas() {
   const isPixiHandledRef = useRef(false);
@@ -101,10 +109,14 @@ export function MapCanvas() {
   const resetMeasure = useAppStore((state) => state.resetMeasure);
   const syncMeasureFromSelection = useAppStore((state) => state.syncMeasureFromSelection);
 
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  // Panning moves the world container directly instead of re-rendering the canvas on every
+  // pointer move; only the subscribers of `viewportStore` (the geo tile layer) re-render.
+  const positionRef = useRef({ x: 0, y: 0 });
+  const worldContainerRef = useRef<Container | null>(null);
   const [scale, setScale] = useState(1);
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
+  const [viewportStore] = useState(() => createViewportStore({ scale: 1, position: { x: 0, y: 0 } }));
   const [canvasContextMenu, setCanvasContextMenu] = useState<{
     x: number;
     y: number;
@@ -113,8 +125,9 @@ export function MapCanvas() {
   const lastContextMenuTime = useRef(0);
 
   const screenToWorld = useCallback(
-    (screenX: number, screenY: number) => viewportScreenToWorld(screenX, screenY, { scale, position }),
-    [position, scale],
+    (screenX: number, screenY: number) =>
+      viewportScreenToWorld(screenX, screenY, { scale, position: positionRef.current }),
+    [scale],
   );
 
   /** World coordinates under a pointer / mouse event on the viewport. */
@@ -123,14 +136,50 @@ export function MapCanvas() {
     return screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
   };
 
+  const placeWorldContainer = useCallback(() => {
+    const container = worldContainerRef.current;
+    if (!container) return;
+    container.x = positionRef.current.x + VIEWPORT_ORIGIN_OFFSET;
+    container.y = positionRef.current.y + VIEWPORT_ORIGIN_OFFSET;
+  }, []);
+
+  const panTo = useCallback(
+    (position: { x: number; y: number }) => {
+      positionRef.current = position;
+      placeWorldContainer();
+      viewportStore.set({ scale: scaleRef.current, position });
+    },
+    [placeWorldContainer, viewportStore],
+  );
+
+  const panBy = (dx: number, dy: number) => {
+    const { x, y } = positionRef.current;
+    panTo({ x: x + dx, y: y + dy });
+  };
+
   const applyViewport = useCallback(
     (viewport: Viewport) => {
-      setScale(viewport.scale);
       setMapScale(viewport.scale);
-      setPosition(viewport.position);
+      if (viewport.scale === scaleRef.current) {
+        panTo(viewport.position);
+        return;
+      }
+      // A new scale re-renders the canvas, and the commit that applies it also moves the container
+      // (`syncWorldContainer`), so the position and the scale never show up a frame apart.
+      positionRef.current = viewport.position;
+      scaleRef.current = viewport.scale;
+      setScale(viewport.scale);
     },
-    [setMapScale],
+    [setMapScale, panTo],
   );
+
+  // Runs in every commit of the PixiJS tree (its own React root, which commits after this
+  // component): the first mount and each new scale. The container then gets its position in the
+  // same commit that gives it the scale, and the geo tile layer follows before the next frame.
+  const syncWorldContainer = useCallback(() => {
+    placeWorldContainer();
+    viewportStore.set({ scale: scaleRef.current, position: positionRef.current });
+  }, [placeWorldContainer, viewportStore]);
 
   const occupancySettings = useAppStore((state) => state.occupancySettings);
   const { shouldShowBlendedPreview, previewTexture, previewInfo, previewError } = useBlendedPreview();
@@ -1217,7 +1266,7 @@ export function MapCanvas() {
       if (interactionMode.current === 'pan_map') {
         const dx = e.clientX - lastMousePos.current.x;
         const dy = e.clientY - lastMousePos.current.y;
-        setPosition((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+        panBy(dx, dy);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
         return;
       }
@@ -1368,7 +1417,7 @@ export function MapCanvas() {
     if (interactionMode.current === 'pan_map') {
       const dx = e.clientX - lastMousePos.current.x;
       const dy = e.clientY - lastMousePos.current.y;
-      setPosition((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+      panBy(dx, dy);
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } else if (interactionMode.current === 'drag_node') {
       if (movingNodesState.current) {
@@ -1845,7 +1894,8 @@ export function MapCanvas() {
     // Determine cursor position in screen space
     const rect = containerRef.current.getBoundingClientRect();
     const zoomFactor = 1 - e.deltaY * 0.001;
-    applyViewport(zoomAt({ scale, position }, e.clientX - rect.left, e.clientY - rect.top, zoomFactor));
+    const viewport = { scale: scaleRef.current, position: positionRef.current };
+    applyViewport(zoomAt(viewport, e.clientX - rect.left, e.clientY - rect.top, zoomFactor));
   };
 
   const textStyle = useMemo(
@@ -1899,9 +1949,10 @@ export function MapCanvas() {
     >
       <Application preserveDrawingBuffer={true} background={canvasBackgroundColor} resolution={1} resizeTo={window}>
         {/* Container is explicitly Y-inverted to exactly match ROS coordinates (X right, Y up) */}
-        <pixiContainer x={position.x + 400} y={position.y + 400} scale={{ x: scale, y: -scale }}>
+        {/* x/y are set by `placeWorldContainer`, never by props, so a render cannot undo a pan */}
+        <pixiContainer ref={worldContainerRef} scale={{ x: scale, y: -scale }}>
           {/* 0. Geographic base map (OSM / satellite tiles) at the very back */}
-          <GeoTileLayer scale={scale} position={position} />
+          <GeoTileLayer viewport={viewportStore} />
 
           {/* 1. Layer stack: map instances and custom layers in the user's order, bottom to top */}
           <LayerStack
@@ -2171,6 +2222,7 @@ export function MapCanvas() {
           {/* Marquee Selection Rectangle */}
           {marqueeBox && <pixiGraphics draw={drawMarquee} zIndex={10000} />}
         </pixiContainer>
+        <AfterPixiCommit run={syncWorldContainer} />
       </Application>
 
       <GeoAttribution />
