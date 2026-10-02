@@ -56,12 +56,13 @@ export function ShortcutManager() {
         return;
       }
 
-      // A blocking task (export, save, map load…) covers the app with its overlay until it ends.
-      // Its backend work no longer freezes the main thread, so keys would otherwise act mid-task.
+      // A blocking task (export, map load…) covers the app with its overlay until it ends. Its backend
+      // work no longer freezes the main thread, so keys would otherwise act mid-task. Escape is ignored
+      // too: it would close the dialog that started the task (as `Modal` itself refuses to).
       const hasBlockingTask = Object.values(currentState.activeLoadingTasks ?? {}).some(
         (task: any) => task.blocking !== false,
       );
-      if (hasBlockingTask && e.key !== 'Escape') {
+      if (hasBlockingTask) {
         return;
       }
 

@@ -153,7 +153,22 @@ describe('ShortcutManager', () => {
     input.remove();
   });
 
-  it('ignores shortcuts other than Escape while a blocking task is running, and acts again once it ends', () => {
+  it('keeps the dialog that started a blocking task open when Escape is pressed during it', () => {
+    renderShortcuts({ modalStack: ['export'], isExportModalOpen: true });
+    let taskId = '';
+    act(() => {
+      taskId = getAppState().startLoading({ message: 'エクスポートを実行中...', blocking: true });
+    });
+
+    press('Escape');
+    expect(getAppState().isExportModalOpen).toBe(true);
+
+    act(() => getAppState().stopLoading(taskId));
+    press('Escape');
+    expect(getAppState().isExportModalOpen).toBe(false);
+  });
+
+  it('ignores shortcuts while a blocking task is running, and acts again once it ends', () => {
     renderShortcuts({ ...twoWaypoints(), selectedNodeIds: ['node-1'] });
     let taskId = '';
     act(() => {

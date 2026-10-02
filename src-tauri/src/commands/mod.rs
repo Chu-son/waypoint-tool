@@ -9,6 +9,11 @@ pub mod export_pipeline;
 /// Serializes the file commands below. Synchronous commands run on the main thread, so they used to
 /// run one at a time by construction; moved to blocking workers they would otherwise overlap (two
 /// saves of the same file, a load during an export).
+///
+/// Only commands the frontend calls inside a blocking loading task (its overlay stops the user from
+/// editing meanwhile) run on a worker. Short commands called outside one (`save_project`,
+/// `read_image_base64`) stay synchronous: the frozen main thread is what keeps the project from
+/// changing while it is written. They still take the lock, after any worker command finishes.
 static IO_LOCK: Mutex<()> = Mutex::new(());
 
 fn with_io_lock<T>(f: impl FnOnce() -> T) -> T {
@@ -60,9 +65,10 @@ pub async fn blend_map_preview(layers: Vec<map::BlendPreviewLayer>) -> Result<ma
     run_blocking(move || map::blend_map_preview(layers)).await
 }
 
+// Synchronous on purpose (see `IO_LOCK`): an edit made while saving would be marked as saved.
 #[command]
-pub async fn save_project(path: String, data: serde_json::Value) -> Result<(), String> {
-    run_blocking_io(move || io::save_project(&path, &data)).await
+pub fn save_project(path: String, data: serde_json::Value) -> Result<(), String> {
+    with_io_lock(|| io::save_project(&path, &data))
 }
 
 #[command]
@@ -98,9 +104,10 @@ pub fn infer_import_mapping(
     io::infer_import_mapping(&template, engine.unwrap_or_default())
 }
 
+// Synchronous (see `IO_LOCK`): a single small image, read outside any loading task.
 #[command]
-pub async fn read_image_base64(path: String) -> Result<String, String> {
-    run_blocking_io(move || read_image_as_data_url(&path)).await
+pub fn read_image_base64(path: String) -> Result<String, String> {
+    with_io_lock(|| read_image_as_data_url(&path))
 }
 
 fn read_image_as_data_url(path: &str) -> Result<String, String> {
