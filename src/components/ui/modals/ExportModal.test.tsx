@@ -527,6 +527,51 @@ describe('ExportModal UI', () => {
     });
   });
 
+  describe('reopening', () => {
+    const exportOnce = async (onClose: () => void) => {
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+    };
+
+    it('shows the item that was selected when the dialog was closed', () => {
+      const onClose = vi.fn();
+      const { rerender } = render(<ExportModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByDisplayValue('waypoints/{{yyyymmdd}}_waypoints.yaml')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('area_1.pgm'));
+      expect(screen.getByDisplayValue('Map/{{name}}.pgm')).toBeInTheDocument();
+
+      rerender(<ExportModal isOpen={false} onClose={onClose} />);
+      rerender(<ExportModal isOpen={true} onClose={onClose} />);
+      expect(screen.getByDisplayValue('Map/{{name}}.pgm')).toBeInTheDocument();
+    });
+
+    it('keeps the date in file names from the first opening, however much later it reopens', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date(2026, 0, 2, 3, 4, 5));
+        const onClose = vi.fn();
+        const { rerender } = render(<ExportModal isOpen={true} onClose={onClose} />);
+        await exportOnce(onClose);
+        rerender(<ExportModal isOpen={false} onClose={onClose} />);
+
+        vi.setSystemTime(new Date(2026, 0, 3, 9, 0, 0));
+        onClose.mockClear();
+        rerender(<ExportModal isOpen={true} onClose={onClose} />);
+        await exportOnce(onClose);
+
+        const calls = vi.mocked(BackendAPI.executeExportPackage).mock.calls.map(([options]) => options);
+        expect(calls.map((o) => o.session_timestamp)).toEqual(['20260102_030405', '20260102_030405']);
+        expect(calls.map((o) => o.waypoint_items[0].path)).toEqual([
+          '/mock/export/dir/waypoints/20260102_waypoints.yaml',
+          '/mock/export/dir/waypoints/20260102_waypoints.yaml',
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('path pattern editing', () => {
     const PATTERN = 'waypoints/{{yyyymmdd}}_waypoints.yaml';
     const storedPattern = () => useAppStore.getState().exportProfiles[0].items[0].relativePathPattern;

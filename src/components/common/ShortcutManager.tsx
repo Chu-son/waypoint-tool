@@ -2,44 +2,11 @@ import { useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { confirmDiscardChanges } from '../../services/projectGuard';
 
+/**
+ * Global keyboard shortcuts. Reads the store when a key is pressed instead of subscribing to it,
+ * so it never re-renders, and registers its listener once.
+ */
 export function ShortcutManager() {
-  const {
-    selectedNodeIds = [],
-    activeTool,
-    removeNodes,
-    selectAllNodes,
-    selectNodes,
-    setExportModalOpen,
-    loadProject,
-    saveProject,
-    saveProjectAs,
-    resetProject,
-    setRightPanelActiveTab,
-    undo,
-    redo,
-    selectedEditObjectId,
-    activeCustomLayerId,
-    setActiveCustomLayerId,
-    removeEditObject,
-    setSelectedEditObjectId,
-    pushHistorySnapshot,
-    selectedAnnotationIds = [],
-    removeAnnotationObjects,
-    clearAnnotationSelection,
-    setAnnotationEditMode,
-    setActiveTool,
-    setActivePlugin,
-    clearPluginInteractionData,
-    setMapEditMode,
-    showOccupancyHighlight,
-    setShowOccupancyHighlight,
-    handleGlobalEscape,
-    copySelectedMapElements,
-    cutSelectedMapElements,
-    pasteMapElements,
-    duplicateSelectedMapElements,
-  } = useAppStore();
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore shortcuts when user is typing in input fields (except Escape)
@@ -97,6 +64,35 @@ export function ShortcutManager() {
       if (hasBlockingTask && e.key !== 'Escape') {
         return;
       }
+
+      const {
+        selectedNodeIds = [],
+        activeTool,
+        removeNodes,
+        selectAllNodes,
+        setExportModalOpen,
+        loadProject,
+        saveProject,
+        saveProjectAs,
+        resetProject,
+        undo,
+        redo,
+        selectedEditObjectId,
+        activeCustomLayerId,
+        removeEditObject,
+        setSelectedEditObjectId,
+        pushHistorySnapshot,
+        selectedAnnotationIds = [],
+        removeAnnotationObjects,
+        setActiveTool,
+        showOccupancyHighlight,
+        setShowOccupancyHighlight,
+        handleGlobalEscape,
+        copySelectedMapElements,
+        cutSelectedMapElements,
+        pasteMapElements,
+        duplicateSelectedMapElements,
+      } = useAppStore.getState();
 
       // Basic Actions
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -198,42 +194,7 @@ export function ShortcutManager() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    selectedNodeIds,
-    activeTool,
-    removeNodes,
-    selectAllNodes,
-    selectNodes,
-    setExportModalOpen,
-    loadProject,
-    saveProject,
-    saveProjectAs,
-    resetProject,
-    setRightPanelActiveTab,
-    undo,
-    redo,
-    selectedEditObjectId,
-    activeCustomLayerId,
-    setActiveCustomLayerId,
-    removeEditObject,
-    setSelectedEditObjectId,
-    pushHistorySnapshot,
-    selectedAnnotationIds,
-    removeAnnotationObjects,
-    clearAnnotationSelection,
-    setAnnotationEditMode,
-    setActiveTool,
-    setActivePlugin,
-    clearPluginInteractionData,
-    setMapEditMode,
-    showOccupancyHighlight,
-    setShowOccupancyHighlight,
-    handleGlobalEscape,
-    copySelectedMapElements,
-    cutSelectedMapElements,
-    pasteMapElements,
-    duplicateSelectedMapElements,
-  ]);
+  }, []);
 
   return null;
 }

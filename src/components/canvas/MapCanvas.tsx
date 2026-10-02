@@ -1,5 +1,5 @@
 import { useMeasureAltSnap } from './hooks/useMeasureAltSnap';
-import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Application, extend } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle } from 'pixi.js';
 import { useAppStore } from '../../stores/appStore';
@@ -62,7 +62,7 @@ function AfterPixiCommit({ run }: { run: () => void }) {
   return null;
 }
 
-export function MapCanvas() {
+function MapCanvasView() {
   const isPixiHandledRef = useRef(false);
   const lastWorldPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -2238,3 +2238,6 @@ export function MapCanvas() {
     </div>
   );
 }
+
+/** Takes no props, so re-rendering the app around it (e.g. resizing a side panel) skips the canvas. */
+export const MapCanvas = memo(MapCanvasView);

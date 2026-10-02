@@ -25,6 +25,24 @@ describe('ShortcutManager', () => {
     expect(getAppState().nodes['node-1']).toBeUndefined();
   });
 
+  it('acts on the selection made after it started listening', () => {
+    renderShortcuts(twoWaypoints());
+    act(() => getAppState().selectNodes(['node-2']));
+
+    press('Delete');
+
+    expect(getAppState().rootNodeIds).toEqual(['node-1']);
+  });
+
+  it('M toggles the measure tool on and off', () => {
+    renderShortcuts();
+
+    press('m');
+    expect(getAppState().activeTool).toBe('measure');
+    press('m');
+    expect(getAppState().activeTool).toBe('select');
+  });
+
   it('Ctrl+A selects every waypoint', () => {
     renderShortcuts(twoWaypoints());
 
