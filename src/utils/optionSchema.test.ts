@@ -7,6 +7,12 @@ import {
   resolveTypeSpec,
   expandSchemaRefs,
   resolveOptionsSchema,
+  listCollectionPaths,
+  listElementPropertyPaths,
+  listValueCandidates,
+  findOptionSpecAtPath,
+  findSpecAtPath,
+  getElementSpec,
 } from './optionSchema';
 import type { DefinitionDef, OptionsSchema } from '../types/options';
 
@@ -414,6 +420,62 @@ describe('listPropertyPaths', () => {
       ],
     };
     expect(listPropertyPaths(schema)).toEqual(['options.nav', 'options.nav.is_through_point']);
+  });
+
+  it('expands a union into its discriminator and the fields of every variant', () => {
+    expect(listPropertyPaths(actionSchema)).toEqual([
+      'options.pose_action',
+      'options.pose_action.type',
+      'options.pose_action.countdown_ms',
+      'options.pose_action.localization',
+      'options.actions',
+    ]);
+  });
+});
+
+const actionSchema: OptionsSchema = {
+  options: [
+    { name: 'pose_action', label: 'Pose action', type: 'ref', ref: 'action' },
+    { name: 'actions', label: 'Actions', type: 'list', item: { type: 'ref', ref: 'action' } },
+  ],
+  globals: [],
+  definitions: [
+    {
+      name: 'action',
+      type: 'union',
+      variants: [
+        { value: 'wait', fields: [{ name: 'countdown_ms', label: 'ms', type: 'integer' }] },
+        { value: 'load_map', fields: [{ name: 'localization', label: 'Loc', type: 'string' }] },
+      ],
+    },
+  ],
+};
+
+describe('collection paths for element conditions', () => {
+  it('lists only list / map properties as collection targets', () => {
+    expect(listCollectionPaths(actionSchema)).toEqual(['options.actions']);
+  });
+
+  it('offers element-relative paths, with the variant values as candidates for the discriminator', () => {
+    const resolved = resolveOptionsSchema(actionSchema)!;
+    const elementSpec = getElementSpec(findOptionSpecAtPath(resolved, 'options.actions'));
+
+    expect(listElementPropertyPaths(elementSpec)).toEqual(['', 'type', 'countdown_ms', 'localization']);
+    expect(listValueCandidates(findSpecAtPath(elementSpec!, ['type']))).toEqual(['wait', 'load_map']);
+    expect(listValueCandidates(findSpecAtPath(elementSpec!, ['localization']))).toEqual([]);
+  });
+
+  it('has no element type for a non-collection or unknown property', () => {
+    const resolved = resolveOptionsSchema(actionSchema)!;
+    expect(getElementSpec(findOptionSpecAtPath(resolved, 'options.pose_action'))).toBeUndefined();
+    expect(findOptionSpecAtPath(resolved, 'options.missing')).toBeUndefined();
+    expect(listElementPropertyPaths(undefined)).toEqual([]);
+  });
+
+  it('treats a scalar element as the element itself, and a map value type as its element', () => {
+    expect(listElementPropertyPaths({ type: 'string' })).toEqual(['']);
+    expect(getElementSpec({ type: 'map', value_type: { type: 'float' } })).toEqual({ type: 'float' });
+    expect(getElementSpec({ type: 'list' })).toEqual({ type: 'string' });
   });
 });
 

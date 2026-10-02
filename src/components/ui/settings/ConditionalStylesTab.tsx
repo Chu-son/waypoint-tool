@@ -11,9 +11,9 @@ import { TabSectionHeader } from './TabSectionHeader';
 import { Plus, Trash2, Copy, ChevronUp, ChevronDown, Upload, Layers, Sparkles, Info, Check } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { notify } from '../../../services/notify';
-import { ConditionGroupEditor } from './ConditionEditor';
+import { ConditionGroupEditor, type ConditionScope } from './ConditionEditor';
 import { StyleOverrideEditor } from './StyleOverrideEditor';
-import { listPropertyPaths } from '../../../utils/optionSchema';
+import { listPropertyPaths, resolveOptionsSchema } from '../../../utils/optionSchema';
 
 export function ConditionalStylesTab() {
   const conditionalStyles = useAppStore((state) => state.conditionalStyles) || [];
@@ -43,6 +43,11 @@ export function ConditionalStylesTab() {
 
   // 条件式の対象プロパティは object フィールドまで入れ子で指定できるようにするため、
   // スキーマ上でアドレス可能なパス一覧（例: "options.navigation.is_through_point"）を使う。
+  // 要素条件が list / map の要素型を辿れるよう、ref を展開した実効スキーマをエディタに渡す。
+  const conditionScope = useMemo<ConditionScope>(
+    () => ({ kind: 'root', schema: resolveOptionsSchema(optionsSchema) }),
+    [optionsSchema],
+  );
   const conditionPropertyPaths = useMemo(() => {
     return optionsSchema ? listPropertyPaths(optionsSchema) : [];
   }, [optionsSchema]);
@@ -121,19 +126,6 @@ export function ConditionalStylesTab() {
 
   return (
     <div className="space-y-6">
-      {/* Property Options datalist for autocomplete */}
-      <datalist id="property-options-list">
-        <option value="name" />
-        <option value="type" />
-        <option value="index" />
-        <option value="transform.x" />
-        <option value="transform.y" />
-        <option value="transform.yaw" />
-        {conditionPropertyPaths.map((path) => (
-          <option key={path} value={path} />
-        ))}
-      </datalist>
-
       {/* Header & Global Master Controls */}
       <div className="space-y-3 pb-4 border-b border-border-base/40">
         <TabSectionHeader
@@ -428,7 +420,7 @@ export function ConditionalStylesTab() {
                 <ConditionGroupEditor
                   group={selectedRule.condition}
                   onChange={(updatedGroup) => updateConditionalStyleRule(selectedRule.id, { condition: updatedGroup })}
-                  optionsList={conditionPropertyPaths}
+                  scope={conditionScope}
                 />
               </div>
 

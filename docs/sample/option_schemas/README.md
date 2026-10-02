@@ -25,6 +25,10 @@ v2.0 ウェイポイント YAML を出力する例です。
   定義している。`on_reached_actions`/`on_departure_actions` のどちらから使っても、`definitions.action`
   のプリセットは共有される。プリセットの値を1箇所変えれば、参照している全ウェイポイントに反映される。
 
+条件付き書式では、`on_reached_actions` の要素条件（`Settings > Conditional Styles` の「要素条件追加」）で
+「`load_map` アクションを持つウェイポイント」のように、リストの中身で見た目を切り替えられる
+（対象 `options.on_reached_actions` / 量化子 `any` / 条件 `type` = `load_map`）。
+
 このサンプルは mg_robot 専用のコードを一切含まない。Option Schema と Jinja テンプレートだけで
 表現できることを示す（=「タグ付きユニオンのリスト」という一般的なパターンへの対応）。
 

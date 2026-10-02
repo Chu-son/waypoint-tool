@@ -115,6 +115,76 @@ describe('ConditionalStylesTab', () => {
     expect(updatedRule.name).toBe('更新されたルール名');
   });
 
+  describe('element conditions on a list option', () => {
+    beforeEach(() => {
+      useAppStore.setState({
+        optionsSchema: {
+          options: [
+            {
+              name: 'on_reached_actions',
+              label: 'Actions',
+              type: 'list',
+              item: {
+                type: 'union',
+                variants: [
+                  { value: 'load_map', fields: [{ name: 'localization', label: 'Loc', type: 'string' }] },
+                  { value: 'amcl_reset', fields: [] },
+                ],
+              },
+            },
+          ],
+          globals: [],
+        },
+      });
+    });
+
+    const storedCondition = () => useAppStore.getState().conditionalStyles[0].condition;
+
+    it('adds an element condition that targets the first list option', () => {
+      render(<ConditionalStylesTab />);
+
+      fireEvent.click(screen.getByRole('button', { name: '要素条件追加' }));
+
+      expect(storedCondition().children[1]).toMatchObject({
+        type: 'collection',
+        property: 'options.on_reached_actions',
+        quantifier: 'any',
+        condition: { children: [] },
+      });
+    });
+
+    it('stores the quantifier and a sub-condition on the element key chosen in the editor', () => {
+      render(<ConditionalStylesTab />);
+      fireEvent.click(screen.getByRole('button', { name: '要素条件追加' }));
+
+      fireEvent.change(screen.getByLabelText('量化子'), { target: { value: 'none' } });
+      const addButtons = screen.getAllByRole('button', { name: '条件追加' });
+      fireEvent.click(addButtons[addButtons.length - 1]);
+      const properties = screen.getAllByLabelText('プロパティ');
+      fireEvent.change(properties[properties.length - 1], { target: { value: 'type' } });
+      const values = screen.getAllByLabelText('比較値');
+      fireEvent.change(values[values.length - 1], { target: { value: 'load_map' } });
+
+      expect(storedCondition().children[1]).toMatchObject({
+        type: 'collection',
+        quantifier: 'none',
+        condition: { children: [{ type: 'rule', property: 'type', operator: 'equals', value: 'load_map' }] },
+      });
+    });
+
+    it('offers the variant values as candidates for the discriminator inside the element condition', () => {
+      const { container } = render(<ConditionalStylesTab />);
+      fireEvent.click(screen.getByRole('button', { name: '要素条件追加' }));
+      const addButtons = screen.getAllByRole('button', { name: '条件追加' });
+      fireEvent.click(addButtons[addButtons.length - 1]);
+      const properties = screen.getAllByLabelText('プロパティ');
+      fireEvent.change(properties[properties.length - 1], { target: { value: 'type' } });
+
+      const candidates = Array.from(container.querySelectorAll('datalist option')).map((o) => o.getAttribute('value'));
+      expect(candidates).toEqual(expect.arrayContaining(['load_map', 'amcl_reset']));
+    });
+  });
+
   it('can reorder rules with move up and down buttons', () => {
     const secondRule: ConditionalStyleRule = {
       ...sampleRule,

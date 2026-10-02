@@ -23,11 +23,27 @@ export interface ConditionRule {
   secondValue?: any; // For 'between' operator
 }
 
+export type ConditionQuantifier = 'any' | 'all' | 'none';
+
+/**
+ * list の各要素 / map の各値に対してサブ条件を評価する。
+ * `condition` 内のプロパティは要素からの相対パス（空文字は要素自身）。
+ */
+export interface ConditionCollection {
+  id: string;
+  type: 'collection';
+  property: string; // e.g. "options.on_reached_actions"
+  quantifier: ConditionQuantifier;
+  condition: ConditionGroup;
+}
+
+export type ConditionNode = ConditionRule | ConditionGroup | ConditionCollection;
+
 export interface ConditionGroup {
   id: string;
   type: 'group';
   logicalOperator: 'and' | 'or';
-  children: Array<ConditionRule | ConditionGroup>;
+  children: ConditionNode[];
 }
 
 export type WaypointShape = 'default' | 'circle' | 'square' | 'diamond' | 'star';
