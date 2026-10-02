@@ -15,6 +15,8 @@ import {
   Bookmark,
   Code2,
   Copy,
+  Link2,
+  Unlink2,
 } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
 import { useResolvedMapLayers } from '../../../hooks/useResolvedMapLayers';
@@ -36,7 +38,10 @@ export function LayerPanel() {
   const mapLayers = useResolvedMapLayers();
   const mapInstances = useAppStore((state) => state.mapLayers);
   const updateMapLayer = useAppStore((state) => state.updateMapLayer);
+  const mapSources = useAppStore((state) => state.mapSources);
   const updateMapSource = useAppStore((state) => state.updateMapSource);
+  const setMapLayerOrigin = useAppStore((state) => state.setMapLayerOrigin);
+  const setMapLayerPoseLinked = useAppStore((state) => state.setMapLayerPoseLinked);
   const duplicateMapLayer = useAppStore((state) => state.duplicateMapLayer);
   const removeMapLayer = useAppStore((state) => state.removeMapLayer);
 
@@ -294,7 +299,12 @@ export function LayerPanel() {
                   }}
                   onDuplicate={() => duplicateMapLayer(layer.id)}
                   onUpdateLayer={(updates) => updateMapLayer(layer.id, updates)}
-                  onUpdateSource={(updates) => updateMapSource(layer.sourceId, updates)}
+                  onSetOrigin={(origin) => setMapLayerOrigin(layer.id, origin)}
+                  onSetPoseLinked={(linked) => setMapLayerPoseLinked(layer.id, linked)}
+                  onUpdateThresholds={(updates) => {
+                    const source = mapSources.find((s) => s.id === layer.sourceId);
+                    if (source) updateMapSource(source.id, { info: { ...source.info, ...updates } });
+                  }}
                   isRenaming={renamingMapLayerId === layer.id}
                   onStartRename={() => setRenamingMapLayerId(layer.id)}
                   onRename={(name) => {
@@ -490,6 +500,20 @@ export function LayerPanel() {
                   >
                     複製（別の領域を使う）
                   </ContextMenuItem>
+                  {(sharedCountBySource.get(layer.sourceId) ?? 1) > 1 || layer.origin_override ? (
+                    <ContextMenuItem
+                      icon={
+                        layer.origin_override ? (
+                          <Link2 size={13} className="text-text-muted" />
+                        ) : (
+                          <Unlink2 size={13} className="text-text-muted" />
+                        )
+                      }
+                      onSelect={() => setMapLayerPoseLinked(layer.id, !!layer.origin_override)}
+                    >
+                      {layer.origin_override ? '位置を再共有' : '位置の共有を解除'}
+                    </ContextMenuItem>
+                  ) : null}
                   <ContextMenuItem
                     icon={
                       layer.visible ? (

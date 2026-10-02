@@ -118,6 +118,37 @@ export function sameClip(a: MapLayerClip | null, b: MapLayerClip | null): boolea
   );
 }
 
+export type MapPose = readonly [number, number, number];
+
+/**
+ * The clip after its map moves from pose `from` to pose `to` (`[x, y, yaw]`), so the clipped part stays on
+ * the same part of the map. Rectangles stay axis-aligned: each keeps its size and moves with its center,
+ * except that a quarter turn (nearest multiple of 90°) swaps its width and height.
+ */
+export function moveClipWithPose(clip: MapLayerClip | null, from: MapPose, to: MapPose): MapLayerClip | null {
+  if (!clip) return null;
+  const cosFrom = Math.cos(from[2]);
+  const sinFrom = Math.sin(from[2]);
+  const cosTo = Math.cos(to[2]);
+  const sinTo = Math.sin(to[2]);
+  const quarterTurns = Math.round((to[2] - from[2]) / (Math.PI / 2));
+  const swapSize = Math.abs(quarterTurns) % 2 === 1;
+  return {
+    rects: clip.rects.map((rect) => {
+      const dx = rect.x + rect.width / 2 - from[0];
+      const dy = rect.y + rect.height / 2 - from[1];
+      // World → map frame of the old pose → world of the new pose.
+      const mapX = dx * cosFrom + dy * sinFrom;
+      const mapY = -dx * sinFrom + dy * cosFrom;
+      const centerX = to[0] + mapX * cosTo - mapY * sinTo;
+      const centerY = to[1] + mapX * sinTo + mapY * cosTo;
+      const width = swapSize ? rect.height : rect.width;
+      const height = swapSize ? rect.width : rect.height;
+      return { x: centerX - width / 2, y: centerY - height / 2, width, height };
+    }),
+  };
+}
+
 export function rectContains(rect: ClipRect, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
 }

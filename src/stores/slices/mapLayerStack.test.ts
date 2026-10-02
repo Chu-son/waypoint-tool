@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getAppState, resetAppStore } from '../../test/store';
 import { layerStackState, makeManualCustomLayer, makeMap } from '../../test/fixtures';
+import { orderedMapLayers } from '../../utils/layerStack';
 
 describe('map layer stack', () => {
   beforeEach(() => resetAppStore());
@@ -46,6 +47,75 @@ describe('map layer stack', () => {
 
     expect(getAppState().mapSources).toHaveLength(1);
     expect(getAppState().mapSources[0].info.origin).toEqual([3, 4, 0]);
+  });
+
+  describe('unlinking the pose of a copy', () => {
+    const rect = { x: 2, y: 0, width: 2, height: 1 };
+    const twoCopies = () => {
+      resetAppStore(layerStackState(makeMap('a', { info: { origin: [0, 0, 0] }, clip: { rects: [rect] } })));
+      return getAppState().duplicateMapLayer('a')!;
+    };
+    const originOf = (id: string) => orderedMapLayers(getAppState()).find((l) => l.id === id)?.info.origin;
+    const clipOf = (id: string) => getAppState().mapLayers.find((l) => l.id === id)?.clip;
+
+    it('leaves the map where it is when the pose is unlinked', () => {
+      const copyId = twoCopies();
+
+      getAppState().setMapLayerPoseLinked(copyId, false);
+
+      expect(originOf(copyId)).toEqual([0, 0, 0]);
+      expect(clipOf(copyId)).toEqual({ rects: [rect] });
+    });
+
+    it('moves only the unlinked copy, with its use area following the map', () => {
+      const copyId = twoCopies();
+      getAppState().setMapLayerPoseLinked(copyId, false);
+
+      getAppState().setMapLayerOrigin(copyId, [1, 2, 0]);
+
+      expect(originOf(copyId)).toEqual([1, 2, 0]);
+      expect(clipOf(copyId)).toEqual({ rects: [{ x: 3, y: 2, width: 2, height: 1 }] });
+      expect(originOf('a')).toEqual([0, 0, 0]);
+      expect(clipOf('a')).toEqual({ rects: [rect] });
+      expect(getAppState().mapSources[0].info.origin).toEqual([0, 0, 0]);
+    });
+
+    it('moves every linked copy together, leaving the unlinked one alone', () => {
+      const copyId = twoCopies();
+      const thirdId = getAppState().duplicateMapLayer('a')!;
+      getAppState().setMapLayerPoseLinked(thirdId, false);
+
+      getAppState().setMapLayerOrigin(copyId, [0, 5, 0]);
+
+      expect(originOf('a')).toEqual([0, 5, 0]);
+      expect(originOf(copyId)).toEqual([0, 5, 0]);
+      expect(originOf(thirdId)).toEqual([0, 0, 0]);
+      expect(clipOf('a')?.rects[0].y).toBe(5);
+      expect(clipOf(thirdId)?.rects[0].y).toBe(0);
+    });
+
+    it('returns to the shared pose when linked again, with its use area following the map', () => {
+      const copyId = twoCopies();
+      getAppState().setMapLayerPoseLinked(copyId, false);
+      getAppState().setMapLayerOrigin(copyId, [1, 2, 0]);
+
+      getAppState().setMapLayerPoseLinked(copyId, true);
+
+      expect(originOf(copyId)).toEqual([0, 0, 0]);
+      expect(clipOf(copyId)).toEqual({ rects: [rect] });
+    });
+
+    it('starts a copy of an unlinked layer at the same own pose', () => {
+      const copyId = twoCopies();
+      getAppState().setMapLayerPoseLinked(copyId, false);
+      getAppState().setMapLayerOrigin(copyId, [1, 2, 0]);
+
+      const copyOfCopy = getAppState().duplicateMapLayer(copyId)!;
+      getAppState().setMapLayerOrigin(copyOfCopy, [9, 9, 0]);
+
+      expect(originOf(copyOfCopy)).toEqual([9, 9, 0]);
+      expect(originOf(copyId)).toEqual([1, 2, 0]);
+    });
   });
 
   it('keeps a removed custom layer out of the stack, and brings it back with undo', () => {

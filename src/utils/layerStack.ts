@@ -26,7 +26,7 @@ export function resolveMapLayers(mapSources: MapSource[], mapLayers: ProjectMapL
     if (!source) continue;
     resolved.push({
       ...layer,
-      info: source.info,
+      info: layer.origin_override ? { ...source.info, origin: layer.origin_override } : source.info,
       image_base64: source.image_base64,
       width: source.width,
       height: source.height,

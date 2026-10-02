@@ -25,6 +25,19 @@ describe('resolveMapLayers', () => {
     ]);
   });
 
+  it('gives an instance with its own pose that pose, keeping the rest of the source metadata', () => {
+    const a = makeMap('a', { info: { origin: [1, 2, 0], resolution: 0.1 } });
+    const own = { ...a.layer, id: 'a-own', origin_override: [5, 6, 1] as [number, number, number] };
+
+    const resolved = resolveMapLayers([a.source], [a.layer, own]);
+
+    expect(resolved.map((l) => [l.id, l.info.origin, l.info.resolution])).toEqual([
+      ['a', [1, 2, 0], 0.1],
+      ['a-own', [5, 6, 1], 0.1],
+    ]);
+    expect(a.source.info.origin).toEqual([1, 2, 0]);
+  });
+
   it('leaves out instances whose source is missing', () => {
     const a = makeMap('a');
     expect(resolveMapLayers([], [a.layer])).toEqual([]);

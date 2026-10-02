@@ -505,6 +505,28 @@ describe('projectMigration', () => {
     expect(normalized.map_sources[2].info.initial_origin).toEqual([0, 0, 0]);
   });
 
+  describe('map layer own pose', () => {
+    const source = { id: 's', name: 's', info: { resolution: 0.05, origin: [0, 0, 0] }, image_base64: 'i' };
+    const layer = (id: string, extra: Record<string, unknown> = {}) => ({ id, sourceId: 's', name: id, ...extra });
+
+    it('keeps an unlinked layer pose and treats missing or invalid ones as linked', () => {
+      const normalized = migrateAndNormalizeProjectData({
+        map_sources: [source],
+        map_layers: [
+          layer('own', { origin_override: [1.5, -2, 0.5] }),
+          layer('old-file'),
+          layer('broken', { origin_override: 'nope' }),
+        ],
+      });
+
+      expect(normalized.map_layers.map((l) => [l.id, l.origin_override])).toEqual([
+        ['own', [1.5, -2, 0.5]],
+        ['old-file', null],
+        ['broken', null],
+      ]);
+    });
+  });
+
   describe('map layer stack', () => {
     const legacyMap = (id: string, extra: Record<string, unknown> = {}) => ({
       id,

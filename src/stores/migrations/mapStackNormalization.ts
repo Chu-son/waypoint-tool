@@ -60,6 +60,7 @@ function normalizeInstance(raw: any, source: MapSource, defaultOpacity: number):
     opacity: typeof raw?.opacity === 'number' ? raw.opacity : defaultOpacity,
     blend_mode: BLEND_MODES.includes(raw?.blend_mode) ? raw.blend_mode : 'overwrite',
     clip: normalizeClip(raw?.clip),
+    origin_override: toTriple(raw?.origin_override),
   };
 }
 

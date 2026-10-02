@@ -120,6 +120,7 @@ export function makeMap(id: string, overrides: Partial<ResolvedMapLayer> = {}): 
     opacity: 1,
     blend_mode: 'overwrite',
     clip: null,
+    origin_override: null,
     ...instance,
   };
   return { source, layer };

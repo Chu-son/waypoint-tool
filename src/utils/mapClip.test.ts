@@ -5,6 +5,7 @@ import {
   halfOfBounds,
   handlePosition,
   mapWorldBounds,
+  moveClipWithPose,
   rectFromCorners,
   resizeRect,
   sameClip,
@@ -103,6 +104,38 @@ describe('resizeRect', () => {
       expect(resizeRect(rect, handle, at)).toEqual(rect);
     }
     expect(CLIP_HANDLES).toHaveLength(8);
+  });
+});
+
+describe('moveClipWithPose', () => {
+  const clip = { rects: [{ x: 2, y: 0, width: 2, height: 1 }] };
+
+  it('has nothing to move without a clip', () => {
+    expect(moveClipWithPose(null, [0, 0, 0], [5, 5, 0])).toBeNull();
+  });
+
+  it('shifts the clip by the translation of the map', () => {
+    expect(moveClipWithPose(clip, [0, 0, 0], [1, -3, 0])).toEqual({ rects: [{ x: 3, y: -3, width: 2, height: 1 }] });
+  });
+
+  it('keeps the clip on the same part of the map across a quarter turn, swapping width and height', () => {
+    // The clip centre is at (3, 0.5) in the world, i.e. 3 m along the map's x axis from its origin.
+    const [rect] = moveClipWithPose(clip, [0, 0, 0], [0, 0, Math.PI / 2])!.rects;
+
+    expect(rect.width).toBeCloseTo(1);
+    expect(rect.height).toBeCloseTo(2);
+    expect([rect.x + rect.width / 2, rect.y + rect.height / 2]).toEqual([expect.closeTo(-0.5), expect.closeTo(3)]);
+  });
+
+  it('keeps the size under a turn that is not a quarter turn', () => {
+    const [rect] = moveClipWithPose(clip, [0, 0, 0], [0, 0, Math.PI / 6])!.rects;
+    expect([rect.width, rect.height]).toEqual([2, 1]);
+  });
+
+  it('moves back to where it started when the pose is restored', () => {
+    const away = moveClipWithPose(clip, [1, 1, 0.3], [4, -2, 1.9]);
+    const [back] = moveClipWithPose(away, [4, -2, 1.9], [1, 1, 0.3])!.rects;
+    expect([back.x, back.y]).toEqual([expect.closeTo(2), expect.closeTo(0)]);
   });
 });
 

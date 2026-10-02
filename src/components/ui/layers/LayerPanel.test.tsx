@@ -252,6 +252,44 @@ describe('LayerPanel', () => {
       expect(mapSources[0].info.origin[2]).toBeCloseTo(Math.PI / 2);
     });
 
+    it('lets one copy be nudged on its own after unlinking its pose', () => {
+      renderWithStore(<LayerPanel />, layerStackState(makeMap('l1', { name: 'Map 1' })));
+      fireEvent.click(screen.getByTitle(DUPLICATE_MAP));
+      const copyName = 'Map 1 (copy)';
+      expect(screen.queryByText('Own pose')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getAllByTitle(EDIT_MAP_LAYER)[0]);
+      fireEvent.click(screen.getByRole('switch', { name: 'Link pose' }));
+      fireEvent.click(screen.getByTitle('Rotate +90° (Clockwise)'));
+
+      expect(screen.getByText('Own pose')).toBeInTheDocument();
+      expect(screen.getByText(copyName)).toBeInTheDocument();
+      const { mapLayers, mapSources } = getAppState();
+      expect(mapSources[0].info.origin).toEqual([0, 0, 0]);
+      expect(mapLayers.filter((l) => l.origin_override !== null)).toHaveLength(1);
+      expect(mapLayers.find((l) => l.name === copyName)?.origin_override?.[2]).toBeCloseTo(Math.PI / 2);
+    });
+
+    it('unlinks and re-links the pose from the context menu', () => {
+      renderWithStore(<LayerPanel />, layerStackState(makeMap('l1', { name: 'Map 1' })));
+      fireEvent.click(screen.getByTitle(DUPLICATE_MAP));
+
+      fireEvent.contextMenu(screen.getByText('Map 1 (copy)'));
+      fireEvent.click(screen.getByText('位置の共有を解除'));
+      expect(screen.getByText('Own pose')).toBeInTheDocument();
+
+      fireEvent.contextMenu(screen.getByText('Map 1 (copy)'));
+      fireEvent.click(screen.getByText('位置を再共有'));
+      expect(screen.queryByText('Own pose')).not.toBeInTheDocument();
+    });
+
+    it('offers no pose link for a map that has no other copy', () => {
+      renderWithStore(<LayerPanel />, layerStackState(makeMap('l1', { name: 'Map 1' })));
+      fireEvent.click(screen.getByTitle(EDIT_MAP_LAYER));
+
+      expect(screen.queryByRole('switch', { name: 'Link pose' })).not.toBeInTheDocument();
+    });
+
     it('keeps the map data while another copy still uses it, and drops it with the last copy', async () => {
       vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
       renderWithStore(<LayerPanel />, layerStackState(makeMap('l1', { name: 'Map 1' })));

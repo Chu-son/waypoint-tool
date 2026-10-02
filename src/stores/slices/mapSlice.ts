@@ -13,7 +13,13 @@ import {
 } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 import { insertAbove, moveInOrder } from '../../utils/layerStack';
-import { sameClip } from '../../utils/mapClip';
+import { moveClipWithPose, sameClip } from '../../utils/mapClip';
+
+/** The pose shared by the linked instances of a source (`[0, 0, 0]` when its metadata has none). */
+const sourceOrigin = (source: MapSource): [number, number, number] => {
+  const raw = source.info?.origin;
+  return Array.isArray(raw) ? [Number(raw[0]) || 0, Number(raw[1]) || 0, Number(raw[2]) || 0] : [0, 0, 0];
+};
 
 export type MapSlice = {
   /** Loaded map files (image + metadata). Shared by every instance in `mapLayers` that references it. */
@@ -48,8 +54,15 @@ export type MapSlice = {
   /** Adds another instance of the same map directly above `id` (for using a different part of it). */
   duplicateMapLayer: (id: string) => string | null;
   updateMapLayer: (id: string, updates: Partial<Omit<ProjectMapLayer, 'id' | 'sourceId'>>) => void;
-  /** Edits map data shared by all instances: pose (`info.origin`) and occupancy thresholds. */
+  /** Edits map data shared by all instances: occupancy thresholds and, for linked instances, the pose. */
   updateMapSource: (id: string, updates: Partial<Omit<MapSource, 'id'>>) => void;
+  /**
+   * Moves a map instance. A linked instance moves the shared pose, so every linked instance of the map
+   * moves with it; an unlinked one moves alone. The use areas of the instances that moved follow the map.
+   */
+  setMapLayerOrigin: (id: string, origin: [number, number, number]) => void;
+  /** Unlinks (the map stays where it is) or re-links (it returns to the shared pose) an instance's pose. */
+  setMapLayerPoseLinked: (id: string, linked: boolean) => void;
   /** Starts reshaping a layer's use area on the canvas. The whole drag is one undo step. */
   beginMapClipDrag: (layerId: string) => void;
   updateMapClipDrag: (clip: MapLayerClip) => void;
@@ -272,6 +285,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
         opacity: state.defaultMapOpacity,
         blend_mode: 'overwrite',
         clip: null,
+        origin_override: null,
       };
       return {
         mapSources: [...state.mapSources, source],
@@ -289,6 +303,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       id: uuidv4(),
       name: `${original.name} (copy)`,
       clip: original.clip ? { rects: original.clip.rects.map((r) => ({ ...r })) } : null,
+      origin_override: original.origin_override ? [...original.origin_override] : null,
     };
     set((state) => ({
       mapLayers: [copy, ...state.mapLayers],
@@ -309,6 +324,43 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       mapSources: state.mapSources.map((s) => (s.id === id ? { ...s, ...updates } : s)),
       isDirty: true,
     })),
+
+  setMapLayerOrigin: (id, origin) =>
+    set((state) => {
+      const layer = state.mapLayers.find((l) => l.id === id);
+      const source = layer && state.mapSources.find((s) => s.id === layer.sourceId);
+      if (!layer || !source) return {};
+      if (layer.origin_override) {
+        return {
+          mapLayers: state.mapLayers.map((l) =>
+            l.id === id
+              ? { ...l, origin_override: origin, clip: moveClipWithPose(l.clip, layer.origin_override!, origin) }
+              : l,
+          ),
+          isDirty: true,
+        };
+      }
+      const from = sourceOrigin(source);
+      return {
+        mapSources: state.mapSources.map((s) => (s.id === source.id ? { ...s, info: { ...s.info, origin } } : s)),
+        mapLayers: state.mapLayers.map((l) =>
+          l.sourceId === source.id && !l.origin_override ? { ...l, clip: moveClipWithPose(l.clip, from, origin) } : l,
+        ),
+        isDirty: true,
+      };
+    }),
+
+  setMapLayerPoseLinked: (id, linked) =>
+    set((state) => {
+      const layer = state.mapLayers.find((l) => l.id === id);
+      const source = layer && state.mapSources.find((s) => s.id === layer.sourceId);
+      if (!layer || !source || linked === !layer.origin_override) return {};
+      const shared = sourceOrigin(source);
+      const next: Partial<ProjectMapLayer> = linked
+        ? { origin_override: null, clip: moveClipWithPose(layer.clip, layer.origin_override!, shared) }
+        : { origin_override: shared };
+      return { mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...next } : l)), isDirty: true };
+    }),
 
   beginMapClipDrag: (layerId) => {
     const layer = get().mapLayers.find((l) => l.id === layerId);

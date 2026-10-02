@@ -144,6 +144,11 @@ export interface ProjectMapLayer {
   blend_mode: MapBlendMode;
   /** `null` uses the whole map. */
   clip: MapLayerClip | null;
+  /**
+   * Pose of this instance alone. `null` follows the source's `info.origin`, so the pose is shared with
+   * every other instance of the map; a value unlinks it, so this instance can be nudged on its own.
+   */
+  origin_override: [number, number, number] | null;
 }
 
 /** A map instance joined with the pixel data and metadata of its source, ready for drawing and export. */
