@@ -121,6 +121,15 @@ export type PackageExportMapItem = {
   }[];
 };
 
+export type PackageExportMapListItem = {
+  /** Absolute path of the list file. */
+  path: string;
+  /** One map name per line, in output order. */
+  entries: string[];
+  /** true: keep the existing lines and add only the names it lacks. false: replace per the conflict resolution. */
+  append: boolean;
+};
+
 export type ExecuteExportPackageOptions = {
   root_dir: string;
   conflict_resolution: 'overwrite' | 'backup_file';
@@ -135,6 +144,7 @@ export type ExecuteExportPackageOptions = {
   integer_keys: string[];
   waypoint_items: PackageExportWaypointItem[];
   map_items: PackageExportMapItem[];
+  map_lists: PackageExportMapListItem[];
 };
 
 export type ExportResultSummary = {

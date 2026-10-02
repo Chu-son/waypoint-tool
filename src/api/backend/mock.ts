@@ -244,7 +244,8 @@ export class MockBackendAPI implements IBackendAPI {
   async executeExportPackage(options: any): Promise<any> {
     console.log('[Mock Backend] executeExportPackage called with:', options);
     return {
-      exported_files_count: (options.waypoint_items?.length || 0) + (options.map_items?.length || 0),
+      exported_files_count:
+        (options.waypoint_items?.length || 0) + (options.map_items?.length || 0) + (options.map_lists?.length || 0),
       backed_up_files: [],
     };
   }

@@ -27,6 +27,17 @@ pub struct ExportPackageOptions {
     pub integer_keys: Vec<String>,
     pub waypoint_items: Vec<PackageWaypointItem>,
     pub map_items: Vec<PackageMapItem>,
+    /// 同じフォルダに出力したマップ名の一覧ファイル（map_list.txt）。
+    #[serde(default)]
+    pub map_lists: Vec<PackageMapListItem>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PackageMapListItem {
+    pub path: String, // Absolute target path
+    pub entries: Vec<String>,
+    /// true の場合は既存の行を残し、未記載の名前だけを末尾に追加する。false の場合は競合設定に従って作り直す。
+    pub append: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -118,6 +129,21 @@ fn floatify_waypoint(waypoint: &mut serde_json::Value, integer_keys: &HashSet<&s
             _ => floatify(v, &no_exclusions),
         }
     }
+}
+
+/// 既存のリストの行（空行は除く）を残し、まだ載っていない名前だけを末尾に足した内容を返す。
+fn merge_map_list(existing: &str, entries: &[String]) -> String {
+    let mut lines: Vec<String> = existing
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    for entry in entries {
+        if !lines.contains(entry) {
+            lines.push(entry.clone());
+        }
+    }
+    lines.join("\n") + "\n"
 }
 
 fn backup_file_if_exists(path_str: &str, timestamp: &str, backed_up: &mut Vec<String>) -> Result<(), String> {
@@ -329,6 +355,31 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
         }
     }
 
+    // 3. マップ一覧ファイルの出力処理
+    for list in options.map_lists {
+        let list_path = Path::new(&list.path);
+        if let Some(parent) = list_path.parent() {
+            if !parent.exists() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create directory {}: {}", parent.display(), e))?;
+            }
+        }
+
+        let content = if list.append && list_path.exists() {
+            let existing =
+                fs::read_to_string(list_path).map_err(|e| format!("Failed to read map list {}: {}", list.path, e))?;
+            merge_map_list(&existing, &list.entries)
+        } else {
+            if is_backup {
+                backup_file_if_exists(&list.path, &options.session_timestamp, &mut backed_up_files)?;
+            }
+            list.entries.join("\n") + "\n"
+        };
+
+        fs::write(list_path, content).map_err(|e| format!("Failed to write map list {}: {}", list.path, e))?;
+        exported_count += 1;
+    }
+
     Ok(ExportResultSummary {
         exported_files_count: exported_count,
         backed_up_files,
@@ -376,6 +427,7 @@ mod tests {
                 image_data_b64: None,
             }],
             map_items: vec![],
+            map_lists: vec![],
         };
 
         let result = execute_export_package(options).unwrap();
@@ -417,6 +469,7 @@ mod tests {
                 image_data_b64: None,
             }],
             map_items: vec![],
+            map_lists: vec![],
         };
 
         execute_export_package(options).unwrap();
@@ -447,6 +500,7 @@ mod tests {
                 image_data_b64: None,
             }],
             map_items: vec![],
+            map_lists: vec![],
         };
 
         execute_export_package(options).unwrap();
@@ -486,6 +540,7 @@ mod tests {
                 image_data_b64: None,
             }],
             map_items: vec![],
+            map_lists: vec![],
         };
 
         execute_export_package(options).unwrap();
@@ -544,6 +599,7 @@ mod tests {
                 image_data_b64: None,
             }],
             map_items: vec![],
+            map_lists: vec![],
         };
 
         execute_export_package(options).unwrap();
@@ -692,6 +748,67 @@ mod tests {
             serde_json::json!({ "geo": sample_geo(), "float_numbers": false }),
         );
         assert_eq!(out, "500000 54");
+    }
+
+    /// map_lists だけを持つ最小のリクエストを実行する。
+    fn export_map_list(dir: &Path, conflict_resolution: &str, append: bool, entries: &[&str]) -> ExportResultSummary {
+        let options: ExportPackageOptions = serde_json::from_value(serde_json::json!({
+            "root_dir": dir.to_string_lossy(),
+            "conflict_resolution": conflict_resolution,
+            "session_timestamp": "20260912_110000",
+            "waypoint_items": [],
+            "map_items": [],
+            "map_lists": [{
+                "path": dir.join("Map").join("map_list.txt").to_string_lossy(),
+                "entries": entries,
+                "append": append,
+            }],
+        }))
+        .unwrap();
+        execute_export_package(options).unwrap()
+    }
+
+    #[test]
+    fn test_map_list_is_created_with_one_name_per_line() {
+        let tmp = TempDir::new().unwrap();
+        let result = export_map_list(tmp.path(), "overwrite", true, &["a", "b"]);
+
+        assert_eq!(result.exported_files_count, 1);
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("Map").join("map_list.txt")).unwrap(),
+            "a\nb\n"
+        );
+    }
+
+    #[test]
+    fn test_map_list_append_keeps_existing_lines_and_skips_duplicates() {
+        let tmp = TempDir::new().unwrap();
+        fs::create_dir_all(tmp.path().join("Map")).unwrap();
+        fs::write(tmp.path().join("Map").join("map_list.txt"), "old\na\n\n").unwrap();
+
+        let result = export_map_list(tmp.path(), "backup_file", true, &["a", "b"]);
+
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("Map").join("map_list.txt")).unwrap(),
+            "old\na\nb\n"
+        );
+        assert!(result.backed_up_files.is_empty(), "appending does not back up the list");
+    }
+
+    #[test]
+    fn test_map_list_follows_conflict_resolution_when_not_appending() {
+        let tmp = TempDir::new().unwrap();
+        fs::create_dir_all(tmp.path().join("Map")).unwrap();
+        fs::write(tmp.path().join("Map").join("map_list.txt"), "old\n").unwrap();
+
+        let result = export_map_list(tmp.path(), "backup_file", false, &["a"]);
+
+        assert_eq!(
+            fs::read_to_string(tmp.path().join("Map").join("map_list.txt")).unwrap(),
+            "a\n"
+        );
+        assert_eq!(result.backed_up_files.len(), 1);
+        assert_eq!(fs::read_to_string(&result.backed_up_files[0]).unwrap(), "old\n");
     }
 
     #[test]

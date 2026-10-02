@@ -315,6 +315,63 @@ export function findDuplicateOutputPaths(files: ResolvedExportFile[]): string[] 
   return [...duplicates];
 }
 
+export interface ResolvedMapList {
+  /** The list file as it appears in the output tree (a pair-secondary entry of the first item that writes to it). */
+  file: ResolvedExportFile;
+  /** Names to list, in output order, without duplicates: the `.yaml` of ROS standard maps, the `.png` of image-only maps. */
+  entries: string[];
+  /** Items writing into the same list disagree on how to treat an existing file, so the export cannot decide. */
+  hasConflictingModes: boolean;
+  /** Keep the existing lines and add only what is missing (otherwise the profile's conflict resolution applies). */
+  append: boolean;
+}
+
+const dirOf = (path: string) => path.substring(0, Math.max(path.lastIndexOf('/'), 0));
+const joinDir = (dir: string, name: string) => (dir ? `${dir}/${name}` : name);
+
+/**
+ * Groups the maps that enabled items write into one list file per directory and list name, so maps of several
+ * items (or sets) that share a folder end up in a single list. Case is ignored, as for file names on Windows.
+ */
+export function resolveMapListFiles(files: ResolvedExportFile[]): ResolvedMapList[] {
+  const lists = new Map<string, ResolvedMapList>();
+
+  for (const file of files) {
+    const { item } = file;
+    if (!item.enabled || !item.type.startsWith('map') || file.isPairSecondary || !item.mapList) continue;
+
+    const listName = normalizeRelativePath(item.mapList.fileName).split('/').pop();
+    if (!listName) continue;
+
+    const relativePath = joinDir(dirOf(file.relativePath), listName);
+    const key = joinDir(dirOf(file.fullPath), listName).toLowerCase();
+    const mapName = item.mapFormat === 'png_only' ? file.fileName : file.fileName.replace(/\.pgm$/i, '.yaml');
+    const append = item.mapList.existing === 'append';
+
+    const existing = lists.get(key);
+    if (!existing) {
+      lists.set(key, {
+        file: {
+          item,
+          relativePath,
+          fullPath: joinDir(dirOf(file.fullPath), listName),
+          fileName: listName,
+          sourceLabel: 'Map List',
+          isPairSecondary: true,
+        },
+        entries: [mapName],
+        hasConflictingModes: false,
+        append,
+      });
+      continue;
+    }
+    if (existing.append !== append) existing.hasConflictingModes = true;
+    if (!existing.entries.includes(mapName)) existing.entries.push(mapName);
+  }
+
+  return [...lists.values()];
+}
+
 /**
  * ResolvedExportFile 一覧からディレクトリツリーを構築
  */

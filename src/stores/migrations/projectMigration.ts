@@ -7,6 +7,7 @@ import {
   RectangularFootprint,
   CircularFootprint,
   ConditionalStyleRule,
+  ExportMapList,
   ExportProfile,
   LayerVisibilitySet,
   OptionsSchema,
@@ -133,6 +134,14 @@ export const LEGACY_PLUGIN_ID_MAP: Record<string, string> = {
   DrivableAreaAnnotationGenerator: 'drivable_area_annotation_generator',
   NoiseFilterLayerGenerator: 'noise_filter_layer_generator',
 };
+
+/** エクスポート項目のマップ一覧設定。ファイル名が空・不正なものは設定なしとして落とす。 */
+function normalizeMapList(raw: any): { mapList: ExportMapList } | Record<string, never> {
+  const fileName = raw?.fileName ?? raw?.file_name;
+  if (typeof fileName !== 'string' || fileName.trim() === '') return {};
+  const existing = raw.existing === 'conflict_setting' ? 'conflict_setting' : 'append';
+  return { mapList: { fileName: fileName.trim(), existing } };
+}
 
 /**
  * 頭字語（例: RS, ROS等）に対応した CamelCase/PascalCase -> snake_case 変換関数
@@ -467,6 +476,7 @@ export function normalizeV1(raw: any): StrictProjectData {
                 ...(typeof (item.visibilitySetId ?? item.visibility_set_id) === 'string'
                   ? { visibilitySetId: item.visibilitySetId ?? item.visibility_set_id }
                   : {}),
+                ...normalizeMapList(item.mapList ?? item.map_list),
                 enabled: item.enabled !== false,
               }))
             : [],

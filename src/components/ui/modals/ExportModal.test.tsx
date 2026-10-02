@@ -5,7 +5,7 @@ import { BackendAPI, DialogAPI } from '../../../api';
 import { resetAppStore } from '../../../test/store';
 import { useAppStore } from '../../../stores/appStore';
 import { layerStackState, makeMap } from '../../../test/fixtures';
-import type { LayerVisibilitySet } from '../../../types/store';
+import type { ExportMapList, LayerVisibilitySet } from '../../../types/store';
 
 describe('ExportModal UI', () => {
   beforeEach(() => {
@@ -121,6 +121,7 @@ describe('ExportModal UI', () => {
           region: expect.objectContaining({ name: 'area_1' }),
         }),
       ],
+      map_lists: [],
     });
     expect(DialogAPI.message).toHaveBeenCalledWith(expect.stringContaining('出力ファイル数: 2 件'), undefined);
   });
@@ -355,6 +356,123 @@ describe('ExportModal UI', () => {
       render(<ExportModal isOpen={true} onClose={vi.fn()} />);
 
       expect(screen.queryByRole('combobox', { name: 'レイヤー表示セット' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('map list file', () => {
+    const mapItem = (id: string, pattern: string, mapList?: ExportMapList) => ({
+      id,
+      type: 'map_region' as const,
+      sourceId: 'reg1',
+      relativePathPattern: pattern,
+      mapFormat: 'ros_standard' as const,
+      ...(mapList ? { mapList } : {}),
+      enabled: true,
+    });
+    const setUp = (items: ReturnType<typeof mapItem>[]) =>
+      useAppStore.setState({
+        exportProfiles: [
+          {
+            id: 'test_prof',
+            name: '標準エクスポート',
+            conflictResolution: 'backup_file',
+            outputRootDir: '/mock/export/dir',
+            items,
+          },
+        ],
+      });
+    const exportNow = () => {
+      const onClose = vi.fn();
+      render(<ExportModal isOpen={true} onClose={onClose} />);
+      fireEvent.click(screen.getByRole('button', { name: /保存してエクスポート/ }));
+      return onClose;
+    };
+    const list = (existing: 'append' | 'conflict_setting' = 'append'): ExportMapList => ({
+      fileName: 'map_list.txt',
+      existing,
+    });
+
+    it('hands the backend one list holding the maps of every item that shares a folder', async () => {
+      setUp([mapItem('m1', 'Map/a_{{name}}.pgm', list()), mapItem('m2', 'Map/b_{{name}}.pgm', list())]);
+
+      const onClose = exportNow();
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0].map_lists).toEqual([
+        { path: '/mock/export/dir/Map/map_list.txt', entries: ['a_area_1.yaml', 'b_area_1.yaml'], append: true },
+      ]);
+    });
+
+    it('shows the list file in the output tree', () => {
+      setUp([mapItem('m1', 'Map/{{name}}.pgm', list())]);
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+
+      expect(screen.getByText('map_list.txt')).toBeInTheDocument();
+    });
+
+    it('writes no list for an item that does not ask for one', async () => {
+      setUp([mapItem('m1', 'Map/{{name}}.pgm')]);
+
+      const onClose = exportNow();
+
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(vi.mocked(BackendAPI.executeExportPackage).mock.calls[0][0].map_lists).toEqual([]);
+    });
+
+    it('refuses to export when items sharing a list disagree on how to treat an existing one', async () => {
+      setUp([
+        mapItem('m1', 'Map/a_{{name}}.pgm', list('append')),
+        mapItem('m2', 'Map/b_{{name}}.pgm', list('conflict_setting')),
+      ]);
+
+      exportNow();
+
+      await waitFor(() =>
+        expect(DialogAPI.message).toHaveBeenCalledWith(
+          expect.stringContaining('/mock/export/dir/Map/map_list.txt'),
+          undefined,
+        ),
+      );
+      expect(BackendAPI.executeExportPackage).not.toHaveBeenCalled();
+    });
+
+    it('does not flag an existing list as a conflict when it is appended to, but does when it is replaced', async () => {
+      vi.mocked(BackendAPI.checkExportConflicts).mockImplementation(async (files) =>
+        files.filter((f) => f.endsWith('map_list.txt')),
+      );
+
+      setUp([mapItem('m1', 'Map/{{name}}.pgm', list('append'))]);
+      const { unmount } = render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+      await waitFor(() => expect(BackendAPI.checkExportConflicts).toHaveBeenCalled());
+      expect(screen.queryByText(/件の同名ファイルが存在/)).not.toBeInTheDocument();
+      unmount();
+
+      setUp([mapItem('m1', 'Map/{{name}}.pgm', list('conflict_setting'))]);
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+      expect(await screen.findByText(/1 件の同名ファイルが存在/)).toBeInTheDocument();
+    });
+
+    it('lets a map item turn the list on, rename it and choose how an existing one is treated, and keeps it once saved', () => {
+      setUp([mapItem('m1', 'Map/{{name}}.pgm')]);
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'マップ一覧ファイルを出力' }));
+      fireEvent.change(screen.getByRole('textbox', { name: 'マップ一覧のファイル名' }), {
+        target: { value: 'maps.txt' },
+      });
+      fireEvent.click(screen.getByRole('radio', { name: '競合設定に従って作り直す' }));
+      fireEvent.click(screen.getByRole('button', { name: '保存のみ' }));
+
+      expect(useAppStore.getState().exportProfiles[0].items[0].mapList).toEqual({
+        fileName: 'maps.txt',
+        existing: 'conflict_setting',
+      });
+    });
+
+    it('does not offer a list for a waypoint item', () => {
+      render(<ExportModal isOpen={true} onClose={vi.fn()} />);
+
+      expect(screen.queryByRole('checkbox', { name: 'マップ一覧ファイルを出力' })).not.toBeInTheDocument();
     });
   });
 
