@@ -20,6 +20,7 @@ import { BrowseInput } from '../common/BrowseInput';
 import { cn } from '../../../utils/cn';
 import { TreeDirectoryNode, TreeFileNode } from '../../../utils/exportTemplateEngine';
 import { ExportVisibilitySetField } from './ExportVisibilitySetField';
+import { ExportMapListField } from './ExportMapListField';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -407,6 +408,13 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
                       </label>
                     </div>
                   </div>
+                )}
+
+                {selectedItem.type.startsWith('map') && (
+                  <ExportMapListField
+                    value={selectedItem.mapList}
+                    onChange={(mapList) => handleUpdateItem(selectedItem.id, { mapList })}
+                  />
                 )}
 
                 {/* Waypoint High-Res Image Option */}

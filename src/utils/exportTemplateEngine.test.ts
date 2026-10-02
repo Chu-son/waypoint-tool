@@ -5,6 +5,7 @@ import {
   resolveExportFiles,
   buildExportTreePreview,
   findDuplicateOutputPaths,
+  resolveMapListFiles,
   type ResolvedExportFile,
 } from './exportTemplateEngine';
 import { ExportTargetItem } from '../types/store';
@@ -185,6 +186,130 @@ describe('exportTemplateEngine', () => {
         'Map/north_Nav _ Full.pgm',
       );
       expect(resolveExportPattern('Map/{{name}}_{{SET}}.pgm', { now, name: 'north' })).toBe('Map/north_current.pgm');
+    });
+  });
+
+  describe('resolveMapListFiles', () => {
+    const regions = [
+      { id: 'r1', name: 'north' },
+      { id: 'r2', name: 'south' },
+    ];
+    const resolve = (items: ExportTargetItem[]) =>
+      resolveMapListFiles(
+        resolveExportFiles(items, {
+          now: new Date(2026, 8, 12),
+          projectName: 'p',
+          rootDir: '/out',
+          availableRegions: regions,
+          templates: [],
+          defaultFormats: [],
+        }),
+      );
+    const mapItem = (id: string, overrides: Partial<ExportTargetItem> = {}): ExportTargetItem => ({
+      id,
+      type: 'map_all_regions',
+      sourceId: 'all',
+      relativePathPattern: 'Map/{{name}}.pgm',
+      mapFormat: 'ros_standard',
+      mapList: { fileName: 'map_list.txt', existing: 'append' },
+      enabled: true,
+      ...overrides,
+    });
+
+    it('lists the yaml of every map written to the same folder in one file, across items', () => {
+      const lists = resolve([
+        mapItem('a', { relativePathPattern: 'Map/a_{{name}}.pgm' }),
+        mapItem('b', { type: 'map_region', sourceId: 'r1', relativePathPattern: 'Map/b_{{name}}.pgm' }),
+      ]);
+
+      expect(lists).toHaveLength(1);
+      expect(lists[0].file.fullPath).toBe('/out/Map/map_list.txt');
+      expect(lists[0].entries).toEqual(['a_north.yaml', 'a_south.yaml', 'b_north.yaml']);
+    });
+
+    it('keeps lists of different folders apart', () => {
+      const lists = resolve([
+        mapItem('a', { relativePathPattern: 'Nav/{{name}}.pgm' }),
+        mapItem('b', { relativePathPattern: 'Loc/{{name}}.pgm' }),
+      ]);
+
+      expect(lists.map((l) => [l.file.fullPath, l.entries])).toEqual([
+        ['/out/Nav/map_list.txt', ['north.yaml', 'south.yaml']],
+        ['/out/Loc/map_list.txt', ['north.yaml', 'south.yaml']],
+      ]);
+    });
+
+    it('lists the png file name for an image-only map', () => {
+      const lists = resolve([
+        mapItem('a', {
+          type: 'map_region',
+          sourceId: 'r1',
+          mapFormat: 'png_only',
+          relativePathPattern: 'Map/{{name}}.png',
+        }),
+      ]);
+
+      expect(lists[0].entries).toEqual(['north.png']);
+    });
+
+    it('lists the output file name, which may differ from the region name', () => {
+      const lists = resolve([
+        mapItem('a', { type: 'map_region', sourceId: 'r1', relativePathPattern: 'Map/nav_{{name}}.pgm' }),
+      ]);
+
+      expect(lists[0].entries).toEqual(['nav_north.yaml']);
+    });
+
+    it('lists a map once even when two items write the same file name', () => {
+      const lists = resolve([mapItem('a'), mapItem('b')]);
+
+      expect(lists[0].entries).toEqual(['north.yaml', 'south.yaml']);
+    });
+
+    it('ignores items without a list setting, disabled items and waypoint items', () => {
+      const lists = resolve([
+        mapItem('a', { mapList: undefined }),
+        mapItem('b', { enabled: false }),
+        {
+          id: 'w',
+          type: 'waypoint_default',
+          sourceId: '__default_yaml__',
+          relativePathPattern: 'wp.yaml',
+          mapList: { fileName: 'map_list.txt', existing: 'append' },
+          enabled: true,
+        },
+      ]);
+
+      expect(lists).toEqual([]);
+    });
+
+    it('ignores case in the list name when grouping, as file names on Windows do', () => {
+      const lists = resolve([
+        mapItem('a', { mapList: { fileName: 'Map_List.txt', existing: 'append' } }),
+        mapItem('b', { mapList: { fileName: 'map_list.txt', existing: 'append' } }),
+      ]);
+
+      expect(lists).toHaveLength(1);
+    });
+
+    it('appends only when every item sharing the list says so, and reports a disagreement', () => {
+      const agree = resolve([mapItem('a'), mapItem('b')]);
+      expect(agree[0]).toMatchObject({ append: true, hasConflictingModes: false });
+
+      const replace = resolve([mapItem('a', { mapList: { fileName: 'map_list.txt', existing: 'conflict_setting' } })]);
+      expect(replace[0]).toMatchObject({ append: false, hasConflictingModes: false });
+
+      const disagree = resolve([
+        mapItem('a'),
+        mapItem('b', { mapList: { fileName: 'map_list.txt', existing: 'conflict_setting' } }),
+      ]);
+      expect(disagree[0].hasConflictingModes).toBe(true);
+    });
+
+    it('keeps the list inside the output folder when the name carries a path', () => {
+      const lists = resolve([mapItem('a', { mapList: { fileName: '../../etc/list.txt', existing: 'append' } })]);
+
+      expect(lists[0].file.fullPath).toBe('/out/Map/list.txt');
     });
   });
 

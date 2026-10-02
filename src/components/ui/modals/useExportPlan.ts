@@ -7,6 +7,7 @@ import {
   resolveExportFiles,
   buildExportTreePreview,
   findDuplicateOutputPaths,
+  resolveMapListFiles,
 } from '../../../utils/exportTemplateEngine';
 import {
   collectIntegerOptionKeys,
@@ -160,10 +161,13 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     defaultExportFormats,
   ]);
 
+  // Map list files collect the maps that share a folder; they show in the tree next to the maps.
+  const mapLists = useMemo(() => resolveMapListFiles(resolvedFiles), [resolvedFiles]);
+
   // Build tree from resolved files
   const treeNodes = useMemo(() => {
-    return buildExportTreePreview(resolvedFiles);
-  }, [resolvedFiles]);
+    return buildExportTreePreview([...resolvedFiles, ...mapLists.map((l) => l.file)]);
+  }, [resolvedFiles, mapLists]);
 
   // Check conflicts with debounce
   useEffect(() => {
@@ -174,7 +178,11 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
 
     const timer = setTimeout(async () => {
       try {
-        const fullPaths = resolvedFiles.map((f) => f.fullPath);
+        // A list that is appended to is not replaced, so an existing one is no conflict.
+        const fullPaths = [
+          ...resolvedFiles.map((f) => f.fullPath),
+          ...mapLists.filter((l) => !l.append).map((l) => l.file.fullPath),
+        ];
         const existing = await BackendAPI.checkExportConflicts(fullPaths);
         setConflictFiles(new Set(existing));
       } catch (err) {
@@ -183,7 +191,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [isOpen, resolvedFiles, rootDir]);
+  }, [isOpen, resolvedFiles, mapLists, rootDir]);
 
   // Select first item if none selected
   useEffect(() => {
@@ -352,6 +360,14 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
       return;
     }
 
+    const conflictingLists = mapLists.filter((l) => l.hasConflictingModes).map((l) => l.file.fullPath);
+    if (conflictingLists.length > 0) {
+      void notify(
+        `同じマップ一覧ファイルに出力する項目の間で、既存ファイルの扱いが異なります。扱いをそろえてください。\n${conflictingLists.join('\n')}`,
+      );
+      return;
+    }
+
     if (mapProblems.undecided.length > 0) {
       const detail = mapProblems.undecided.map((u) => `「${u.setName}」: ${u.count} 件`).join('\n');
       const proceed = await confirmAction(
@@ -431,6 +447,7 @@ export function useExportPlan({ isOpen, onClose }: UseExportPlanOptions) {
             integer_keys: collectIntegerOptionKeys(optionsSchema),
             waypoint_items: waypointItems,
             map_items: mapItems,
+            map_lists: mapLists.map((l) => ({ path: l.file.fullPath, entries: l.entries, append: l.append })),
           });
 
           let alertMsg = `エクスポートが完了しました。\n出力ファイル数: ${result.exported_files_count} 件`;

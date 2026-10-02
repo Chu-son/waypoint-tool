@@ -48,7 +48,17 @@ export interface ExportTargetItem {
   includeMapImage?: boolean;
   /** Map items only: the layer visibility set that decides which layers are drawn. Absent means the current display. */
   visibilitySetId?: string;
+  /** Map items only: also list the output maps in a text file in the same directory. Absent means no list. */
+  mapList?: ExportMapList;
   enabled: boolean;
+}
+
+/** How an existing list file is treated: `append` adds only the names it lacks, `conflict_setting` follows the profile. */
+export type MapListExisting = 'append' | 'conflict_setting';
+
+export interface ExportMapList {
+  fileName: string;
+  existing: MapListExisting;
 }
 
 export interface ExportProfile {

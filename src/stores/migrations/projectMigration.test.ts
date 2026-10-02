@@ -694,6 +694,41 @@ describe('projectMigration', () => {
     });
   });
 
+  describe('export item map list', () => {
+    const normalizeItem = (extra: Record<string, unknown>) =>
+      migrateAndNormalizeProjectData({
+        version: 1,
+        export_profiles: [
+          {
+            id: 'p',
+            name: 'P',
+            items: [
+              { id: 'i', type: 'map_all_regions', sourceId: 'all', relativePathPattern: 'Map/{{name}}.pgm', ...extra },
+            ],
+          },
+        ],
+      }).export_profiles[0].items[0];
+
+    it('keeps the list setting of a map item', () => {
+      const item = normalizeItem({ mapList: { fileName: 'map_list.txt', existing: 'conflict_setting' } });
+
+      expect(item.mapList).toEqual({ fileName: 'map_list.txt', existing: 'conflict_setting' });
+    });
+
+    it('appends to an existing list unless told otherwise', () => {
+      expect(normalizeItem({ mapList: { fileName: 'map_list.txt' } }).mapList?.existing).toBe('append');
+      expect(normalizeItem({ mapList: { fileName: 'map_list.txt', existing: 'bogus' } }).mapList?.existing).toBe(
+        'append',
+      );
+    });
+
+    it('writes no list for a project saved before the setting existed, or one with a blank name', () => {
+      expect(normalizeItem({}).mapList).toBeUndefined();
+      expect(normalizeItem({ mapList: { fileName: '  ', existing: 'append' } }).mapList).toBeUndefined();
+      expect(normalizeItem({ mapList: 'map_list.txt' }).mapList).toBeUndefined();
+    });
+  });
+
   describe('option schema globals', () => {
     const globals = [{ name: 'default_speed', label: 'Default Speed', type: 'float', value: 0.5 }];
 
