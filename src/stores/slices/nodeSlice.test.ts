@@ -828,3 +828,125 @@ describe('NodeSlice - insertionTarget & group selection', () => {
     expect(useAppStore.getState().insertionTarget).toEqual({ parentId: null, index: 1 });
   });
 });
+
+describe('NodeSlice - restoreGeneratorSource', () => {
+  const t = (x: number) => ({ x, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
+  // The generator replaced: a, a group holding g1 and a nested generator (with its parameters), and b.
+  const snapshot = {
+    topLevelIds: ['a', 'grp', 'b'],
+    nodes: {
+      a: { id: 'a', type: 'manual', name: 'A', transform: t(0), options: { stop: true } },
+      grp: { id: 'grp', type: 'group', name: 'Group', children_ids: ['g1', 'inner'] },
+      g1: { id: 'g1', type: 'manual', name: 'G1', transform: t(1) },
+      inner: {
+        id: 'inner',
+        type: 'generator',
+        name: 'Inner',
+        plugin_id: 'sweep',
+        generator_params: { properties: { pitch: 2 } },
+        children_ids: ['i1'],
+      },
+      i1: { id: 'i1', type: 'manual', transform: t(2) },
+      b: { id: 'b', type: 'manual', name: 'B', transform: t(3) },
+    },
+  } as const;
+  const generator = (id = 'gen'): WaypointNode => ({
+    id,
+    type: 'generator',
+    children_ids: [`${id}-c0`, `${id}-c1`],
+    source_snapshot: JSON.parse(JSON.stringify(snapshot)),
+  });
+  const withGenerator = (parentId?: string) => {
+    const nodes: Record<string, WaypointNode> = {
+      before: { id: 'before', type: 'manual', transform: t(-1) },
+      gen: generator(),
+      'gen-c0': { id: 'gen-c0', type: 'manual', transform: t(0) },
+      'gen-c1': { id: 'gen-c1', type: 'manual', transform: t(3) },
+      after: { id: 'after', type: 'manual', transform: t(9) },
+    };
+    if (parentId) {
+      nodes[parentId] = { id: parentId, type: 'group', children_ids: ['before', 'gen', 'after'] };
+      useAppStore.setState({ nodes, rootNodeIds: [parentId] });
+    } else {
+      useAppStore.setState({ nodes, rootNodeIds: ['before', 'gen', 'after'] });
+    }
+  };
+  const state = () => useAppStore.getState();
+  const named = (ids: string[]) => ids.map((id) => state().nodes[id].name);
+
+  it('puts the original hierarchy back where the generator was, groups and nested generators included', () => {
+    withGenerator();
+
+    const restored = state().restoreGeneratorSource('gen');
+
+    expect(state().rootNodeIds).toEqual(['before', ...restored, 'after']);
+    expect(named(restored)).toEqual(['A', 'Group', 'B']);
+    const group = state().nodes[restored[1]];
+    expect(named(group.children_ids!)).toEqual(['G1', 'Inner']);
+    const inner = state().nodes[group.children_ids![1]];
+    expect(inner.generator_params).toEqual({ properties: { pitch: 2 } });
+    expect(inner.children_ids).toHaveLength(1);
+    expect(state().nodes[restored[0]].options).toEqual({ stop: true });
+  });
+
+  it('removes the generator and its children', () => {
+    withGenerator();
+
+    state().restoreGeneratorSource('gen');
+
+    expect(state().nodes['gen']).toBeUndefined();
+    expect(state().nodes['gen-c0']).toBeUndefined();
+    expect(state().nodes['gen-c1']).toBeUndefined();
+  });
+
+  it('restores inside the parent group when the generator sat in one', () => {
+    withGenerator('outer');
+
+    const restored = state().restoreGeneratorSource('gen');
+
+    expect(state().rootNodeIds).toEqual(['outer']);
+    expect(state().nodes['outer'].children_ids).toEqual(['before', ...restored, 'after']);
+  });
+
+  it('gives the restored nodes new ids, so restoring two copies of a generator does not collide', () => {
+    withGenerator();
+
+    const first = state().restoreGeneratorSource('gen');
+    useAppStore.setState((s) => ({
+      nodes: { ...s.nodes, gen2: generator('gen2') },
+      rootNodeIds: [...s.rootNodeIds, 'gen2'],
+    }));
+    const second = state().restoreGeneratorSource('gen2');
+
+    expect(first.some((id) => second.includes(id))).toBe(false);
+    expect(first).not.toContain('a');
+  });
+
+  it('selects the restored nodes', () => {
+    withGenerator();
+
+    const restored = state().restoreGeneratorSource('gen');
+
+    expect(state().selectedNodeIds).toEqual(expect.arrayContaining(restored));
+  });
+
+  it('is undone in one step', () => {
+    withGenerator();
+
+    state().restoreGeneratorSource('gen');
+    state().undo();
+
+    expect(state().rootNodeIds).toEqual(['before', 'gen', 'after']);
+    expect(state().nodes['gen'].children_ids).toEqual(['gen-c0', 'gen-c1']);
+  });
+
+  it('does nothing for a generator without a snapshot', () => {
+    useAppStore.setState({
+      nodes: { gen: { id: 'gen', type: 'generator', children_ids: [] } },
+      rootNodeIds: ['gen'],
+    });
+
+    expect(state().restoreGeneratorSource('gen')).toEqual([]);
+    expect(state().rootNodeIds).toEqual(['gen']);
+  });
+});

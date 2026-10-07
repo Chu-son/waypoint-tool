@@ -44,7 +44,7 @@ export type PluginManifest = {
   executable: string;
   module_name?: string;
   inputs: PluginInputDef[];
-  needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region' | 'robot_footprint')[];
+  needs?: ('selected_points' | 'occupancy_grid' | 'occupancy_grid_in_region' | 'robot_footprint' | 'waypoint_range')[];
   properties: OptionDef[];
   icon?: string;
   legacy_ids?: string[];

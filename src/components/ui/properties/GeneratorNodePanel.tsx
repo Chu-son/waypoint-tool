@@ -7,7 +7,9 @@ import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { PluginDataViewer } from '../common/PluginDataViewer';
 import { GeneratorRegenerateConflictModal } from '../modals/GeneratorRegenerateConflictModal';
 import { detectGeneratorModifications, computeGeneratorStash } from '../../../utils/generatorStashUtils';
-import { Play, Settings2, RefreshCcw, BoxSelect } from 'lucide-react';
+import { flattenSourceSnapshot } from '../../../utils/pluginResult';
+import { confirmAction } from '../../../services/notify';
+import { Play, Settings2, RefreshCcw, BoxSelect, Undo2 } from 'lucide-react';
 import { WaypointNode, GeneratorModificationSummary, GeneratorStash } from '../../../types/store';
 import { InternalPropertiesSection } from './InternalPropertiesSection';
 
@@ -19,6 +21,7 @@ interface GeneratorNodePanelProps {
 export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
   const plugins = useAppStore((state) => state.plugins);
   const explodeGenerator = useAppStore((state) => state.explodeGenerator);
+  const restoreGeneratorSource = useAppStore((state) => state.restoreGeneratorSource);
   const updatePluginInteractionData = useAppStore((state) => state.updatePluginInteractionData);
   const pluginInteractionData = useAppStore((state) => state.pluginInteractionData);
   const nodes = useAppStore((state) => state.nodes);
@@ -32,6 +35,32 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
 
   const pluginId = node.plugin_id || '';
   const plugin = plugins[pluginId];
+  const sourceSnapshot = node.source_snapshot;
+  const sourcePointCount = sourceSnapshot ? flattenSourceSnapshot(sourceSnapshot).length : 0;
+  // 範囲は初回実行時に固定済みで、再生成では選び直せない
+  const rangeFrozen = !!sourceSnapshot && !!plugin?.manifest.needs?.includes('waypoint_range');
+
+  const handleRestoreSource = async () => {
+    if (detectGeneratorModifications(node, nodes).hasModifications) {
+      const confirmed = await confirmAction('ジェネレーター内の手動編集は破棄されます。元の状態に戻しますか？', {
+        title: 'Restore Original',
+      });
+      if (!confirmed) return;
+    }
+    restoreGeneratorSource(node.id);
+  };
+
+  const restoreButton = sourceSnapshot && (
+    <Button
+      variant="secondary"
+      onClick={handleRestoreSource}
+      className="w-full gap-2"
+      title="Replace this generator with the original waypoints (groups included)"
+    >
+      <Undo2 size={14} />
+      元に戻す (Restore Original)
+    </Button>
+  );
 
   useEffect(() => {
     if (node.generator_params?.properties) setGenParams({ ...node.generator_params.properties });
@@ -120,9 +149,17 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
             );
           })}
 
+          {rangeFrozen && (
+            <p className="text-[11px] text-text-muted">
+              元の点: {sourcePointCount} 点（固定。「元に戻す」でグループごと元の状態に戻せます）
+            </p>
+          )}
+
           {plugin.manifest.inputs?.map((inp, idx) => {
             const key = inp.name || inp.id;
             if (!key) return null;
+            // 元の点は初回実行時に固定済み。再生成では選択し直せないので入力を出さない。
+            if (rangeFrozen && inp.type === 'waypoint') return null;
 
             return (
               <PluginInputEditor
@@ -155,6 +192,7 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
               )}
               {isExecuting ? 'Re-Generating...' : 'Re-Generate Path'}
             </Button>
+            {restoreButton}
             <Button
               variant="danger"
               onClick={async () => {
@@ -186,7 +224,8 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
             <PluginDataViewer data={node.plugin_data} title="保存された内部データ" defaultExpanded={true} />
           )}
 
-          <div className="pt-4 border-t border-border-base">
+          <div className="pt-4 border-t border-border-base space-y-2">
+            {restoreButton}
             <Button
               variant="danger"
               onClick={async () => {

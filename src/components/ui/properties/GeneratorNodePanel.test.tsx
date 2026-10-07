@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { GeneratorNodePanel } from './GeneratorNodePanel';
-import { BackendAPI } from '../../../api';
+import { BackendAPI, DialogAPI } from '../../../api';
 import { renderWithStore } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { makePlugin, makeTransform, makeWaypoint, waypointTree } from '../../../test/fixtures';
@@ -90,6 +90,77 @@ describe('GeneratorNodePanel', () => {
       await waitFor(() => expect(screen.queryByText(CONFLICT_TITLE)).not.toBeInTheDocument());
       expect(BackendAPI.runPlugin).not.toHaveBeenCalled();
       expect(getAppState().nodes['child-1'].transform).toMatchObject({ x: 2, y: 2 });
+    });
+  });
+
+  describe('Restore Original', () => {
+    const RESTORE = '元に戻す (Restore Original)';
+
+    /** A generator that replaced one group holding one waypoint; its generated waypoint now sits at `current`. */
+    function renderRestorable(current = makeTransform(1, 2, 0), withSnapshot = true) {
+      const generator = makeWaypoint('gen-1', {
+        type: 'generator',
+        plugin_id: 'test-gen',
+        transform: undefined,
+        children_ids: ['child-1'],
+        baseline_waypoints: [{ transform: makeTransform(1, 2, 0) }],
+        source_snapshot: withSnapshot
+          ? {
+              topLevelIds: ['orig-group'],
+              nodes: {
+                'orig-group': makeWaypoint('orig-group', {
+                  type: 'group',
+                  name: 'Original Group',
+                  transform: undefined,
+                  children_ids: ['orig-wp'],
+                }),
+                'orig-wp': makeWaypoint('orig-wp', { name: 'Original Waypoint' }),
+              },
+            }
+          : undefined,
+      });
+      return renderWithStore(<GeneratorNodePanel node={generator} />, {
+        ...waypointTree([generator, makeWaypoint('child-1', { transform: current })]),
+        plugins: { [plugin.id]: plugin },
+      });
+    }
+
+    const rootNames = () => getAppState().rootNodeIds.map((id) => getAppState().nodes[id].name);
+
+    it('is offered only for generators that kept their original range', () => {
+      renderRestorable(makeTransform(1, 2, 0), false);
+      expect(screen.queryByText(RESTORE)).not.toBeInTheDocument();
+    });
+
+    it('brings the original group back without asking when nothing was edited', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask');
+      renderRestorable();
+
+      fireEvent.click(screen.getByText(RESTORE));
+
+      await waitFor(() => expect(rootNames()).toEqual(['Original Group']));
+      expect(ask).not.toHaveBeenCalled();
+      const group = getAppState().nodes[getAppState().rootNodeIds[0]];
+      expect(getAppState().nodes[group.children_ids![0]].name).toBe('Original Waypoint');
+    });
+
+    it('asks before throwing away hand edits, and keeps the generator if declined', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      renderRestorable(makeTransform(5, 5, 0));
+
+      fireEvent.click(screen.getByText(RESTORE));
+
+      await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+      expect(getAppState().rootNodeIds).toEqual(['gen-1']);
+    });
+
+    it('restores after the user confirms discarding hand edits', async () => {
+      vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+      renderRestorable(makeTransform(5, 5, 0));
+
+      fireEvent.click(screen.getByText(RESTORE));
+
+      await waitFor(() => expect(rootNames()).toEqual(['Original Group']));
     });
   });
 });

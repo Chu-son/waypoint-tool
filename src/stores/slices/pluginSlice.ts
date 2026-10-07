@@ -7,13 +7,15 @@ import {
   AnnotationGroup,
   AnnotationObject,
   GeneratorStash,
+  SourceSnapshot,
   WaypointNode,
   PipelineMetadata,
   InsertionTarget,
 } from '../../types/store';
 import { BackendAPI } from '../../api';
 import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../services/mapRasterize';
-import { applyGeneratorStash, computeGeneratorStash } from '../../utils/generatorStashUtils';
+import { applyGeneratorStash, computeGeneratorStash, resolveGeneratorStash } from '../../utils/generatorStashUtils';
+import { notify } from '../../services/notify';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';
 import { baseMapResolution, insertBelowCustomLayers } from '../../utils/layerStack';
@@ -26,6 +28,8 @@ import {
   extractWaypointsFromRawResult,
   pluginWaypointTransform,
   toBaselineWaypoints,
+  captureSourceSnapshot,
+  flattenSourceSnapshot,
 } from '../../utils/pluginResult';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -222,6 +226,28 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       contextData.selected_points = selectedNodeIds.map((id) => nodes[id]?.transform).filter(Boolean);
     }
 
+    let sourceSnapshot: SourceSnapshot | undefined = undefined;
+    if (plugin.manifest.needs?.includes('waypoint_range')) {
+      // 初回実行では消費するノード（グループ・入れ子のジェネレーターを含む部分木）をここで写しとして凍結する。
+      // 再生成では、そのジェネレーターが保持している写しを使う（同じインデックスにはもうジェネレーター自身が
+      // いるため、解決し直せない）。
+      const existingGenerator = targetParentWaypointId
+        ? nodes[targetParentWaypointId]
+        : existingExecutionId
+          ? Object.values(nodes).find((n) => n.type === 'generator' && n.source_execution_id === existingExecutionId)
+          : undefined;
+      const consumedIds = params.placement?.type === 'replace_ids' ? params.placement.ids : idsToConsume;
+
+      if (existingGenerator?.source_snapshot) {
+        sourceSnapshot = existingGenerator.source_snapshot;
+      } else if (consumedIds.length > 0) {
+        sourceSnapshot = captureSourceSnapshot(consumedIds, nodes);
+      } else {
+        throw new Error('This plugin requires selecting a range of waypoints first.');
+      }
+      contextData.waypoint_range = flattenSourceSnapshot(sourceSnapshot);
+    }
+
     if (plugin.manifest.needs?.includes('robot_footprint')) {
       contextData.robot_footprint = robotFootprint;
     }
@@ -253,6 +279,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     let resultingParentWaypointId: string | undefined = undefined;
     const resultingCustomLayerIds: string[] = [];
     let resultingAnnotationGroupId: string | undefined = undefined;
+    let unmatchedStashCount = 0;
 
     get().runInHistoryTransaction(() => {
       const store = get();
@@ -329,6 +356,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
             plugin_data: waypointPluginData || rawResult.plugin_data,
             children_ids: [],
             baseline_waypoints: baselineWaypoints,
+            source_snapshot: sourceSnapshot,
           };
 
           store.addNodes([generatorNode], targetParentId, targetIndex);
@@ -336,7 +364,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
 
         // Apply stash if provided
-        const waypointsToInstantiate = stashToApply ? applyGeneratorStash(waypointItems, stashToApply) : waypointItems;
+        const resolved = stashToApply
+          ? resolveGeneratorStash(waypointItems, stashToApply)
+          : { waypoints: waypointItems, unmatched: 0 };
+        unmatchedStashCount = resolved.unmatched;
+        const waypointsToInstantiate = resolved.waypoints;
 
         // Add child waypoint nodes in a single atomic batch
         const childNodes: WaypointNode[] = waypointsToInstantiate.map((wp) => ({
@@ -495,6 +527,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         }
       }
     });
+
+    if (unmatchedStashCount > 0) {
+      void notify(`${unmatchedStashCount} 件の手動編集は、再生成後の対応する点が見つからず適用できませんでした。`, {
+        title: '再生成',
+        kind: 'warning',
+      });
+    }
 
     return {
       success: true,

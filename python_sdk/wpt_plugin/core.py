@@ -45,6 +45,7 @@ def emit_output_to_stdout(payload: Any, threshold_bytes: int = PAYLOAD_OFFLOAD_T
 class Transform(TypedDict, total=False):
     x: float
     y: float
+    z: float
     qx: float
     qy: float
     qz: float
@@ -53,6 +54,9 @@ class Transform(TypedDict, total=False):
 class Waypoint(TypedDict, total=False):
     transform: Transform
     options: Dict[str, Any]
+    name: str
+    # 再生成をまたいで同じ点を指す安定キー。手動編集の退避（スタッシュ）をこのキーで照合する。
+    stash_key: str
 
 class PluginBase:
     """Base class for all Waypoint Tool Python plugins."""
@@ -190,6 +194,16 @@ class PluginBase:
                 ))
         return points
 
+    def get_waypoint_range(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """context["waypoint_range"]（本体が初回実行時に固定した元のウェイポイント）を返す。
+
+        各要素は {"id", "name", "transform", "options"}。再生成でも同じ内容が渡される。
+        needs に "waypoint_range" を指定していない場合は空リストを返す。"""
+        data = context.get("waypoint_range")
+        if not data or not isinstance(data, list):
+            return []
+        return [item for item in data if isinstance(item, dict) and isinstance(item.get("transform"), dict)]
+
     @staticmethod
     def log(message: str):
         print(f"[PLUGIN] {message}", file=sys.stderr)
@@ -233,6 +247,7 @@ class PluginResult:
                                z: Optional[Sequence[float]] = None,
                                names: Optional[Sequence[str]] = None,
                                options: Optional[Sequence[Optional[Dict[str, Any]]]] = None,
+                               stash_keys: Optional[Sequence[Optional[str]]] = None,
                                name: Optional[str] = None,
                                plugin_data: Optional[Dict[str, Any]] = None) -> 'PluginResult':
         """Add generated waypoints in compact columnar format.
@@ -257,6 +272,8 @@ class PluginResult:
             self._waypoints["names"] = list(names)
         if options is not None:
             self._waypoints["options"] = list(options)
+        if stash_keys is not None:
+            self._waypoints["stash_keys"] = list(stash_keys)
         if name is not None:
             self._waypoints["name"] = name
         if plugin_data is not None:
@@ -366,7 +383,9 @@ class PluginGenerator(PluginBase):
     @staticmethod
     def make_waypoint(x: float, y: float, yaw: float,
                        options: Optional[Dict[str, Any]] = None,
-                       precision: int = 6) -> Waypoint:
+                       precision: int = 6,
+                       name: Optional[str] = None,
+                       stash_key: Optional[str] = None) -> Waypoint:
         qx, qy, qz, qw = yaw_to_quaternion(yaw)
         wp: Waypoint = {
             "transform": {
@@ -380,6 +399,10 @@ class PluginGenerator(PluginBase):
         }
         if options is not None:
             wp["options"] = options
+        if name is not None:
+            wp["name"] = name
+        if stash_key is not None:
+            wp["stash_key"] = stash_key
         return wp
 
     @staticmethod

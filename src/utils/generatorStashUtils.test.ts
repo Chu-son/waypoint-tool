@@ -3,6 +3,7 @@ import {
   detectGeneratorModifications,
   computeGeneratorStash,
   applyGeneratorStash,
+  resolveGeneratorStash,
   normalizeAngle,
   areOptionsEqual,
 } from './generatorStashUtils';
@@ -244,5 +245,109 @@ describe('generatorStashUtils', () => {
       expect(applied[1].x).toBe(1);
       expect(applied[2].x).toBe(2);
     });
+  });
+});
+
+describe('generatorStashUtils - stash_key matching', () => {
+  const tf = (x: number): Transform => ({ x, y: 0, z: 0, ...yawToQuaternion(0) });
+
+  // baseline: orig:0, one interpolated point, orig:1
+  const keyedBaseline = [
+    { transform: tf(0), stash_key: 'orig:0' },
+    { transform: tf(1), stash_key: 'seg:0:1/2' },
+    { transform: tf(2), stash_key: 'orig:1' },
+  ];
+  const generator = (baseline: WaypointNode['baseline_waypoints']): WaypointNode => ({
+    id: 'gen',
+    type: 'generator',
+    children_ids: ['c0', 'c1', 'c2'],
+    baseline_waypoints: baseline,
+  });
+  const children = (overrides: Record<string, Partial<WaypointNode>> = {}): Record<string, WaypointNode> => ({
+    c0: { id: 'c0', type: 'manual', transform: tf(0), ...overrides.c0 },
+    c1: { id: 'c1', type: 'manual', transform: tf(1), ...overrides.c1 },
+    c2: { id: 'c2', type: 'manual', transform: tf(2), ...overrides.c2 },
+  });
+
+  it('keeps an edit on the same point after the point count changes', () => {
+    const stash = computeGeneratorStash(generator(keyedBaseline), children({ c2: { options: { stop: true } } }));
+
+    // regenerated without the interpolated point (e.g. subdivision disabled)
+    const regenerated = [
+      { x: 0, y: 0, yaw: 0, stash_key: 'orig:0' },
+      { x: 2, y: 0, yaw: 0, stash_key: 'orig:1' },
+    ];
+    const { waypoints, unmatched } = resolveGeneratorStash(regenerated, stash);
+
+    expect(waypoints[1].options).toEqual({ stop: true });
+    expect(waypoints[0].options).toBeUndefined();
+    expect(unmatched).toBe(0);
+  });
+
+  it('reports an edit whose point no longer exists instead of applying it elsewhere', () => {
+    const stash = computeGeneratorStash(generator(keyedBaseline), children({ c1: { transform: tf(1.2) } }));
+
+    const regenerated = [
+      { x: 0, y: 0, yaw: 0, stash_key: 'orig:0' },
+      { x: 2, y: 0, yaw: 0, stash_key: 'orig:1' },
+    ];
+    const { waypoints, unmatched } = resolveGeneratorStash(regenerated, stash);
+
+    expect(waypoints.map((w) => w.x)).toEqual([0, 2]);
+    expect(unmatched).toBe(1);
+  });
+
+  it('does not apply keyed edits to output points that have no key', () => {
+    const stash = computeGeneratorStash(generator(keyedBaseline), children({ c0: { transform: tf(0.5) } }));
+
+    const { waypoints, unmatched } = resolveGeneratorStash([{ x: 0, y: 0, yaw: 0 }], stash);
+
+    expect(waypoints[0].x).toBe(0);
+    expect(unmatched).toBe(1);
+  });
+
+  it('reports a point the user appended after generation as unmatched', () => {
+    const generatorWithExtra = { ...generator(keyedBaseline), children_ids: ['c0', 'c1', 'c2', 'c3'] };
+    const nodes = { ...children(), c3: { id: 'c3', type: 'manual', transform: tf(9) } as WaypointNode };
+
+    const stash = computeGeneratorStash(generatorWithExtra, nodes);
+    const { unmatched } = resolveGeneratorStash(
+      keyedBaseline.map((b) => ({ x: b.transform.x, y: 0, yaw: 0, stash_key: b.stash_key })),
+      stash,
+    );
+
+    expect(unmatched).toBe(1);
+  });
+
+  it('falls back to index matching when only some baseline points have a key', () => {
+    const partial = [keyedBaseline[0], { transform: tf(1) }, keyedBaseline[2]];
+    const stash = computeGeneratorStash(generator(partial), children({ c1: { transform: tf(1.5) } }));
+
+    const { waypoints, unmatched } = resolveGeneratorStash(
+      [
+        { x: 0, y: 0, yaw: 0 },
+        { x: 1, y: 0, yaw: 0 },
+      ],
+      stash,
+    );
+
+    expect(waypoints[1].x).toBeCloseTo(1.5);
+    expect(unmatched).toBe(0);
+  });
+
+  it('falls back to index matching when keys are duplicated', () => {
+    const dup = [keyedBaseline[0], { transform: tf(1), stash_key: 'orig:0' }, keyedBaseline[2]];
+    const stash = computeGeneratorStash(generator(dup), children({ c1: { transform: tf(1.5) } }));
+
+    const { waypoints } = resolveGeneratorStash(
+      [
+        { x: 0, y: 0, yaw: 0, stash_key: 'orig:0' },
+        { x: 1, y: 0, yaw: 0, stash_key: 'orig:0' },
+      ],
+      stash,
+    );
+
+    // applied by position, never by the duplicated key
+    expect(waypoints[1].x).toBeCloseTo(1.5);
   });
 });
