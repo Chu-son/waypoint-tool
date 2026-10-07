@@ -1,7 +1,7 @@
 {
     "name": "Interpolation Generator",
-    "version": "1.0.0",
-    "description": "既存のWaypointの間をピッチ指定で補完します。StartとEndの間に点があればそこをたどります。",
+    "version": "2.1.0",
+    "description": "StartとEndの間のウェイポイントを、指定した最大間隔以下になるように細分化します。範囲内のグループやジェネレーターの中の点も対象にできます（「グループ内も補間する」で切り替え）。元の点は保持されており、ジェネレーターの「元に戻す」でグループの階層ごと元の状態に戻せます。",
     "type": "python",
     "executable": "main.py",
     "inputs": [
@@ -16,13 +16,25 @@
             "type": "waypoint"
         }
     ],
-    "needs": [],
+    "needs": ["waypoint_range"],
     "properties": [
         {
-            "name": "pitch",
-            "label": "Pitch (m)",
+            "name": "max_pitch",
+            "label": "最大間隔 (m)",
             "type": "float",
             "default": 1.0
+        },
+        {
+            "name": "include_groups",
+            "label": "グループ内も補間する",
+            "type": "boolean",
+            "default": true
+        },
+        {
+            "name": "enabled",
+            "label": "細分化を有効にする",
+            "type": "boolean",
+            "default": true
         }
     ]
 }

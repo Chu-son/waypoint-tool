@@ -1,8 +1,9 @@
 /**
  * Normalisation of plugin output (docs/PLUGIN_GUIDE.md): waypoints, custom layers and annotations.
  */
-import type { Transform, WaypointBaselineItem } from '../types/store';
+import type { SourceSnapshot, Transform, WaypointBaselineItem, WaypointNode, WaypointOptions } from '../types/store';
 import { yawToQuaternion } from './transformUtils';
+import { collectDescendantIds } from './treeUtils';
 
 /**
  * Pose of a plugin-emitted waypoint. Accepts an explicit `transform`, a quaternion, or a `yaw`
@@ -23,7 +24,59 @@ export function toBaselineWaypoints(items: any[]): WaypointBaselineItem[] {
     transform: pluginWaypointTransform(wp),
     options: wp.options ? { ...wp.options } : undefined,
     name: wp.name,
+    stash_key: typeof wp.stash_key === 'string' ? wp.stash_key : undefined,
   }));
+}
+
+/** A waypoint frozen into `context.waypoint_range` (the `needs: ["waypoint_range"]` payload). */
+export interface WaypointRangeItem {
+  id: string;
+  name?: string;
+  transform: Transform;
+  options?: WaypointOptions;
+  /** Ids of the groups / generators (outermost first) this waypoint sits in within the range. Empty if directly in the range. */
+  group_path: string[];
+}
+
+/**
+ * Deep copy of the subtrees a generator consumes (groups and nested generators included), so the
+ * original hierarchy can be restored later (`restoreGeneratorSource`).
+ */
+export function captureSourceSnapshot(ids: string[], nodes: Record<string, WaypointNode>): SourceSnapshot {
+  const captured: Record<string, WaypointNode> = {};
+  ids.forEach((id) => {
+    if (!nodes[id]) throw new Error(`The selected range contains a node that no longer exists (${id}).`);
+    [id, ...collectDescendantIds(id, nodes)].forEach((nid) => {
+      if (nodes[nid]) captured[nid] = JSON.parse(JSON.stringify(nodes[nid]));
+    });
+  });
+  return { topLevelIds: [...ids], nodes: captured };
+}
+
+/**
+ * Flattens a snapshot into the `waypoint_range` payload: every waypoint in tree order, descending
+ * into groups and generators, each tagged with the containers it sits in.
+ */
+export function flattenSourceSnapshot(snapshot: SourceSnapshot): WaypointRangeItem[] {
+  const items: WaypointRangeItem[] = [];
+  const visit = (id: string, path: string[]) => {
+    const node = snapshot.nodes[id];
+    if (!node) return;
+    if (node.type === 'manual') {
+      if (!node.transform) return;
+      items.push({
+        id: node.id,
+        name: node.name,
+        transform: { ...node.transform },
+        options: node.options ? { ...node.options } : undefined,
+        group_path: path,
+      });
+      return;
+    }
+    (node.children_ids || []).forEach((childId) => visit(childId, [...path, id]));
+  };
+  snapshot.topLevelIds.forEach((id) => visit(id, []));
+  return items;
 }
 
 /** Custom layers from `{ custom_layers: [...] }` or a single bare layer `{ image_base64, info }`. */
@@ -57,7 +110,8 @@ export interface ParsedWaypointsResult {
 
 /**
  * Accepts every waypoint output shape a plugin may return and yields a flat item list:
- * - `{ waypoints: { columnar: true, x: [...], y: [...], ... } }` (column-oriented, for large outputs)
+ * - `{ waypoints: { columnar: true, x: [...], y: [...], ... } }` (column-oriented, for large outputs;
+ *   optional `names` / `options` / `stash_keys` columns)
  * - `{ waypoints: { name, items: [...], plugin_data } }`
  * - `{ waypoints: [...] }`
  * - a bare array of waypoints (legacy)
@@ -80,6 +134,7 @@ export function extractWaypointsFromRawResult(rawResult: any): ParsedWaypointsRe
           yaw: wp.yaw?.[i] ?? 0,
           name: wp.names?.[i],
           options: wp.options?.[i],
+          stash_key: wp.stash_keys?.[i],
         };
       }
       pluginData = wp.plugin_data;

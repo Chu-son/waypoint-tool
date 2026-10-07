@@ -4,7 +4,11 @@ import {
   extractCustomLayerItems,
   extractWaypointsFromRawResult,
   pluginWaypointTransform,
+  toBaselineWaypoints,
+  captureSourceSnapshot,
+  flattenSourceSnapshot,
 } from './pluginResult';
+import type { WaypointNode } from '../types/store';
 import { quaternionToYaw } from './transformUtils';
 
 describe('pluginWaypointTransform', () => {
@@ -90,4 +94,74 @@ describe('extractWaypointsFromRawResult', () => {
       expect(extractWaypointsFromRawResult(raw).items).toEqual([]);
     },
   );
+
+  it('keeps stash_keys from the columnar format', () => {
+    const { items } = extractWaypointsFromRawResult({
+      waypoints: { columnar: true, count: 2, x: [0, 1], y: [0, 0], stash_keys: ['orig:0', 'orig:1'] },
+    });
+    expect(items.map((i) => i.stash_key)).toEqual(['orig:0', 'orig:1']);
+  });
+});
+
+describe('toBaselineWaypoints', () => {
+  it('records the stash_key of each generated waypoint', () => {
+    const baseline = toBaselineWaypoints([
+      { x: 0, y: 0, stash_key: 'orig:0' },
+      { x: 1, y: 0 },
+    ]);
+    expect(baseline.map((b) => b.stash_key)).toEqual(['orig:0', undefined]);
+  });
+});
+
+describe('captureSourceSnapshot / flattenSourceSnapshot', () => {
+  const t = (x: number) => ({ x, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
+  const makeNodes = (): Record<string, WaypointNode> => ({
+    a: { id: 'a', type: 'manual', name: 'A', transform: t(0), options: { stop: true } },
+    g: { id: 'g', type: 'group', name: 'G', children_ids: ['g1', 'inner'] },
+    g1: { id: 'g1', type: 'manual', transform: t(1) },
+    inner: { id: 'inner', type: 'generator', children_ids: ['i1'] },
+    i1: { id: 'i1', type: 'manual', transform: t(2) },
+    empty: { id: 'empty', type: 'group', children_ids: [] },
+    b: { id: 'b', type: 'manual', transform: t(3) },
+  });
+
+  it('lists the waypoints in tree order with their name and options', () => {
+    const nodes = makeNodes();
+    const range = flattenSourceSnapshot(captureSourceSnapshot(['b', 'a'], nodes));
+
+    expect(range).toEqual([
+      { id: 'b', name: undefined, transform: t(3), options: undefined, group_path: [] },
+      { id: 'a', name: 'A', transform: t(0), options: { stop: true }, group_path: [] },
+    ]);
+  });
+
+  it('descends into groups and nested generators and tags each waypoint with its containers', () => {
+    const range = flattenSourceSnapshot(captureSourceSnapshot(['a', 'g', 'empty', 'b'], makeNodes()));
+
+    expect(range.map((w) => [w.id, w.group_path])).toEqual([
+      ['a', []],
+      ['g1', ['g']],
+      ['i1', ['g', 'inner']],
+      ['b', []],
+    ]);
+  });
+
+  it('keeps the whole subtree, empty groups included, for restoring', () => {
+    const snapshot = captureSourceSnapshot(['g', 'empty'], makeNodes());
+
+    expect(snapshot.topLevelIds).toEqual(['g', 'empty']);
+    expect(Object.keys(snapshot.nodes).sort()).toEqual(['empty', 'g', 'g1', 'i1', 'inner']);
+  });
+
+  it('is a copy, so later edits to the nodes do not change the snapshot', () => {
+    const nodes = makeNodes();
+    const snapshot = captureSourceSnapshot(['a'], nodes);
+    nodes.a.transform!.x = 99;
+
+    expect(flattenSourceSnapshot(snapshot)[0].transform.x).toBe(0);
+  });
+
+  it('rejects a range that contains a node which no longer exists', () => {
+    expect(() => captureSourceSnapshot(['a', 'gone'], makeNodes())).toThrow(/no longer exists/);
+  });
 });

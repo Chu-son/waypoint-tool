@@ -18,6 +18,37 @@ import {
 import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { WaypointClipboardPayload } from '../../utils/mapElementClipboard';
 
+/**
+ * Replaces `targetId` with `replacementIds` at the same position in its parent's children (or in
+ * the root list). `nodes` must already be in its final state apart from the parent's children.
+ */
+function replaceInTree(
+  rootIds: string[],
+  nodes: Record<string, WaypointNode>,
+  targetId: string,
+  replacementIds: string[],
+): { rootIds: string[]; nodes: Record<string, WaypointNode> } {
+  const newRootIds = [...rootIds];
+  const newNodes = { ...nodes };
+  const rootIdx = newRootIds.indexOf(targetId);
+
+  if (rootIdx !== -1) {
+    newRootIds.splice(rootIdx, 1, ...replacementIds);
+  } else {
+    Object.keys(newNodes).forEach((nid) => {
+      const parent = newNodes[nid];
+      if (parent.children_ids && parent.children_ids.includes(targetId)) {
+        const idx = parent.children_ids.indexOf(targetId);
+        const nextChildren = [...parent.children_ids];
+        nextChildren.splice(idx, 1, ...replacementIds);
+        newNodes[nid] = { ...parent, children_ids: nextChildren };
+      }
+    });
+  }
+
+  return { rootIds: newRootIds, nodes: newNodes };
+}
+
 export type NodeSlice = {
   nodes: Record<string, WaypointNode>;
   rootNodeIds: string[];
@@ -46,6 +77,8 @@ export type NodeSlice = {
   selectAllNodes: () => void;
   deselectAllNodes: () => void;
   explodeGenerator: (id: string) => void;
+  /** Replaces a generator with the original subtree it consumed (groups and nested generators included). Returns the restored top-level ids. */
+  restoreGeneratorSource: (id: string) => string[];
   duplicateNodes: (ids: string[]) => string[];
   pasteWaypoints: (payload: WaypointClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setInsertionTarget: (target: InsertionTarget | null) => void;
@@ -301,28 +334,15 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       }
 
       const childIds = groupNode.children_ids || [];
-      const newNodes = { ...state.nodes };
-      delete newNodes[groupId];
+      const withoutGroup = { ...state.nodes };
+      delete withoutGroup[groupId];
 
-      let newRootIds = [...state.rootNodeIds];
-      const rootIdx = newRootIds.indexOf(groupId);
-
-      if (rootIdx !== -1) {
-        newRootIds.splice(rootIdx, 1, ...childIds);
-      } else {
-        Object.keys(newNodes).forEach((nid) => {
-          const parent = newNodes[nid];
-          if (parent.children_ids && parent.children_ids.includes(groupId)) {
-            const idx = parent.children_ids.indexOf(groupId);
-            const nextChildren = [...parent.children_ids];
-            nextChildren.splice(idx, 1, ...childIds);
-            newNodes[nid] = {
-              ...parent,
-              children_ids: nextChildren,
-            };
-          }
-        });
-      }
+      const { rootIds: newRootIds, nodes: newNodes } = replaceInTree(
+        state.rootNodeIds,
+        withoutGroup,
+        groupId,
+        childIds,
+      );
 
       const nextTarget = mapInsertionTarget(
         state.insertionTarget,
@@ -353,6 +373,58 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
 
   explodeGenerator: (id: string) => {
     get().ungroupNode(id);
+  },
+
+  restoreGeneratorSource: (id: string) => {
+    const generator = get().nodes[id];
+    if (!generator || generator.type !== 'generator' || !generator.source_snapshot) return [];
+    get().pushHistorySnapshot();
+
+    let restoredIds: string[] = [];
+    set((state) => {
+      const snapshot = state.nodes[id].source_snapshot!;
+      // 新しい ID で作り直す。ジェネレーターを複製してから戻した場合でも ID が衝突しない。
+      const remapped = remapHierarchicalIds(snapshot.topLevelIds, snapshot.nodes);
+      restoredIds = remapped.newTopLevelIds;
+
+      const withoutGenerator = { ...state.nodes };
+      collectDescendantIds(id, state.nodes).forEach((childId) => delete withoutGenerator[childId]);
+      delete withoutGenerator[id];
+
+      const { rootIds: newRootIds, nodes: newNodes } = replaceInTree(
+        state.rootNodeIds,
+        { ...withoutGenerator, ...remapped.newItems },
+        id,
+        restoredIds,
+      );
+
+      const nextTarget = mapInsertionTarget(
+        state.insertionTarget,
+        state.rootNodeIds,
+        state.nodes,
+        newRootIds,
+        newNodes,
+      );
+
+      const nextSelected = expandSelectionWithDescendants(restoredIds, newNodes);
+      return {
+        nodes: newNodes,
+        rootNodeIds: newRootIds,
+        insertionTarget: nextTarget,
+        selectedNodeIds: nextSelected,
+        selection: nextSelected.length > 0 ? { type: 'nodes', ids: nextSelected } : { type: 'none' },
+        selectedAnnotationIds: [],
+        activeCustomLayerId: null,
+        selectedEditObjectId: null,
+        isDirty: true,
+      };
+    });
+
+    if (get().autoRecalculatePath && get().activePathCalculatorPluginId) {
+      get().debouncedRecalculatePath(100);
+    }
+
+    return restoredIds;
   },
 
   moveNodesInTree: (movingIds: string[], targetId: string, position: 'before' | 'after' | 'inside') => {

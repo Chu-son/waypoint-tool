@@ -2,7 +2,20 @@
 Interpolation Generator
 ========================
 
-既存の Waypoint の間をピッチ指定で補完するプラグイン。
+指定した範囲のウェイポイントを、隣り合う点の間隔が最大間隔以下になるように細分化するプラグイン。
+
+元の点は本体が初回実行時に ``context["waypoint_range"]`` として固定する。範囲にグループや入れ子の
+ジェネレーターが含まれる場合は、その中の点も範囲の点として順に渡される（``group_path`` で所属が分かる）。
+「グループ内も補間する」を外すと、同じグループの中の区間は分割しない。
+
+階層ごと元の状態に戻すには、本体の「元に戻す」を使う。「細分化を有効にする」を外して再生成すると、
+元の点だけが（フラットに）出力される。
+
+出力する各点には ``stash_key`` を付ける。ピッチや有効/無効を切り替えて点数が変わっても、
+生成物の中で手動編集した点を、再生成後の同じ点へ引き継げる。
+
+- 元の点:  ``orig:{i}``（i は範囲内での番号。再生成しても変わらない）
+- 補間点:  ``seg:{i}:{j}/{n}``（区間 i を n 分割したときの j 番目）
 """
 
 import sys
@@ -11,86 +24,93 @@ import math
 
 # SDK のインポート
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from wpt_plugin import WaypointGenerator, Point
+from wpt_plugin import PluginGenerator, PluginResult
+
+MIN_PITCH = 0.01
 
 
-class InterpolationGenerator(WaypointGenerator):
-    """2点（またはそれ以上の範囲）の間を等間隔で補完するジェネレーター。
-    """
+class InterpolationGenerator(PluginGenerator):
+    """範囲内の隣り合うウェイポイントの間を等間隔に細分化するジェネレーター。"""
 
     def generate(self, context):
-        # waypoint_range はフロントエンドから渡される WaypointNode のリスト
-        # 各ノードは 'transform' プロパティを持つ
-        nodes = context.get("waypoint_range", [])
-        if len(nodes) < 2:
+        originals = self.get_waypoint_range(context)
+        if len(originals) < 2:
             self.log("Insufficient waypoints in range (need at least 2).")
+            return PluginResult()
+
+        enabled = bool(self.get_property(context, "enabled", default=True))
+        # 旧バージョンの `pitch` も読む
+        pitch = float(self.get_property(context, "max_pitch", default=self.get_property(context, "pitch", default=1.0)))
+        pitch = max(pitch, MIN_PITCH)
+
+        include_groups = bool(self.get_property(context, "include_groups", default=True))
+
+        waypoints = []
+        for i, original in enumerate(originals):
+            previous = originals[i - 1] if i > 0 else None
+            if previous is not None and enabled and (include_groups or not self._in_same_group(previous, original)):
+                waypoints.extend(self._interpolate(previous, original, i - 1, pitch))
+            waypoints.append(self._original_waypoint(original, i))
+
+        res = PluginResult()
+        res.add_waypoints(
+            waypoints,
+            plugin_data={
+                "enabled": enabled,
+                "max_pitch": pitch,
+                "original_count": len(originals),
+                "output_count": len(waypoints),
+            },
+        )
+        self.log(f"{len(originals)} original waypoints -> {len(waypoints)} (enabled={enabled}, max_pitch={pitch}).")
+        return res
+
+    @staticmethod
+    def _in_same_group(a, b):
+        """範囲内で、同じ最上位のグループ（またはジェネレーター）の中にある2点か。
+
+        group_path は範囲内での祖先コンテナの ID（外側が先頭）。範囲の直下の点は空。"""
+        path_a, path_b = a.get("group_path") or [], b.get("group_path") or []
+        return bool(path_a) and bool(path_b) and path_a[0] == path_b[0]
+
+    @staticmethod
+    def _original_waypoint(original, index):
+        """元の点は姿勢（z・ロール・ピッチ含む）も名前も options もそのまま返し、Explode で元通りに戻せるようにする。"""
+        wp = {
+            "transform": dict(original["transform"]),
+            "stash_key": f"orig:{index}",
+        }
+        if original.get("name") is not None:
+            wp["name"] = original["name"]
+        if original.get("options"):
+            wp["options"] = dict(original["options"])
+        return wp
+
+    def _interpolate(self, start, end, segment_index, pitch):
+        """start と end の間に入れる中間点を返す（両端は含まない）。"""
+        a, b = start["transform"], end["transform"]
+        ax, ay, az = a.get("x", 0.0), a.get("y", 0.0), a.get("z", 0.0)
+        bx, by, bz = b.get("x", 0.0), b.get("y", 0.0), b.get("z", 0.0)
+
+        dist = math.hypot(bx - ax, by - ay)
+        # 浮動小数の誤差（1.1 / 0.1 = 11.000000000000002 など）で余分に1分割しないよう許容を持たせる
+        count = math.ceil(dist / pitch - 1e-9)
+        if count <= 1:
             return []
 
-        pitch = float(self.get_property(context, "pitch", default=1.0))
-        if pitch <= 0.01:
-            pitch = 0.01
-
-        # 座標リストの作成
-        path_points = []
-        for node in nodes:
-            t = node.get("transform")
-            if t:
-                path_points.append(Point(t["x"], t["y"], yaw=self._get_yaw_from_transform(t)))
-
-        if len(path_points) < 2:
-            return []
-
-        generated_waypoints = []
-        
-        # 各セグメントごとに補完
-        for i in range(len(path_points) - 1):
-            p1 = path_points[i]
-            p2 = path_points[i+1]
-            
-            dist = p1.distance_to(p2)
-            num_segments = math.ceil(dist / pitch)
-            if num_segments < 1:
-                num_segments = 1
-                
-            actual_pitch = dist / num_segments
-            
-            # セグメントの開始点（最初のセグメントのみ追加、以降は前のセグメントの終点と重なるため）
-            if i == 0:
-                generated_waypoints.append(self.make_waypoint(
-                    p1.x, p1.y, p1.yaw,
-                    options={"generated_by": "InterpolationGenerator", "original": True}
-                ))
-
-            # 中間点の生成
-            for j in range(1, num_segments):
-                ratio = j / num_segments
-                interp_x = p1.x + (p2.x - p1.x) * ratio
-                interp_y = p1.y + (p2.y - p1.y) * ratio
-                
-                # Yaw は単純な線形補完（または p1 の yaw を維持）
-                # ここでは進行方向に向ける
-                seg_yaw = math.atan2(p2.y - p1.y, p2.x - p1.x)
-                
-                generated_waypoints.append(self.make_waypoint(
-                    interp_x, interp_y, seg_yaw,
-                    options={"generated_by": "InterpolationGenerator", "interp": True}
-                ))
-            
-            # セグメントの終点
-            generated_waypoints.append(self.make_waypoint(
-                p2.x, p2.y, p2.yaw,
-                options={"generated_by": "InterpolationGenerator", "original": True}
-            ))
-
-        self.log(f"Interpolated {len(generated_waypoints)} waypoints over {len(path_points)-1} segments.")
-        return generated_waypoints
-
-    def _get_yaw_from_transform(self, t):
-        qx = t.get("qx", 0)
-        qy = t.get("qy", 0)
-        qz = t.get("qz", 0)
-        qw = t.get("qw", 1)
-        return math.atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
+        yaw = math.atan2(by - ay, bx - ax)
+        points = []
+        for j in range(1, count):
+            ratio = j / count
+            wp = self.make_waypoint(
+                ax + (bx - ax) * ratio,
+                ay + (by - ay) * ratio,
+                yaw,
+                stash_key=f"seg:{segment_index}:{j}/{count}",
+            )
+            wp["transform"]["z"] = az + (bz - az) * ratio
+            points.append(wp)
+        return points
 
 
 if __name__ == "__main__":

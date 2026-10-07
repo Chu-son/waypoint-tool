@@ -144,87 +144,121 @@ export function computeGeneratorStash(
 ): GeneratorStash {
   const summary = detectGeneratorModifications(generatorNode, allNodes);
   const stash: GeneratorStash = {};
+  const baseline = generatorNode.baseline_waypoints ?? [];
+
+  // 全ての点が重複しない stash_key を持つときだけキーで照合する。そうでなければ従来どおり番号で照合する。
+  const keys = baseline.map((b) => b.stash_key);
+  const keyed = keys.length > 0 && keys.every((k) => typeof k === 'string') && new Set(keys).size === keys.length;
 
   for (const diff of summary.diffs) {
-    stash[diff.index] = diff;
+    if (!keyed) {
+      stash[diff.index] = diff;
+    } else {
+      // 末尾に手動追加された点にはキーがない。どの出力にも一致しないキーで残し、未適用として報告させる。
+      const key = keys[diff.index] ?? `__unkeyed:${diff.index}`;
+      stash[key] = { ...diff, key };
+    }
   }
 
   return stash;
 }
 
+export interface ResolvedGeneratorStash {
+  waypoints: any[];
+  /** 新しい生成結果に対応する点がなく、適用できなかった差分の数 */
+  unmatched: number;
+}
+
 /**
- * プラグインが新しく生成したウェイポイント一覧に、スタッシュされた手動変更差分を適用する
+ * プラグインが新しく生成したウェイポイント一覧に、スタッシュされた手動変更差分を適用する。
+ * 生成物が `stash_key` を持つ場合はキーで、持たない場合は番号で差分を引く。
  */
-export function applyGeneratorStash(generatedWaypoints: any[], stash: GeneratorStash): any[] {
-  if (!stash || Object.keys(stash).length === 0) {
-    return generatedWaypoints;
+export function resolveGeneratorStash(generatedWaypoints: any[], stash: GeneratorStash): ResolvedGeneratorStash {
+  const total = stash ? Object.keys(stash).length : 0;
+  if (total === 0) {
+    return { waypoints: generatedWaypoints, unmatched: 0 };
   }
 
-  return generatedWaypoints.map((rawWp, index) => {
-    const diff = stash[index];
+  // 照合方式はスタッシュの作られ方で決まる（computeGeneratorStash 参照）。キーで保存された差分を番号で引いて
+  // 別の点に当てたり、番号で保存された差分をキーで引こうとしたりしない。
+  const keyed = Object.values(stash).some((d) => d.key !== undefined);
+  const used = new Set<string | number>();
+  const waypoints = generatedWaypoints.map((rawWp, index) => {
+    const slot = keyed ? rawWp?.stash_key : index;
+    const diff = slot === undefined ? undefined : stash[slot];
     if (!diff) {
       return rawWp;
     }
-
-    const cloned = JSON.parse(JSON.stringify(rawWp));
-
-    // 既存の座標とクォータニオンを取得
-    let origX = cloned.transform?.x ?? cloned.x ?? 0;
-    let origY = cloned.transform?.y ?? cloned.y ?? 0;
-    let origZ = cloned.transform?.z ?? cloned.z ?? 0;
-
-    let origYaw = 0;
-    if (typeof cloned.yaw === 'number') {
-      origYaw = cloned.yaw;
-    } else if (cloned.transform) {
-      origYaw = quaternionToYaw(cloned.transform);
-    } else if (cloned.qw !== undefined || cloned.qz !== undefined) {
-      origYaw = quaternionToYaw({
-        qx: cloned.qx ?? 0,
-        qy: cloned.qy ?? 0,
-        qz: cloned.qz ?? 0,
-        qw: cloned.qw ?? 1,
-      });
-    }
-
-    const newX = origX + diff.deltaX;
-    const newY = origY + diff.deltaY;
-    const newZ = origZ + diff.deltaZ;
-    const newYaw = normalizeAngle(origYaw + diff.deltaYaw);
-    const quat = yawToQuaternion(newYaw);
-
-    if (cloned.transform) {
-      cloned.transform.x = newX;
-      cloned.transform.y = newY;
-      cloned.transform.z = newZ;
-      cloned.transform.qx = quat.qx;
-      cloned.transform.qy = quat.qy;
-      cloned.transform.qz = quat.qz;
-      cloned.transform.qw = quat.qw;
-    } else {
-      cloned.x = newX;
-      cloned.y = newY;
-      cloned.z = newZ;
-      cloned.qx = quat.qx;
-      cloned.qy = quat.qy;
-      cloned.qz = quat.qz;
-      cloned.qw = quat.qw;
-      if (cloned.yaw !== undefined) {
-        cloned.yaw = newYaw;
-      }
-    }
-
-    if (diff.modifiedOptions) {
-      cloned.options = {
-        ...(cloned.options || {}),
-        ...diff.modifiedOptions,
-      };
-    }
-
-    if (diff.customName) {
-      cloned.name = diff.customName;
-    }
-
-    return cloned;
+    used.add(slot);
+    return applyDiff(rawWp, diff);
   });
+
+  return { waypoints, unmatched: total - used.size };
+}
+
+export function applyGeneratorStash(generatedWaypoints: any[], stash: GeneratorStash): any[] {
+  return resolveGeneratorStash(generatedWaypoints, stash).waypoints;
+}
+
+function applyDiff(rawWp: any, diff: WaypointDiffItem): any {
+  const cloned = JSON.parse(JSON.stringify(rawWp));
+
+  // 既存の座標とクォータニオンを取得
+  let origX = cloned.transform?.x ?? cloned.x ?? 0;
+  let origY = cloned.transform?.y ?? cloned.y ?? 0;
+  let origZ = cloned.transform?.z ?? cloned.z ?? 0;
+
+  let origYaw = 0;
+  if (typeof cloned.yaw === 'number') {
+    origYaw = cloned.yaw;
+  } else if (cloned.transform) {
+    origYaw = quaternionToYaw(cloned.transform);
+  } else if (cloned.qw !== undefined || cloned.qz !== undefined) {
+    origYaw = quaternionToYaw({
+      qx: cloned.qx ?? 0,
+      qy: cloned.qy ?? 0,
+      qz: cloned.qz ?? 0,
+      qw: cloned.qw ?? 1,
+    });
+  }
+
+  const newX = origX + diff.deltaX;
+  const newY = origY + diff.deltaY;
+  const newZ = origZ + diff.deltaZ;
+  const newYaw = normalizeAngle(origYaw + diff.deltaYaw);
+  const quat = yawToQuaternion(newYaw);
+
+  if (cloned.transform) {
+    cloned.transform.x = newX;
+    cloned.transform.y = newY;
+    cloned.transform.z = newZ;
+    cloned.transform.qx = quat.qx;
+    cloned.transform.qy = quat.qy;
+    cloned.transform.qz = quat.qz;
+    cloned.transform.qw = quat.qw;
+  } else {
+    cloned.x = newX;
+    cloned.y = newY;
+    cloned.z = newZ;
+    cloned.qx = quat.qx;
+    cloned.qy = quat.qy;
+    cloned.qz = quat.qz;
+    cloned.qw = quat.qw;
+    if (cloned.yaw !== undefined) {
+      cloned.yaw = newYaw;
+    }
+  }
+
+  if (diff.modifiedOptions) {
+    cloned.options = {
+      ...(cloned.options || {}),
+      ...diff.modifiedOptions,
+    };
+  }
+
+  if (diff.customName) {
+    cloned.name = diff.customName;
+  }
+
+  return cloned;
 }

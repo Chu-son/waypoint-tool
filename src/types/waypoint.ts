@@ -21,10 +21,14 @@ export interface WaypointBaselineItem {
   transform: Transform;
   options?: WaypointOptions;
   name?: string;
+  /** プラグインが付けた、再生成をまたいで同じ点を指す安定キー（スタッシュの照合に使う） */
+  stash_key?: string;
 }
 
 export interface WaypointDiffItem {
   index: number;
+  /** 照合に使った安定キー。キーを持たない生成物の差分では未設定（番号で照合する） */
+  key?: string;
   hasTransformDiff: boolean;
   deltaX: number;
   deltaY: number;
@@ -34,7 +38,7 @@ export interface WaypointDiffItem {
   customName?: string;
 }
 
-export type GeneratorStash = Record<number, WaypointDiffItem>;
+export type GeneratorStash = Record<string | number, WaypointDiffItem>;
 
 export interface GeneratorModificationSummary {
   hasModifications: boolean;
@@ -43,6 +47,15 @@ export interface GeneratorModificationSummary {
   totalBaseline: number;
   diffs: WaypointDiffItem[];
   hasCountChanged: boolean;
+}
+
+/**
+ * ジェネレーターが置き換えた範囲（グループや入れ子のジェネレーターを含む部分木）の写し。
+ * 「元に戻す」で階層ごと復元するために、初回実行時に取る。
+ */
+export interface SourceSnapshot {
+  topLevelIds: string[];
+  nodes: Record<string, WaypointNode>;
 }
 
 export type WaypointNode = {
@@ -57,6 +70,8 @@ export type WaypointNode = {
   source_execution_id?: string;
   plugin_data?: Record<string, any>;
   baseline_waypoints?: WaypointBaselineItem[];
+  /** `needs: ["waypoint_range"]` のジェネレーターが置き換えた元の部分木。「元に戻す」で使う */
+  source_snapshot?: SourceSnapshot;
   pipeline_metadata?: PipelineMetadata;
 };
 

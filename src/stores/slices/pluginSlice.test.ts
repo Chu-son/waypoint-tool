@@ -139,6 +139,191 @@ describe('pluginSlice - executeGeneratorPlugin placement & history atomicity', (
   });
 });
 
+describe('pluginSlice - generators that consume a waypoint range (needs: waypoint_range)', () => {
+  const subdivider: PluginInstance = {
+    id: 'subdivider',
+    manifest: {
+      name: 'Subdivider',
+      type: 'python',
+      executable: 'main.py',
+      inputs: [],
+      needs: ['waypoint_range'],
+      properties: [],
+    },
+    folder_path: '/plugins/subdivider',
+    is_builtin: true,
+  };
+  const t = (x: number) => ({ x, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1 });
+  const out = (x: number, stash_key: string, extra: Record<string, any> = {}) => ({
+    transform: t(x),
+    stash_key,
+    ...extra,
+  });
+  const range = () =>
+    useAppStore.getState().nodes[useAppStore.getState().rootNodeIds[0]].generator_params!.waypoint_range;
+  const sentRange = (call: number) => (BackendAPI.runPlugin as any).mock.calls[call][1].waypoint_range;
+
+  const runFirst = async () => {
+    (BackendAPI.runPlugin as any).mockResolvedValueOnce({
+      waypoints: [out(0, 'orig:0'), out(1, 'seg:0:1/2'), out(2, 'orig:1')],
+    });
+    return useAppStore.getState().executeGeneratorPlugin({
+      plugin: subdivider,
+      properties: {},
+      placement: { type: 'replace_ids', ids: ['a', 'b'] },
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAppStore.setState({
+      nodes: {
+        a: { id: 'a', type: 'manual', name: 'Start', transform: t(0), options: { stop: true } },
+        b: { id: 'b', type: 'manual', name: 'End', transform: t(2) },
+        grp: { id: 'grp', type: 'group', name: 'G', children_ids: ['gc'] },
+        gc: { id: 'gc', type: 'manual', name: 'InGroup', transform: t(1) },
+      },
+      rootNodeIds: ['a', 'b'],
+      selectedNodeIds: [],
+      insertionTarget: null,
+      customLayers: [],
+      annotationObjects: {},
+      annotationGroups: {},
+      plugins: { subdivider },
+      historyPast: [],
+      historyFuture: [],
+      historyTransactionDepth: 0,
+      isDirty: false,
+    });
+  });
+
+  it('hands the consumed waypoints to the plugin and keeps them in the generator', async () => {
+    await runFirst();
+
+    expect(sentRange(0)).toEqual([
+      { id: 'a', name: 'Start', transform: t(0), options: { stop: true }, group_path: [] },
+      { id: 'b', name: 'End', transform: t(2), options: undefined, group_path: [] },
+    ]);
+    expect(range()).toEqual(sentRange(0));
+    expect(useAppStore.getState().nodes['a']).toBeUndefined();
+  });
+
+  it('regenerates from the frozen waypoints, not from whatever sits at the old indices', async () => {
+    const res = await runFirst();
+    const genId = res.parentWaypointId!;
+    const frozen = range();
+
+    // The generator now occupies index 0; an unrelated waypoint follows it.
+    useAppStore.setState((s) => ({
+      nodes: { ...s.nodes, z: { id: 'z', type: 'manual', transform: t(50) } },
+      rootNodeIds: [...s.rootNodeIds, 'z'],
+    }));
+    (BackendAPI.runPlugin as any).mockResolvedValueOnce({ waypoints: [out(0, 'orig:0'), out(2, 'orig:1')] });
+    await useAppStore.getState().executeGeneratorPlugin({
+      plugin: subdivider,
+      properties: {},
+      interactionData: { start_node: 0, end_node: 1 },
+      existingExecutionId: useAppStore.getState().nodes[genId].source_execution_id,
+      targetParentWaypointId: genId,
+    });
+
+    expect(sentRange(1)).toEqual(frozen);
+    expect(useAppStore.getState().nodes[genId].children_ids).toHaveLength(2);
+  });
+
+  it('includes the waypoints inside groups in the range and remembers the group', async () => {
+    useAppStore.setState({ rootNodeIds: ['a', 'grp', 'b'] });
+    (BackendAPI.runPlugin as any).mockResolvedValueOnce({ waypoints: [out(0, 'orig:0')] });
+
+    const res = await useAppStore.getState().executeGeneratorPlugin({
+      plugin: subdivider,
+      properties: {},
+      placement: { type: 'replace_ids', ids: ['a', 'grp', 'b'] },
+    });
+
+    expect(sentRange(0).map((w: any) => [w.id, w.group_path])).toEqual([
+      ['a', []],
+      ['gc', ['grp']],
+      ['b', []],
+    ]);
+    const state = useAppStore.getState();
+    expect(state.rootNodeIds).toEqual([res.parentWaypointId]);
+    expect(state.nodes['grp']).toBeUndefined();
+    expect(state.nodes[res.parentWaypointId!].source_snapshot!.topLevelIds).toEqual(['a', 'grp', 'b']);
+  });
+
+  it('fails without touching the tree when the range contains a node that no longer exists', async () => {
+    await expect(
+      useAppStore.getState().executeGeneratorPlugin({
+        plugin: subdivider,
+        properties: {},
+        placement: { type: 'replace_ids', ids: ['a', 'gone'] },
+      }),
+    ).rejects.toThrow(/no longer exists/);
+
+    expect(useAppStore.getState().rootNodeIds).toEqual(['a', 'b']);
+    expect(BackendAPI.runPlugin).not.toHaveBeenCalled();
+  });
+
+  it('requires a range on first run', async () => {
+    await expect(useAppStore.getState().executeGeneratorPlugin({ plugin: subdivider, properties: {} })).rejects.toThrow(
+      /range of waypoints/,
+    );
+  });
+
+  it('turning subdivision off and exploding restores the original waypoints, edits included', async () => {
+    const res = await runFirst();
+    const genId = res.parentWaypointId!;
+    const state = () => useAppStore.getState();
+
+    // The user tweaks the end waypoint inside the generator, then regenerates keeping that edit.
+    const endChildId = state().nodes[genId].children_ids![2];
+    state().updateNode(endChildId, { options: { speed: 0.3 } });
+    const { computeGeneratorStash } = await import('../../utils/generatorStashUtils');
+    const stash = computeGeneratorStash(state().nodes[genId], state().nodes);
+
+    (BackendAPI.runPlugin as any).mockResolvedValueOnce({
+      waypoints: [out(0, 'orig:0', { name: 'Start' }), out(2, 'orig:1', { name: 'End' })],
+    });
+    await state().executeGeneratorPlugin({
+      plugin: subdivider,
+      properties: { enabled: false },
+      existingExecutionId: state().nodes[genId].source_execution_id,
+      targetParentWaypointId: genId,
+      stashToApply: stash,
+    });
+    state().explodeGenerator(genId);
+
+    const restored = state().rootNodeIds.map((id) => state().nodes[id]);
+    expect(restored.map((n) => n.name)).toEqual(['Start', 'End']);
+    expect(restored.map((n) => n.transform!.x)).toEqual([0, 2]);
+    expect(restored[1].options).toEqual({ speed: 0.3 });
+  });
+
+  it('tells the user when an edit has no matching point after regeneration', async () => {
+    const message = vi.spyOn(DialogAPI, 'message').mockResolvedValue(undefined);
+    const res = await runFirst();
+    const genId = res.parentWaypointId!;
+    const state = () => useAppStore.getState();
+
+    // Edit the interpolated point, then regenerate without it.
+    state().updateNode(state().nodes[genId].children_ids![1], { options: { note: 'x' } });
+    const { computeGeneratorStash } = await import('../../utils/generatorStashUtils');
+    const stash = computeGeneratorStash(state().nodes[genId], state().nodes);
+
+    (BackendAPI.runPlugin as any).mockResolvedValueOnce({ waypoints: [out(0, 'orig:0'), out(2, 'orig:1')] });
+    await state().executeGeneratorPlugin({
+      plugin: subdivider,
+      properties: {},
+      existingExecutionId: state().nodes[genId].source_execution_id,
+      targetParentWaypointId: genId,
+      stashToApply: stash,
+    });
+
+    expect(message).toHaveBeenCalledWith(expect.stringContaining('1 件'), expect.anything());
+  });
+});
+
 describe('pluginSlice - executePipeline', () => {
   const step1Plugin: PluginInstance = {
     id: 'layer_filter',
