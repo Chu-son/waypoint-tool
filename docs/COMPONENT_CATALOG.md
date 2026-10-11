@@ -297,7 +297,7 @@
 
 ### Canvas 補助モジュール (`src/components/canvas/`)
 - **`MapLayerSprite`** (`MapLayerSprite.tsx`): 占有格子画像 1 枚を ROS 原点に合わせて描画し、占有ハイライトフィルタを適用。マップインスタンスに使用領域（`clip`）があるときは、ワールド座標の矩形和集合を Pixi マスク（`utils/clipMask.ts`）として適用する。
-- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useMapClipEdit`（マップの使用領域のドラッグ描画・ハンドルでのリサイズ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
+- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useMapClipEdit`（マップの使用領域のドラッグ描画・ハンドルでのリサイズ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得。バックエンドが返す RGBA のバイト列から直接テクスチャを作る。要求に増える番号を付けて古い計算を打ち切らせ、設定 `enableBlendCache` に応じて手描きレイヤーの `RasterCache` とバックエンドの `DecodeCache` を持つ・手放す）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
 - **純粋関数** (`canvas/utils/`): `viewport`（screen⇔world 変換・フィット・ズーム）, `hitTest`（矩形入力ハンドル判定・計測スナップ）, `canvasTheme`（フォールバックグリッド配色）, `labelLayout`（ラベル配置）, `tileCache`（タイルの同時取得数制限・LRU・失敗時の再試行間隔）
 
 ### Canvas レイヤー & フィルター群 (`src/components/canvas/`)
@@ -343,7 +343,7 @@
 - **`useAppStore`** ([`src/stores/appStore.ts`](file:///home/chuson/develop/waypoint-tool/src/stores/appStore.ts))
   - **概要**: 全状態とアクション（`nodeSlice`, `mapSlice`, `pluginSlice`, `pathCalculatorSlice`, `projectSlice`, `uiSlice` ほか）を提供するメインフック。
 - **Services** (`src/services/`): ストアと API を組み合わせるユースケース
-  - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `importFiles`（インポート対象ファイルの選択と、スキーマ・テンプレート・プロジェクトの読み込み時の検証・正規化。`ImportFileError` はそのまま利用者に見せてよい）, `optionSchemaApply`（スキーマの検証・正規化・消えたプリセットの値への展開・適用。設定画面の Apply とインポートが共用）, `templateImport`（テンプレートの上書き／追加）, `projectImport`（取り込み計画の適用。スキーマを先に適用し、断られたら何も変えない）, `mapImport`（ファイルを選んでマップレイヤーとして追加。レイヤーパネル・ワークフロー・インポートが共用）, `mapRasterize`（レイヤーのラスタライズ）, `workflowActions`（カスタム UI ワークフロー）
+  - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `importFiles`（インポート対象ファイルの選択と、スキーマ・テンプレート・プロジェクトの読み込み時の検証・正規化。`ImportFileError` はそのまま利用者に見せてよい）, `optionSchemaApply`（スキーマの検証・正規化・消えたプリセットの値への展開・適用。設定画面の Apply とインポートが共用）, `templateImport`（テンプレートの上書き／追加）, `projectImport`（取り込み計画の適用。スキーマを先に適用し、断られたら何も変えない）, `mapImport`（ファイルを選んでマップレイヤーとして追加。レイヤーパネル・ワークフロー・インポートが共用）, `mapRasterize`（レイヤーのラスタライズ。`createRasterCache()` で作ったキャッシュを `prepareLayersForExport` の `rasterCache` に渡すと、手描きレイヤーは `editObjects` と解像度が変わらない間、描いた PNG を使い回す）, `workflowActions`（カスタム UI ワークフロー）
 - **API アダプタ** (`src/api/`): `BackendAPI`（Tauri IPC）, `DialogAPI`（ファイル／確認／メッセージダイアログ）, `AppAPI`（バージョン・終了・ウィンドウ操作）。いずれも jsdom / ブラウザでは Mock 実装に自動切替。
 - **プラグイン出力・設定の純粋関数** (`src/utils/`): `pluginResult`（出力の正規化）, `pluginBindings`（パイプラインのバインディング解決）, `pluginRegistry`（カスタムプラグイン登録）, `pythonPath`（インタプリタ解決）, `exportPackage`（エクスポート要求の構築）, `footprint`（フットプリント幅）
 - **背景地図の純粋関数** (`src/utils/geo/`): `utm`（WGS84 ⇔ UTM）, `webMercator`（XYZ タイル座標・ズーム選択）, `geoTransform`（緯度経度 ⇔ ワールド座標・タイル配置・表示タイル列挙・エクスポート用のマップ原点 `mapOriginGeo`）, `basemapPresets`（OSM / Esri 衛星 / 地理院 / カスタムのプリセットとタイル URL 生成）, `alignDrag`（ドラッグによる移動・回転量の算出）
