@@ -184,15 +184,22 @@ export class MockBackendAPI implements IBackendAPI {
     return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   }
 
-  async blendMapPreview(_layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
-    console.log('[Mock Backend] blendMapPreview called');
+  async clearBlendCache(): Promise<void> {
+    console.log('[Mock Backend] clearBlendCache called');
+  }
+
+  async blendMapPreview(
+    _layers: BlendPreviewLayerInput[],
+    requestId: number,
+    _useCache: boolean,
+  ): Promise<BlendPreviewResult> {
+    console.log('[Mock Backend] blendMapPreview called, request', requestId);
     return {
-      image_data_b64:
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
       width: 1,
       height: 1,
       origin: [0, 0, 0],
       resolution: 0.05,
+      cells: new Uint8Array([1]),
     };
   }
 

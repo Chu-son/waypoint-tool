@@ -36,6 +36,12 @@ export type UISlice = {
   indexStartIndex: 0 | 1;
   /** true の場合、エクスポート時に整数値（0 など）も float 形式（0.0）で出力する。 */
   exportIntegersAsFloat: boolean;
+  /**
+   * true の場合、エクスポートプレビュー／占有ハイライトの再生成を速くするために、デコード済みのレイヤー画像と
+   * 手描きレイヤーのラスタライズ結果をメモリに残す。メモリ使用量が増えるため、設定で切れる（アプリ全体の設定で、
+   * プロジェクトには保存しない）。
+   */
+  enableBlendCache: boolean;
   themeMode: 'dark' | 'light';
   setThemeMode: (mode: 'dark' | 'light') => void;
   themePreset: string;
@@ -107,6 +113,7 @@ export type UISlice = {
   toggleAttributeVisibility: (attr: string) => void;
   setIndexStartIndex: (index: 0 | 1) => void;
   setExportIntegersAsFloat: (enabled: boolean) => void;
+  setEnableBlendCache: (enabled: boolean) => void;
   setIsDirty: (dirty: boolean) => void;
 
   setLeftPanelActiveTab: (tab: string) => void;
@@ -219,6 +226,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   visibleAttributes: [],
   indexStartIndex: 0,
   exportIntegersAsFloat: true,
+  enableBlendCache: true,
   themeMode: 'light',
   setThemeMode: (mode: 'dark' | 'light') => set({ themeMode: mode === 'light' ? 'light' : 'dark' }),
   themePreset: 'default',
@@ -416,6 +424,9 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   setIndexStartIndex: (index: 0 | 1) => set({ indexStartIndex: index, isDirty: true }),
 
   setExportIntegersAsFloat: (enabled: boolean) => set({ exportIntegersAsFloat: enabled, isDirty: true }),
+
+  // An app-wide preference, not part of the project: changing it does not dirty the project.
+  setEnableBlendCache: (enabled: boolean) => set({ enableBlendCache: enabled }),
 
   revealInTree: (type, id) => {
     const targetTab = type === 'node' ? 'waypoints' : 'annotations';

@@ -1,10 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Texture } from 'pixi.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { BufferImageSource, Texture } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
-import { prepareLayersForExport } from '../../../services/mapRasterize';
+import { cellsToRgba } from '../../../api/backend/blendPreviewCodec';
+import type { BlendPreviewResult } from '../../../api/types';
+import { createRasterCache, prepareLayersForExport, type RasterCache } from '../../../services/mapRasterize';
+import { createTrace, megabytes } from '../../../services/perfTrace';
 
 const LOADING_TASK_ID = 'blended-preview';
+
+/**
+ * Numbers the preview requests in increasing order. The backend stops computing a request once a newer
+ * one arrives, so the numbering must never go back — it is shared by every use of this hook.
+ */
+let lastRequestId = 0;
+
+/** The blended pixels as a texture, uploaded straight from the backend's bytes (no image to decode). */
+function textureFromPreview(result: BlendPreviewResult): Texture {
+  const source = new BufferImageSource({
+    resource: cellsToRgba(result.cells),
+    width: result.width,
+    height: result.height,
+    format: 'rgba8unorm',
+  });
+  return new Texture({ source });
+}
 
 /**
  * While the export preview or occupancy highlight is on, asks the backend to blend all map and
@@ -27,6 +47,15 @@ export function useBlendedPreview() {
   const [previewTexture, setPreviewTexture] = useState<Texture | null>(null);
   const [previewInfo, setPreviewInfo] = useState<any>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const enableBlendCache = useAppStore((state) => state.enableBlendCache);
+  // Pictures of the custom layers drawn for the previous preview (see `RasterCache`).
+  const rasterCache = useRef<RasterCache>(createRasterCache());
+  // The newest request, settled or not. The backend's cache is released only after it, so a request that
+  // is still running cannot fill the cache again behind the release.
+  const latestRequest = useRef<Promise<unknown>>(Promise.resolve());
+  // Whether the backend may be holding decoded layers of ours.
+  const holdsBackendCache = useRef(false);
 
   // Changes to blend_mode, stack order, clip, visibility, images, custom layers or occupancy settings.
   const previewSyncKey = useMemo(() => {
@@ -73,36 +102,42 @@ export function useBlendedPreview() {
     });
     setPreviewError(null);
 
-    prepareLayersForExport({ mapSources, mapLayers, customLayers, layerOrder })
+    // Read when the request is made, not subscribed to: switching the setting must not regenerate the preview.
+    const useCache = useAppStore.getState().enableBlendCache;
+    if (useCache) holdsBackendCache.current = true;
+
+    // Dev only: prints where the time of this preview went (see `createTrace`).
+    const trace = createTrace('Blend Preview');
+
+    latestRequest.current = prepareLayersForExport(
+      { mapSources, mapLayers, customLayers, layerOrder },
+      useCache ? { rasterCache: rasterCache.current } : {},
+    )
       .then((layerInputs) => {
         if (cancelled) return null;
         if (!layerInputs || layerInputs.length === 0) return null;
-        return BackendAPI.blendMapPreview(layerInputs);
+        const sent = layerInputs.reduce((sum, layer) => sum + (layer.image_base64?.length ?? 0), 0);
+        trace.mark('prepare layers (rasterize + toDataURL)', `${layerInputs.length} layers, ${megabytes(sent)} base64`);
+        return BackendAPI.blendMapPreview(layerInputs, ++lastRequestId, useCache);
       })
       .then((result) => {
         if (cancelled || !result) {
           stopLoading(LOADING_TASK_ID);
           return;
         }
-        const img = new Image();
-        img.onload = () => {
-          if (cancelled) return;
-          setPreviewTexture(Texture.from(img));
-          setPreviewInfo({
-            resolution: result.resolution,
-            origin: result.origin,
-            occupied_thresh: occupancySettings.defaultOccupiedThresh,
-            free_thresh: occupancySettings.defaultFreeThresh,
-            negate: occupancySettings.defaultNegate,
-          });
-          stopLoading(LOADING_TASK_ID);
-        };
-        img.onerror = () => {
-          if (cancelled) return;
-          setPreviewError('Failed to load image texture from base64.');
-          stopLoading(LOADING_TASK_ID);
-        };
-        img.src = result.image_data_b64;
+        trace.mark('IPC round trip (send + backend + receive)', `${megabytes(result.cells.length)} received`);
+        const texture = textureFromPreview(result);
+        trace.mark('create texture (cells → RGBA + texture)');
+        setPreviewTexture(texture);
+        setPreviewInfo({
+          resolution: result.resolution,
+          origin: result.origin,
+          occupied_thresh: occupancySettings.defaultOccupiedThresh,
+          free_thresh: occupancySettings.defaultFreeThresh,
+          negate: occupancySettings.defaultNegate,
+        });
+        stopLoading(LOADING_TASK_ID);
+        void trace.markAfterPaint('render + GPU upload (2 frames)').then(() => trace.end());
       })
       .catch((err) => {
         if (cancelled) return;
@@ -128,11 +163,40 @@ export function useBlendedPreview() {
     stopLoading,
   ]);
 
+  // Give the memory back once the preview is off, or the cache is switched off.
+  useEffect(() => {
+    if (shouldShowBlendedPreview && enableBlendCache) return;
+    rasterCache.current.clear();
+    if (!holdsBackendCache.current) return;
+    holdsBackendCache.current = false;
+    void latestRequest.current
+      .then(() => BackendAPI.clearBlendCache())
+      .catch((err) => console.error('[Blend Preview] Failed to release the cache:', err));
+  }, [shouldShowBlendedPreview, enableBlendCache]);
+
+  useEffect(() => {
+    const cache = rasterCache.current;
+    const pending = latestRequest;
+    const holds = holdsBackendCache;
+    return () => {
+      cache.clear();
+      if (!holds.current) return;
+      holds.current = false;
+      void pending.current.then(() => BackendAPI.clearBlendCache()).catch(() => {});
+    };
+  }, []);
+
   useEffect(() => {
     return () => {
-      if (previewTexture && !previewTexture.destroyed) {
-        previewTexture.destroy(false);
-      }
+      if (!previewTexture) return;
+      // The canvas still draws the old texture until the next frames show the new one (or none); destroying it
+      // before then makes the renderer bind a source that is already gone. It owns its source (made in
+      // `textureFromPreview`), so destroy that as well.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!previewTexture.destroyed) previewTexture.destroy(true);
+        }),
+      );
     };
   }, [previewTexture]);
 

@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { prepareLayersForExport, getEditLayerBoundingBox } from './mapRasterize';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { prepareLayersForExport, getEditLayerBoundingBox, createRasterCache } from './mapRasterize';
 import { layerStackState, makeManualCustomLayer, makeMap } from '../test/fixtures';
 import type { PluginCustomLayer } from '../types/store';
 
@@ -113,5 +113,106 @@ describe('getEditLayerBoundingBox', () => {
     expect(bbox.maxX).toBeGreaterThanOrEqual(8.0);
     expect(bbox.minY).toBeLessThanOrEqual(3.0);
     expect(bbox.maxY).toBeGreaterThanOrEqual(7.0);
+  });
+});
+
+describe('prepareLayersForExport with a raster cache', () => {
+  const rect = (id: string, cx: number) =>
+    ({ id, type: 'rect', cx, cy: 0, width: 1, height: 1, angle: 0, fillValue: 0 }) as const;
+
+  /** jsdom has no canvas: stand in for the drawing surface and give every picture a number of its own. */
+  let pictures = 0;
+  beforeEach(() => {
+    pictures = 0;
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      new Proxy({}, { get: () => () => {}, set: () => true }) as never,
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(
+      () => `data:image/png;base64,picture-${++pictures}`,
+    );
+  });
+
+  const stackOf = (...layers: ReturnType<typeof makeManualCustomLayer>[]) => layerStackState(makeMap('map'), ...layers);
+  const pictureOf = async (
+    stack: ReturnType<typeof layerStackState>,
+    id: string,
+    options?: Parameters<typeof prepareLayersForExport>[1],
+  ) => (await prepareLayersForExport(stack, options)).find((l) => l.id === id)?.image_base64;
+
+  it('draws a custom layer every time without a cache', async () => {
+    const stack = stackOf(makeManualCustomLayer('drawing', { editObjects: [rect('r', 0)] }));
+
+    const first = await pictureOf(stack, 'drawing');
+    const second = await pictureOf(stack, 'drawing');
+
+    expect(second).not.toBe(first);
+  });
+
+  it('reuses the picture of a layer that did not change', async () => {
+    const cache = createRasterCache();
+    const stack = stackOf(makeManualCustomLayer('drawing', { editObjects: [rect('r', 0)] }));
+
+    const first = await pictureOf(stack, 'drawing', { rasterCache: cache });
+    const second = await pictureOf(stack, 'drawing', { rasterCache: cache });
+
+    expect(second).toBe(first);
+  });
+
+  it('draws a layer again once its objects change, and only that layer', async () => {
+    const cache = createRasterCache();
+    const untouched = makeManualCustomLayer('untouched', { editObjects: [rect('a', 0)] });
+    const edited = makeManualCustomLayer('edited', { editObjects: [rect('b', 0)] });
+    const before = stackOf(untouched, edited);
+    const untouchedBefore = await pictureOf(before, 'untouched', { rasterCache: cache });
+    const editedBefore = await pictureOf(before, 'edited', { rasterCache: cache });
+
+    // The store replaces the objects array on every edit.
+    const after = stackOf(untouched, { ...edited, editObjects: [rect('b', 3)] });
+
+    expect(await pictureOf(after, 'untouched', { rasterCache: cache })).toBe(untouchedBefore);
+    expect(await pictureOf(after, 'edited', { rasterCache: cache })).not.toBe(editedBefore);
+  });
+
+  it('keeps the new name and blend mode of a layer whose picture is reused', async () => {
+    const cache = createRasterCache();
+    const objects = [rect('r', 0)];
+    const stack = stackOf(makeManualCustomLayer('drawing', { name: 'Old', editObjects: objects }));
+    await prepareLayersForExport(stack, { rasterCache: cache });
+
+    const renamed = stackOf(
+      makeManualCustomLayer('drawing', { name: 'New name', blend_mode: 'merge_obstacles', editObjects: objects }),
+    );
+    const layer = (await prepareLayersForExport(renamed, { rasterCache: cache })).find((l) => l.id === 'drawing');
+
+    expect(layer?.name).toBe('New name');
+    expect(layer?.blend_mode).toBe('merge_obstacles');
+    expect(layer?.info.image).toBe('new_name.png');
+    expect(pictures).toBe(1);
+  });
+
+  it('draws a layer again when the resolution of the base map changes', async () => {
+    const cache = createRasterCache();
+    const objects = [rect('r', 0)];
+    const layer = makeManualCustomLayer('drawing', { editObjects: objects });
+    const coarse = layerStackState(makeMap('map', { info: { resolution: 0.1 } }), layer);
+    const fine = layerStackState(makeMap('map', { info: { resolution: 0.05 } }), layer);
+
+    const first = await pictureOf(coarse, 'drawing', { rasterCache: cache });
+    const second = await pictureOf(fine, 'drawing', { rasterCache: cache });
+
+    expect(second).not.toBe(first);
+  });
+
+  it('forgets the pictures of layers that were removed', async () => {
+    const cache = createRasterCache();
+    const objects = [rect('r', 0)];
+    const withLayer = stackOf(makeManualCustomLayer('drawing', { editObjects: objects }));
+    const first = await pictureOf(withLayer, 'drawing', { rasterCache: cache });
+
+    await prepareLayersForExport(stackOf(), { rasterCache: cache });
+    // The same layer comes back (an undo): the cache must not hand out the picture it had before.
+    const second = await pictureOf(withLayer, 'drawing', { rasterCache: cache });
+
+    expect(second).not.toBe(first);
   });
 });

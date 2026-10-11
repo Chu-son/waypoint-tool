@@ -4,7 +4,7 @@ import { FormField } from '../common/FormField';
 import { Slider } from '../common/Slider';
 import { BrowseInput } from '../common/BrowseInput';
 import { ToggleSwitch } from '../common/ToggleSwitch';
-import { Sliders, Terminal, Settings2 } from 'lucide-react';
+import { Sliders, Terminal, Settings2, Zap } from 'lucide-react';
 import { TabSectionHeader } from './TabSectionHeader';
 import { SettingsSection } from './SettingsSection';
 
@@ -15,9 +15,11 @@ export function GeneralTab() {
   const globalPythonPath = useAppStore((state) => state.globalPythonPath);
 
   const exportIntegersAsFloat = useAppStore((state) => state.exportIntegersAsFloat);
+  const enableBlendCache = useAppStore((state) => state.enableBlendCache);
 
   const setIndexStartIndex = useAppStore((state) => state.setIndexStartIndex);
   const setExportIntegersAsFloat = useAppStore((state) => state.setExportIntegersAsFloat);
+  const setEnableBlendCache = useAppStore((state) => state.setEnableBlendCache);
   const setGlobalPythonPath = useAppStore((state) => state.setGlobalPythonPath);
 
   return (
@@ -90,7 +92,21 @@ export function GeneralTab() {
         </FormField>
       </SettingsSection>
 
-      {/* 2. Python Environment */}
+      {/* 2. Performance */}
+      <SettingsSection
+        title="Performance"
+        description="Trade memory for speed when the blended map is regenerated."
+        icon={Zap}
+      >
+        <FormField
+          label="Cache Blend Preview Data"
+          description="Keeps decoded map layers and rasterized custom layers in memory, so the export preview and the occupancy highlight update faster after an edit. Uses more memory while the preview is shown; turn it off on low-memory machines."
+        >
+          <ToggleSwitch checked={enableBlendCache} onChange={setEnableBlendCache} title="Cache Blend Preview Data" />
+        </FormField>
+      </SettingsSection>
+
+      {/* 3. Python Environment */}
       <SettingsSection
         title="Python Environment"
         description="Execution command or virtual environment path for Generator plugins."

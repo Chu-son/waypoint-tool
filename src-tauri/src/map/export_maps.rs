@@ -1,6 +1,7 @@
-use super::blending::{blend_layers_to_image, LayerClip, LayerInput, RectRegion};
-use base64::{engine::general_purpose, Engine as _};
+use super::blending::{blend_layers_to_cells, LayerClip, LayerInput, RectRegion};
+use super::layer_decode::{decode_layer, ClassifiedLayer, LayerDecodeError};
 use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
+use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -52,6 +53,35 @@ pub struct ExportLayerInfo {
     pub origin: [f64; 3],
 }
 
+/// 出力するリージョンのどれかに描かれるレイヤーだけをデコードする（位置情報が無いレイヤーと、
+/// 全リージョンで非表示のレイヤーは使われないので読まない）。リージョンの `layerVisibility` にエントリが無いレイヤーは表示扱い。
+/// レイヤーごとに並列にデコードし、結果は `layers` の順序を保つ。デコードできないレイヤーは `on_error` に知らせて除外する。
+pub fn decode_drawn_layers<'a>(
+    layers: &'a [ExportLayer],
+    region_visibilities: &[&HashMap<String, bool>],
+    on_error: &(dyn Fn(&ExportLayer, &LayerDecodeError) + Sync),
+) -> Vec<(&'a ExportLayer, ClassifiedLayer)> {
+    layers
+        .par_iter()
+        .filter(|layer| {
+            layer.info.is_some()
+                && region_visibilities
+                    .iter()
+                    .any(|visibility| visibility.get(&layer.id).copied().unwrap_or(true))
+        })
+        .filter_map(|layer| {
+            let b64 = layer.image_base64.as_ref()?;
+            match decode_layer(b64) {
+                Ok(classified) => Some((layer, classified)),
+                Err(e) => {
+                    on_error(layer, &e);
+                    None
+                }
+            }
+        })
+        .collect()
+}
+
 pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
     let save_dir = Path::new(&options.save_dir);
     if !save_dir.exists() {
@@ -60,33 +90,13 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
 
     let mut map_names = Vec::new();
 
-    // Decode all layer images first to avoid redundant decoding
-    let mut decoded_layers = Vec::new();
+    // Decode the layer images that some region draws once, up front, to avoid redundant decoding
     let mut layers = options.layers;
     layers.sort_by_key(|l| l.z_index);
-
-    for layer in &layers {
-        if let Some(b64) = layer.image_base64.as_ref() {
-            let b64_data = if b64.starts_with("data:image") {
-                b64.split(',').nth(1).unwrap_or(b64)
-            } else {
-                b64
-            };
-
-            if let Ok(bytes) = general_purpose::STANDARD.decode(b64_data) {
-                if let Ok(img) = image::load_from_memory(&bytes) {
-                    decoded_layers.push((layer, img));
-                } else {
-                    println!(
-                        "Warning: Failed to load image from decoded bytes for layer {}",
-                        layer.id
-                    );
-                }
-            } else {
-                println!("Warning: Failed to decode base64 for layer {}", layer.id);
-            }
-        }
-    }
+    let visibilities: Vec<_> = options.regions.iter().map(|r| &r.layer_visibility).collect();
+    let decoded_layers = decode_drawn_layers(&layers, &visibilities, &|layer, e| {
+        println!("Warning: Failed to decode image for layer {}: {}", layer.id, e);
+    });
 
     for region in options.regions {
         // Base resolution
@@ -131,15 +141,14 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
             height: region.rect.height,
         };
 
-        let out_img = blend_layers_to_image(&active_layer_inputs, &region_rect, resolution);
+        let blended = blend_layers_to_cells(&active_layer_inputs, &region_rect, resolution);
 
         // Save image
         if options.format == "ros_standard" {
             let img_filename = format!("{}.pgm", region.name);
             let img_path = save_dir.join(&img_filename);
 
-            // convert to luma8
-            let luma_img = image::DynamicImage::ImageRgba8(out_img).into_luma8();
+            let luma = blended.to_luma8();
 
             let mut pgm_file = fs::File::create(&img_path)
                 .map_err(|e| format!("Failed to create image file {}: {}", img_filename, e))?;
@@ -148,12 +157,7 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
                 pnm::PnmEncoder::new(&mut pgm_file).with_subtype(pnm::PnmSubtype::Graymap(pnm::SampleEncoding::Binary));
 
             encoder
-                .write_image(
-                    luma_img.as_raw(),
-                    luma_img.width(),
-                    luma_img.height(),
-                    ExtendedColorType::L8,
-                )
+                .write_image(&luma, blended.width, blended.height, ExtendedColorType::L8)
                 .map_err(|e| format!("Failed to save image {}: {}", img_filename, e))?;
 
             let yaml_filename = format!("{}.yaml", region.name);
@@ -167,7 +171,8 @@ pub fn export_maps(options: ExportMapsOptions) -> Result<(), String> {
         } else {
             let img_filename = format!("{}.png", region.name);
             let img_path = save_dir.join(&img_filename);
-            out_img
+            blended
+                .to_rgba_image()
                 .save(&img_path)
                 .map_err(|e| format!("Failed to save image {}: {}", img_filename, e))?;
         }
@@ -242,5 +247,80 @@ mod tests {
         assert!(clip.contains(1.0, 0.0));
         assert!(!clip.contains(2.5, 0.0), "right edge is exclusive");
         assert!(!clip.contains(1.0, -1.5));
+    }
+
+    fn layer_with_image(id: &str, image_base64: &str, positioned: bool) -> ExportLayer {
+        ExportLayer {
+            id: id.to_string(),
+            name: id.to_string(),
+            image_base64: Some(image_base64.to_string()),
+            info: positioned.then_some(ExportLayerInfo {
+                resolution: 0.05,
+                origin: [0.0, 0.0, 0.0],
+            }),
+            opacity: 1.0,
+            blend_mode: "overwrite".to_string(),
+            z_index: 0,
+            clip: None,
+        }
+    }
+
+    fn visibility(entries: &[(&str, bool)]) -> HashMap<String, bool> {
+        entries.iter().map(|(id, shown)| (id.to_string(), *shown)).collect()
+    }
+
+    /// A 1×1 PNG, as base64.
+    fn pixel_png() -> String {
+        use base64::{engine::general_purpose, Engine as _};
+        let mut png = Vec::new();
+        image::DynamicImage::ImageLuma8(image::GrayImage::from_pixel(1, 1, image::Luma([0])))
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        general_purpose::STANDARD.encode(&png)
+    }
+
+    #[test]
+    fn only_layers_that_some_region_draws_are_decoded() {
+        // Broken images, so that decoding any of them would be reported.
+        let layers = [
+            layer_with_image("drawn", &pixel_png(), true),
+            layer_with_image("hidden_everywhere", "!!broken!!", true),
+            layer_with_image("hidden_in_one", "!!broken!!", true),
+            layer_with_image("no_position", "!!broken!!", false),
+            layer_with_image("drawn_but_broken", "!!broken!!", true),
+        ];
+        let first = visibility(&[
+            ("hidden_everywhere", false),
+            ("hidden_in_one", false),
+            ("drawn_but_broken", true),
+        ]);
+        let second = visibility(&[("hidden_everywhere", false)]);
+        let reported = std::sync::Mutex::new(Vec::new());
+
+        let decoded = decode_drawn_layers(&layers, &[&first, &second], &|layer, _| {
+            reported.lock().unwrap().push(layer.id.clone());
+        });
+
+        let ids: Vec<_> = decoded.iter().map(|(layer, _)| layer.id.as_str()).collect();
+        assert_eq!(ids, ["drawn"]);
+        let mut reported = reported.into_inner().unwrap();
+        reported.sort();
+        // `hidden_in_one` is drawn by the second region (no entry means shown), so it is read, and fails.
+        assert_eq!(reported, ["drawn_but_broken", "hidden_in_one"]);
+    }
+
+    #[test]
+    fn decoded_layers_keep_the_order_of_the_layers() {
+        let png = pixel_png();
+        let layers: Vec<_> = (0..40)
+            .map(|i| layer_with_image(&format!("layer{i}"), &png, true))
+            .collect();
+        let shown = visibility(&[]);
+
+        let decoded = decode_drawn_layers(&layers, &[&shown], &|_, _| {});
+
+        let ids: Vec<_> = decoded.iter().map(|(layer, _)| layer.id.clone()).collect();
+        let expected: Vec<_> = (0..40).map(|i| format!("layer{i}")).collect();
+        assert_eq!(ids, expected);
     }
 }

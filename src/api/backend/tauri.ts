@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { PluginInstance, ImportFieldMapping, TemplateEngine } from '../../types/store';
 import { IBackendAPI, MapLoadResult, BlendPreviewLayerInput, BlendPreviewResult } from '../types';
+import { parseBlendPreview } from './blendPreviewCodec';
 
 export class TauriBackendAPI implements IBackendAPI {
   async loadROSMap(yamlPath: string): Promise<MapLoadResult> {
@@ -94,8 +95,17 @@ export class TauriBackendAPI implements IBackendAPI {
     return invoke('export_maps', { options });
   }
 
-  async blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult> {
-    return invoke('blend_map_preview', { layers });
+  async blendMapPreview(
+    layers: BlendPreviewLayerInput[],
+    requestId: number,
+    useCache: boolean,
+  ): Promise<BlendPreviewResult> {
+    // The backend answers with raw bytes (header + RGBA pixels), which `invoke` hands back as an ArrayBuffer.
+    return parseBlendPreview(await invoke<ArrayBuffer>('blend_map_preview', { layers, requestId, useCache }));
+  }
+
+  async clearBlendCache(): Promise<void> {
+    return invoke('clear_blend_cache');
   }
 
   async fetchMapTile(url: string): Promise<string> {

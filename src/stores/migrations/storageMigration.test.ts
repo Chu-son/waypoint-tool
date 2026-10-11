@@ -65,6 +65,14 @@ describe('storageMigration', () => {
     expect(migrateStorage({ exportIntegersAsFloat: 'nope' }, 3).exportIntegersAsFloat).toBe(true);
   });
 
+  it('keeps the blend preview cache on unless the stored setting is explicitly off', () => {
+    expect(migrateStorage({}, 0).enableBlendCache).toBe(true);
+    expect(migrateStorage({}, 3).enableBlendCache).toBe(true);
+    expect(migrateStorage({ enableBlendCache: true }, 3).enableBlendCache).toBe(true);
+    expect(migrateStorage({ enableBlendCache: false }, 3).enableBlendCache).toBe(false);
+    expect(migrateStorage({ enableBlendCache: 'nope' }, 3).enableBlendCache).toBe(true);
+  });
+
   it('normalizes themeMode to dark or light correctly', () => {
     expect(migrateStorage({ themeMode: 'light' }, 2).themeMode).toBe('light');
     expect(migrateStorage({ themeMode: 'dark' }, 2).themeMode).toBe('dark');

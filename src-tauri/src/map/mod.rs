@@ -8,6 +8,7 @@ use std::path::Path;
 pub mod blend_preview;
 pub mod blending;
 pub mod export_maps;
+pub mod layer_decode;
 pub mod occupancy;
 pub use blend_preview::*;
 pub use blending::*;

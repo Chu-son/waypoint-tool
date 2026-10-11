@@ -26,6 +26,8 @@ serde_yaml = "0.9.34"
 csv = "1.4.0"
 handlebars = "6.4.0"
 image = "0.25.9"
+# image が既に使っている共有スレッドプール。ブレンドとレイヤーのデコードの並列化に使う。
+rayon = "1.11"
 base64 = { version = "0.22.1", features = ["alloc"] }
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
@@ -38,4 +40,33 @@ minijinja = { version = "2.24.0", features = ["json", "loop_controls"] }
 
 [dev-dependencies]
 
+# 開発ビルド（`tauri dev`・`cargo test`）では、地図画像の PNG/PGM のデコード・エンコードと base64 が最適化なしで動き、
+# リリースビルドの数十倍遅い。画像まわりの依存だけを最適化する（自前のコードはデバッグしやすいまま）。
+# リリースビルドには影響しない。
+[profile.dev.package.image]
+opt-level = 3
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3
+[profile.dev.package.adler2]
+opt-level = 3
+[profile.dev.package.simd-adler32]
+opt-level = 3
+[profile.dev.package.base64]
+opt-level = 3
+[profile.dev.package.rayon]
+opt-level = 3
+[profile.dev.package.rayon-core]
+opt-level = 3
+[profile.dev.package.crossbeam-deque]
+opt-level = 3
+[profile.dev.package.crossbeam-epoch]
+opt-level = 3
 

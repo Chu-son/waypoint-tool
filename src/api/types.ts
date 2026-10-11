@@ -47,11 +47,12 @@ export type BlendPreviewLayerInput = {
 };
 
 export type BlendPreviewResult = {
-  image_data_b64: string;
   width: number;
   height: number;
   origin: [number, number, number];
   resolution: number;
+  /** `width × height` セル、上の行から、1 セル 1 バイト（0 = Unknown, 1 = Free, 2 = Obstacle）。色は `cellsToRgba` で付ける。 */
+  cells: Uint8Array;
 };
 
 export interface IBackendAPI {
@@ -80,7 +81,16 @@ export interface IBackendAPI {
   readTextFile(path: string): Promise<string>;
   writeTextFile(path: string, content: string): Promise<void>;
   exportMaps(options: ExportMapsOptions): Promise<void>;
-  blendMapPreview(layers: BlendPreviewLayerInput[]): Promise<BlendPreviewResult>;
+  /**
+   * `requestId` は呼び出しのたびに増やす。より新しい要求が届くと、古い要求は計算を途中で打ち切って
+   * `BLEND_PREVIEW_CANCELLED` で失敗する（結果が捨てられる要求が CPU を使い続けないため）。
+   */
+  blendMapPreview(layers: BlendPreviewLayerInput[], requestId: number, useCache: boolean): Promise<BlendPreviewResult>;
+  /**
+   * `blendMapPreview` に `useCache: true` を渡すと、バックエンドはデコード済みのレイヤーをメモリに残す。
+   * プレビューを止めたとき・キャッシュの設定を切ったときに、それを手放す。
+   */
+  clearBlendCache(): Promise<void>;
   loadCustomUiConfig(): Promise<any>;
   loadCustomUiPreset(): Promise<{ type: 'dev' | 'sample'; path: string; config: any } | null>;
   checkPythonPackages(pythonPath: string, packages: string[]): Promise<Record<string, boolean>>;
