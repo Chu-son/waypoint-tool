@@ -1,4 +1,6 @@
-use image::{DynamicImage, GenericImageView, Rgba, RgbaImage};
+use super::layer_decode::ClassifiedLayer;
+use image::{Rgba, RgbaImage};
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,48 +103,6 @@ impl BlendMode {
     }
 }
 
-/// レイヤー画像の画素を RGBA で読む。`DynamicImage::get_pixel` は画素ごとに形式の判定と色変換を行うため、
-/// 変換が自明な 8bit 形式は具体型のバッファから直接組み立てる（結果は `get_pixel` と同一）。
-enum PixelSource<'a> {
-    L8(&'a image::GrayImage),
-    La8(&'a image::GrayAlphaImage),
-    Rgb8(&'a image::RgbImage),
-    Rgba8(&'a RgbaImage),
-    Other(&'a DynamicImage),
-}
-
-impl<'a> PixelSource<'a> {
-    fn new(image: &'a DynamicImage) -> Self {
-        match image {
-            DynamicImage::ImageLuma8(img) => PixelSource::L8(img),
-            DynamicImage::ImageLumaA8(img) => PixelSource::La8(img),
-            DynamicImage::ImageRgb8(img) => PixelSource::Rgb8(img),
-            DynamicImage::ImageRgba8(img) => PixelSource::Rgba8(img),
-            other => PixelSource::Other(other),
-        }
-    }
-
-    #[inline]
-    fn rgba(&self, x: u32, y: u32) -> [u8; 4] {
-        match self {
-            PixelSource::L8(img) => {
-                let [l] = img.get_pixel(x, y).0;
-                [l, l, l, 255]
-            }
-            PixelSource::La8(img) => {
-                let [l, a] = img.get_pixel(x, y).0;
-                [l, l, l, a]
-            }
-            PixelSource::Rgb8(img) => {
-                let [r, g, b] = img.get_pixel(x, y).0;
-                [r, g, b, 255]
-            }
-            PixelSource::Rgba8(img) => img.get_pixel(x, y).0,
-            PixelSource::Other(img) => img.get_pixel(x, y).0,
-        }
-    }
-}
-
 /// ワールド座標 (m) の矩形。`x`/`y` は最小コーナー (Y 上向き)。
 /// 半開区間 [x, x+width) × [y, y+height) を表すため、辺を共有する 2 つの矩形は重ならず隙間も生じない。
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -169,7 +129,7 @@ impl LayerClip {
 
 pub struct LayerInput<'a> {
     pub id: &'a str,
-    pub image: &'a DynamicImage,
+    pub image: &'a ClassifiedLayer,
     pub resolution: f64,
     pub origin: [f64; 3],
     pub blend_mode: &'a str,
@@ -185,30 +145,199 @@ pub struct RectRegion {
     pub height: f64,
 }
 
+/// ブレンド結果。1 セル 1 値で持ち、RGBA 画像・PGM 用のグレー値・プレビュー用のバイト列はここから作る。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlendedCells {
+    pub width: u32,
+    pub height: u32,
+    /// 行優先、上の行から。
+    pub cells: Vec<CellValue>,
+}
+
+impl BlendedCells {
+    pub fn to_rgba_image(&self) -> RgbaImage {
+        let mut raw = vec![0u8; self.cells.len() * 4];
+        raw.par_chunks_exact_mut(4)
+            .zip(self.cells.par_iter())
+            .for_each(|(px, cell)| px.copy_from_slice(&cell.to_rgba().0));
+        RgbaImage::from_raw(self.width, self.height, raw).expect("buffer holds width × height RGBA pixels")
+    }
+
+    /// `to_rgba_image()` を `DynamicImage::into_luma8()` で変換したものと同じバイト列（ROS 標準の PGM 用）。
+    pub fn to_luma8(&self) -> Vec<u8> {
+        // 取り得る色は 3 つだけなので、画像ライブラリの変換を 3 回通して表にする。
+        let palette = RgbaImage::from_fn(3, 1, |x, _| CELL_ORDER[x as usize].to_rgba());
+        let luma = image::DynamicImage::ImageRgba8(palette).into_luma8().into_raw();
+        self.cells.par_iter().map(|cell| luma[*cell as usize]).collect()
+    }
+}
+
+/// `CellValue as usize` の並び（宣言順）。
+const CELL_ORDER: [CellValue; 3] = [CellValue::Unknown, CellValue::Free, CellValue::Obstacle];
+
+/// これより小さい出力は、帯に分けても並列化のコストのほうが大きいので 1 本で処理する。
+const MIN_PARALLEL_CELLS: u64 = 65_536;
+/// 帯の数は並列度の何倍にするか（帯ごとの負荷の偏りをならす）。
+const BANDS_PER_THREAD: usize = 4;
+
 /// レイヤー群を指定されたワールド矩形領域に共通アルゴリズムで合成描画
 pub fn blend_layers_to_image(layers: &[LayerInput], region: &RectRegion, output_resolution: f64) -> RgbaImage {
-    let out_w = (region.width / output_resolution).round() as u32;
-    let out_h = (region.height / output_resolution).round() as u32;
+    blend_layers_to_cells(layers, region, output_resolution).to_rgba_image()
+}
+
+/// `blend_layers_to_image` と同じ合成を、画像にする前のセル値で返す。
+pub fn blend_layers_to_cells(layers: &[LayerInput], region: &RectRegion, output_resolution: f64) -> BlendedCells {
+    blend_layers_to_cells_cancellable(layers, region, output_resolution, &|| false)
+        .expect("a blend that is never cancelled always completes")
+}
+
+/// `is_cancelled` が true を返したら、残りの計算を省いて `None` を返す。
+/// 結果が捨てられると分かっている呼び出し（新しい要求に置き換えられたプレビュー）が CPU を使い続けないための仕組み。
+pub fn blend_layers_to_cells_cancellable(
+    layers: &[LayerInput],
+    region: &RectRegion,
+    output_resolution: f64,
+    is_cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<BlendedCells> {
+    let (out_w, out_h) = output_size(region, output_resolution);
+    blend_cells(
+        layers,
+        region,
+        output_resolution,
+        default_band_rows(out_w, out_h),
+        is_cancelled,
+    )
+}
+
+fn output_size(region: &RectRegion, output_resolution: f64) -> (u32, u32) {
+    (
+        (region.width / output_resolution).round() as u32,
+        (region.height / output_resolution).round() as u32,
+    )
+}
+
+/// 並列に処理する行の帯の高さ。小さい出力は全体を 1 つの帯にする。
+fn default_band_rows(out_w: u32, out_h: u32) -> u32 {
+    if (out_w as u64) * (out_h as u64) < MIN_PARALLEL_CELLS {
+        return out_h.max(1);
+    }
+    let bands = rayon::current_num_threads() * BANDS_PER_THREAD;
+    (out_h as usize).div_ceil(bands).max(1) as u32
+}
+
+/// 出力の行を `band_rows` 行ずつの帯に分け、帯ごとに全レイヤーを z 順に適用する。
+/// セルどうしは独立なので、帯の分け方によらず結果は同じ。
+fn blend_cells(
+    layers: &[LayerInput],
+    region: &RectRegion,
+    output_resolution: f64,
+    band_rows: u32,
+    is_cancelled: &(dyn Fn() -> bool + Sync),
+) -> Option<BlendedCells> {
+    let (out_w, out_h) = output_size(region, output_resolution);
 
     if out_w == 0 || out_h == 0 {
-        return RgbaImage::new(0, 0);
+        return Some(BlendedCells {
+            width: 0,
+            height: 0,
+            cells: Vec::new(),
+        });
     }
 
     let mut sorted_layers: Vec<_> = layers.iter().collect();
     sorted_layers.sort_by_key(|l| l.z_index);
+    let plans: Vec<LayerPlan> = sorted_layers
+        .into_iter()
+        .filter_map(|layer| LayerPlan::new(layer, region, output_resolution, out_w, out_h))
+        .collect();
 
-    let mut cell_state = vec![CellValue::Unknown; (out_w * out_h) as usize];
+    let mut cells = vec![CellValue::Unknown; out_w as usize * out_h as usize];
+    let band_cells = band_rows.max(1) as usize * out_w as usize;
+    cells.par_chunks_mut(band_cells).enumerate().for_each(|(band, chunk)| {
+        let first_row = band as u32 * band_rows.max(1);
+        for plan in &plans {
+            if is_cancelled() {
+                return;
+            }
+            plan.apply(chunk, first_row, out_w);
+        }
+    });
 
-    for layer in sorted_layers {
-        let l_w = layer.image.width() as f64;
-        let l_h = layer.image.height() as f64;
+    if is_cancelled() {
+        return None;
+    }
+    Some(BlendedCells {
+        width: out_w,
+        height: out_h,
+        cells,
+    })
+}
+
+/// レイヤー画像上に該当する画素が無いことを表す番兵。
+const OUT_OF_LAYER: u32 = u32::MAX;
+/// 矩形のビットマスクで判定できる上限（これを超えたら矩形を順に調べる）。
+const MAX_MASKED_RECTS: usize = 64;
+
+/// 1 レイヤーぶんの、出力の列・行ごとに前計算した値。
+/// 出力画素 (c, r) のワールド座標 → レイヤー座標の変換は、x と y を別々に計算して足すだけの形をしているので、
+/// 画素ごとに f64 の変換をやり直さず、列ごと・行ごとに 1 回だけ計算する。式と演算順序は 1 画素ずつ計算する
+/// 場合（`reference_blend`）と同じなので、結果はビット単位で同じ。
+struct LayerPlan<'a> {
+    image: &'a ClassifiedLayer,
+    blend_mode: BlendMode,
+    /// 走査する列・行の範囲（`layer_output_range`、両端を含む）。
+    c0: u32,
+    c1: u32,
+    r0: u32,
+    r1: u32,
+    mapping: Mapping,
+    clip: ClipPlan<'a>,
+}
+
+enum Mapping {
+    /// yaw なし。レイヤーの列は出力の列だけ、行は出力の行だけで決まる。
+    Axis { cols: Vec<u32>, rows: Vec<u32> },
+    /// yaw あり。`lx = col.0 + row.0`、`ly = col.1 + row.1`。
+    Rotated {
+        cols: Vec<(f64, f64)>,
+        rows: Vec<(f64, f64)>,
+        resolution: f64,
+        layer_height: f64,
+    },
+}
+
+enum ClipPlan<'a> {
+    None,
+    /// 矩形ごとに 1 ビット。矩形はワールド座標の x と y の条件の AND なので、列のマスクと行のマスクの AND が 0 でなければ内側。
+    Masks {
+        cols: Vec<u64>,
+        rows: Vec<u64>,
+    },
+    /// 矩形が多いとき。1 画素ずつ `LayerClip::contains` で調べる。
+    Rects {
+        clip: &'a LayerClip,
+        xs: Vec<f64>,
+        ys: Vec<f64>,
+    },
+}
+
+impl<'a> LayerPlan<'a> {
+    /// 出力のどの画素にも当たらないレイヤーは `None`。
+    fn new(
+        layer: &'a LayerInput<'a>,
+        region: &RectRegion,
+        output_resolution: f64,
+        out_w: u32,
+        out_h: u32,
+    ) -> Option<Self> {
+        let image = layer.image;
+        let l_w = image.width() as f64;
+        let l_h = image.height() as f64;
         let yaw = layer.origin[2];
         let has_yaw = yaw.abs() >= 1e-9;
         let (cos_yaw, sin_yaw) = if has_yaw { (yaw.cos(), yaw.sin()) } else { (1.0, 0.0) };
-        let pixels = PixelSource::new(layer.image);
-        let blend_mode = BlendMode::parse(layer.blend_mode);
 
-        let Some((c0, c1, r0, r1)) = layer_output_range(
+        let (c0, c1, r0, r1) = layer_output_range(
             layer,
             region,
             output_resolution,
@@ -216,56 +345,154 @@ pub fn blend_layers_to_image(layers: &[LayerInput], region: &RectRegion, output_
             out_h,
             (cos_yaw, sin_yaw),
             has_yaw,
-        ) else {
-            continue;
+        )?;
+
+        let xs: Vec<f64> = (c0..=c1).map(|c| region.x + (c as f64) * output_resolution).collect();
+        let ys: Vec<f64> = (r0..=r1)
+            .map(|r| region.y + ((out_h - 1 - r) as f64) * output_resolution)
+            .collect();
+
+        let mapping = if has_yaw {
+            Mapping::Rotated {
+                cols: xs
+                    .iter()
+                    .map(|&world_x| {
+                        let dx = world_x - layer.origin[0];
+                        (dx * cos_yaw, -dx * sin_yaw)
+                    })
+                    .collect(),
+                rows: ys
+                    .iter()
+                    .map(|&world_y| {
+                        let dy = world_y - layer.origin[1];
+                        (dy * sin_yaw, dy * cos_yaw)
+                    })
+                    .collect(),
+                resolution: layer.resolution,
+                layer_height: l_h,
+            }
+        } else {
+            Mapping::Axis {
+                cols: xs
+                    .iter()
+                    .map(|&world_x| {
+                        let c_l = ((world_x - layer.origin[0]) / layer.resolution).round() as i32;
+                        if c_l < 0 || c_l >= l_w as i32 {
+                            OUT_OF_LAYER
+                        } else {
+                            c_l as u32
+                        }
+                    })
+                    .collect(),
+                rows: ys
+                    .iter()
+                    .map(|&world_y| {
+                        let r_l = (l_h - 1.0 - (world_y - layer.origin[1]) / layer.resolution).round() as i32;
+                        if r_l < 0 || r_l >= l_h as i32 {
+                            OUT_OF_LAYER
+                        } else {
+                            r_l as u32
+                        }
+                    })
+                    .collect(),
+            }
         };
 
-        for r in r0..=r1 {
-            for c in c0..=c1 {
-                let world_x = region.x + (c as f64) * output_resolution;
-                let world_y = region.y + ((out_h - 1 - r) as f64) * output_resolution;
-
-                if let Some(clip) = layer.clip {
-                    if !clip.contains(world_x, world_y) {
-                        continue;
-                    }
-                }
-
-                let dx = world_x - layer.origin[0];
-                let dy = world_y - layer.origin[1];
-
-                let (lx, ly) = if has_yaw {
-                    (dx * cos_yaw + dy * sin_yaw, -dx * sin_yaw + dy * cos_yaw)
-                } else {
-                    (dx, dy)
+        let clip = match layer.clip {
+            None => ClipPlan::None,
+            Some(clip) if clip.rects.len() <= MAX_MASKED_RECTS => {
+                let mask = |value: f64, along_x: bool| {
+                    clip.rects.iter().enumerate().fold(0u64, |bits, (i, r)| {
+                        let (start, size) = if along_x { (r.x, r.width) } else { (r.y, r.height) };
+                        if value >= start && value < start + size {
+                            bits | (1 << i)
+                        } else {
+                            bits
+                        }
+                    })
                 };
-
-                let c_l = (lx / layer.resolution).round() as i32;
-                let r_l = (l_h - 1.0 - ly / layer.resolution).round() as i32;
-
-                if c_l < 0 || c_l >= l_w as i32 || r_l < 0 || r_l >= l_h as i32 {
-                    continue;
+                ClipPlan::Masks {
+                    cols: xs.iter().map(|&x| mask(x, true)).collect(),
+                    rows: ys.iter().map(|&y| mask(y, false)).collect(),
                 }
-
-                let px = pixels.rgba(c_l as u32, r_l as u32);
-                // Transparent pixels carry no data (custom layers are rasterized on a transparent
-                // background), so they never take part in blending, whatever the blend mode.
-                if px[3] < 128 {
-                    continue;
-                }
-                let incoming = classify_pixel(px);
-
-                let idx = (r * out_w + c) as usize;
-                cell_state[idx] = blend_mode.apply(cell_state[idx], incoming);
             }
+            Some(clip) => ClipPlan::Rects { clip, xs, ys },
+        };
+
+        Some(Self {
+            image,
+            blend_mode: BlendMode::parse(layer.blend_mode),
+            c0,
+            c1,
+            r0,
+            r1,
+            mapping,
+            clip,
+        })
+    }
+
+    #[inline]
+    fn inside_clip(&self, col: usize, row: usize) -> bool {
+        match &self.clip {
+            ClipPlan::None => true,
+            ClipPlan::Masks { cols, rows } => cols[col] & rows[row] != 0,
+            ClipPlan::Rects { clip, xs, ys } => clip.contains(xs[col], ys[row]),
         }
     }
 
-    let mut out_img = RgbaImage::new(out_w, out_h);
-    for (px, cell) in out_img.pixels_mut().zip(&cell_state) {
-        *px = cell.to_rgba();
+    /// 出力の `first_row` 行目から始まる帯 `chunk`（`out_w` 列幅）に、このレイヤーを合成する。
+    fn apply(&self, chunk: &mut [CellValue], first_row: u32, out_w: u32) {
+        let band_rows = (chunk.len() / out_w as usize) as u32;
+        let first = first_row.max(self.r0);
+        let last = (first_row + band_rows - 1).min(self.r1);
+        if first > last {
+            return;
+        }
+
+        for r in first..=last {
+            let ri = (r - self.r0) as usize;
+            if matches!(&self.mapping, Mapping::Axis { rows, .. } if rows[ri] == OUT_OF_LAYER) {
+                continue;
+            }
+            let row_cells = &mut chunk[((r - first_row) * out_w) as usize..][..out_w as usize];
+            for c in self.c0..=self.c1 {
+                let ci = (c - self.c0) as usize;
+                if !self.inside_clip(ci, ri) {
+                    continue;
+                }
+
+                let (c_l, r_l) = match &self.mapping {
+                    Mapping::Axis { cols, rows } => (cols[ci], rows[ri]),
+                    Mapping::Rotated {
+                        cols,
+                        rows,
+                        resolution,
+                        layer_height,
+                    } => {
+                        let lx = cols[ci].0 + rows[ri].0;
+                        let ly = cols[ci].1 + rows[ri].1;
+                        let c_l = (lx / resolution).round() as i32;
+                        let r_l = (layer_height - 1.0 - ly / resolution).round() as i32;
+                        if c_l < 0 || c_l >= self.image.width() as i32 || r_l < 0 || r_l >= self.image.height() as i32 {
+                            continue;
+                        }
+                        (c_l as u32, r_l as u32)
+                    }
+                };
+                if c_l == OUT_OF_LAYER || r_l == OUT_OF_LAYER {
+                    continue;
+                }
+
+                // Transparent pixels carry no data (custom layers are rasterized on a transparent
+                // background), so they never take part in blending, whatever the blend mode.
+                let Some(incoming) = self.image.cell(c_l, r_l) else {
+                    continue;
+                };
+                let slot = &mut row_cells[c as usize];
+                *slot = self.blend_mode.apply(*slot, incoming);
+            }
+        }
     }
-    out_img
 }
 
 /// 出力画像のうち、レイヤー画像の画素に当たり得る列・行の範囲 `(c0, c1, r0, r1)`（両端を含む）。
@@ -335,6 +562,8 @@ fn layer_output_range(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map::layer_decode::test_support::{noise_in_every_format, noise_rgba};
+    use image::{DynamicImage, GenericImageView};
 
     #[test]
     fn test_classify_pixel() {
@@ -414,7 +643,7 @@ mod tests {
         img.put_pixel(0, 1, CellValue::Free.to_rgba());
         img.put_pixel(1, 1, CellValue::Free.to_rgba());
 
-        let dyn_img = DynamicImage::ImageRgba8(img);
+        let dyn_img = ClassifiedLayer::from_image(&DynamicImage::ImageRgba8(img));
 
         // Layer with 90 degree counter-clockwise rotation (PI / 2)
         // origin at (0, 0, PI/2), resolution = 1.0
@@ -449,8 +678,12 @@ mod tests {
         assert_eq!(classify_pixel(px), CellValue::Obstacle);
     }
 
-    fn solid_image(size: u32, cell: CellValue) -> DynamicImage {
-        DynamicImage::ImageRgba8(RgbaImage::from_pixel(size, size, cell.to_rgba()))
+    fn solid_image(size: u32, cell: CellValue) -> ClassifiedLayer {
+        ClassifiedLayer::from_image(&DynamicImage::ImageRgba8(RgbaImage::from_pixel(
+            size,
+            size,
+            cell.to_rgba(),
+        )))
     }
 
     fn cell_at(img: &RgbaImage, col: u32, row: u32) -> CellValue {
@@ -553,7 +786,7 @@ mod tests {
 
     fn layer_with<'a>(
         id: &'a str,
-        image: &'a DynamicImage,
+        image: &'a ClassifiedLayer,
         blend_mode: &'a str,
         z_index: i32,
         clip: Option<&'a LayerClip>,
@@ -610,7 +843,11 @@ mod tests {
     #[test]
     fn transparent_pixels_leave_cells_below_untouched_even_when_replacing() {
         let obstacles = solid_image(2, CellValue::Obstacle);
-        let transparent = DynamicImage::ImageRgba8(RgbaImage::from_pixel(2, 2, Rgba([0, 0, 0, 0])));
+        let transparent = ClassifiedLayer::from_image(&DynamicImage::ImageRgba8(RgbaImage::from_pixel(
+            2,
+            2,
+            Rgba([0, 0, 0, 0]),
+        )));
         let layers = [
             layer_with("base", &obstacles, "overwrite", 0, None),
             layer_with("top", &transparent, "replace", 1, None),
@@ -663,9 +900,55 @@ mod tests {
         assert_eq!(cell_at(&out, 1, 1), CellValue::Obstacle);
     }
 
+    /// A layer for the equivalence test: the original picture (read by the reference through
+    /// `DynamicImage::get_pixel`) and the same picture classified for the engine under test.
+    struct TestLayer {
+        image: DynamicImage,
+        classified: ClassifiedLayer,
+        resolution: f64,
+        origin: [f64; 3],
+        blend_mode: &'static str,
+        z_index: i32,
+        clip: Option<LayerClip>,
+    }
+
+    impl TestLayer {
+        fn new(
+            image: DynamicImage,
+            resolution: f64,
+            origin: [f64; 3],
+            blend_mode: &'static str,
+            z_index: i32,
+            clip: Option<LayerClip>,
+        ) -> Self {
+            let classified = ClassifiedLayer::from_image(&image);
+            Self {
+                image,
+                classified,
+                resolution,
+                origin,
+                blend_mode,
+                z_index,
+                clip,
+            }
+        }
+
+        fn input(&self) -> LayerInput<'_> {
+            LayerInput {
+                id: "layer",
+                image: &self.classified,
+                resolution: self.resolution,
+                origin: self.origin,
+                blend_mode: self.blend_mode,
+                z_index: self.z_index,
+                clip: self.clip.as_ref(),
+            }
+        }
+    }
+
     /// The straightforward blend: every layer visits every output pixel and reads it through
     /// `DynamicImage::get_pixel`. `blend_layers_to_image` must produce exactly the same image.
-    fn reference_blend(layers: &[LayerInput], region: &RectRegion, output_resolution: f64) -> RgbaImage {
+    fn reference_blend(layers: &[TestLayer], region: &RectRegion, output_resolution: f64) -> RgbaImage {
         let out_w = (region.width / output_resolution).round() as u32;
         let out_h = (region.height / output_resolution).round() as u32;
         if out_w == 0 || out_h == 0 {
@@ -685,7 +968,7 @@ mod tests {
                 for c in 0..out_w {
                     let world_x = region.x + (c as f64) * output_resolution;
                     let world_y = region.y + ((out_h - 1 - r) as f64) * output_resolution;
-                    if let Some(clip) = layer.clip {
+                    if let Some(clip) = layer.clip.as_ref() {
                         if !clip.contains(world_x, world_y) {
                             continue;
                         }
@@ -717,41 +1000,17 @@ mod tests {
         out_img
     }
 
-    /// Deterministic pixels around the classification thresholds (gray 89/90, 229/230, alpha 127/128).
-    fn noise_rgba(width: u32, height: u32, seed: u32) -> RgbaImage {
-        const LEVELS: [u8; 10] = [0, 50, 89, 90, 128, 205, 229, 230, 254, 255];
-        const ALPHAS: [u8; 4] = [255, 255, 128, 127];
-        let mut state = seed.wrapping_mul(2_654_435_761).wrapping_add(1);
-        let mut next = move || {
-            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-            (state >> 16) as usize
-        };
-        RgbaImage::from_fn(width, height, |_, _| {
-            let (r, g, b) = (LEVELS[next() % 10], LEVELS[next() % 10], LEVELS[next() % 10]);
-            Rgba([r, g, b, ALPHAS[next() % 4]])
-        })
-    }
-
-    /// The same noise in every pixel format the blend reads: the 8-bit fast paths and the generic fallback.
-    fn noise_in_every_format(width: u32, height: u32, seed: u32) -> Vec<(&'static str, DynamicImage)> {
-        let rgba = DynamicImage::ImageRgba8(noise_rgba(width, height, seed));
-        vec![
-            ("L8", DynamicImage::ImageLuma8(rgba.to_luma8())),
-            ("LA8", DynamicImage::ImageLumaA8(rgba.to_luma_alpha8())),
-            ("RGB8", DynamicImage::ImageRgb8(rgba.to_rgb8())),
-            ("RGBA8", rgba.clone()),
-            ("L16", DynamicImage::ImageLuma16(rgba.to_luma16())),
-            ("RGBA32F", DynamicImage::ImageRgba32F(rgba.to_rgba32f())),
-        ]
-    }
-
-    #[test]
-    fn fast_pixel_paths_read_the_same_rgba_as_get_pixel() {
-        for (format, image) in noise_in_every_format(31, 17, 7) {
-            let source = PixelSource::new(&image);
-            for (x, y, px) in image.pixels() {
-                assert_eq!(source.rgba(x, y), px.0, "{format} at ({x}, {y})");
-            }
+    /// Clips of many small rectangles in a scatter: past `MAX_MASKED_RECTS`, so they take the slow path.
+    fn many_rect_clip(count: usize) -> LayerClip {
+        LayerClip {
+            rects: (0..count)
+                .map(|i| ClipRect {
+                    x: -0.6 + (i % 10) as f64 * 0.17,
+                    y: -0.5 + (i / 10) as f64 * 0.13,
+                    width: 0.15,
+                    height: 0.11,
+                })
+                .collect(),
         }
     }
 
@@ -839,42 +1098,72 @@ mod tests {
         // Layer resolutions, including degenerate ones that fall back to scanning everything.
         let resolutions = [0.05, 0.031, -0.05, 0.0];
 
+        // No clip, a clip of two rectangles (bit masks), and one past the mask limit (rectangle by rectangle).
+        let clips = [None, Some(clip), Some(many_rect_clip(MAX_MASKED_RECTS + 6))];
+        // Thread count × band height: one band on one thread, one-row bands on a few threads,
+        // and uneven bands on more threads than there are bands.
+        let pools: Vec<_> = [(1, None), (2, Some(1)), (7, Some(3))]
+            .into_iter()
+            .map(|(n, band_rows)| {
+                (
+                    rayon::ThreadPoolBuilder::new().num_threads(n).build().unwrap(),
+                    band_rows,
+                )
+            })
+            .collect();
+
         let mut compared = 0;
         for (format, image) in noise_in_every_format(50, 33, 3) {
             for &yaw in &yaws {
                 for &resolution in &resolutions {
-                    for layer_clip in [None, Some(&clip)] {
+                    for layer_clip in &clips {
                         for mode in modes {
+                            // The clip does not depend on the blend mode, and the many-rectangle clip is slow to check.
+                            let many_rects = layer_clip.as_ref().is_some_and(|c| c.rects.len() > MAX_MASKED_RECTS);
+                            if many_rects && mode != "overwrite" {
+                                continue;
+                            }
                             let layers = [
-                                LayerInput {
-                                    id: "base",
-                                    image: &base,
-                                    resolution: 0.05,
-                                    origin: [-0.8, -0.6, 0.2],
-                                    blend_mode: "overwrite",
-                                    z_index: 0,
-                                    clip: None,
-                                },
-                                LayerInput {
-                                    id: "layer",
-                                    image: &image,
+                                TestLayer::new(base.clone(), 0.05, [-0.8, -0.6, 0.2], "overwrite", 0, None),
+                                TestLayer::new(
+                                    image.clone(),
                                     resolution,
-                                    origin: [0.1, -0.15, yaw],
-                                    blend_mode: mode,
-                                    z_index: 1,
-                                    clip: layer_clip,
-                                },
+                                    [0.1, -0.15, yaw],
+                                    mode,
+                                    1,
+                                    layer_clip.clone(),
+                                ),
                             ];
+                            let inputs: Vec<_> = layers.iter().map(TestLayer::input).collect();
                             for (region, output_resolution) in &regions {
-                                let expected = reference_blend(&layers, region, *output_resolution);
-                                let actual = blend_layers_to_image(&layers, region, *output_resolution);
-                                assert!(
-                                    actual == expected,
-                                    "{format} yaw={yaw} res={resolution} clip={} mode={mode} region=({}, {}) out_res={output_resolution}",
-                                    layer_clip.is_some(),
+                                let case = format!(
+                                    "{format} yaw={yaw} res={resolution} clip={:?} mode={mode} region=({}, {}) out_res={output_resolution}",
+                                    layer_clip.as_ref().map(|c| c.rects.len()),
                                     region.x,
                                     region.y,
                                 );
+                                let expected = reference_blend(&layers, region, *output_resolution);
+                                let actual = blend_layers_to_image(&inputs, region, *output_resolution);
+                                assert!(actual == expected, "{case}");
+
+                                // Splitting the output into bands, on any number of threads, changes nothing.
+                                // How the layer samples is independent of the banding, so one resolution is enough.
+                                let (_, out_h) = output_size(region, *output_resolution);
+                                let pools = if resolution == 0.05 { &pools[..] } else { &[] };
+                                for (pool, band_rows) in pools {
+                                    let band_rows = band_rows.unwrap_or(out_h.max(1));
+                                    let banded = pool
+                                        .install(|| {
+                                            blend_cells(&inputs, region, *output_resolution, band_rows, &|| false)
+                                        })
+                                        .expect("not cancelled")
+                                        .to_rgba_image();
+                                    assert!(
+                                        banded == expected,
+                                        "{case}: bands of {band_rows} rows on {} threads",
+                                        pool.current_num_threads()
+                                    );
+                                }
                                 compared += 1;
                             }
                         }
@@ -882,6 +1171,60 @@ mod tests {
                 }
             }
         }
-        assert_eq!(compared, 6 * 4 * 4 * 2 * 5 * 6);
+        // formats × yaws × resolutions × (modes × 2 clips + 1 many-rectangle clip) × regions
+        assert_eq!(compared, 6 * 4 * 4 * (5 * 2 + 1) * 6);
+    }
+
+    #[test]
+    fn a_cancelled_blend_returns_nothing() {
+        let obstacles = solid_image(4, CellValue::Obstacle);
+        let layers = [layer_with("map", &obstacles, "overwrite", 0, None)];
+
+        let blended = blend_layers_to_cells_cancellable(&layers, &region_of(4.0), 1.0, &|| true);
+
+        assert!(blended.is_none());
+    }
+
+    #[test]
+    fn a_blend_cancelled_midway_stops_before_applying_the_remaining_layers() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let obstacles = solid_image(4, CellValue::Obstacle);
+        let layers = [
+            layer_with("a", &obstacles, "overwrite", 0, None),
+            layer_with("b", &obstacles, "overwrite", 1, None),
+            layer_with("c", &obstacles, "overwrite", 2, None),
+        ];
+        // The request is superseded after the first check.
+        let checks = AtomicUsize::new(0);
+        let is_cancelled = || checks.fetch_add(1, Ordering::SeqCst) >= 1;
+
+        let blended = blend_cells(&layers, &region_of(4.0), 1.0, 4, &is_cancelled);
+
+        assert!(blended.is_none());
+        assert!(
+            checks.load(Ordering::SeqCst) < 4,
+            "the layers after the cancellation were not even visited"
+        );
+    }
+
+    #[test]
+    fn luma_bytes_equal_the_rgba_image_converted_by_the_image_crate() {
+        let cells = BlendedCells {
+            width: 3,
+            height: 2,
+            cells: vec![
+                CellValue::Unknown,
+                CellValue::Free,
+                CellValue::Obstacle,
+                CellValue::Obstacle,
+                CellValue::Free,
+                CellValue::Unknown,
+            ],
+        };
+
+        let expected = DynamicImage::ImageRgba8(cells.to_rgba_image()).into_luma8().into_raw();
+
+        assert_eq!(cells.to_luma8(), expected);
     }
 }

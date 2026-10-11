@@ -1,6 +1,12 @@
-use super::blending::{blend_layers_to_image, LayerClip, LayerInput, RectRegion};
-use base64::{engine::general_purpose, Engine as _};
+use super::blending::{blend_layers_to_cells_cancellable, LayerClip, LayerInput, RectRegion};
+use super::layer_decode::{decode_layer, ClassifiedLayer, DecodeCache, LayerKey};
+use rayon::prelude::*;
 use serde::Deserialize;
+use std::collections::HashSet;
+use std::sync::Arc;
+
+/// The error of a preview that stopped early because a newer request replaced it.
+pub const PREVIEW_CANCELLED: &str = "cancelled";
 
 #[derive(Debug, Deserialize)]
 pub struct BlendPreviewLayer {
@@ -14,16 +20,45 @@ pub struct BlendPreviewLayer {
     pub clip: Option<LayerClip>,
 }
 
-#[derive(serde::Serialize)]
 pub struct BlendPreviewResult {
-    pub image_data_b64: String,
     pub width: u32,
     pub height: u32,
     pub origin: [f64; 3],
     pub resolution: f64,
+    /// `width × height` pixels, row by row from the top, 4 bytes (R, G, B, A) each.
+    pub rgba: Vec<u8>,
 }
 
-pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewResult, String> {
+/// Size of the header `into_bytes` puts before the pixels.
+pub const PREVIEW_HEADER_BYTES: usize = 40;
+
+impl BlendPreviewResult {
+    /// The wire format of the preview, all numbers little-endian:
+    /// `width: u32`, `height: u32`, `origin: [f64; 3]`, `resolution: f64`, then the RGBA pixels.
+    /// Sent as a raw binary response: no JSON, no base64, no image codec in between.
+    pub fn into_bytes(self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(PREVIEW_HEADER_BYTES + self.rgba.len());
+        bytes.extend_from_slice(&self.width.to_le_bytes());
+        bytes.extend_from_slice(&self.height.to_le_bytes());
+        for value in self.origin {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        bytes.extend_from_slice(&self.resolution.to_le_bytes());
+        bytes.extend_from_slice(&self.rgba);
+        bytes
+    }
+}
+
+/// Blends the visible layers into one occupancy image. `is_cancelled` is polled while the work goes on;
+/// once it returns true the preview stops and fails with [`PREVIEW_CANCELLED`], since nobody wants its result.
+///
+/// Decoded layers are looked up in `cache` when one is given, and only the layers of this preview stay in it
+/// afterwards. Without a cache every layer is decoded each time and nothing is kept.
+pub fn blend_map_preview(
+    layers: Vec<BlendPreviewLayer>,
+    cache: Option<&DecodeCache>,
+    is_cancelled: &(dyn Fn() -> bool + Sync),
+) -> Result<BlendPreviewResult, String> {
     let mut visible: Vec<_> = layers
         .into_iter()
         .filter(|l| l.visible && l.image_base64.is_some())
@@ -34,20 +69,21 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
         return Err("No visible layers".to_string());
     }
 
-    let mut decoded = Vec::new();
-    for layer in &visible {
-        let b64 = layer.image_base64.as_ref().unwrap();
-        let b64_data = if b64.starts_with("data:image") {
-            b64.split(',').nth(1).unwrap_or(b64)
-        } else {
-            b64
-        };
-        let bytes = general_purpose::STANDARD
-            .decode(b64_data)
-            .map_err(|e| format!("Base64 decode error: {}", e))?;
-        let img = image::load_from_memory(&bytes).map_err(|e| format!("Image load error: {}", e))?;
-        decoded.push((layer, img));
-    }
+    let decoded: Vec<(&BlendPreviewLayer, Option<LayerKey>, Arc<ClassifiedLayer>)> = visible
+        .par_iter()
+        .map(|layer| {
+            if is_cancelled() {
+                return Err(PREVIEW_CANCELLED.to_string());
+            }
+            let b64 = layer.image_base64.as_ref().unwrap();
+            let (key, classified) = match cache {
+                Some(cache) => cache.decode(b64).map(|(key, classified)| (Some(key), classified)),
+                None => decode_layer(b64).map(|classified| (None, Arc::new(classified))),
+            }
+            .map_err(|e| e.to_string())?;
+            Ok((layer, key, classified))
+        })
+        .collect::<Result<_, String>>()?;
 
     let mut min_x = f64::MAX;
     let mut min_y = f64::MAX;
@@ -55,7 +91,7 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
     let mut max_y = f64::MIN;
     let mut min_resolution = f64::MAX;
 
-    for (layer, img) in &decoded {
+    for (layer, _, img) in &decoded {
         let info = layer.info.as_ref();
         let l_res = info
             .and_then(|i| i.get("resolution"))
@@ -129,7 +165,7 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
     let out_h = (((max_y - min_y) / resolution).ceil() as u32).max(1);
 
     let mut layer_inputs = Vec::new();
-    for (layer, img) in &decoded {
+    for (layer, _, img) in &decoded {
         let info = layer.info.as_ref();
         let l_res = info
             .and_then(|i| i.get("resolution"))
@@ -154,7 +190,7 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
 
         layer_inputs.push(LayerInput {
             id: &layer.id,
-            image: img,
+            image: img.as_ref(),
             resolution: l_res,
             origin: [l_ox, l_oy, l_oyaw],
             blend_mode: &layer.blend_mode,
@@ -170,20 +206,283 @@ pub fn blend_map_preview(layers: Vec<BlendPreviewLayer>) -> Result<BlendPreviewR
         height: out_h as f64 * resolution,
     };
 
-    let out_img = blend_layers_to_image(&layer_inputs, &region, resolution);
+    let blended = blend_layers_to_cells_cancellable(&layer_inputs, &region, resolution, is_cancelled)
+        .ok_or_else(|| PREVIEW_CANCELLED.to_string())?;
 
-    let mut png_data: Vec<u8> = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut png_data);
-    image::DynamicImage::ImageRgba8(out_img)
-        .write_to(&mut cursor, image::ImageFormat::Png)
-        .map_err(|e| format!("PNG encode error: {}", e))?;
-    let b64 = general_purpose::STANDARD.encode(&png_data);
+    // A preview that stopped early never gets here, so it cannot evict what the newer preview is using.
+    if let Some(cache) = cache {
+        let used: HashSet<LayerKey> = decoded.iter().filter_map(|(_, key, _)| *key).collect();
+        cache.retain_only(&used);
+    }
 
     Ok(BlendPreviewResult {
-        image_data_b64: format!("data:image/png;base64,{}", b64),
-        width: out_w,
-        height: out_h,
+        width: blended.width,
+        height: blended.height,
         origin: [min_x, min_y, 0.0],
         resolution,
+        rgba: blended.to_rgba_image().into_raw(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::{engine::general_purpose, Engine as _};
+    use image::{DynamicImage, GrayImage, ImageFormat, Luma};
+
+    /// A 4×4 picture: a wall along the given row, free space elsewhere.
+    fn room_png_b64(wall_row: u32) -> String {
+        let room = GrayImage::from_fn(4, 4, |_, y| Luma([if y == wall_row { 0 } else { 254 }]));
+        let mut png = Vec::new();
+        DynamicImage::ImageLuma8(room)
+            .write_to(&mut std::io::Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+        general_purpose::STANDARD.encode(&png)
+    }
+
+    fn room_layer(visible: bool) -> BlendPreviewLayer {
+        room_layer_with_wall_at(0, visible)
+    }
+
+    fn room_layer_with_wall_at(wall_row: u32, visible: bool) -> BlendPreviewLayer {
+        BlendPreviewLayer {
+            id: format!("room{wall_row}"),
+            image_base64: Some(format!("data:image/png;base64,{}", room_png_b64(wall_row))),
+            info: Some(serde_json::json!({ "resolution": 1.0, "origin": [2.0, 3.0, 0.0] })),
+            blend_mode: "overwrite".to_string(),
+            z_index: 0,
+            visible,
+            clip: None,
+        }
+    }
+
+    fn u32_at(bytes: &[u8], at: usize) -> u32 {
+        u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap())
+    }
+
+    fn f64_at(bytes: &[u8], at: usize) -> f64 {
+        f64::from_le_bytes(bytes[at..at + 8].try_into().unwrap())
+    }
+
+    #[test]
+    fn the_preview_is_a_header_followed_by_the_occupancy_pixels() {
+        let bytes = blend_map_preview(vec![room_layer(true)], None, &|| false)
+            .unwrap()
+            .into_bytes();
+
+        assert_eq!((u32_at(&bytes, 0), u32_at(&bytes, 4)), (4, 4));
+        assert_eq!(
+            [f64_at(&bytes, 8), f64_at(&bytes, 16), f64_at(&bytes, 24)],
+            [2.0, 3.0, 0.0]
+        );
+        assert_eq!(f64_at(&bytes, 32), 1.0);
+        let pixels = &bytes[PREVIEW_HEADER_BYTES..];
+        assert_eq!(pixels.len(), 4 * 4 * 4);
+        let (wall, free) = ([0, 0, 0, 255], [254, 254, 254, 255]);
+        for (i, pixel) in pixels.chunks_exact(4).enumerate() {
+            assert_eq!(pixel, if i < 4 { wall } else { free }, "pixel {i}");
+        }
+    }
+
+    #[test]
+    fn a_preview_that_a_newer_request_replaced_fails_as_cancelled() {
+        let error = blend_map_preview(vec![room_layer(true)], None, &|| true).err().unwrap();
+
+        assert_eq!(error, PREVIEW_CANCELLED);
+    }
+
+    #[test]
+    fn hidden_layers_are_not_drawn() {
+        let error = blend_map_preview(vec![room_layer(false)], None, &|| false)
+            .err()
+            .unwrap();
+
+        assert_eq!(error, "No visible layers");
+    }
+
+    fn preview_bytes(wall_row: u32, cache: Option<&DecodeCache>) -> Vec<u8> {
+        blend_map_preview(vec![room_layer_with_wall_at(wall_row, true)], cache, &|| false)
+            .unwrap()
+            .into_bytes()
+    }
+
+    #[test]
+    fn a_cached_preview_looks_the_same_as_an_uncached_one() {
+        let cache = DecodeCache::default();
+
+        let first = preview_bytes(0, Some(&cache));
+        let again = preview_bytes(0, Some(&cache));
+
+        assert_eq!(first, preview_bytes(0, None));
+        assert_eq!(again, first);
+    }
+
+    #[test]
+    fn the_cache_follows_the_images_of_the_latest_preview() {
+        let cache = DecodeCache::default();
+
+        let before_the_edit = preview_bytes(0, Some(&cache));
+        assert_eq!(cache.len(), 1);
+        // The map was edited: the wall moved. The new picture is blended, not the cached old one.
+        let after_the_edit = preview_bytes(2, Some(&cache));
+
+        assert_ne!(after_the_edit, before_the_edit);
+        assert_eq!(after_the_edit, preview_bytes(2, None));
+        assert_eq!(cache.len(), 1, "the old picture was let go");
+    }
+
+    #[test]
+    fn a_preview_without_a_cache_leaves_the_cache_alone() {
+        let cache = DecodeCache::default();
+        preview_bytes(0, Some(&cache));
+
+        preview_bytes(2, None);
+
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn a_cancelled_preview_does_not_evict_what_the_newer_one_uses() {
+        let cache = DecodeCache::default();
+        preview_bytes(0, Some(&cache));
+
+        let cancelled = blend_map_preview(vec![room_layer_with_wall_at(2, true)], Some(&cache), &|| true);
+
+        assert_eq!(cancelled.err().as_deref(), Some(PREVIEW_CANCELLED));
+        assert_eq!(cache.len(), 1);
+        assert_eq!(preview_bytes(0, Some(&cache)), preview_bytes(0, None));
+    }
+
+    #[test]
+    fn clearing_the_cache_lets_go_of_every_picture() {
+        let cache = DecodeCache::default();
+        preview_bytes(0, Some(&cache));
+
+        cache.clear();
+
+        assert!(cache.is_empty());
+        assert_eq!(preview_bytes(0, Some(&cache)), preview_bytes(0, None));
+    }
+
+    #[test]
+    fn a_broken_image_is_reported_by_the_step_that_failed() {
+        let mut layer = room_layer(true);
+        layer.image_base64 = Some("!!not base64!!".to_string());
+
+        let error = blend_map_preview(vec![layer], None, &|| false).err().unwrap();
+
+        assert!(error.starts_with("Base64 decode error"), "{error}");
+    }
+}
+
+#[cfg(test)]
+mod bench {
+    use super::super::blending::blend_layers_to_cells;
+    use super::*;
+    use base64::{engine::general_purpose, Engine as _};
+    use image::{DynamicImage, ImageFormat, Luma};
+    use std::time::Instant;
+
+    /// Map-like picture: free space with walls and unknown regions, so the PNG compresses like a real map.
+    fn map_png_b64(size: u32, seed: u32) -> String {
+        let img = image::GrayImage::from_fn(size, size, |x, y| {
+            // Sensor-like speckle, so the PNG is about as large as a scanned map's.
+            let speckle =
+                (x.wrapping_mul(2_654_435_761) ^ y.wrapping_mul(40_503) ^ seed).wrapping_mul(2_246_822_519) >> 28 == 0;
+            let wall = speckle || (x / 97 + y / 61 + seed).is_multiple_of(7);
+            let unknown = (x / 400 + y / 300 + seed).is_multiple_of(5);
+            Luma([if wall {
+                0
+            } else if unknown {
+                205
+            } else {
+                254
+            }])
+        });
+        let mut png = Vec::new();
+        DynamicImage::ImageLuma8(img)
+            .write_to(&mut std::io::Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+        format!("data:image/png;base64,{}", general_purpose::STANDARD.encode(&png))
+    }
+
+    fn layer(id: &str, size: u32, seed: u32, origin: serde_json::Value, mode: &str, z: i32) -> BlendPreviewLayer {
+        BlendPreviewLayer {
+            id: id.to_string(),
+            image_base64: Some(map_png_b64(size, seed)),
+            info: Some(serde_json::json!({ "resolution": 0.05, "origin": origin })),
+            blend_mode: mode.to_string(),
+            z_index: z,
+            visible: true,
+            clip: None,
+        }
+    }
+
+    fn timed<T>(label: &str, f: impl FnOnce() -> T) -> T {
+        let start = Instant::now();
+        let value = f();
+        println!("{label:<28} {:>8.1} ms", start.elapsed().as_secs_f64() * 1000.0);
+        value
+    }
+
+    /// Per-stage timings of one preview. Run with:
+    /// `cargo test --release blend_preview_stage_timings -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn blend_preview_stage_timings() {
+        let layers = || {
+            vec![
+                layer("a", 4000, 0, serde_json::json!([0.0, 0.0, 0.0]), "overwrite", 0),
+                layer("b", 3000, 1, serde_json::json!([50.0, 30.0, 0.3]), "merge_obstacles", 1),
+            ]
+        };
+
+        let input = layers();
+        let b64_bytes: usize = input.iter().map(|l| l.image_base64.as_ref().unwrap().len()).sum();
+        println!("payload (base64)             {:>8.1} MB", b64_bytes as f64 / 1e6);
+
+        let decoded: Vec<_> = timed("decode + classify (parallel)", || {
+            input
+                .par_iter()
+                .map(|l| decode_layer(l.image_base64.as_ref().unwrap()).unwrap())
+                .collect()
+        });
+
+        let region = RectRegion {
+            x: 0.0,
+            y: 0.0,
+            width: 250.0,
+            height: 250.0,
+        };
+        let inputs: Vec<_> = decoded
+            .iter()
+            .zip(&input)
+            .map(|(img, l)| {
+                let origin = l.info.as_ref().unwrap()["origin"].as_array().unwrap();
+                LayerInput {
+                    id: &l.id,
+                    image: img,
+                    resolution: 0.05,
+                    origin: [
+                        origin[0].as_f64().unwrap(),
+                        origin[1].as_f64().unwrap(),
+                        origin[2].as_f64().unwrap(),
+                    ],
+                    blend_mode: &l.blend_mode,
+                    z_index: l.z_index,
+                    clip: None,
+                }
+            })
+            .collect();
+        let blended = timed("blend (25 MP output)", || blend_layers_to_cells(&inputs, &region, 0.05));
+        timed("RGBA bytes", || blended.to_rgba_image());
+
+        let result = timed("blend_map_preview (total)", || {
+            blend_map_preview(layers(), None, &|| false).unwrap()
+        });
+        println!(
+            "result (binary)              {:>8.1} MB",
+            result.into_bytes().len() as f64 / 1e6
+        );
+    }
 }

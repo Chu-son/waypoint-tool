@@ -1,5 +1,5 @@
-use crate::map::blending::{blend_layers_to_image, LayerInput, RectRegion};
-use crate::map::export_maps::{ExportLayer, ExportRegion};
+use crate::map::blending::{blend_layers_to_cells, LayerInput, RectRegion};
+use crate::map::export_maps::{decode_drawn_layers, ExportLayer, ExportRegion};
 use crate::templating::{self, TemplateEngine};
 use base64::{engine::general_purpose, Engine as _};
 use image::{codecs::pnm, ExtendedColorType, ImageEncoder};
@@ -176,24 +176,6 @@ fn backup_file_if_exists(path_str: &str, timestamp: &str, backed_up: &mut Vec<St
     Ok(())
 }
 
-/// レイヤー画像（base64、`data:` URL 可）をデコードする。デコードできないレイヤーは除外する。
-fn decode_layer_images(layers: &[ExportLayer]) -> Vec<(&ExportLayer, image::DynamicImage)> {
-    layers
-        .iter()
-        .filter_map(|layer| {
-            let b64 = layer.image_base64.as_ref()?;
-            let b64_data = if b64.starts_with("data:image") {
-                b64.split(',').nth(1).unwrap_or(b64)
-            } else {
-                b64
-            };
-            let bytes = general_purpose::STANDARD.decode(b64_data).ok()?;
-            let img = image::load_from_memory(&bytes).ok()?;
-            Some((layer, img))
-        })
-        .collect()
-}
-
 pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportResultSummary, String> {
     let mut backed_up_files = Vec::new();
     let mut exported_count = 0;
@@ -277,13 +259,18 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
     }
 
     // マップアイテムが共有するレイヤー。z_index 順に並べ、画像はマップアイテムがあるときに 1 回だけデコードする。
-    // デコードできない画像のレイヤーは従来どおり黙って除外する。
+    // どのアイテムでも描かれないレイヤーは読まない。デコードできない画像のレイヤーは従来どおり黙って除外する。
     let mut layers = options.layers;
     layers.sort_by_key(|l| l.z_index);
     let decoded_layers = if options.map_items.is_empty() {
         Vec::new()
     } else {
-        decode_layer_images(&layers)
+        let visibilities: Vec<_> = options
+            .map_items
+            .iter()
+            .map(|item| &item.region.layer_visibility)
+            .collect();
+        decode_drawn_layers(&layers, &visibilities, &|_, _| {})
     };
 
     // 2. Map アイテムのエクスポート処理
@@ -328,7 +315,7 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             height: map_item.region.rect.height,
         };
 
-        let out_img = blend_layers_to_image(&active_layer_inputs, &region_rect, resolution);
+        let blended = blend_layers_to_cells(&active_layer_inputs, &region_rect, resolution);
 
         if map_item.format == "ros_standard" {
             let pgm_path_str = format!("{}.pgm", map_item.save_path);
@@ -340,18 +327,13 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
             }
 
             // Save PGM
-            let luma_img = image::DynamicImage::ImageRgba8(out_img).into_luma8();
+            let luma = blended.to_luma8();
             let mut pgm_file = fs::File::create(Path::new(&pgm_path_str))
                 .map_err(|e| format!("Failed to create pgm file {}: {}", pgm_path_str, e))?;
             let encoder =
                 pnm::PnmEncoder::new(&mut pgm_file).with_subtype(pnm::PnmSubtype::Graymap(pnm::SampleEncoding::Binary));
             encoder
-                .write_image(
-                    luma_img.as_raw(),
-                    luma_img.width(),
-                    luma_img.height(),
-                    ExtendedColorType::L8,
-                )
+                .write_image(&luma, blended.width, blended.height, ExtendedColorType::L8)
                 .map_err(|e| format!("Failed to save pgm {}: {}", pgm_path_str, e))?;
             exported_count += 1;
 
@@ -375,7 +357,8 @@ pub fn execute_export_package(options: ExportPackageOptions) -> Result<ExportRes
                 backup_file_if_exists(&png_path_str, &options.session_timestamp, &mut backed_up_files)?;
             }
 
-            out_img
+            blended
+                .to_rgba_image()
                 .save(Path::new(&png_path_str))
                 .map_err(|e| format!("Failed to save png {}: {}", png_path_str, e))?;
             exported_count += 1;
@@ -956,5 +939,112 @@ mod tests {
         floatify(&mut value, &HashSet::new());
         assert!(value["small"].is_f64() && value["neg"].is_f64());
         assert!(value["big"].is_i64());
+    }
+
+    /// FNV-1a: a hash that stays the same across Rust versions, for pinning output bytes.
+    fn fnv1a(bytes: &[u8]) -> u64 {
+        bytes.iter().fold(0xcbf2_9ce4_8422_2325, |h, b| {
+            (h ^ *b as u64).wrapping_mul(0x0100_0000_01b3)
+        })
+    }
+
+    /// A layer of deterministic noise around the classification thresholds, stored as a PNG of the given format.
+    fn noise_layer(
+        id: &str,
+        format: &str,
+        seed: u32,
+        info: serde_json::Value,
+        extra: serde_json::Value,
+    ) -> serde_json::Value {
+        const LEVELS: [u8; 10] = [0, 50, 89, 90, 128, 205, 229, 230, 254, 255];
+        const ALPHAS: [u8; 4] = [255, 255, 128, 127];
+        let mut state = seed.wrapping_mul(2_654_435_761).wrapping_add(1);
+        let mut next = move || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (state >> 16) as usize
+        };
+        let rgba = image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(60, 45, |_, _| {
+            let (r, g, b) = (LEVELS[next() % 10], LEVELS[next() % 10], LEVELS[next() % 10]);
+            image::Rgba([r, g, b, ALPHAS[next() % 4]])
+        }));
+        let picture = match format {
+            "L8" => image::DynamicImage::ImageLuma8(rgba.to_luma8()),
+            "LA8" => image::DynamicImage::ImageLumaA8(rgba.to_luma_alpha8()),
+            "RGB8" => image::DynamicImage::ImageRgb8(rgba.to_rgb8()),
+            "L16" => image::DynamicImage::ImageLuma16(rgba.to_luma16()),
+            _ => rgba,
+        };
+        let mut png = Vec::new();
+        picture
+            .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+            .unwrap();
+        let mut layer = serde_json::json!({
+            "id": id,
+            "name": id,
+            "image_base64": format!("data:image/png;base64,{}", general_purpose::STANDARD.encode(&png)),
+            "info": info,
+            "opacity": 1.0,
+        });
+        layer
+            .as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        layer
+    }
+
+    #[test]
+    fn exported_map_files_keep_their_exact_bytes() {
+        let tmp = TempDir::new().unwrap();
+        let (ros, png_only) = (tmp.path().join("ros"), tmp.path().join("png_only"));
+        let at = |x: f64, y: f64, yaw: f64, resolution: f64| serde_json::json!({ "resolution": resolution, "origin": [x, y, yaw] });
+
+        let mut png_item = map_item(&png_only, serde_json::json!({ "rotated": false, "unused": false }));
+        png_item["format"] = "png_only".into();
+        png_item["region"]["rect"] = serde_json::json!({ "x": 0.1, "y": -0.2, "width": 1.9, "height": 1.3 });
+        let mut ros_item = map_item(&ros, serde_json::json!({ "unused": false }));
+        ros_item["region"]["rect"] = serde_json::json!({ "x": -1.0, "y": -1.0, "width": 4.0, "height": 3.5 });
+
+        run_export(
+            tmp.path(),
+            serde_json::json!({
+                "layers": [
+                    noise_layer("base", "RGBA8", 1, at(-0.5, -0.5, 0.0, 0.05), serde_json::json!({ "blend_mode": "overwrite", "z_index": 0 })),
+                    noise_layer(
+                        "rotated",
+                        "L8",
+                        2,
+                        at(0.2, 0.1, 0.37, 0.05),
+                        serde_json::json!({
+                            "blend_mode": "merge_obstacles",
+                            "z_index": 1,
+                            "clip": { "rects": [
+                                { "x": -0.3, "y": -0.2, "width": 1.4, "height": 1.4 },
+                                { "x": 0.6, "y": 0.5, "width": 1.1, "height": 0.3 },
+                            ] },
+                        }),
+                    ),
+                    noise_layer("fine", "LA8", 3, at(0.0, -0.3, 0.0, 0.031), serde_json::json!({ "blend_mode": "replace", "z_index": 2 })),
+                    noise_layer("colour", "RGB8", 4, at(-0.2, 0.0, -2.1, 0.05), serde_json::json!({ "blend_mode": "merge_free", "z_index": 3 })),
+                    noise_layer("deep", "L16", 5, at(0.4, 0.4, 0.0, 0.05), serde_json::json!({ "blend_mode": "overwrite", "z_index": 4 })),
+                    noise_layer("unused", "RGBA8", 6, at(0.0, 0.0, 0.0, 0.05), serde_json::json!({ "blend_mode": "overwrite", "z_index": 5 })),
+                ],
+                "map_items": [ros_item, png_item],
+            }),
+        );
+
+        let hashes: Vec<(String, u64)> = ["ros.pgm", "ros.yaml", "png_only.png"]
+            .into_iter()
+            .map(|file| (file.to_string(), fnv1a(&fs::read(tmp.path().join(file)).unwrap())))
+            .collect();
+        // Taken from the output of the straightforward per-pixel blend, before the blend was reworked for speed.
+        let expected: [(&str, u64); 3] = [
+            ("ros.pgm", 0x1fe6_899d_6706_e7d6),
+            ("ros.yaml", 0x7f74_cd0d_2325_6474),
+            ("png_only.png", 0x6998_b6f2_670f_1ae6),
+        ];
+        for ((file, hash), (expected_file, expected_hash)) in hashes.iter().zip(expected) {
+            assert_eq!(file, expected_file);
+            assert_eq!(*hash, expected_hash, "{file} changed");
+        }
     }
 }

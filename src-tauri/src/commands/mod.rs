@@ -1,7 +1,8 @@
 use crate::{io, map};
 use base64::{engine::general_purpose, Engine as _};
 use std::fs;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use tauri::{command, AppHandle, Manager};
 
 pub mod export_pipeline;
@@ -59,10 +60,45 @@ pub async fn export_maps(options: map::ExportMapsOptions) -> Result<(), String> 
     run_blocking_io(move || map::export_maps(options)).await
 }
 
+/// The newest `blend_map_preview` request the frontend has made. The frontend numbers its requests in
+/// increasing order and drops the result of any request a newer one has replaced, so a request that
+/// is no longer the newest can stop computing instead of competing with the one that matters.
+#[derive(Default)]
+pub struct PreviewRequests(Arc<AtomicU64>);
+
 // Read-only: works on the images it is given, so it is not serialized with the file commands.
+// Returns `BlendPreviewResult::into_bytes()` as a raw binary response (no JSON, no base64);
+// a request replaced by a newer one fails with `map::PREVIEW_CANCELLED`.
+//
+// With `use_cache`, the decoded layers are kept between previews in `DecodeCache` (and only those of the latest
+// preview stay); without it the cache is emptied, so turning the setting off gives the memory back at once.
 #[command]
-pub async fn blend_map_preview(layers: Vec<map::BlendPreviewLayer>) -> Result<map::BlendPreviewResult, String> {
-    run_blocking(move || map::blend_map_preview(layers)).await
+pub async fn blend_map_preview(
+    requests: tauri::State<'_, PreviewRequests>,
+    cache: tauri::State<'_, map::layer_decode::DecodeCache>,
+    request_id: u64,
+    use_cache: bool,
+    layers: Vec<map::BlendPreviewLayer>,
+) -> Result<tauri::ipc::Response, String> {
+    let newest = Arc::clone(&requests.0);
+    let cache = cache.inner().clone();
+    // `max`, not a plain store: requests can reach the backend out of order.
+    newest.fetch_max(request_id, Ordering::SeqCst);
+    run_blocking(move || {
+        let superseded = || newest.load(Ordering::SeqCst) > request_id;
+        if !use_cache {
+            cache.clear();
+        }
+        map::blend_map_preview(layers, use_cache.then_some(&cache), &superseded)
+            .map(|result| tauri::ipc::Response::new(result.into_bytes()))
+    })
+    .await
+}
+
+/// Lets go of the decoded layers `blend_map_preview` kept (the preview was turned off, or the cache setting was).
+#[command]
+pub fn clear_blend_cache(cache: tauri::State<'_, map::layer_decode::DecodeCache>) {
+    cache.clear();
 }
 
 // Synchronous on purpose (see `IO_LOCK`): an edit made while saving would be marked as saved.

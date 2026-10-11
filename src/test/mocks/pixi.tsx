@@ -38,13 +38,43 @@ class MockUniformGroup {
   }
 }
 
+/** Keeps what it was built from, so a test can check the pixels a texture was made of. */
+class MockBufferImageSource {
+  resource: unknown;
+  width: number;
+  height: number;
+  format: unknown;
+  constructor(options: { resource: unknown; width: number; height: number; format?: unknown }) {
+    this.resource = options.resource;
+    this.width = options.width;
+    this.height = options.height;
+    this.format = options.format;
+  }
+}
+
+class MockTexture {
+  static from = vi.fn(() => ({ destroy: vi.fn() }));
+  static EMPTY = {};
+  static WHITE = {};
+  source: MockBufferImageSource | undefined;
+  width: number;
+  height: number;
+  destroy = vi.fn();
+  constructor(options?: { source?: MockBufferImageSource }) {
+    this.source = options?.source;
+    this.width = options?.source?.width ?? 0;
+    this.height = options?.source?.height ?? 0;
+  }
+}
+
 export const pixiJsMock = {
   Container: vi.fn(() => ({ destroy: vi.fn() })),
   Sprite: vi.fn(() => ({ destroy: vi.fn() })),
   Graphics: vi.fn(() => createGraphicsRecorder()),
   Text: vi.fn(() => ({ destroy: vi.fn() })),
   TextStyle: vi.fn(),
-  Texture: { from: vi.fn(() => ({ destroy: vi.fn() })), EMPTY: {}, WHITE: {} },
+  Texture: MockTexture,
+  BufferImageSource: MockBufferImageSource,
   Rectangle: vi.fn((x = 0, y = 0, width = 0, height = 0) => ({ x, y, width, height })),
   Filter: MockFilter,
   GlProgram: { from: vi.fn(() => ({})) },
