@@ -8,10 +8,11 @@ import { layerStackState, makeMap } from '../../../test/fixtures';
 
 vi.mock('pixi.js', () => import('../../../test/mocks/pixi').then((m) => m.pixiJsMock));
 
-const PIXELS = new Uint8Array([0, 0, 0, 255, 254, 254, 254, 255]);
+const CELLS = new Uint8Array([2, 1]);
+const PIXELS = [0, 0, 0, 255, 254, 254, 254, 255];
 
-function previewOf(rgba: Uint8Array = PIXELS): BlendPreviewResult {
-  return { width: 2, height: 1, origin: [-1, 2, 0], resolution: 0.05, rgba };
+function previewOf(cells: Uint8Array = CELLS): BlendPreviewResult {
+  return { width: 2, height: 1, origin: [-1, 2, 0], resolution: 0.05, cells };
 }
 
 describe('useBlendedPreview', () => {
@@ -51,7 +52,7 @@ describe('useBlendedPreview', () => {
       source: { resource: Uint8Array };
     };
     expect([texture.width, texture.height]).toEqual([2, 1]);
-    expect(Array.from(texture.source.resource)).toEqual(Array.from(PIXELS));
+    expect(Array.from(texture.source.resource)).toEqual(PIXELS);
     expect(result.current.previewInfo).toMatchObject({ resolution: 0.05, origin: [-1, 2, 0] });
   });
 

@@ -51,8 +51,8 @@ export type BlendPreviewResult = {
   height: number;
   origin: [number, number, number];
   resolution: number;
-  /** `width × height` 画素、上の行から、1 画素 4 バイト（R, G, B, A）。 */
-  rgba: Uint8Array;
+  /** `width × height` セル、上の行から、1 セル 1 バイト（0 = Unknown, 1 = Free, 2 = Obstacle）。色は `cellsToRgba` で付ける。 */
+  cells: Uint8Array;
 };
 
 export interface IBackendAPI {

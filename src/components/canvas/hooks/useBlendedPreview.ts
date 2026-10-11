@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { BufferImageSource, Texture } from 'pixi.js';
 import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
+import { cellsToRgba } from '../../../api/backend/blendPreviewCodec';
 import type { BlendPreviewResult } from '../../../api/types';
 import { createRasterCache, prepareLayersForExport, type RasterCache } from '../../../services/mapRasterize';
 import { createTrace, megabytes } from '../../../services/perfTrace';
@@ -17,7 +18,7 @@ let lastRequestId = 0;
 /** The blended pixels as a texture, uploaded straight from the backend's bytes (no image to decode). */
 function textureFromPreview(result: BlendPreviewResult): Texture {
   const source = new BufferImageSource({
-    resource: result.rgba,
+    resource: cellsToRgba(result.cells),
     width: result.width,
     height: result.height,
     format: 'rgba8unorm',
@@ -124,9 +125,9 @@ export function useBlendedPreview() {
           stopLoading(LOADING_TASK_ID);
           return;
         }
-        trace.mark('IPC round trip (send + backend + receive)', `${megabytes(result.rgba.length)} received`);
+        trace.mark('IPC round trip (send + backend + receive)', `${megabytes(result.cells.length)} received`);
         const texture = textureFromPreview(result);
-        trace.mark('create texture');
+        trace.mark('create texture (cells → RGBA + texture)');
         setPreviewTexture(texture);
         setPreviewInfo({
           resolution: result.resolution,

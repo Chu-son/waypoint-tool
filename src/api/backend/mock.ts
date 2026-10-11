@@ -199,7 +199,7 @@ export class MockBackendAPI implements IBackendAPI {
       height: 1,
       origin: [0, 0, 0],
       resolution: 0.05,
-      rgba: new Uint8Array([254, 254, 254, 255]),
+      cells: new Uint8Array([1]),
     };
   }
 

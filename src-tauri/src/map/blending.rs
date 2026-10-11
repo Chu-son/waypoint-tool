@@ -163,6 +163,11 @@ impl BlendedCells {
         RgbaImage::from_raw(self.width, self.height, raw).expect("buffer holds width × height RGBA pixels")
     }
 
+    /// 1 セル 1 バイトの値（`CELL_ORDER` の添字: Unknown = 0, Free = 1, Obstacle = 2）。プレビューの応答に使う。
+    pub fn to_codes(&self) -> Vec<u8> {
+        self.cells.par_iter().map(|cell| *cell as u8).collect()
+    }
+
     /// `to_rgba_image()` を `DynamicImage::into_luma8()` で変換したものと同じバイト列（ROS 標準の PGM 用）。
     pub fn to_luma8(&self) -> Vec<u8> {
         // 取り得る色は 3 つだけなので、画像ライブラリの変換を 3 回通して表にする。

@@ -25,8 +25,10 @@ pub struct BlendPreviewResult {
     pub height: u32,
     pub origin: [f64; 3],
     pub resolution: f64,
-    /// `width × height` pixels, row by row from the top, 4 bytes (R, G, B, A) each.
-    pub rgba: Vec<u8>,
+    /// `width × height` cells, row by row from the top, 1 byte each: 0 = Unknown, 1 = Free, 2 = Obstacle
+    /// (see `BlendedCells::to_codes`). The frontend turns them into colours; a colour image would be 4 times larger,
+    /// and the size of the response is what the preview waits on most.
+    pub cells: Vec<u8>,
 }
 
 /// Size of the header `into_bytes` puts before the pixels.
@@ -34,17 +36,17 @@ pub const PREVIEW_HEADER_BYTES: usize = 40;
 
 impl BlendPreviewResult {
     /// The wire format of the preview, all numbers little-endian:
-    /// `width: u32`, `height: u32`, `origin: [f64; 3]`, `resolution: f64`, then the RGBA pixels.
+    /// `width: u32`, `height: u32`, `origin: [f64; 3]`, `resolution: f64`, then the cells.
     /// Sent as a raw binary response: no JSON, no base64, no image codec in between.
     pub fn into_bytes(self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(PREVIEW_HEADER_BYTES + self.rgba.len());
+        let mut bytes = Vec::with_capacity(PREVIEW_HEADER_BYTES + self.cells.len());
         bytes.extend_from_slice(&self.width.to_le_bytes());
         bytes.extend_from_slice(&self.height.to_le_bytes());
         for value in self.origin {
             bytes.extend_from_slice(&value.to_le_bytes());
         }
         bytes.extend_from_slice(&self.resolution.to_le_bytes());
-        bytes.extend_from_slice(&self.rgba);
+        bytes.extend_from_slice(&self.cells);
         bytes
     }
 }
@@ -220,7 +222,7 @@ pub fn blend_map_preview(
         height: blended.height,
         origin: [min_x, min_y, 0.0],
         resolution,
-        rgba: blended.to_rgba_image().into_raw(),
+        cells: blended.to_codes(),
     })
 }
 
@@ -277,10 +279,10 @@ mod tests {
         );
         assert_eq!(f64_at(&bytes, 32), 1.0);
         let pixels = &bytes[PREVIEW_HEADER_BYTES..];
-        assert_eq!(pixels.len(), 4 * 4 * 4);
-        let (wall, free) = ([0, 0, 0, 255], [254, 254, 254, 255]);
-        for (i, pixel) in pixels.chunks_exact(4).enumerate() {
-            assert_eq!(pixel, if i < 4 { wall } else { free }, "pixel {i}");
+        assert_eq!(pixels.len(), 4 * 4);
+        let (obstacle, free) = (2, 1);
+        for (i, cell) in pixels.iter().enumerate() {
+            assert_eq!(*cell, if i < 4 { obstacle } else { free }, "cell {i}");
         }
     }
 
@@ -475,7 +477,7 @@ mod bench {
             })
             .collect();
         let blended = timed("blend (25 MP output)", || blend_layers_to_cells(&inputs, &region, 0.05));
-        timed("RGBA bytes", || blended.to_rgba_image());
+        timed("cell codes", || blended.to_codes());
 
         let result = timed("blend_map_preview (total)", || {
             blend_map_preview(layers(), None, &|| false).unwrap()
