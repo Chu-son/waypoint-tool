@@ -154,6 +154,23 @@ describe('SettingsModal UI', () => {
     expect(useAppStore.getState().isDirty).toBe(true);
   });
 
+  it('lets the user turn off the blend preview cache on the General tab, without touching the project', async () => {
+    useAppStore.setState({ enableBlendCache: true, isDirty: false });
+    render(<SettingsModal isOpen={true} onClose={vi.fn()} />);
+
+    const toggle = screen.getByRole('switch', { name: 'Cache Blend Preview Data' });
+    expect(toggle).toBeChecked();
+
+    act(() => {
+      fireEvent.click(toggle);
+    });
+
+    expect(toggle).not.toBeChecked();
+    expect(useAppStore.getState().enableBlendCache).toBe(false);
+    // It is a preference of this machine, not part of the project.
+    expect(useAppStore.getState().isDirty).toBe(false);
+  });
+
   it('allows switching color theme between dark and light on the Appearance tab', async () => {
     useAppStore.setState({ themeMode: 'dark', isCustomUiMode: false, customUiConfig: null });
     render(<SettingsModal isOpen={true} onClose={vi.fn()} />);

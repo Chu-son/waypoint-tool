@@ -72,6 +72,7 @@ export const useAppStore = create<AppState>()(
         pluginSettings: state.pluginSettings,
         globalPythonPath: state.globalPythonPath,
         decimalPrecision: state.decimalPrecision,
+        enableBlendCache: state.enableBlendCache,
         themeMode: state.themeMode,
         themePreset: state.themePreset,
         leftPanelViewMode: state.leftPanelViewMode,
