@@ -89,8 +89,17 @@ pub async fn blend_map_preview(
         if !use_cache {
             cache.clear();
         }
-        map::blend_map_preview(layers, use_cache.then_some(&cache), &superseded)
-            .map(|result| tauri::ipc::Response::new(result.into_bytes()))
+        let started = std::time::Instant::now();
+        let result = map::blend_map_preview(layers, use_cache.then_some(&cache), &superseded)
+            .map(|result| tauri::ipc::Response::new(result.into_bytes()));
+        // Dev builds only: lets the frontend's "IPC round trip" be split into compute and transfer.
+        if cfg!(debug_assertions) {
+            eprintln!(
+                "[perf] blend_map_preview #{request_id} backend compute: {:.1} ms (cache: {use_cache})",
+                started.elapsed().as_secs_f64() * 1000.0
+            );
+        }
+        result
     })
     .await
 }

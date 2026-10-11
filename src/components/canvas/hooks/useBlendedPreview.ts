@@ -4,6 +4,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { BackendAPI } from '../../../api';
 import type { BlendPreviewResult } from '../../../api/types';
 import { createRasterCache, prepareLayersForExport, type RasterCache } from '../../../services/mapRasterize';
+import { createTrace, megabytes } from '../../../services/perfTrace';
 
 const LOADING_TASK_ID = 'blended-preview';
 
@@ -104,6 +105,9 @@ export function useBlendedPreview() {
     const useCache = useAppStore.getState().enableBlendCache;
     if (useCache) holdsBackendCache.current = true;
 
+    // Dev only: prints where the time of this preview went (see `createTrace`).
+    const trace = createTrace('Blend Preview');
+
     latestRequest.current = prepareLayersForExport(
       { mapSources, mapLayers, customLayers, layerOrder },
       useCache ? { rasterCache: rasterCache.current } : {},
@@ -111,6 +115,8 @@ export function useBlendedPreview() {
       .then((layerInputs) => {
         if (cancelled) return null;
         if (!layerInputs || layerInputs.length === 0) return null;
+        const sent = layerInputs.reduce((sum, layer) => sum + (layer.image_base64?.length ?? 0), 0);
+        trace.mark('prepare layers (rasterize + toDataURL)', `${layerInputs.length} layers, ${megabytes(sent)} base64`);
         return BackendAPI.blendMapPreview(layerInputs, ++lastRequestId, useCache);
       })
       .then((result) => {
@@ -118,7 +124,10 @@ export function useBlendedPreview() {
           stopLoading(LOADING_TASK_ID);
           return;
         }
-        setPreviewTexture(textureFromPreview(result));
+        trace.mark('IPC round trip (send + backend + receive)', `${megabytes(result.rgba.length)} received`);
+        const texture = textureFromPreview(result);
+        trace.mark('create texture');
+        setPreviewTexture(texture);
         setPreviewInfo({
           resolution: result.resolution,
           origin: result.origin,
@@ -127,6 +136,7 @@ export function useBlendedPreview() {
           negate: occupancySettings.defaultNegate,
         });
         stopLoading(LOADING_TASK_ID);
+        void trace.markAfterPaint('render + GPU upload (2 frames)').then(() => trace.end());
       })
       .catch((err) => {
         if (cancelled) return;

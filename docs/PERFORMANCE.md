@@ -108,6 +108,12 @@
 
 ---
 
+### 2.6 計測のしかた
+
+- **フロント（開発時のみ）**: `tauri dev` でプレビューを出すと、DevTools のコンソールに `[perf] Blend Preview` の表が出る（`src/services/perfTrace.ts`、本番ビルドでは何もしない）。段は「レイヤーの準備（ラスタライズ + `toDataURL`）」「IPC の往復」「テクスチャの作成」「描画 + GPU アップロード」。
+- **バックエンド（dev ビルドのみ）**: `blend_map_preview` が端末に `[perf] blend_map_preview #id backend compute: … ms` を出す。フロントの「IPC の往復」からこの値を引いたものが、引数の JSON 化と結果の転送の時間。
+- **Rust 単体**: `cargo test --release blend_preview_stage_timings -- --ignored --nocapture`。
+
 ## 3. 調査中に見つかった要確認事項（性能以外）
 
 性能改善の調査中に見つかった、挙動に関する確認事項です。直すと出力が変わるため、性能改善とは別に判断してください。
