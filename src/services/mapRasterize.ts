@@ -165,18 +165,14 @@ export function getEditLayerBoundingBox(
   return { minX, maxX, minY, maxY, widthPx, heightPx };
 }
 
-/**
- * Rasterizes a manual CustomLayer into an independent ExportLayer with a transparent background.
- */
-export async function rasterizeManualCustomLayerToExportLayer(
-  customLayer: ManualCustomLayer,
-  targetResolution?: number,
-): Promise<Omit<PreparedExportLayer, 'z_index' | 'visible'> | null> {
-  if (!customLayer.visible || customLayer.editObjects.length === 0) {
-    return null;
-  }
+/** A manual layer drawn to a PNG: the picture and where its lower-left corner lies in the world. */
+type RasterizedPicture = { dataUrl: string; originX: number; originY: number };
 
-  const resolution = targetResolution || 0.05;
+/**
+ * Draws the objects of a manual layer onto a transparent canvas. The picture depends only on the
+ * objects and the resolution (not on the layer's name or blend mode).
+ */
+function renderManualLayerPicture(customLayer: ManualCustomLayer, resolution: number): RasterizedPicture | null {
   const bbox = getEditLayerBoundingBox(customLayer, resolution);
 
   const canvas = document.createElement('canvas');
@@ -200,16 +196,55 @@ export async function rasterizeManualCustomLayerToExportLayer(
     drawEditObjectToCanvas(ctx, obj, info);
   }
 
-  const dataUrl = canvas.toDataURL('image/png');
+  return { dataUrl: canvas.toDataURL('image/png'), originX: bbox.minX, originY: bbox.minY };
+}
+
+/**
+ * Remembers the last picture drawn for each manual layer, so drawing the layers again for a preview
+ * skips the ones that did not change. Costs memory (one PNG per layer), so callers opt in by creating one.
+ * It is a plain object the caller owns, not module state: whoever creates it decides how long it lives.
+ */
+export type RasterCache = Map<string, { editObjects: EditObject[]; resolution: number; picture: RasterizedPicture }>;
+
+export function createRasterCache(): RasterCache {
+  return new Map();
+}
+
+/**
+ * Rasterizes a manual CustomLayer into an independent ExportLayer with a transparent background.
+ * With a `cache`, the picture is reused while the layer's objects (compared by identity: the store
+ * replaces the array on every edit) and the resolution stay the same.
+ */
+export async function rasterizeManualCustomLayerToExportLayer(
+  customLayer: ManualCustomLayer,
+  targetResolution?: number,
+  cache?: RasterCache,
+): Promise<Omit<PreparedExportLayer, 'z_index' | 'visible'> | null> {
+  if (!customLayer.visible || customLayer.editObjects.length === 0) {
+    return null;
+  }
+
+  const resolution = targetResolution || 0.05;
+  const cached = cache?.get(customLayer.id);
+  let picture: RasterizedPicture | null;
+  if (cached && cached.editObjects === customLayer.editObjects && cached.resolution === resolution) {
+    picture = cached.picture;
+  } else {
+    picture = renderManualLayerPicture(customLayer, resolution);
+    if (picture && cache) {
+      cache.set(customLayer.id, { editObjects: customLayer.editObjects, resolution, picture });
+    }
+  }
+  if (!picture) return null;
 
   return {
     id: customLayer.id,
     name: customLayer.name,
-    image_base64: dataUrl,
+    image_base64: picture.dataUrl,
     info: {
       image: `${customLayer.name.replace(/\s+/g, '_').toLowerCase()}.png`,
       resolution,
-      origin: [bbox.minX, bbox.minY, 0],
+      origin: [picture.originX, picture.originY, 0],
       negate: 0,
       occupied_thresh: 0.65,
       free_thresh: 0.196,
@@ -356,10 +391,18 @@ export type PreparedExportLayer = {
  */
 export async function prepareLayersForExport(
   stack: LayerStack,
-  options: { includeHidden?: boolean } = {},
+  options: { includeHidden?: boolean; rasterCache?: RasterCache } = {},
 ): Promise<PreparedExportLayer[]> {
   const { customLayers, layerOrder } = stack;
   const includeHidden = options.includeHidden === true;
+  const { rasterCache } = options;
+  if (rasterCache) {
+    // Let go of the pictures of layers that no longer exist.
+    const present = new Set(customLayers.map((l) => l.id));
+    for (const id of rasterCache.keys()) {
+      if (!present.has(id)) rasterCache.delete(id);
+    }
+  }
   const zIndexes = stackZIndexes(layerOrder);
   const zOf = (id: string) => zIndexes.get(id) ?? 0;
 
@@ -386,7 +429,7 @@ export async function prepareLayersForExport(
         const zIndex = zOf(cl.id);
 
         if (cl.type === 'manual') {
-          const exportLayer = await rasterizeManualCustomLayerToExportLayer(cl, baseResolution);
+          const exportLayer = await rasterizeManualCustomLayerToExportLayer(cl, baseResolution, rasterCache);
           if (!exportLayer) return null;
           return {
             ...exportLayer,
