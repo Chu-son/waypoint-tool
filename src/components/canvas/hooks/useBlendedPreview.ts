@@ -187,10 +187,15 @@ export function useBlendedPreview() {
 
   useEffect(() => {
     return () => {
-      if (previewTexture && !previewTexture.destroyed) {
-        // The texture owns its source (made in `textureFromPreview`), so destroy that as well.
-        previewTexture.destroy(true);
-      }
+      if (!previewTexture) return;
+      // The canvas still draws the old texture until the next frames show the new one (or none); destroying it
+      // before then makes the renderer bind a source that is already gone. It owns its source (made in
+      // `textureFromPreview`), so destroy that as well.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!previewTexture.destroyed) previewTexture.destroy(true);
+        }),
+      );
     };
   }, [previewTexture]);
 

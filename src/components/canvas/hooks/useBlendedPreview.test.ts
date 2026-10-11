@@ -143,6 +143,26 @@ describe('useBlendedPreview', () => {
     });
   });
 
+  it('lets go of the previous texture only after the canvas has had frames to switch to the new one', async () => {
+    const { result } = renderHook(() => useBlendedPreview());
+    act(() => getAppState().setShowOccupancyHighlight(true));
+    await waitFor(() => expect(result.current.previewTexture).not.toBeNull());
+    const first = result.current.previewTexture as unknown as { destroy: ReturnType<typeof vi.fn> };
+
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => frames.push(callback));
+    const nextFrame = () => act(() => frames.splice(0).forEach((callback) => callback(0)));
+
+    act(() => getAppState().updateMapLayer('m1', { blend_mode: 'merge_obstacles' }));
+    await waitFor(() => expect(result.current.previewTexture).not.toBe(first));
+
+    expect(first.destroy).not.toHaveBeenCalled();
+    nextFrame();
+    expect(first.destroy).not.toHaveBeenCalled();
+    nextFrame();
+    expect(first.destroy).toHaveBeenCalledWith(true);
+  });
+
   it('reports a backend failure', async () => {
     blend.mockRejectedValue(new Error('blend failed'));
     const { result } = renderHook(() => useBlendedPreview());
