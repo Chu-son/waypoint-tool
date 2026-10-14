@@ -19,6 +19,7 @@ import {
 } from '../canvasConstants';
 import { resolveAnnotationConditionalStyle, parseColorSafe } from '../../../utils/conditionalStyles';
 import { resolveOptionsSchema } from '../../../utils/optionSchema';
+import { isAnnotationShown } from '../../../utils/annotationVisibility';
 
 interface AnnotationLayerProps {
   scale: number;
@@ -89,13 +90,7 @@ export const AnnotationLayer = memo(function AnnotationLayer({
 
   const renderSingleAnnotation = (obj: AnnotationObject, isPreview = false) => {
     if (!isPreview) {
-      if (!obj.visible) return null;
-      let currentGid = obj.group_id;
-      while (currentGid) {
-        const grp = annotationGroups[currentGid];
-        if (grp && grp.visible === false) return null;
-        currentGid = grp?.parent_id;
-      }
+      if (!isAnnotationShown(obj, annotationGroups)) return null;
     }
 
     // Evaluate conditional styles

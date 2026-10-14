@@ -7,6 +7,11 @@ import {
   selectedLayerItemIds,
   ungroupLayerItems,
 } from '../../services/layerCommands';
+import {
+  groupAnnotationItems,
+  selectedAnnotationItemIds,
+  ungroupAnnotationItems,
+} from '../../services/annotationCommands';
 
 /**
  * Global keyboard shortcuts. Reads the store when a key is pressed instead of subscribing to it,
@@ -194,12 +199,16 @@ export function ShortcutManager() {
             duplicateSelectedMapElements?.();
             break;
           case 'g': {
-            // Grouping follows what is selected; layers are the tree that has it for now.
+            // Grouping follows what is selected: layers or annotations.
             const layerIds = selectedLayerItemIds();
-            if (layerIds.length === 0) break;
+            const annotationIds = selectedAnnotationItemIds();
+            if (layerIds.length === 0 && annotationIds.length === 0) break;
             e.preventDefault();
-            if (e.shiftKey) ungroupLayerItems(layerIds);
-            else groupLayerItems(layerIds);
+            if (layerIds.length > 0) {
+              if (e.shiftKey) ungroupLayerItems(layerIds);
+              else groupLayerItems(layerIds);
+            } else if (e.shiftKey) ungroupAnnotationItems(annotationIds);
+            else groupAnnotationItems(annotationIds);
             break;
           }
           case 'h':

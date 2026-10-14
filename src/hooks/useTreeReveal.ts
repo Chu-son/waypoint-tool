@@ -4,7 +4,8 @@ import { useAppStore } from '../stores/appStore';
 export interface UseTreeRevealProps {
   treeType: 'node' | 'annotation';
   getAncestorIds: (id: string) => string[];
-  setExpanded: React.Dispatch<React.SetStateAction<Set<string>>>;
+  /** Opens the given containers; must be a stable reference. */
+  expandItems: (ids: string[]) => void;
   scrollDelayMs?: number;
   flashDurationMs?: number;
 }
@@ -12,7 +13,7 @@ export interface UseTreeRevealProps {
 export function useTreeReveal({
   treeType,
   getAncestorIds,
-  setExpanded,
+  expandItems,
   scrollDelayMs = 60,
   flashDurationMs = 1800,
 }: UseTreeRevealProps) {
@@ -30,19 +31,7 @@ export function useTreeReveal({
     const ancestors = getAncestorIds(id);
 
     // 1. 先祖グループを自動展開
-    if (ancestors.length > 0) {
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        let changed = false;
-        ancestors.forEach((ancId) => {
-          if (!next.has(ancId)) {
-            next.add(ancId);
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }
+    if (ancestors.length > 0) expandItems(ancestors);
 
     // 2. DOMの更新・レンダリング完了を待ってスクロール＆フラッシュ
     const scrollTimer = setTimeout(() => {
@@ -60,7 +49,7 @@ export function useTreeReveal({
     return () => {
       clearTimeout(scrollTimer);
     };
-  }, [treeRevealTarget, treeType, getAncestorIds, setExpanded, clearTreeRevealTarget, scrollDelayMs, flashDurationMs]);
+  }, [treeRevealTarget, treeType, getAncestorIds, expandItems, clearTreeRevealTarget, scrollDelayMs, flashDurationMs]);
 
   return { flashingId };
 }

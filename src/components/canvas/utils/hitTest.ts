@@ -1,4 +1,5 @@
-import type { AnnotationObject, WaypointNode } from '../../../types/store';
+import type { AnnotationGroup, AnnotationObject, WaypointNode } from '../../../types/store';
+import { isAnnotationShown } from '../../../utils/annotationVisibility';
 import { getAnnotationCenter } from '../../../stores/slices/measureSlice';
 
 export type SnapTarget = {
@@ -82,6 +83,7 @@ export function findNearestObjectCenter(
   nodes: Record<string, WaypointNode>,
   annotations: Record<string, AnnotationObject>,
   scale: number,
+  annotationGroups: Record<string, AnnotationGroup> = {},
 ): SnapTarget | null {
   let closestDist = SNAP_RADIUS_PX / Math.max(scale, 0.001);
   let result: SnapTarget | null = null;
@@ -102,7 +104,7 @@ export function findNearestObjectCenter(
   }
 
   for (const annot of Object.values(annotations)) {
-    if (!annot || annot.visible === false) continue;
+    if (!annot || !isAnnotationShown(annot, annotationGroups)) continue;
     const center = getAnnotationCenter(annot);
     const dist = Math.hypot(center.x - worldX, center.y - worldY);
     if (dist < closestDist) {

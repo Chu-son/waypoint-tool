@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from '../appStore';
 import { PointAnnotation, AnnotationGroup } from '../../types/store';
+import { isAnnotationShown } from '../../utils/annotationVisibility';
 
 describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () => {
   beforeEach(() => {
@@ -116,15 +117,26 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
     expect(state.annotationGroups['sub-g'].parent_id).toBeUndefined();
   });
 
-  it('toggles group visibility recursively', () => {
-    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: true, labelVisible: true };
-    const p2: PointAnnotation = { id: 'p2', type: 'point', name: 'P2', x: 1, y: 1, visible: true, labelVisible: true };
+  it('hides what a group holds without touching their own visibility, and brings back exactly what was shown', () => {
+    // p1 was hidden by the user before the group is toggled.
+    const p1: PointAnnotation = { id: 'p1', type: 'point', name: 'P1', x: 0, y: 0, visible: false, labelVisible: true };
+    const p2: PointAnnotation = {
+      id: 'p2',
+      type: 'point',
+      name: 'P2',
+      x: 1,
+      y: 1,
+      visible: true,
+      labelVisible: true,
+      group_id: 'sub-g',
+    };
     const subGroup: AnnotationGroup = {
       id: 'sub-g',
       name: 'SubGroup',
       type: 'manual_group',
       visible: true,
       children_ids: ['p2'],
+      parent_id: 'top-g',
     };
     const topGroup: AnnotationGroup = {
       id: 'top-g',
@@ -139,21 +151,22 @@ describe('AnnotationSlice - groupAnnotations, ungroupAnnotation, nesting', () =>
       annotationGroups: { 'top-g': topGroup, 'sub-g': subGroup },
       rootAnnotationIds: ['top-g'],
     });
+    const shown = () => {
+      const { annotationObjects, annotationGroups } = useAppStore.getState();
+      return [p1, p2].filter((p) => isAnnotationShown(annotationObjects[p.id], annotationGroups)).map((p) => p.id);
+    };
+
+    expect(shown()).toEqual(['p2']);
 
     useAppStore.getState().toggleAnnotationGroupVisibility('top-g');
-
-    let state = useAppStore.getState();
-    expect(state.annotationGroups['top-g'].visible).toBe(false);
-    expect(state.annotationGroups['sub-g'].visible).toBe(false);
-    expect(state.annotationObjects['p1'].visible).toBe(false);
-    expect(state.annotationObjects['p2'].visible).toBe(false);
-
-    useAppStore.getState().toggleAnnotationGroupVisibility('top-g');
-    state = useAppStore.getState();
-    expect(state.annotationGroups['top-g'].visible).toBe(true);
+    expect(shown()).toEqual([]);
+    const state = useAppStore.getState();
     expect(state.annotationGroups['sub-g'].visible).toBe(true);
-    expect(state.annotationObjects['p1'].visible).toBe(true);
     expect(state.annotationObjects['p2'].visible).toBe(true);
+
+    useAppStore.getState().toggleAnnotationGroupVisibility('top-g');
+    expect(shown()).toEqual(['p2']);
+    expect(useAppStore.getState().annotationObjects['p1'].visible).toBe(false);
   });
 
   describe('moveAnnotationsInTree', () => {

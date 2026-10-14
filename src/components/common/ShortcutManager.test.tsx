@@ -4,7 +4,7 @@ import { ShortcutManager } from './ShortcutManager';
 import { BackendAPI, DialogAPI } from '../../api';
 import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
-import { makeWaypoint, waypointTree } from '../../test/fixtures';
+import { makePointAnnotation, makeWaypoint, waypointTree } from '../../test/fixtures';
 import type { AppState } from '../../stores/appStore';
 
 const press = (key: string, modifiers: Partial<KeyboardEventInit> = {}) =>
@@ -23,6 +23,39 @@ describe('ShortcutManager', () => {
 
     expect(getAppState().rootNodeIds).toEqual(['node-2']);
     expect(getAppState().nodes['node-1']).toBeUndefined();
+  });
+
+  describe('Ctrl+G on annotations', () => {
+    const twoAnnotations = (): Partial<AppState> => ({
+      annotationObjects: { a: makePointAnnotation('a'), b: makePointAnnotation('b') },
+      annotationGroups: {},
+      rootAnnotationIds: ['a', 'b'],
+    });
+
+    it('groups the selected annotations, and Ctrl+Shift+G dissolves the group', () => {
+      renderShortcuts(twoAnnotations());
+      act(() => getAppState().selectAnnotationObjects(['a', 'b']));
+
+      press('g', { ctrlKey: true });
+
+      const [groupId] = getAppState().rootAnnotationIds;
+      expect(getAppState().annotationGroups[groupId].children_ids).toEqual(['a', 'b']);
+      expect(getAppState().selectedAnnotationIds).toEqual([groupId]);
+
+      press('G', { ctrlKey: true, shiftKey: true });
+
+      expect(getAppState().rootAnnotationIds).toEqual(['a', 'b']);
+      expect(getAppState().annotationGroups).toEqual({});
+      expect(getAppState().selectedAnnotationIds).toEqual(['a', 'b']);
+    });
+
+    it('does nothing when nothing is selected', () => {
+      renderShortcuts(twoAnnotations());
+
+      press('g', { ctrlKey: true });
+
+      expect(getAppState().rootAnnotationIds).toEqual(['a', 'b']);
+    });
   });
 
   it('acts on the selection made after it started listening', () => {

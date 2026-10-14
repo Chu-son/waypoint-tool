@@ -38,6 +38,8 @@ interface TreeRowProps {
   /** A collapsed container that holds selected items. */
   holdsSelection: boolean;
   isEditing: boolean;
+  /** Briefly highlighted after "reveal in tree". */
+  isFlashing?: boolean;
   dropIndicator: DropPosition | null;
   content: TreeRowContent;
   onClick: (e: React.MouseEvent) => void;
@@ -58,6 +60,7 @@ export function TreeRow({
   isSelected,
   holdsSelection,
   isEditing,
+  isFlashing,
   dropIndicator,
   content,
   onClick,
@@ -110,6 +113,7 @@ export function TreeRow({
               ? 'bg-primary-base/10 border-primary-base/40 text-text-base'
               : 'bg-surface-panel/40 hover:bg-surface-hover border-border-base/40 text-text-muted hover:text-text-base',
           dropIndicator === 'inside' && 'ring-2 ring-primary-base bg-primary-base/10',
+          isFlashing && 'ring-2 ring-primary-base ring-offset-1 shadow-lg bg-primary-base/25 animate-pulse',
           shownDimmed && 'opacity-60',
         )}
       >

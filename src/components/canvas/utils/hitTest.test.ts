@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { findNearestObjectCenter, hitTestRectHandles } from './hitTest';
-import { makePointAnnotation, makeTransform, makeWaypoint } from '../../../test/fixtures';
+import { makeAnnotationGroup, makePointAnnotation, makeTransform, makeWaypoint } from '../../../test/fixtures';
 
 describe('hitTestRectHandles', () => {
   const data = {
@@ -47,6 +47,16 @@ describe('findNearestObjectCenter', () => {
   it('snaps to the closest waypoint or annotation within the screen radius', () => {
     expect(findNearestObjectCenter(9, 0, nodes, annotations, 10)).toMatchObject({ objectId: 'p', x: 10 });
     expect(findNearestObjectCenter(1, 0, nodes, annotations, 10)).toMatchObject({ objectId: 'a', objectType: 'node' });
+  });
+
+  it('does not snap to an annotation whose group is hidden', () => {
+    const grouped = { p: makePointAnnotation('p', { x: 10, y: 0, group_id: 'g' }) };
+    const groups = { g: makeAnnotationGroup('g', ['p'], { visible: false }) };
+
+    expect(findNearestObjectCenter(9, 0, {}, grouped, 10, groups)).toBeNull();
+    expect(findNearestObjectCenter(9, 0, {}, grouped, 10, { g: { ...groups.g, visible: true } })).toMatchObject({
+      objectId: 'p',
+    });
   });
 
   it('returns null when nothing is close enough on screen', () => {

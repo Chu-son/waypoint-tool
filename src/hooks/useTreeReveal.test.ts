@@ -14,7 +14,7 @@ describe('useTreeReveal', () => {
   });
 
   it('does nothing when treeRevealTarget is null or type does not match', () => {
-    const setExpanded = vi.fn();
+    const expandItems = vi.fn();
     const getAncestorIds = vi.fn().mockReturnValue(['grp-1']);
 
     useAppStore.setState({ treeRevealTarget: { type: 'annotation', id: 'annot-1', timestamp: 123 } });
@@ -23,21 +23,17 @@ describe('useTreeReveal', () => {
       useTreeReveal({
         treeType: 'node',
         getAncestorIds,
-        setExpanded,
+        expandItems,
       }),
     );
 
     expect(getAncestorIds).not.toHaveBeenCalled();
-    expect(setExpanded).not.toHaveBeenCalled();
+    expect(expandItems).not.toHaveBeenCalled();
   });
 
   it('expands ancestors and scrolls to element when treeRevealTarget matches', () => {
-    let expandedSet = new Set<string>();
-    const setExpanded = vi.fn((updater) => {
-      if (typeof updater === 'function') {
-        expandedSet = updater(expandedSet);
-      }
-    });
+    const expandedSet = new Set<string>();
+    const expandItems = vi.fn((ids: string[]) => ids.forEach((id) => expandedSet.add(id)));
     const getAncestorIds = vi.fn().mockReturnValue(['top-grp', 'sub-grp']);
 
     // Mock DOM element
@@ -55,7 +51,7 @@ describe('useTreeReveal', () => {
       useTreeReveal({
         treeType: 'node',
         getAncestorIds,
-        setExpanded,
+        expandItems,
         scrollDelayMs: 50,
         flashDurationMs: 1000,
       }),

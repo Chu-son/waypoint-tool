@@ -128,7 +128,11 @@ export function WaypointTree() {
   const { flashingId } = useTreeReveal({
     treeType: 'node',
     getAncestorIds: React.useCallback((id: string) => getAncestorIds(id, getWaypointParentId), [getWaypointParentId]),
-    setExpanded: setExpandedNodes,
+    expandItems: React.useCallback(
+      (ids: string[]) =>
+        setExpandedNodes((prev) => (ids.every((id) => prev.has(id)) ? prev : new Set([...prev, ...ids]))),
+      [setExpandedNodes],
+    ),
   });
 
   interface DisplayTreeItem {

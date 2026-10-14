@@ -91,6 +91,7 @@ function MapCanvasView() {
   const selectNodes = useAppStore((state) => state.selectNodes);
   const nodes = useAppStore((state) => state.nodes);
   const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
+  const annotationGroups = useAppStore((state) => state.annotationGroups) || {};
   const rootNodeIds = useAppStore((state) => state.rootNodeIds);
   const insertionTarget = useAppStore((state) => state.insertionTarget);
   const updateNode = useAppStore((state) => state.updateNode);
@@ -984,7 +985,7 @@ function MapCanvasView() {
       const { x: worldX, y: worldY } = eventToWorld(e);
 
       if (e.altKey || isAltPressed) {
-        const nearest = findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale);
+        const nearest = findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale, annotationGroups);
         if (nearest) {
           commitMeasurePoint(nearest);
           return;
@@ -1247,7 +1248,9 @@ function MapCanvasView() {
     if (activeTool === 'measure') {
       const state = useAppStore.getState();
       const isAlt = e.altKey || isAltPressed;
-      const nearest = isAlt ? findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale) : null;
+      const nearest = isAlt
+        ? findNearestObjectCenter(worldX, worldY, nodes, annotationObjects, scale, annotationGroups)
+        : null;
       setSnappedMeasureTarget(nearest ? { x: nearest.x, y: nearest.y, objectName: nearest.objectName } : null);
 
       if (state.measureStartPoint && !state.measureEndPoint) {

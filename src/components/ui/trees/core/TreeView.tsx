@@ -51,6 +51,8 @@ export interface TreeViewProps {
   onItemContextMenu?: (e: React.MouseEvent, id: string) => void;
   onBackgroundContextMenu?: (e: React.MouseEvent) => void;
   emptyState?: ReactNode;
+  /** The row to highlight briefly (see `useTreeReveal`). */
+  flashingId?: string | null;
 }
 
 /**
@@ -75,6 +77,7 @@ export function TreeView({
   onItemContextMenu,
   onBackgroundContextMenu,
   emptyState,
+  flashingId,
 }: TreeViewProps) {
   const expandedIds = useAppStore((state) => state.expandedTreeItems[treeId] ?? EMPTY);
   const setTreeItemExpanded = useAppStore((state) => state.setTreeItemExpanded);
@@ -265,6 +268,7 @@ export function TreeView({
               isSelected={selectedSet.has(row.id)}
               holdsSelection={!row.isExpanded && holdingSelection.has(row.id)}
               isEditing={editingId === row.id}
+              isFlashing={flashingId === row.id}
               dropIndicator={dropTarget?.targetId === row.id ? dropTarget.position : null}
               content={content}
               onClick={(e) => handleItemClick(row.id, e)}

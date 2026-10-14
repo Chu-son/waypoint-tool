@@ -32,7 +32,14 @@ export function useMeasureAltSnap({ lastWorldPosRef, scaleRef, abortRef }: UseMe
       const state = useAppStore.getState();
       if (state.activeTool === 'measure' && lastWorldPosRef.current) {
         const { x, y } = lastWorldPosRef.current;
-        const nearest = findNearestObjectCenter(x, y, state.nodes, state.annotationObjects || {}, scaleRef.current);
+        const nearest = findNearestObjectCenter(
+          x,
+          y,
+          state.nodes,
+          state.annotationObjects || {},
+          scaleRef.current,
+          state.annotationGroups,
+        );
         setSnappedMeasureTarget(nearest ? { x: nearest.x, y: nearest.y, objectName: nearest.objectName } : null);
         if (state.measureStartPoint && !state.measureEndPoint && nearest) {
           setMeasureHoverPoint({ x: nearest.x, y: nearest.y });
