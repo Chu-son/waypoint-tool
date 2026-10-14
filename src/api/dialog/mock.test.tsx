@@ -21,4 +21,17 @@ describe('MockDialogAPI', () => {
     const result = await api.ask('Confirm?');
     expect(result).toBe(true);
   });
+
+  it('chooses yes, no or cancel from two confirmations', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
+
+    confirm.mockReturnValueOnce(true);
+    expect(await api.choose('Which?')).toBe('yes');
+
+    confirm.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    expect(await api.choose('Which?')).toBe('no');
+
+    confirm.mockReturnValueOnce(false).mockReturnValueOnce(false);
+    expect(await api.choose('Which?')).toBe('cancel');
+  });
 });

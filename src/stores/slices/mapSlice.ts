@@ -11,6 +11,7 @@ import {
   EditObject,
   ExportRegion,
   LayerGroup,
+  GroupPoseOffset,
 } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -33,6 +34,7 @@ import { selectedCustomLayerId } from '../../utils/layerSelection';
 import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose, sameClip } from '../../utils/mapClip';
 import {
+  composeOffset,
   isIdentityTransform,
   mapsSharingPoseWithOutside,
   transformEditObject,
@@ -44,6 +46,14 @@ import {
 const sourceOrigin = (source: MapSource): [number, number, number] => {
   const raw = source.info?.origin;
   return Array.isArray(raw) ? [Number(raw[0]) || 0, Number(raw[1]) || 0, Number(raw[2]) || 0] : [0, 0, 0];
+};
+
+/** The group with `pose_offset` set, or removed when there is none. */
+const withPoseOffset = (group: LayerGroup, offset: GroupPoseOffset | undefined): LayerGroup => {
+  const next: LayerGroup = { ...group };
+  if (offset) next.pose_offset = offset;
+  else delete next.pose_offset;
+  return next;
 };
 
 /** What moving a group does to a map it shares with instances outside the group. */
@@ -688,6 +698,10 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
     if (options?.recordHistory !== false) state.pushHistorySnapshot({ includeMapPoses: true });
     set((s) => ({
+      layerGroups: {
+        ...s.layerGroups,
+        [groupId]: withPoseOffset(s.layerGroups[groupId], composeOffset(s.layerGroups[groupId].pose_offset, transform)),
+      },
       mapSources: s.mapSources.map((source) => {
         const moved = movedSources.get(source.id);
         return moved ? { ...source, info: { ...source.info, origin: moved.to } } : source;

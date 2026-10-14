@@ -70,6 +70,8 @@ export type UISlice = {
   panelLayout: PanelLayout;
   leftPanelActiveTab: string;
   rightPanelActiveTab: string;
+  /** Selecting an item brings the Inspector forward. Off: the panel stays where the user left it. */
+  autoFocusInspector: boolean;
   leftPanelViewMode: 'tabs' | 'split';
   rightPanelViewMode: 'tabs' | 'split';
   isLeftPanelOpen: boolean;
@@ -126,6 +128,7 @@ export type UISlice = {
 
   setLeftPanelActiveTab: (tab: string) => void;
   setRightPanelActiveTab: (tab: string) => void;
+  setAutoFocusInspector: (enabled: boolean) => void;
   setLeftPanelViewMode: (mode: 'tabs' | 'split') => void;
   setRightPanelViewMode: (mode: 'tabs' | 'split') => void;
   setLeftPanelOpen: (open: boolean) => void;
@@ -283,6 +286,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
   panelLayout: DEFAULT_PANEL_LAYOUT,
   leftPanelActiveTab: 'waypoints',
   rightPanelActiveTab: 'layers',
+  autoFocusInspector: true,
   leftPanelViewMode: 'tabs',
   rightPanelViewMode: 'tabs',
   isLeftPanelOpen: true,
@@ -572,6 +576,7 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
   setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
+  setAutoFocusInspector: (enabled) => set({ autoFocusInspector: enabled }),
   setLeftPanelViewMode: (mode) => set({ leftPanelViewMode: mode, isDirty: true }),
   setRightPanelViewMode: (mode) => set({ rightPanelViewMode: mode, isDirty: true }),
   setLeftPanelOpen: (open) => set({ isLeftPanelOpen: open }),

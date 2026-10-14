@@ -1,5 +1,6 @@
-import { act, fireEvent, screen, within } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { DialogAPI } from '../../../api';
 import { MapLayerInspector } from './MapLayerInspector';
 import { renderWithStore } from '../../../test/render';
 import { getAppState } from '../../../test/store';
@@ -42,6 +43,47 @@ describe('MapLayerInspector', () => {
     fireEvent.click(screen.getByTitle('Reset pose to YAML origin'));
 
     expect(getAppState().mapSources[0].info).toMatchObject({ origin: [10, 20, 0], initial_origin: [10, 20, 0] });
+  });
+
+  describe('moving a map that is not shown', () => {
+    const hiddenMap = () =>
+      layerStackState(makeMap('l1', { name: 'Map 1', visible: false, info: { origin: [10, 20, 0] } }));
+
+    it('warns first, and moves nothing when the user cancels', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      renderWithStore(<MapLayerInspector id="l1" />, hiddenMap());
+
+      fireEvent.click(screen.getByRole('button', { name: /Move right/ }));
+
+      await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+      expect(ask.mock.calls[0][0]).toContain('Map 1');
+      expect(getAppState().mapSources[0].info.origin).toEqual([10, 20, 0]);
+    });
+
+    it('moves once the user goes on, and asks only once', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(true);
+      renderWithStore(<MapLayerInspector id="l1" />, hiddenMap());
+
+      fireEvent.click(screen.getByRole('button', { name: /Move right/ }));
+      await waitFor(() => expect(getAppState().mapSources[0].info.origin[0]).toBeCloseTo(10.1));
+      fireEvent.click(screen.getByRole('button', { name: /Move right/ }));
+      await waitFor(() => expect(getAppState().mapSources[0].info.origin[0]).toBeCloseTo(10.2));
+
+      expect(ask).toHaveBeenCalledTimes(1);
+    });
+
+    it('names the group that hides the map', async () => {
+      const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
+      renderWithStore(
+        <MapLayerInspector id="l1" />,
+        layerStackState(makeLayerGroup('site', [makeMap('l1')], { name: 'Site', visible: false })),
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Move right/ }));
+
+      await waitFor(() => expect(ask).toHaveBeenCalled());
+      expect(ask.mock.calls[0][0]).toContain('Site');
+    });
   });
 
   it('nudges the pose with the adjuster buttons and arrow keys', () => {

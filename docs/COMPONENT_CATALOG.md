@@ -17,7 +17,7 @@
   - **概要**: 数値編集用インプット。入力中の中間状態を許容し、フォーカス外/Enter で確定。`step` 指定時は ↑/↓ キーで増減（Shift ×10、Alt ×0.1）。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`, `onEditStart`, `onEditEnd`
 - **`PoseAdjuster`** ([`src/components/ui/common/PoseAdjuster.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/PoseAdjuster.tsx))
-  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`MapPoseSection`（マップレイヤーの Inspector）、`LayerGroupPoseSection`（グループの一括位置調整）、`GeoMapCard` で共用。
+  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`onNudge` が `false`（または `false` の Promise）を返すと「断られた」とみなし、その押下のあいだ以降の繰り返しを止める。Promise が未解決のあいだの繰り返しは捨てる（確認ダイアログが重ならない）。`MapPoseSection`（マップレイヤーの Inspector）、`LayerGroupPoseSection`（グループの一括位置調整）、`GeoMapCard` で共用。
   - **主要Props**: `onNudge`, `onEditStart`, `onEditEnd`（押下/キー保持の一連操作を Undo 1 エントリにまとめるために使う）
 - **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
   - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。`document.body` へポータル描画し、モーダルより前面（`z-[60]`）に出るため、モーダルから開始した処理でも見える。`message` / `detail`（改行可）を表示し、3 秒を超えると経過秒数も出す。
@@ -128,7 +128,7 @@
 - **レイヤーの Inspector** (`ui/properties/`): 選択（`ActiveSelection.layers`）に応じて `LayerSelectionInspector` が次を切り替える。
   - `MapLayerInspector`（マップ：名前・表示・複製・削除、姿勢 `MapPoseSection`（既定は同じマップの全複製で共有。「Link pose」トグルで解除すると、そのレイヤーだけ動かせる。解除中はツリーの行に `Own` バッジ）、閾値 `MapThresholdSection`（同じマップの全複製で共有）、不透明度、ブレンド、使用領域 `MapClipEditor`）
   - `CustomLayerInspector`（手描き・プラグインのレイヤー）
-  - `LayerGroupInspector`（グループ：名前・表示・解除・削除、`LayerGroupPoseSection` による一括位置調整（ΔX/ΔY/ΔYaw と「適用」、±90°、微調整パッド、回転の中心（外接矩形の中心／原点）、プラグインレイヤーの注記、共有姿勢が外にもあるときの確認））
+  - `LayerGroupInspector`（グループ：名前・表示・解除・削除、`LayerGroupPoseSection` による一括位置調整（累積の移動量 ΔX/ΔY/ΔYaw（書き換えると差の分だけ動く）と Reset、±90°、微調整パッド、回転の中心（外接矩形の中心／原点）、プラグインレイヤーの注記、共有姿勢が外にもあるときの 3 択の確認、非表示のときの警告））
   - `LayerMultiInspector`（複数選択：件数・種別の内訳・まとめて表示/非表示・グループ化・削除）
   - 共通のヘッダー `LayerInspectorHeader`（種類のアイコン・名前・表示・複製・削除）
 - **`AnnotationInspector`** ([`src/components/ui/properties/AnnotationInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/AnnotationInspector.tsx))
@@ -196,7 +196,7 @@
   - **概要**: アノテーションオブジェクトの一覧表示、ドラッグ＆ドロップ並び替え、可視性/ラベル表示トグル、削除、名前編集、複製、配置モード開始トリガーを提供するコンポーネント。
   - **主要Props**: なし
 - **`PropertiesPanel`** ([`src/components/ui/properties/PropertiesPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/PropertiesPanel.tsx))
-  - **概要**: 現在選択されている Waypoint またはジェネレーターの属性を編集するインスペクター右ペイン。
+  - **概要**: 現在選択されている Waypoint またはジェネレーターの属性を編集するインスペクター右ペイン。何も選ばれていないときは、`InspectorFocusToggle`（選択したら Inspector に切り替えるか、のスイッチ。`autoFocusInspector`）を表示する。
   - **主要Props**: なし
 - **`PluginListPanel`** ([`src/components/ui/plugins/PluginListPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/plugins/PluginListPanel.tsx))
   - **概要**: 利用可能なプラグイン（経路自動生成アルゴリズム）を一覧表示し、クリックで起動するサイドパネル。
@@ -355,8 +355,8 @@
 - **`useAppStore`** ([`src/stores/appStore.ts`](file:///home/chuson/develop/waypoint-tool/src/stores/appStore.ts))
   - **概要**: 全状態とアクション（`nodeSlice`, `mapSlice`, `pluginSlice`, `pathCalculatorSlice`, `projectSlice`, `uiSlice` ほか）を提供するメインフック。
 - **Services** (`src/services/`): ストアと API を組み合わせるユースケース
-  - `notify`（`notify` / `notifyError` / `confirmAction`：`alert`/`confirm` の代替）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `importFiles`（インポート対象ファイルの選択と、スキーマ・テンプレート・プロジェクトの読み込み時の検証・正規化。`ImportFileError` はそのまま利用者に見せてよい）, `optionSchemaApply`（スキーマの検証・正規化・消えたプリセットの値への展開・適用。設定画面の Apply とインポートが共用）, `templateImport`（テンプレートの上書き／追加）, `projectImport`（取り込み計画の適用。スキーマを先に適用し、断られたら何も変えない）, `mapImport`（ファイルを選んでマップレイヤーとして追加。レイヤーパネル・ワークフロー・インポートが共用）, `mapRasterize`（レイヤーのラスタライズ。`createRasterCache()` で作ったキャッシュを `prepareLayersForExport` の `rasterCache` に渡すと、手描きレイヤーは `editObjects` と解像度が変わらない間、描いた PNG を使い回す）, `workflowActions`（カスタム UI ワークフロー）
-- **API アダプタ** (`src/api/`): `BackendAPI`（Tauri IPC）, `DialogAPI`（ファイル／確認／メッセージダイアログ）, `AppAPI`（バージョン・終了・ウィンドウ操作）。いずれも jsdom / ブラウザでは Mock 実装に自動切替。
+  - `notify`（`notify` / `notifyError` / `confirmAction` / `chooseAction`（はい・いいえ・キャンセルの 3 択。ボタン名を指定できる）：`alert`/`confirm` の代替）, `poseEditGuards`（位置調整の前の確認。非表示のレイヤーの警告と、グループ外と共有するマップの扱い。続行の答えは覚え、長押しでも 1 回しか聞かない）, `projectGuard`（未保存変更の破棄確認）, `pluginImport`（プラグインのフォルダ取込・雛形作成）, `importFiles`（インポート対象ファイルの選択と、スキーマ・テンプレート・プロジェクトの読み込み時の検証・正規化。`ImportFileError` はそのまま利用者に見せてよい）, `optionSchemaApply`（スキーマの検証・正規化・消えたプリセットの値への展開・適用。設定画面の Apply とインポートが共用）, `templateImport`（テンプレートの上書き／追加）, `projectImport`（取り込み計画の適用。スキーマを先に適用し、断られたら何も変えない）, `mapImport`（ファイルを選んでマップレイヤーとして追加。レイヤーパネル・ワークフロー・インポートが共用）, `mapRasterize`（レイヤーのラスタライズ。`createRasterCache()` で作ったキャッシュを `prepareLayersForExport` の `rasterCache` に渡すと、手描きレイヤーは `editObjects` と解像度が変わらない間、描いた PNG を使い回す）, `workflowActions`（カスタム UI ワークフロー）
+- **API アダプタ** (`src/api/`): `BackendAPI`（Tauri IPC）, `DialogAPI`（ファイル／確認（`ask`、3 択の `choose`）／メッセージダイアログ）, `AppAPI`（バージョン・終了・ウィンドウ操作）。いずれも jsdom / ブラウザでは Mock 実装に自動切替。
 - **プラグイン出力・設定の純粋関数** (`src/utils/`): `pluginResult`（出力の正規化）, `pluginBindings`（パイプラインのバインディング解決）, `pluginRegistry`（カスタムプラグイン登録）, `pythonPath`（インタプリタ解決）, `exportPackage`（エクスポート要求の構築）, `footprint`（フットプリント幅）
 - **背景地図の純粋関数** (`src/utils/geo/`): `utm`（WGS84 ⇔ UTM）, `webMercator`（XYZ タイル座標・ズーム選択）, `geoTransform`（緯度経度 ⇔ ワールド座標・タイル配置・表示タイル列挙・エクスポート用のマップ原点 `mapOriginGeo`）, `basemapPresets`（OSM / Esri 衛星 / 地理院 / カスタムのプリセットとタイル URL 生成）, `alignDrag`（ドラッグによる移動・回転量の算出）
 - **差分・取り込みの純粋関数** (`src/utils/diff/`, `src/utils/import/`): `diff/lineDiff`（行単位の LCS 差分・変更の前後だけを残す折りたたみ）, `diff/itemDiff`（キーで突き合わせた項目単位の差分 `diffByKey`・キー順に依存しない表示用テキスト）, `import/optionSchemaMerge`（スキーマを options / globals / definitions の項目名で突き合わせ、採否に応じてマージ）, `import/idRemap`（取り込むデータの ID 振り直しと、子・親・ソース・レイヤー順・表示セット・実行 ID の参照の付け替え）, `import/projectImportPlan`（取り込みカテゴリの定義・テンプレート／プロファイルの突き合わせ・取り込み計画 `buildProjectImportPlan`）

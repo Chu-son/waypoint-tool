@@ -11,6 +11,7 @@ import { CustomOptionsGroup } from './CustomOptionsGroup';
 import { ElementCopyContextMenu } from './ElementCopyContextMenu';
 import type { ElementCopyField } from '../../../types/ui';
 import { EmptyState } from '../common/EmptyState';
+import { InspectorFocusToggle } from './InspectorFocusToggle';
 import { Anchor } from 'lucide-react';
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from '../../../utils/transformUtils';
 import { collectDescendantIds, getFlattenedWaypointIds } from '../../../utils/treeUtils';
@@ -149,8 +150,9 @@ export function PropertiesPanel() {
 
   if (selectedNodeIds.length === 0 || (!isMultiSelection && !node)) {
     return (
-      <div className="flex-1 overflow-y-auto w-full p-4">
+      <div className="flex-1 overflow-y-auto w-full p-4 space-y-4">
         <EmptyState message="No item selected." />
+        <InspectorFocusToggle />
       </div>
     );
   }

@@ -22,6 +22,10 @@ function sanitizeGroups(raw: unknown): Record<string, LayerGroup> {
       visible: typeof g.visible === 'boolean' ? g.visible : true,
       children_ids: Array.isArray(g.children_ids) ? stringsOf(g.children_ids) : [],
     };
+    const offset = g.pose_offset as Record<string, unknown> | null | undefined;
+    if (offset && [offset.x, offset.y, offset.yaw].every((v) => typeof v === 'number' && Number.isFinite(v))) {
+      groups[id].pose_offset = { x: offset.x as number, y: offset.y as number, yaw: offset.yaw as number };
+    }
   }
   return groups;
 }

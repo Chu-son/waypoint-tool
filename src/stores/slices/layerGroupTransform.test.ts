@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getAppState, resetAppStore } from '../../test/store';
 import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../../test/fixtures';
+import { buildProjectData } from '../serialization/projectSerializer';
 import type { RigidTransform } from '../../utils/layerGroupTransform';
 import type { PluginCustomLayer } from '../../types/layer';
 
@@ -147,6 +148,28 @@ describe('moving a layer group', () => {
 
     expect(originOf('a')).toEqual([1, 1, 0]);
     expect(originOf('b')).toEqual([1, 1, 0]);
+  });
+
+  it('remembers the total the group has been moved by, and undo takes it back with the move', () => {
+    getAppState().transformLayerGroup('site', shift(1, 2));
+    getAppState().transformLayerGroup('site', shift(0.5, 0));
+
+    expect(getAppState().layerGroups.site.pose_offset).toEqual({ x: 1.5, y: 2, yaw: 0 });
+
+    getAppState().undo();
+    expect(getAppState().layerGroups.site.pose_offset).toEqual({ x: 1, y: 2, yaw: 0 });
+    getAppState().undo();
+    expect(getAppState().layerGroups.site.pose_offset).toBeUndefined();
+  });
+
+  it('keeps the total in the project file', () => {
+    getAppState().transformLayerGroup('site', shift(3, -1));
+    const saved = buildProjectData(getAppState());
+
+    resetAppStore();
+    getAppState().setProjectData(saved);
+
+    expect(getAppState().layerGroups.site.pose_offset).toEqual({ x: 3, y: -1, yaw: 0 });
   });
 
   it('moves an unlinked instance on its own', () => {

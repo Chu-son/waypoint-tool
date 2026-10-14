@@ -197,7 +197,16 @@ export interface IDialogAPI {
   ask(message: string, options?: any): Promise<boolean>;
   /** Show an informational message box and wait until the user dismisses it. */
   message(message: string, options?: MessageDialogOptions): Promise<void>;
+  /** Ask with Yes / No / Cancel buttons (labels are customizable). Resolves to the pressed button. */
+  choose(message: string, options?: ChooseDialogOptions): Promise<ChooseResult>;
 }
+
+export type ChooseResult = 'yes' | 'no' | 'cancel';
+
+export type ChooseDialogOptions = MessageDialogOptions & {
+  /** Button labels; omitted ones use the system defaults. */
+  labels?: { yes?: string; no?: string; cancel?: string };
+};
 
 export type MessageDialogOptions = {
   title?: string;

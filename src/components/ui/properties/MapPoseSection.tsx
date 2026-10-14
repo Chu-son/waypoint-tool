@@ -15,7 +15,7 @@ interface MapPoseSectionProps {
   /** How many map instances draw from this layer's source. */
   sharedCount: number;
   /** Moves this map. While the pose is linked this moves every linked instance of the map. */
-  onSetOrigin: (origin: Pose) => void;
+  onSetOrigin: (origin: Pose) => void | boolean | Promise<void | boolean>;
   /** Links the pose to the other instances of this map, or unlinks it so this instance moves alone. */
   onSetPoseLinked: (linked: boolean) => void;
 }
@@ -34,7 +34,7 @@ export function MapPoseSection({ layer, sharedCount, onSetOrigin, onSetPoseLinke
     const dx = updates.deltaX ?? deltaX;
     const dy = updates.deltaY ?? deltaY;
     const dyawDeg = updates.deltaYawDeg ?? deltaYawDeg;
-    onSetOrigin([initialOrigin[0] + dx, initialOrigin[1] + dy, initialOrigin[2] + dyawDeg * (Math.PI / 180.0)]);
+    return onSetOrigin([initialOrigin[0] + dx, initialOrigin[1] + dy, initialOrigin[2] + dyawDeg * (Math.PI / 180.0)]);
   };
 
   const rotateBy = (stepDeg: number) => {

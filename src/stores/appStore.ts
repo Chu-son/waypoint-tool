@@ -91,6 +91,7 @@ export const useAppStore = create<AppState>()(
         panelLayout: state.panelLayout,
         leftPanelActiveTab: state.leftPanelActiveTab,
         rightPanelActiveTab: state.rightPanelActiveTab,
+        autoFocusInspector: state.autoFocusInspector,
       }),
     },
   ),

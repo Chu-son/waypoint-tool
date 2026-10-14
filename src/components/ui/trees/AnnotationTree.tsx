@@ -115,7 +115,7 @@ export function AnnotationTree() {
 
   const select = (ids: string[]) => {
     selectAnnotationObjects(ids);
-    if (ids.length > 0) {
+    if (ids.length > 0 && useAppStore.getState().autoFocusInspector) {
       setRightPanelActiveTab('inspector');
       setRightPanelOpen(true);
     }

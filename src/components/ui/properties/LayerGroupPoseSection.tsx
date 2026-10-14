@@ -1,10 +1,21 @@
 import { useMemo, useRef, useState } from 'react';
 import { Move, RotateCcw, RotateCw } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
-import type { SharedPoseMode } from '../../../stores/slices/mapSlice';
 import { descendantLayerIds } from '../../../utils/layerTree';
-import { groupWorldBounds, mapsSharingPoseWithOutside, type RigidTransform } from '../../../utils/layerGroupTransform';
-import { confirmAction } from '../../../services/notify';
+import {
+  groupWorldBounds,
+  isZeroOffset,
+  mapsSharingPoseWithOutside,
+  transformBetweenOffsets,
+  type RigidTransform,
+} from '../../../utils/layerGroupTransform';
+import {
+  canEditWithoutAsking,
+  chooseSharedPoseMode,
+  confirmEditWhileHidden,
+  rememberedSharedPoseMode,
+} from '../../../services/poseEditGuards';
+import type { SharedPoseMode } from '../../../stores/slices/mapSlice';
 import { resolveMapLayers } from '../../../utils/layerStack';
 import { Button } from '../common/Button';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
@@ -26,11 +37,15 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
   const customLayers = useAppStore((state) => state.customLayers);
 
   const [pivotMode, setPivotMode] = useState<PivotMode>('center');
-  const [delta, setDelta] = useState({ dx: 0, dy: 0, dyawDeg: 0 });
-  // A held nudge records one undo step: only its first move does.
+  // A held nudge or a number being typed records one undo step: only its first move does.
   const gestureRecorded = useRef(false);
-  // The answer to "move the other users of the map too?", kept while the same maps are shared.
-  const sharedChoice = useRef<{ key: string; mode: SharedPoseMode } | null>(null);
+  // The user cancelled a question while typing a number: the rest of that edit does nothing.
+  const declined = useRef(false);
+  // A question is open (hidden group, shared maps); numbers typed meanwhile wait for its answer.
+  const asking = useRef(false);
+  const queuedTotal = useRef<Partial<{ x: number; y: number; yawDeg: number }> | null>(null);
+  const offset = layerGroups[groupId]?.pose_offset;
+  const shown = { x: offset?.x ?? 0, y: offset?.y ?? 0, yawDeg: ((offset?.yaw ?? 0) * 180) / Math.PI };
 
   const tree = useMemo(() => ({ rootLayerIds, layerGroups }), [rootLayerIds, layerGroups]);
   const contents = useMemo(() => new Set(descendantLayerIds(tree, groupId)), [tree, groupId]);
@@ -57,45 +72,66 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
     return bounds ? { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 } : { x: 0, y: 0 };
   };
 
-  /** How to treat maps shared with layers outside the group: asked once while the same maps stay shared. */
-  const sharedPoseMode = async (): Promise<SharedPoseMode> => {
-    if (sharing.length === 0) return 'move_all';
-    const key = sharing.map((l) => l.id).join(',');
-    if (sharedChoice.current?.key === key) return sharedChoice.current.mode;
-    const names = [...new Set(sharing.map((l) => `「${l.name}」`))].join('、');
-    const moveAll = await confirmAction(
-      `${names} は、このグループの外のレイヤーと姿勢を共有しています。\n\n` +
-        'はい：外のレイヤーも一緒に動かす（位置関係が保たれます）\n' +
-        'いいえ：このグループのマップだけ動かす（姿勢の連動を外します）',
-      { title: 'Move Group', kind: 'info' },
-    );
-    const mode: SharedPoseMode = moveAll ? 'move_all' : 'unlink';
-    sharedChoice.current = { key, mode };
-    return mode;
-  };
-
-  const apply = async (change: { dx: number; dy: number; dyawDeg: number }, recordHistory = true) => {
-    const transform: RigidTransform = {
-      dx: change.dx,
-      dy: change.dy,
-      dyaw: toRadians(change.dyawDeg),
-      pivot: pivotOf(),
+  /** Moves the group after the questions (hidden, shared maps) are answered. Resolves to false when cancelled. */
+  const apply = (buildTransform: () => RigidTransform, recordHistory = true): boolean | Promise<boolean> => {
+    const move = (sharedPose: SharedPoseMode) => {
+      useAppStore.getState().transformLayerGroup(groupId, buildTransform(), { sharedPose, recordHistory });
+      return true;
     };
-    const sharedPose = await sharedPoseMode();
-    useAppStore.getState().transformLayerGroup(groupId, transform, { sharedPose, recordHistory });
+    // With nothing to ask, move at once: several edits in a row must see each other's result.
+    const known = canEditWithoutAsking(groupId) ? rememberedSharedPoseMode(groupId, sharing) : undefined;
+    if (known) return move(known);
+    return (async () => {
+      if (!(await confirmEditWhileHidden(groupId))) return false;
+      const sharedPose = await chooseSharedPoseMode(groupId, sharing);
+      return sharedPose ? move(sharedPose) : false;
+    })();
   };
 
-  const nudge = ({ dx, dy, dyawDeg }: PoseNudge) => {
+  const recordsHistory = () => {
     const record = !gestureRecorded.current;
     gestureRecorded.current = true;
-    void apply({ dx, dy, dyawDeg }, record);
+    return record;
   };
 
-  const applyDelta = async () => {
-    await apply(delta);
-    setDelta({ dx: 0, dy: 0, dyawDeg: 0 });
+  const turnAroundPivot = (dyawDeg: number) =>
+    apply(() => ({ dx: 0, dy: 0, dyaw: toRadians(dyawDeg), pivot: pivotOf() }), recordsHistory());
+
+  const nudge = ({ dx, dy, dyawDeg }: PoseNudge) =>
+    apply(() => ({ dx, dy, dyaw: toRadians(dyawDeg), pivot: pivotOf() }), recordsHistory());
+
+  /** A typed value is the new total: the group moves by the difference from the total at that moment. */
+  const setTotal = (changes: Partial<typeof shown>) => {
+    if (declined.current) return;
+    // A question is open: keep the latest typed value for when it is answered.
+    if (asking.current) {
+      queuedTotal.current = { ...queuedTotal.current, ...changes };
+      return;
+    }
+    const build = () => {
+      const current = useAppStore.getState().layerGroups[groupId]?.pose_offset;
+      return transformBetweenOffsets(current, {
+        x: changes.x ?? current?.x ?? 0,
+        y: changes.y ?? current?.y ?? 0,
+        yaw: changes.yawDeg === undefined ? (current?.yaw ?? 0) : toRadians(changes.yawDeg),
+      });
+    };
+    const result = apply(build, recordsHistory());
+    if (result instanceof Promise) {
+      asking.current = true;
+      void result.then((accepted) => {
+        asking.current = false;
+        const queued = queuedTotal.current;
+        queuedTotal.current = null;
+        if (!accepted) declined.current = true;
+        else if (queued) setTotal(queued);
+      });
+    }
   };
-  const isZero = delta.dx === 0 && delta.dy === 0 && delta.dyawDeg === 0;
+  const startTyping = () => {
+    gestureRecorded.current = false;
+    declined.current = false;
+  };
 
   return (
     <div className="space-y-2">
@@ -131,7 +167,10 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           variant="secondary"
           size="sm"
           className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
-          onClick={() => void apply({ dx: 0, dy: 0, dyawDeg: -90 })}
+          onClick={() => {
+            gestureRecorded.current = false;
+            void turnAroundPivot(-90);
+          }}
           title="グループを反時計回りに 90° 回す"
         >
           <RotateCcw size={12} />
@@ -142,7 +181,10 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           variant="secondary"
           size="sm"
           className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
-          onClick={() => void apply({ dx: 0, dy: 0, dyawDeg: 90 })}
+          onClick={() => {
+            gestureRecorded.current = false;
+            void turnAroundPivot(90);
+          }}
           title="グループを時計回りに 90° 回す"
         >
           <RotateCw size={12} />
@@ -150,38 +192,55 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
         </Button>
       </div>
 
+      <div className="flex items-center justify-between gap-2">
+        <span
+          className="text-[10px] text-text-muted"
+          title="このグループの位置調整で動かした合計。原点まわりに回し、そのあと平行移動した量です。数値を書き換えると、差の分だけ動きます。"
+        >
+          これまでの移動量
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-1.5 text-[10px] text-text-muted hover:text-text-base gap-1"
+          disabled={isZeroOffset(offset)}
+          onClick={() => {
+            startTyping();
+            setTotal({ x: 0, y: 0, yawDeg: 0 });
+          }}
+          title="動かした分をすべて元に戻す"
+        >
+          <RotateCcw size={11} />
+          <span>Reset</span>
+        </Button>
+      </div>
+
       <div className="grid grid-cols-3 gap-1.5">
         <LabeledNumericInput
           label="ΔX (m)"
-          value={delta.dx}
+          value={shown.x}
           step={0.05}
           precision={3}
-          onChange={(dx) => setDelta((d) => ({ ...d, dx }))}
+          onEditStart={startTyping}
+          onChange={(x) => setTotal({ x })}
         />
         <LabeledNumericInput
           label="ΔY (m)"
-          value={delta.dy}
+          value={shown.y}
           step={0.05}
           precision={3}
-          onChange={(dy) => setDelta((d) => ({ ...d, dy }))}
+          onEditStart={startTyping}
+          onChange={(y) => setTotal({ y })}
         />
         <LabeledNumericInput
           label="ΔYaw (°)"
-          value={delta.dyawDeg}
+          value={shown.yawDeg}
           step={1}
           precision={1}
-          onChange={(dyawDeg) => setDelta((d) => ({ ...d, dyawDeg }))}
+          onEditStart={startTyping}
+          onChange={(yawDeg) => setTotal({ yawDeg })}
         />
       </div>
-      <Button
-        variant="primary"
-        size="sm"
-        className="w-full h-7 text-[11px]"
-        disabled={isZero}
-        onClick={() => void applyDelta()}
-      >
-        適用
-      </Button>
 
       <PoseAdjuster
         onNudge={nudge}

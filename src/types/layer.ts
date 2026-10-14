@@ -166,6 +166,18 @@ export interface LayerGroup {
   visible: boolean;
   /** Ids of layers (map instances, custom layers) and groups directly inside, top first. */
   children_ids: string[];
+  /**
+   * What the group's contents have been moved by through the group's pose adjustment, as one rigid
+   * transform around the world origin (turn by `yaw`, then shift by `x`, `y`). Absent when never moved.
+   */
+  pose_offset?: GroupPoseOffset;
+}
+
+/** A rigid transform around the world origin: a point `p` goes to `R(yaw)·p + (x, y)`. Meters and radians. */
+export interface GroupPoseOffset {
+  x: number;
+  y: number;
+  yaw: number;
 }
 
 /**

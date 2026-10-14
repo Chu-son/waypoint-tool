@@ -6,7 +6,7 @@
  * in tests.
  */
 import { DialogAPI } from '../api';
-import type { MessageDialogOptions } from '../api/types';
+import type { ChooseDialogOptions, ChooseResult, MessageDialogOptions } from '../api/types';
 
 /** Show a message to the user. Resolves when the dialog is dismissed. */
 export function notify(message: string, options?: MessageDialogOptions): Promise<void> {
@@ -21,4 +21,9 @@ export function notifyError(message: string, title = 'エラー'): Promise<void>
 /** Ask the user to confirm an action. Resolves to `true` if they accept. */
 export function confirmAction(message: string, options?: MessageDialogOptions): Promise<boolean> {
   return DialogAPI.ask(message, { kind: 'warning', ...options });
+}
+
+/** Ask with three outcomes (yes / no / cancel). Closing the dialog counts as `cancel`. */
+export function chooseAction(message: string, options?: ChooseDialogOptions): Promise<ChooseResult> {
+  return DialogAPI.choose(message, { kind: 'info', ...options });
 }

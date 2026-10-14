@@ -2,7 +2,7 @@
  * Pure geometry for moving a whole layer group: one rigid transform (turn around a pivot, then shift)
  * applied to map poses, plugin layer poses and the objects of hand-drawn layers.
  */
-import type { CustomLayer, EditObject, ProjectMapLayer, ResolvedMapLayer } from '../types/layer';
+import type { CustomLayer, EditObject, GroupPoseOffset, ProjectMapLayer, ResolvedMapLayer } from '../types/layer';
 import { descendantLayerIds, type LayerTree } from './layerTree';
 import { mapWorldBounds, type WorldBounds } from './mapClip';
 
@@ -24,6 +24,52 @@ export function transformPoint(p: { x: number; y: number }, t: RigidTransform): 
   const rx = p.x - t.pivot.x;
   const ry = p.y - t.pivot.y;
   return { x: t.pivot.x + rx * cos - ry * sin + t.dx, y: t.pivot.y + rx * sin + ry * cos + t.dy };
+}
+
+const NO_OFFSET: GroupPoseOffset = { x: 0, y: 0, yaw: 0 };
+const EPSILON = 1e-9;
+
+/** Wraps an angle to (-π, π]. */
+const wrapAngle = (yaw: number): number => {
+  const wrapped = yaw - 2 * Math.PI * Math.floor((yaw + Math.PI) / (2 * Math.PI));
+  return wrapped <= -Math.PI + EPSILON ? Math.PI : wrapped;
+};
+
+const tidy = (v: number): number => (Math.abs(v) < EPSILON ? 0 : Math.round(v * 1e9) / 1e9);
+
+/** True when the offset moves nothing. */
+export const isZeroOffset = (offset: GroupPoseOffset | undefined): boolean =>
+  !offset || (offset.x === 0 && offset.y === 0 && offset.yaw === 0);
+
+/** The offset after applying `t` on top of `offset` (an absent offset is zero). Zero results come back as `undefined`. */
+export function composeOffset(offset: GroupPoseOffset | undefined, t: RigidTransform): GroupPoseOffset | undefined {
+  const o = offset ?? NO_OFFSET;
+  const cos = Math.cos(t.dyaw);
+  const sin = Math.sin(t.dyaw);
+  // p'' = c + R(dyaw)(p' - c) + d with p' = R(yaw)p + o
+  const next = {
+    x: tidy(cos * o.x - sin * o.y + (t.pivot.x - (cos * t.pivot.x - sin * t.pivot.y) + t.dx)),
+    y: tidy(sin * o.x + cos * o.y + (t.pivot.y - (sin * t.pivot.x + cos * t.pivot.y) + t.dy)),
+    yaw: tidy(wrapAngle(o.yaw + t.dyaw)),
+  };
+  return isZeroOffset(next) ? undefined : next;
+}
+
+/**
+ * The transform around the origin that takes the group from `current` to `target`: applying it with
+ * `composeOffset` gives `target` back. Used to turn a typed offset into a move.
+ */
+export function transformBetweenOffsets(current: GroupPoseOffset | undefined, target: GroupPoseOffset): RigidTransform {
+  const o = current ?? NO_OFFSET;
+  const dyaw = wrapAngle(target.yaw - o.yaw);
+  const cos = Math.cos(dyaw);
+  const sin = Math.sin(dyaw);
+  return {
+    dx: target.x - (cos * o.x - sin * o.y),
+    dy: target.y - (sin * o.x + cos * o.y),
+    dyaw,
+    pivot: { x: 0, y: 0 },
+  };
 }
 
 /** A pose `[x, y, yaw]` after the transform: its position moves like a point and its yaw turns with it. */

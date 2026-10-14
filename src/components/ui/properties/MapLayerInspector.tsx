@@ -10,6 +10,7 @@ import { idsHiddenByGroups } from '../../../utils/layerTree';
 import { confirmRemoveLayerItems } from '../../../services/layerCommands';
 import type { MapBlendMode } from '../../../types/store';
 import { MapClipEditor } from '../layers/MapClipEditor';
+import { canEditWithoutAsking, confirmEditWhileHidden } from '../../../services/poseEditGuards';
 import { LayerInspectorHeader } from './LayerInspectorHeader';
 import { MapPoseSection } from './MapPoseSection';
 import { MapThresholdSection } from './MapThresholdSection';
@@ -56,7 +57,13 @@ export function MapLayerInspector({ id }: { id: string }) {
       <MapPoseSection
         layer={layer}
         sharedCount={sharedCount}
-        onSetOrigin={(origin) => setMapLayerOrigin(id, origin)}
+        onSetOrigin={(origin) => {
+          if (canEditWithoutAsking(id)) return setMapLayerOrigin(id, origin);
+          return confirmEditWhileHidden(id).then((proceed) => {
+            if (proceed) setMapLayerOrigin(id, origin);
+            return proceed;
+          });
+        }}
         onSetPoseLinked={(linked) => setMapLayerPoseLinked(id, linked)}
       />
 

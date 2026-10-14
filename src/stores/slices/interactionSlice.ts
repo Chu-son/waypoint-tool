@@ -46,7 +46,12 @@ export interface InteractionSlice {
   handleGlobalEscape: () => boolean;
 }
 
-function applyInspectorTabUpdates(state: AppState, updates: Partial<AppState>) {
+/**
+ * Brings the Inspector forward. Selecting an item only does so while `autoFocusInspector` is on; tool modes
+ * that work in the Inspector (`force`) always do.
+ */
+function applyInspectorTabUpdates(state: AppState, updates: Partial<AppState>, force = false) {
+  if (!force && !state.autoFocusInspector) return;
   const isLeft = state.panelLayout?.leftTabs?.includes('inspector');
   if (isLeft) {
     updates.leftPanelActiveTab = 'inspector';
@@ -202,7 +207,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activeTool = 'add_generator';
             updates.isMapEditMode = false;
             updates.isAnnotationEditMode = false;
-            applyInspectorTabUpdates(state, updates);
+            applyInspectorTabUpdates(state, updates, true);
             updates.elementCopyState = null;
             updates.selectedAnnotationIds = [];
             updates.selectedEditObjectId = null;
@@ -218,7 +223,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.isAnnotationEditMode = true;
             updates.activeAnnotationSubTool = normalizedMode.subTool;
             updates.isMapEditMode = false;
-            applyInspectorTabUpdates(state, updates);
+            applyInspectorTabUpdates(state, updates, true);
             updates.elementCopyState = null;
             updates.selectedNodeIds = [];
             updates.activeCustomLayerId = null;
@@ -246,7 +251,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.mapEditFillValue = normalizedMode.fillValue;
             updates.mapEditBrushSize = normalizedMode.brushSize;
             updates.isAnnotationEditMode = false;
-            applyInspectorTabUpdates(state, updates);
+            applyInspectorTabUpdates(state, updates, true);
             updates.elementCopyState = null;
             break;
           case 'export_region_edit':
