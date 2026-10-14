@@ -41,31 +41,6 @@ export function getFlattenedNodeIds(rootIds: string[], nodes: Record<string, Way
 }
 
 /**
- * アノテーションツリーを深さ優先探索 (DFS) で走査し、すべてのアノテーションオブジェクトIDを順序通りに抽出する。
- */
-export function getFlattenedAnnotationIds(
-  rootIds: string[],
-  annotationGroups: Record<string, AnnotationGroup>,
-  annotationObjects: Record<string, AnnotationObject>,
-): string[] {
-  const result: string[] = [];
-
-  function traverse(id: string) {
-    if (annotationObjects[id]) {
-      result.push(id);
-      return;
-    }
-    const group = annotationGroups[id];
-    if (group && group.children_ids && group.children_ids.length > 0) {
-      group.children_ids.forEach(traverse);
-    }
-  }
-
-  rootIds.forEach(traverse);
-  return result;
-}
-
-/**
  * 子ID → 親ID（ルートは null）の索引。`findNodeParentId` を同じ入力で繰り返し呼ぶ箇所で使う。
  */
 export type ParentIndex = Map<string, string | null>;
@@ -337,63 +312,6 @@ export function getVisibleTreeNodes(
   }
 
   rootIds.forEach((id) => traverse(id, 0));
-  return result;
-}
-
-/**
- * アノテーションツリー用：展開状態（expandedIds）を考慮して表示ノードを深さ優先順で収集する。
- */
-export function getVisibleAnnotationNodes(
-  rootIds: string[],
-  groups: Record<string, AnnotationGroup>,
-  objects: Record<string, AnnotationObject>,
-  expandedIds: Set<string>,
-): VisibleTreeNode[] {
-  const result: VisibleTreeNode[] = [];
-
-  function traverse(id: string, depth: number) {
-    if (objects[id]) {
-      result.push({ id, depth });
-      return;
-    }
-    const grp = groups[id];
-    if (grp) {
-      result.push({ id, depth });
-      if (expandedIds.has(id) && grp.children_ids && grp.children_ids.length > 0) {
-        grp.children_ids.forEach((childId) => traverse(childId, depth + 1));
-      }
-    }
-  }
-
-  rootIds.forEach((id) => traverse(id, 0));
-  return result;
-}
-
-/**
- * グループとオブジェクトの両方を含む、深さ優先探索での全アノテーションノードIDリストを取得する。
- */
-export function getFlattenedAnnotationNodeIds(
-  rootIds: string[],
-  groups: Record<string, AnnotationGroup>,
-  objects: Record<string, AnnotationObject>,
-): string[] {
-  const result: string[] = [];
-
-  function traverse(id: string) {
-    if (objects[id]) {
-      result.push(id);
-      return;
-    }
-    const grp = groups[id];
-    if (grp) {
-      result.push(id);
-      if (grp.children_ids && grp.children_ids.length > 0) {
-        grp.children_ids.forEach(traverse);
-      }
-    }
-  }
-
-  rootIds.forEach(traverse);
   return result;
 }
 

@@ -17,7 +17,7 @@
   - **概要**: 数値編集用インプット。入力中の中間状態を許容し、フォーカス外/Enter で確定。`step` 指定時は ↑/↓ キーで増減（Shift ×10、Alt ×0.1）。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`, `onEditStart`, `onEditEnd`
 - **`PoseAdjuster`** ([`src/components/ui/common/PoseAdjuster.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/PoseAdjuster.tsx))
-  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`MapLayerCard` と `GeoMapCard` で共用。
+  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`MapPoseSection`（マップレイヤーの Inspector）、`LayerGroupPoseSection`（グループの一括位置調整）、`GeoMapCard` で共用。
   - **主要Props**: `onNudge`, `onEditStart`, `onEditEnd`（押下/キー保持の一連操作を Undo 1 エントリにまとめるために使う）
 - **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
   - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。`document.body` へポータル描画し、モーダルより前面（`z-[60]`）に出るため、モーダルから開始した処理でも見える。`message` / `detail`（改行可）を表示し、3 秒を超えると経過秒数も出す。
@@ -91,7 +91,9 @@
 
 ### 共通 Hooks (`src/hooks/`)
 - **`useClickOutside(ref, onOutside, enabled?)`**: 要素の外側でマウスが押されたときにコールバック（ドロップダウン・メニューのクローズ）。
-- **`useTreeInteractionState()`**: WaypointTree / AnnotationTree 共通の DnD センサー、展開集合、インライン編集 ID、ドラッグ中 ID、コンテキストメニュー状態。
+- **`useTreeInteractionState()`**: WaypointTree の DnD センサー、展開集合、インライン編集 ID、ドラッグ中 ID、コンテキストメニュー状態（`TreeView` を使うレイヤー・アノテーションは、展開状態をストア `uiSlice.expandedTreeItems[treeId]` に持つ）。
+- **`useTreeItemSelection({ selectedIds, selectFn, visibleIds, ... })`**: ツリー行のクリック（単一・Ctrl で追加/解除・Shift で範囲）と右クリック時の選択。3 つのツリーが共有する。
+- **`useTreeReveal({ treeType, getAncestorIds, expandItems })`**: 「ツリーで表示」（キャンバスの要素から対応する行へ）。先祖を `expandItems(ids)` で開き、行を一瞬光らせる `flashingId` を返す。
 - **`useExportPlan({ isOpen, onClose })`** (`ui/modals/useExportPlan.ts`): ExportModal のプロファイル/項目編集（ドラフト。保存操作でストアへ反映）、ファイルプレビュー、衝突チェック、エクスポート実行。
 - **`PluginCard`** (`ui/settings/PluginCard.tsx`): PluginsTab の 1 プラグイン分（有効化・並び替え・アイコン・インタプリタ上書き・SDK/依存状態）。**`ManualLayerTools`** (`ui/properties/ManualLayerTools.tsx`): 手動ベクターレイヤーの描画ツール・塗り種別・描画オブジェクト一覧。
 - **`useTreeItemSelection`** / **`useTreeReveal`**: ツリーのクリック・Shift 範囲選択、および選択要素までの自動展開・スクロール。
@@ -122,7 +124,13 @@
   - **主要Props**: `nodeId`
 - **`CustomLayerInspector`** ([`src/components/ui/properties/CustomLayerInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/CustomLayerInspector.tsx))
   - **概要**: 手動ベクター描画レイヤー（直線・矩形・円形・ブラシ）のツール設定や、プラグイン生成マップレイヤーの新規作成・パラメータ編集・再生成・透過度・ブレンドモード調整を行う統合インスペクターUI。
-  - **主要Props**: なし（`appStore` の `activeCustomLayerId` と連動）
+  - **主要Props**: なし（選択中のカスタムレイヤー（`selectedCustomLayerId`）と連動）
+- **レイヤーの Inspector** (`ui/properties/`): 選択（`ActiveSelection.layers`）に応じて `LayerSelectionInspector` が次を切り替える。
+  - `MapLayerInspector`（マップ：名前・表示・複製・削除、姿勢 `MapPoseSection`（既定は同じマップの全複製で共有。「Link pose」トグルで解除すると、そのレイヤーだけ動かせる。解除中はツリーの行に `Own` バッジ）、閾値 `MapThresholdSection`（同じマップの全複製で共有）、不透明度、ブレンド、使用領域 `MapClipEditor`）
+  - `CustomLayerInspector`（手描き・プラグインのレイヤー）
+  - `LayerGroupInspector`（グループ：名前・表示・解除・削除、`LayerGroupPoseSection` による一括位置調整（ΔX/ΔY/ΔYaw と「適用」、±90°、微調整パッド、回転の中心（外接矩形の中心／原点）、プラグインレイヤーの注記、共有姿勢が外にもあるときの確認））
+  - `LayerMultiInspector`（複数選択：件数・種別の内訳・まとめて表示/非表示・グループ化・削除）
+  - 共通のヘッダー `LayerInspectorHeader`（種類のアイコン・名前・表示・複製・削除）
 - **`AnnotationInspector`** ([`src/components/ui/properties/AnnotationInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/AnnotationInspector.tsx))
   - **概要**: 選択中のアノテーションオブジェクト（Point, OrientedPoint, Line, Rect, Circle）の名前・カラー・表示トグル・各幾何座標（位置、サイズ、角度、半径等）を編集するインスペクターUI。
   - **主要Props**: なし（`appStore` の `selectedAnnotationIds` と連動）
@@ -159,12 +167,16 @@
   - **概要**: 画面左端に配置されるメインツール切り替えバー (Select, Add Waypoint, Export Region, Import/Export/Settings等)。
   - **主要Props**: なし
 - **`LayerPanel`** ([`src/components/ui/layers/LayerPanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/layers/LayerPanel.tsx))
-  - **概要**: マップレイヤー (`ProjectMapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、エクスポート領域 (`ExportRegion`) を一元管理するパネル。マップとカスタムレイヤーは `layerOrder` に従う 1 本の「Layers」リストに並び、上下ボタンで種類をまたいで並べ替えできる。共通シェル構造（`LayerCardShell`）により各カードのヘッダー・操作系をコンパクトかつ統一感高く配置。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
-  - **構成ファイル** (`ui/layers/`): `LayerCardShell`（カード枠・ヘッダー共通部）, `MapLayerCard`（ROS マップ：名前（ダブルクリック/右クリックで変更）・複製・姿勢（既定は同じマップの全複製で共有。「Link pose」トグル／右クリックで解除し、そのレイヤーだけ動かせる。解除中は `Own pose` バッジ）/閾値（同じマップの全複製で共有）・不透明度・ブレンド・使用領域）, `MapClipEditor`（使用領域：オン/オフ、キャンバス上でのドラッグ描画（Draw on canvas）、左右上下の半分プリセット、矩形の X/Y/W/H 入力と追加/削除）, `CustomLayerCard`, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）, `LayerVisibilitySetBar`（レイヤー表示セット：プルダウンで選ぶと適用。新規保存・現在の表示での更新・名前変更・削除。保存後に追加されたレイヤーがあるセットは「(needs update)」、適用後に手で表示を変えたセットは「(modified)」と表示し、前者は警告バナーから更新できる。レイヤーが 1 つもないときは表示しない）
+  - **概要**: マップレイヤー (`ProjectMapLayer`)、ベクター図形/プラグイン生成レイヤー (`CustomLayer`)、レイヤーグループ (`LayerGroup`)、エクスポート領域 (`ExportRegion`) を管理するパネル。マップ・カスタムレイヤー・グループは、レイヤーツリー（`LayerTree`。共通の `TreeView` 上）に 1 本の「Layers」として並び、ドラッグ&ドロップ・Alt+↑↓・Ctrl+G で並べ替え・入れ子・グループ化ができる。行は名前・種類・表示の目・複製や削除などの操作だけを持ち、姿勢・閾値・使用領域などの設定は右ペインの Inspector（上記）で編集する。共通シェル構造（`LayerCardShell`）は `RegionCard` と `GeoMapCard` が使う。エクスポートレギオンセクションは開閉トグル（アコーディオン）と登録数バッジを備え、必要時のみ展開して編集可能。
+  - **構成ファイル** (`ui/layers/`): `LayerTree`（レイヤーツリー。`TreeView` に行を渡し、DnD の可否・展開・選択を接続）, `LayerTreeContextMenu`（右クリックメニュー：グループ化・名前変更・解除・複製・削除・グループから出す など）, `LayerCardShell`（カード枠・ヘッダー共通部）, `MapClipEditor`（使用領域：オン/オフ、キャンバス上でのドラッグ描画（Draw on canvas）、左右上下の半分プリセット、矩形の X/Y/W/H 入力と追加/削除。マップの Inspector から使う）, `RegionCard`, `GeoMapCard`（背景地図：ベースマップ切替・不透明度・原点・オフセット/回転・「Align on canvas」）, `GeoOriginFields`（原点の緯度経度/UTM 入力）, `LayerVisibilitySetBar`（レイヤー表示セット：プルダウンで選ぶと適用。新規保存・現在の表示での更新・名前変更・削除。保存後に追加されたレイヤーがあるセットは「(needs update)」、適用後に手で表示を変えたセットは「(modified)」と表示し、前者は警告バナーから更新できる。レイヤーが 1 つもないときは表示しない）
 - **`GeoAttribution`** ([`src/components/ui/overlays/GeoAttribution.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/overlays/GeoAttribution.tsx))
   - **概要**: 背景地図の表示中に、選択中のベースマップの帰属表示（例: © OpenStreetMap contributors）をキャンバス右下へ表示する。
   - **主要Props**: なし
-- **ツリー部品** (`ui/trees/`): `WaypointTree` / `AnnotationTree` 本体と、行コンポーネント `WaypointTreeRow` / `AnnotationTreeRow`、挿入位置バー `InsertionBarItem`
+- **ツリー部品** (`ui/trees/`): `WaypointTree` 本体と行 `WaypointTreeRow`、挿入位置バー `InsertionBarItem`（ウェイポイントは挿入位置を持つため独自実装。理由は ARCHITECTURE.md）。`AnnotationTree` は共通部品の上に作る。
+- **共通ツリー** (`ui/trees/core/`、純関数は `utils/treeCore.ts`):
+  - `TreeView`（`treeId`、`model: TreeModel`、`selectedIds` / `onSelectionChange`、`renderRow(row)`、`onToggleVisible`、`onRename`、`editingId` / `onEditingChange`、`canDrop` / `onDrop`、`onItemContextMenu` / `onBackgroundContextMenu`、`flashingId`、`emptyState`）。行の一覧化・DnD（`computeDropTarget`）・閉じたグループの自動展開・F2・Alt+↑↓・選択項目の祖先の自動展開を担う。
+  - `TreeRow`（行の枠：ドラッグハンドル、開閉の矢印、アイコン、名前（インライン編集は `InlineNameInput`）、バッジ、操作ボタン、ドロップ位置の表示）。インデントは `TREE_INDENT_PX`。
+  - `TreeModel`（`rootIds` と `childrenOf(id)`）、`visibleTreeRows`、`treeParentIndex`、`treeAncestorIds`、`computeDropTarget`。
 - **プラグイン入力フォーム** (`ui/plugins/`): `PluginInputEditor` が入力種別ごとに `PointInputForm` / `PointsListInputForm` / `RectangleInputForm` / `WaypointSelectInputForm` / `AnnotationSelectInputForm` / `CustomLayerSelectInputForm` を切り替える
 - **条件付き書式** (`ui/settings/`): `ConditionalStylesTab` が `ConditionEditor`（ネスト可能な条件グループと、list / map の各要素に対する要素条件 `ConditionCollectionEditor`。プロパティ候補は `ConditionScope`（ルートは実効スキーマ、要素条件の中は要素型）から導出する）と `StyleOverrideEditor`（要素別スタイル上書き）を組み合わせる
   - **主要Props**: なし

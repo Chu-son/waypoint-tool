@@ -53,6 +53,7 @@ it('Delete removes the selected waypoints', () => {
 - 優先順：`getByRole`（name 付き）→ `getByLabelText` → `getByText` / `getByDisplayValue` → `getByTitle`。
 - `getByTestId`・`querySelector`・`className` は最後の手段。アクセシブルな名前が無い要素は、テストのために testid を足すのではなく **`aria-label` 等を付けて UI 側を改善** する。
 - 操作は `@testing-library/user-event`（`renderWithStore` が返す `user`）を推奨。入力欄の最終値だけが重要な場合は `fireEvent.change` でもよい。
+- ツリー（`TreeView`）のドラッグ&ドロップは jsdom ではポインタの座標が得られず検証できない。ドロップ先の判定は純関数 `computeDropTarget`（`treeCore.test.ts`）と、ツリーの変更（`layerTree.test.ts`。ランダムな操作列で不変条件を確かめる）で検証し、コンポーネントのテストは同じ移動をキーボード（Alt+↑↓）で行う。行の操作ボタンは `aria-label`（「○○ を非表示にする」など）で取る。
 - キャンバス（PixiJS）は jsdom 上で属性付きの不活性な要素として描画される。ビューポートへの pointer イベントと、`pixicontainer[x=..][y=..]` による「その座標に描かれたもの」の特定でツール操作を検証する（`MapCanvasInteractions.test.tsx` 参照）。
 
 ## 5. 共通テスト基盤 (`src/test/`)
@@ -60,9 +61,9 @@ it('Delete removes the selected waypoints', () => {
 | ファイル | 用途 |
 |---|---|
 | `setup.ts` | jest-dom 拡張、pointer capture のポリフィル |
-| `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
+| `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `getLayerOrder()`（積み順 = `layerOrderOf` の結果）, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
 | `render.tsx` | `renderWithStore(ui, state)` → `{ user, ...render結果 }` |
-| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップとカスタムレイヤーを上から順に並べたスタックのストア状態）/ `makeManualCustomLayer` / `makePlugin` |
+| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップ・カスタムレイヤー・`makeLayerGroup` のグループを、上から順に入れ子で並べたスタックのストア状態）/ `makeLayerGroup` / `makeAnnotationGroup` / `makeManualCustomLayer` / `makePlugin` |
 | `mocks/pixi.tsx` | PixiJS スタブ、描画呼び出しを記録する `createGraphicsRecorder()` |
 
 テストデータはファクトリで作り、**テストの意図に関係するフィールドだけ** を上書きする。

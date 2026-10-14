@@ -13,8 +13,8 @@ src/components/ui/
 ├── common/         # アプリ横断で使う汎用UI部品（2ファイル以上で共通利用）
 ├── shell/          # TopMenu・ToolPanel・StatusBar・パネル枠などアプリの外枠
 ├── modals/         # モーダルダイアログ
-├── trees/          # Waypoint / Annotation ツリー
-├── layers/         # レイヤー一覧パネル
+├── trees/          # Waypoint / Annotation ツリー（共通部品は trees/core/）
+├── layers/         # レイヤーツリーとパネル
 ├── plugins/        # プラグイン一覧・パラメータ・入力エディタ
 ├── overlays/       # キャンバス上のフローティング UI
 ├── properties/     # Inspector（PropertiesPanel と専用部品）
@@ -360,7 +360,11 @@ export function CustomEditOverlay() {
   - 名前テキスト: `truncate min-w-0 flex-1 font-medium text-text-base`
   - バッジ類: 狭幅パネルでは非表示または短縮（`hidden xs:inline-block sm:inline-block`）
   - 右側操作ボタングループ: `flex items-center gap-0.5 shrink-0 ml-1`
-  - インデントパディングのクランプ: 深い階層でも文字領域を確保するため、`style={{ paddingLeft: `${Math.min(depth * 10 + 6, 32)}px` }}` などで最大インデント幅を制限すること。
+  - インデントパディングのクランプ: 深い階層でも文字領域を確保するため、最大インデント幅を制限すること。共通の `TreeRow` は `treeRowPadding(depth)` = `min(depth × 10 + 6, 56)` px（`TREE_INDENT_PX` = 10、`TREE_BASE_PADDING_PX` = 6、5 段で止まる）を使う。
+- **共通ツリー（`ui/trees/core/`）**: レイヤー・アノテーションなどの階層リストは `TreeView`（キーボード・DnD・展開）と `TreeRow`（行の枠）で作り、行の中身だけを `renderRow` で渡す。行は左から「ドラッグハンドル → 開閉の矢印（グループのみ）→ 種類のアイコン → 名前 → バッジ → 操作ボタン（表示の目・削除など）」の順。
+  - 状態の見せ方は統一する: 選択は `bg-primary-base/15` と枠、選択項目を含む閉じたグループは `bg-primary-base/10` と点、祖先のグループが非表示の行は `opacity-60` と説明つきの印、ドロップは前・後が 2px の線、中が `ring-2`、「ツリーで表示」は一時的な `animate-pulse`。
+  - 色はトークン（`primary-base` など）だけを使う。Raw Tailwind カラーは使わない（本書の規約どおり）。
+  - 操作ボタンには `aria-label`（例: 「○○ を非表示にする」）を付ける。テストはそのラベルで操作する。
 
 ---
 
