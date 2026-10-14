@@ -1,11 +1,15 @@
 import { useAppStore } from '../../../stores/appStore';
-import { selectedCustomLayerId } from '../../../utils/layerSelection';
+import { layerItemKind } from '../../../utils/layerSelection';
 import { CustomLayerInspector } from './CustomLayerInspector';
-import { PropertiesPanel } from './PropertiesPanel';
+import { LayerGroupInspector } from './LayerGroupInspector';
+import { LayerMultiInspector } from './LayerMultiInspector';
+import { MapLayerInspector } from './MapLayerInspector';
 
 /** Inspector for a selection in the layer tree: picks the panel for what is selected. */
 export function LayerSelectionInspector({ ids }: { ids: string[] }) {
-  const customLayerId = useAppStore((state) => selectedCustomLayerId(ids, state));
-  if (customLayerId) return <CustomLayerInspector />;
-  return <PropertiesPanel />;
+  const kind = useAppStore((state) => (ids.length === 1 ? layerItemKind(ids[0], state) : 'multi'));
+  if (kind === 'multi') return <LayerMultiInspector ids={ids} />;
+  if (kind === 'group') return <LayerGroupInspector id={ids[0]} />;
+  if (kind === 'map') return <MapLayerInspector id={ids[0]} />;
+  return <CustomLayerInspector />;
 }

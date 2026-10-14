@@ -178,7 +178,9 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activePluginId = null;
             updates.pluginInteractionData = {};
             updates.elementCopyState = null;
-            if (state.selection?.type === 'layers') {
+            // Leaving vector editing deselects its layer (STATE_MACHINE §6); a layer selected while already
+            // selecting stays selected (the inspector of a hand-drawn layer switches to the select tool).
+            if (state.selection?.type === 'layers' && currentMode.mode === 'custom_layer_edit') {
               updates.selection = { type: 'none' };
               updates.activeCustomLayerId = null;
               updates.selectedEditObjectId = null;
@@ -725,6 +727,9 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
       }
       if (state.selectedAnnotationIds.length > 0) {
         return get().duplicateAnnotations(state.selectedAnnotationIds);
+      }
+      if (state.selection.type === 'layers') {
+        return get().duplicateLayerItems(state.selection.ids);
       }
       return [];
     },

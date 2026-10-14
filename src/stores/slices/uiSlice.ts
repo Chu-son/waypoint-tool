@@ -56,6 +56,14 @@ export type UISlice = {
   revealInTree: (type: 'node' | 'annotation', id: string) => void;
   clearTreeRevealTarget: () => void;
 
+  /**
+   * Expanded containers of each tree (`TreeView`), by tree id. A view state: kept while the app runs,
+   * across tab switches, but neither saved in the project nor dirtying it.
+   */
+  expandedTreeItems: Record<string, string[]>;
+  setTreeItemExpanded: (treeId: string, id: string, expanded: boolean) => void;
+  expandTreeItems: (treeId: string, ids: string[]) => void;
+
   leftPanelWidth: number;
   rightPanelWidth: number;
   showProperties: boolean;
@@ -436,6 +444,22 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     });
   },
   clearTreeRevealTarget: () => set({ treeRevealTarget: null }),
+
+  expandedTreeItems: {},
+  setTreeItemExpanded: (treeId, id, expanded) =>
+    set((state) => {
+      const current = state.expandedTreeItems[treeId] ?? [];
+      if (current.includes(id) === expanded) return {};
+      const next = expanded ? [...current, id] : current.filter((e) => e !== id);
+      return { expandedTreeItems: { ...state.expandedTreeItems, [treeId]: next } };
+    }),
+  expandTreeItems: (treeId, ids) =>
+    set((state) => {
+      const current = state.expandedTreeItems[treeId] ?? [];
+      const added = ids.filter((id) => !current.includes(id));
+      if (added.length === 0) return {};
+      return { expandedTreeItems: { ...state.expandedTreeItems, [treeId]: [...current, ...added] } };
+    }),
 
   moveTabToPanel: (tabId, targetPanel) => {
     const state = get();

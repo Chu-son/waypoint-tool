@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { confirmDiscardChanges } from '../../services/projectGuard';
+import {
+  confirmRemoveLayerItems,
+  groupLayerItems,
+  selectedLayerItemIds,
+  ungroupLayerItems,
+} from '../../services/layerCommands';
 
 /**
  * Global keyboard shortcuts. Reads the store when a key is pressed instead of subscribing to it,
@@ -105,6 +111,8 @@ export function ShortcutManager() {
           removeAnnotationObjects?.(selectedAnnotationIds);
         } else if (selectedNodeIds.length > 0) {
           removeNodes?.(selectedNodeIds);
+        } else if (selectedLayerItemIds().length > 0) {
+          void confirmRemoveLayerItems(selectedLayerItemIds());
         }
       }
 
@@ -185,6 +193,15 @@ export function ShortcutManager() {
             e.preventDefault();
             duplicateSelectedMapElements?.();
             break;
+          case 'g': {
+            // Grouping follows what is selected; layers are the tree that has it for now.
+            const layerIds = selectedLayerItemIds();
+            if (layerIds.length === 0) break;
+            e.preventDefault();
+            if (e.shiftKey) ungroupLayerItems(layerIds);
+            else groupLayerItems(layerIds);
+            break;
+          }
           case 'h':
             e.preventDefault();
             setShowOccupancyHighlight(!showOccupancyHighlight);
