@@ -19,13 +19,30 @@ RUN apt-get update && apt-get install -y \
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs
 
+# ホストと同じ UID/GID・同じ HOME パスのユーザーで動かす。
+# こうすると、ホストの設定ディレクトリ (~/.config/com.chuson.waypoint-tool) や
+# プロジェクトを同じパスでマウントでき、書き込んだファイルの所有者もホストユーザーのままになる。
+ARG USER_UID=1000
+ARG USER_GID=1000
+ARG HOST_HOME=/home/dev
+RUN groupadd --gid ${USER_GID} dev \
+    && useradd --uid ${USER_UID} --gid ${USER_GID} --home-dir ${HOST_HOME} --create-home --shell /bin/bash dev \
+    && mkdir -p ${HOST_HOME}/.config/com.chuson.waypoint-tool \
+                ${HOST_HOME}/.local/share/com.chuson.waypoint-tool/plugins \
+                /workspace/node_modules /workspace/src-tauri/target \
+    && chown -R ${USER_UID}:${USER_GID} ${HOST_HOME} /workspace
+ENV HOME=${HOST_HOME}
+
 # Rust用環境変数の設定（Named Volumeマウント用）
 ENV RUSTUP_HOME=/opt/rust
 ENV CARGO_HOME=/opt/cargo
 ENV PATH="${CARGO_HOME}/bin:${PATH}"
 
-# Rust のインストール
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+# Rust のインストール（非 root で書き込めるよう、同じレイヤー内で所有者を変える）
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && chown -R ${USER_UID}:${USER_GID} /opt/rust /opt/cargo
+
+USER dev
 
 # WebKitGTKを仮想ディスプレイ(Xvfb)で安定させるための設定
 ENV WEBKIT_DISABLE_COMPOSITING_MODE=1

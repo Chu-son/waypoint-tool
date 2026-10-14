@@ -1,19 +1,32 @@
 version: '3.8'
 
+# ホストと同じユーザー・同じパスで動かし、設定とプラグイン、プロジェクトをホストと共有する。
+# 変数は Makefile (`make dev`) が設定する。直接 `docker compose` を使う場合は
+# USER_UID / USER_GID / WPT_PROJECTS_DIR を自分で渡すこと。
 services:
   waypoint-dev:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+        HOST_HOME: ${HOME}
+    user: '${USER_UID:-1000}:${USER_GID:-1000}'
     # WebKitGTKのクラッシュを防ぐためホストのIPC名前空間を共有
     # ※ Rootless環境等で問題が出る場合はコメントアウトまたは `private` で試してください
     ipc: host
     environment:
       # NoVNCコンテナと同じDISPLAYを使用。ホストにDISPLAYが設定されていればそれを引き継ぎ、なければ :1 にフォールバック
       - DISPLAY=${DISPLAY:-:1}
+      - HOME=${HOME}
     volumes:
       - ./:/workspace # ソースコードのマウント
       - /tmp/.X11-unix:/tmp/.X11-unix # ホストのX11ソケットをバインドマウント
+      # ホストと共有するもの。WebKit のデータやキャッシュはコンテナ内に留め、ホストを汚さない。
+      - ${HOME}/.config/com.chuson.waypoint-tool:${HOME}/.config/com.chuson.waypoint-tool # グローバル設定 (settings.json)
+      - ${HOME}/.local/share/com.chuson.waypoint-tool/plugins:${HOME}/.local/share/com.chuson.waypoint-tool/plugins # プラグイン
+      - ${WPT_PROJECTS_DIR:-${HOME}/waypoint-projects}:${WPT_PROJECTS_DIR:-${HOME}/waypoint-projects} # プロジェクト置き場 (最近開いたプロジェクトのパスをそのまま使う)
       - node_modules:/workspace/node_modules # キャッシュ隔離 (ホスト環境と混ざらないよう)
       - cargo_registry:/opt/cargo/registry # Crateキャッシュ隔離
       - rust_target:/workspace/src-tauri/target # ビルド成果物隔離

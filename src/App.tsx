@@ -27,6 +27,7 @@ import {
   useInspectorPanelComponent,
 } from './components/ui/shell/PanelRegistry';
 import { useAppStore } from './stores/appStore';
+import { flushSettings } from './stores/persistence/settingsStorage';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AppAPI, DialogAPI, BackendAPI } from './api';
 import { Button } from './components/ui/common/Button';
@@ -193,6 +194,12 @@ function App() {
 
       // Approved to close.
       useAppStore.getState().setIsDirty(false);
+      try {
+        // Settings are written asynchronously; make sure the latest ones reach the file first.
+        await flushSettings();
+      } catch (err) {
+        console.error('Failed to save settings', err);
+      }
       try {
         // Explicitly trigger window state saving before we force destroy
         await AppAPI.saveWindowState();
