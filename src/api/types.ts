@@ -216,6 +216,12 @@ export interface IAppAPI {
   /** Persist window size/position so it is restored on next launch. */
   saveWindowState(): Promise<void>;
   /**
+   * The persisted global settings (zustand persist payload as a JSON string), or `null` if none
+   * were saved yet. Stored in the app config directory so every way of launching the app shares it.
+   */
+  loadUserSettings(): Promise<string | null>;
+  saveUserSettings(contents: string): Promise<void>;
+  /**
    * Intercept the window close button. The default close is always prevented; the handler
    * decides whether to quit (e.g. by calling `forceExit`). Resolves to an unsubscribe function.
    */

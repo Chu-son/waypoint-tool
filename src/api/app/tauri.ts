@@ -33,6 +33,14 @@ export class TauriAppAPI implements IAppAPI {
     await saveWindowState(StateFlags.ALL);
   }
 
+  loadUserSettings(): Promise<string | null> {
+    return invoke<string | null>('load_user_settings');
+  }
+
+  async saveUserSettings(contents: string): Promise<void> {
+    await invoke('save_user_settings', { contents });
+  }
+
   onCloseRequested(handler: () => void | Promise<void>): Promise<() => void> {
     return getCurrentWindow().onCloseRequested(async (event) => {
       // Always intercept so the app decides when to quit (avoids window-state plugin races).

@@ -196,6 +196,9 @@ pub use custom_ui::*;
 pub mod venv;
 pub use venv::*;
 
+pub mod settings;
+pub use settings::*;
+
 /// 背景地図タイルを取得（キャッシュ優先）し、`data:` URL として返す。
 #[command]
 pub async fn fetch_map_tile(app: AppHandle, url: String) -> Result<String, String> {

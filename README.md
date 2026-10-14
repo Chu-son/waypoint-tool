@@ -103,6 +103,24 @@ make down
 make clean
 ```
 
+#### ホストとの設定共有
+
+グローバル設定（プラグインの登録、最近開いたプロジェクト、テーマなど）は `~/.config/com.chuson.waypoint-tool/settings.json` に保存され、`npm run tauri dev`・リリースの AppImage・Docker のどれで起動しても共有されます。
+
+Docker はホストと同じユーザー・同じパスで動き、次をホストからマウントします（それ以外の WebKit のデータやキャッシュはコンテナ内に留まります）。
+
+- `~/.config/com.chuson.waypoint-tool`（設定）
+- `~/.local/share/com.chuson.waypoint-tool/plugins`（プラグイン）
+- `WPT_PROJECTS_DIR`（プロジェクトやカスタムプラグインの置き場。既定は `~/waypoint-projects`。`WPT_PROJECTS_DIR=/path make dev` で変更できます）
+
+注意:
+- 最近開いたプロジェクトやカスタムプラグインはパスで保存されるため、マウントした場所の外にあるものはコンテナからは見つかりません。
+- 以前の Docker 環境（root で動いていたもの）からの更新時は、ボリュームの所有者が合わないため、一度 `make clean` してから `make dev` してください。
+- ホストと Docker で Python が違う場合、共有した Python のパス（venv など）がコンテナ内では動かないことがあります。
+- 複数の起動方式を同時に動かした場合は、最後に保存したほうの設定が残ります。
+- コンテナが非 root で動くため、ホストの X サーバーが接続を許可している必要があります（例: `xhost +local:`）。
+- 設定の保存先を変えたため、これまでの `tauri dev` やリリースで保存していた設定は引き継がれません（旧バージョンに戻せば残っています）。
+
 ---
 
 ## リリースビルド

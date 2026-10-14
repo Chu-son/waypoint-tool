@@ -122,7 +122,10 @@ graph TD
    - `layers/` 配下の独立した描画レイヤー（`WaypointLayer`, `PathLayer`, `FootprintLayer`, `GridLayer`, `PluginLayer` 等）が `appStore` を参照し WebGL メッシュとして描画します。
 
 4. **境界正規化・マイグレーションレイヤー (Anti-Corruption Layer: `src/stores/migrations/`)**:
-   - プロジェクトファイル（`.wptroj`）読み込み時の `projectMigration.ts`、およびブラウザローカルストレージ設定（`waypoint-tool-storage`）復元時の `storageMigration.ts` を統括します。
+   - プロジェクトファイル（`.wptroj`）読み込み時の `projectMigration.ts`、および設定ファイル（`waypoint-tool-storage`）復元時の `storageMigration.ts` を統括します。
+   - **グローバル設定の保存先**: Zustand `persist` の保存先は `app_config_dir/settings.json`（Linux: `~/.config/com.chuson.waypoint-tool/settings.json`）。WebView の localStorage はオリジンごとに分かれ、`tauri dev`（`http://localhost:1420`）・リリース（`tauri://localhost`）・Docker で設定が別々になるため使わない。Rust の `load_user_settings` / `save_user_settings`（`src-tauri/src/commands/settings.rs`）が読み書きし、中身は解釈しない。書き込みは同じディレクトリの一時ファイルへ書いてから置き換える（途中終了でも壊れない）。不正な JSON は `settings.json.corrupt-<時刻>` に退避して既定値で起動する。
+   - **水和は描画前に完了させる**: 読み込みが非同期のため `skipHydration: true` とし、`main.tsx` が `useAppStore.persist.rehydrate()` を待ってから描画する。`settingsStorage.ts` は読み込み完了前の書き込みを無視し（既定値でファイルを上書きしない）、同じ内容は書かず、書き込みを 1 本にまとめ、この build が知らないキーはそのまま書き戻す（新旧のビルドが同じファイルを共有するため）。終了時は `App.tsx` が `flushSettings()` を待つ。
+   - 複数の起動方式を同時に動かした場合は、最後に保存したほうが残る。
    - 外部入力（旧バージョン形式、未定義プロパティ、キー名揺れ等）をエントリポイント境界で即座に検知し、最新の厳格なスキーマへと完全正規化・デフォルト値補完を実施します。
    - これにより、内部スライスやコンポーネント内に互換フォールバック（`||` や `??`）を散乱させないクリーンアーキテクチャを実現します。
    - 保存時のデータ構築（ストア → `StrictProjectData`）は `src/stores/serialization/projectSerializer.ts`（`buildProjectData`）が担います。
@@ -131,7 +134,7 @@ graph TD
 5. **バックエンド (Tauri / Rust Core)**:
    - ファイルシステムの直接アクセス、テンプレートエンジンによるエクスポート生成、ROS 形式マップのメタデータ解析を実施します。
    - テンプレートのレンダリングは `src-tauri/src/templating.rs` に集約されており、`TemplateEngine`（`handlebars` / `jinja`）に応じて Handlebars（後方互換）または MiniJinja（`{% for %}`/`{% if %}`、四則演算、`toyaml`/`deg`/`rad` 等のカスタムフィルタを追加した Jinja2 互換エンジン）でレンダリングする。`io::export_waypoints` / `io::infer_import_mapping` / `commands::export_pipeline::execute_export_package` の3箇所が共通してこれを呼ぶ。
-   - `execute_export_package` は、テンプレートのレンダリングや YAML/JSON 直列化の前に、ウェイポイントと `globals` の整数を f64 に正規化する（`floatify`）。JS の `0.0` は IPC（JSON）で `0` になり整数として届くため、フロントエンドでは float を表現できないことによる。フロントエンドは一般設定 `exportIntegersAsFloat`（既定 `true`、localStorage とプロジェクトファイル `export_integers_as_float` の両方に保存）を `float_numbers` として、スキーマ上 integer 型のオプション名を `integer_keys`（`collectIntegerOptionKeys`）として渡す。`index` と `options`/`raw_options` 配下の `integer_keys` は整数のまま出力する。
+   - `execute_export_package` は、テンプレートのレンダリングや YAML/JSON 直列化の前に、ウェイポイントと `globals` の整数を f64 に正規化する（`floatify`）。JS の `0.0` は IPC（JSON）で `0` になり整数として届くため、フロントエンドでは float を表現できないことによる。フロントエンドは一般設定 `exportIntegersAsFloat`（既定 `true`、設定ファイルとプロジェクトファイル `export_integers_as_float` の両方に保存）を `float_numbers` として、スキーマ上 integer 型のオプション名を `integer_keys`（`collectIntegerOptionKeys`）として渡す。`index` と `options`/`raw_options` 配下の `integer_keys` は整数のまま出力する。
    - `execute_export_package` のリクエストでは、大きなデータ（`waypoints`、スクリーンショット `map_image_b64`、非表示を含む全レイヤー `layers`）をトップレベルに 1 回だけ載せ、各アイテムはそれを参照するだけにする。waypoint アイテムは `include_map_image` で画像の添付を選び、マップアイテムは `region.layerVisibility` で描画するレイヤーを選ぶ。アイテムごとに持たせると、リクエストが「レイヤー画像 × リージョン数」に膨らみ、IPC の直列化とバックエンドのデコードがその分だけ重くなるため。レイヤー画像のデコードは 1 回のエクスポートにつき 1 回だけ行う。
    - テンプレートのコンテキストは `{ waypoints, globals, geo }`。`geo` は `useExportPlan` が `extractGeoForExport(geoMap)`（`src/utils/exportWaypointUtils.ts`）で作る、位置合わせ後のマップ原点（ワールド座標 (0,0)）の緯度経度・UTM・向きで、背景地図の有効/無効に依存せず常に渡す（`geoTransform.ts` の `mapOriginGeo`）。`geo` も `float_numbers` 有効時は float 化されるが、UTM のゾーン番号 `zone` だけは整数のまま残す。`geo` を持たない呼び出し（`#[serde(default)]`）では `null`。
    - プロジェクトファイルの永続化（`save_project` / `load_project`）は `serde_json::Value` を用いて**完全透過**に扱い、Rust 側での構造体不一致によるデータ消失を防ぎます。Option Schema の YAML 読み込み（`load_options_schema`）も同様に、型の正規化・検証はフロントエンド（`src/utils/optionSchema.ts`）を Single Source of Truth とし、Rust 側は「壊れた YAML を早期に弾く」構造チェックのみを行い、検証済みの生 JSON を返す。

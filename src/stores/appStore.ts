@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { NodeSlice, createNodeSlice } from './slices/nodeSlice';
 import { UISlice, createUISlice } from './slices/uiSlice';
@@ -17,6 +17,7 @@ import { GeoMapSlice, createGeoMapSlice } from './slices/geoMapSlice';
 import { LayerVisibilitySlice, createLayerVisibilitySlice } from './slices/layerVisibilitySlice';
 import { ImportSlice, createImportSlice } from './slices/importSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
+import { settingsStorage } from './persistence/settingsStorage';
 
 export type AppState = NodeSlice &
   UISlice &
@@ -55,6 +56,10 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'waypoint-tool-storage',
+      // Settings live in a file shared by every launch method (see settingsStorage.ts). Reading it is
+      // asynchronous, so main.tsx rehydrates before the first render instead of at store creation.
+      storage: createJSONStorage(() => settingsStorage),
+      skipHydration: true,
       version: STORAGE_VERSION,
       migrate: (persistedState: unknown, version: number) => migrateStorage(persistedState, version),
       partialize: (state) => ({

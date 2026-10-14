@@ -53,6 +53,8 @@ pub fn run() {
             commands::open_devtools,
             commands::load_custom_ui_config,
             commands::load_custom_ui_preset,
+            commands::load_user_settings,
+            commands::save_user_settings,
             commands::fetch_map_tile,
             commands::check_python_packages,
             commands::create_virtualenv,
