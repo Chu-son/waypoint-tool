@@ -15,6 +15,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import {
   allTreeIds,
+  descendantLayerIds,
   detachFromLayerTree,
   insertIntoLayerTree,
   layerOrderOf,
@@ -31,12 +32,22 @@ import type { DropPosition } from '../../utils/treeOps';
 import { selectedCustomLayerId } from '../../utils/layerSelection';
 import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose, sameClip } from '../../utils/mapClip';
+import {
+  isIdentityTransform,
+  mapsSharingPoseWithOutside,
+  transformEditObject,
+  transformPose,
+  type RigidTransform,
+} from '../../utils/layerGroupTransform';
 
 /** The pose shared by the linked instances of a source (`[0, 0, 0]` when its metadata has none). */
 const sourceOrigin = (source: MapSource): [number, number, number] => {
   const raw = source.info?.origin;
   return Array.isArray(raw) ? [Number(raw[0]) || 0, Number(raw[1]) || 0, Number(raw[2]) || 0] : [0, 0, 0];
 };
+
+/** What moving a group does to a map it shares with instances outside the group. */
+export type SharedPoseMode = 'move_all' | 'unlink';
 
 export type MapSlice = {
   /** Loaded map files (image + metadata). Shared by every instance in `mapLayers` that references it. */
@@ -124,6 +135,18 @@ export type MapSlice = {
   setLayerGroupVisible: (groupId: string, visible: boolean) => void;
   /** Sets the own visible flag of layers and groups alike. */
   setLayerItemsVisible: (ids: string[], visible: boolean) => void;
+  /**
+   * Moves everything inside a group (at any depth) as one rigid body: map poses, plugin layer poses and
+   * the objects of hand-drawn layers; the use areas of the maps follow. A map shared with instances outside
+   * the group moves for all of them (`move_all`), or only for the group's instances, which are unlinked
+   * from the shared pose (`unlink`). One undo step (none with `recordHistory: false`, for the later steps
+   * of a held nudge); returns false when there is nothing to move.
+   */
+  transformLayerGroup: (
+    groupId: string,
+    transform: RigidTransform,
+    options?: { sharedPose?: SharedPoseMode; recordHistory?: boolean },
+  ) => boolean;
   /**
    * Copies map instances (sharing their map) and hand-drawn layers right above the originals, and selects
    * the copies. Plugin layers are left out: they belong to the plugin run that made them.
@@ -631,6 +654,62 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       if (!group || group.visible === visible) return {};
       return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, visible } }, isDirty: true };
     }),
+
+  transformLayerGroup: (groupId, transform, options) => {
+    const state = get();
+    if (!state.layerGroups[groupId] || isIdentityTransform(transform)) return false;
+    const inside = new Set(descendantLayerIds(state, groupId));
+    const unlinkShared = options?.sharedPose === 'unlink';
+    const sharedWithOutside = new Set(mapsSharingPoseWithOutside(state, groupId).map((l) => l.sourceId));
+    const sourceById = new Map(state.mapSources.map((s) => [s.id, s]));
+
+    // Linked instances move their source's pose, once per source; unlinked ones carry their own pose.
+    const movedSources = new Map<string, { from: [number, number, number]; to: [number, number, number] }>();
+    const unlinkedPoses = new Map<string, { from: [number, number, number]; to: [number, number, number] }>();
+    for (const layer of state.mapLayers) {
+      const source = sourceById.get(layer.sourceId);
+      if (!inside.has(layer.id) || !source) continue;
+      if (layer.origin_override) {
+        unlinkedPoses.set(layer.id, {
+          from: layer.origin_override,
+          to: transformPose(layer.origin_override, transform),
+        });
+      } else if (unlinkShared && sharedWithOutside.has(source.id)) {
+        const from = sourceOrigin(source);
+        unlinkedPoses.set(layer.id, { from, to: transformPose(from, transform) });
+      } else if (!movedSources.has(source.id)) {
+        const from = sourceOrigin(source);
+        movedSources.set(source.id, { from, to: transformPose(from, transform) });
+      }
+    }
+    const hasMapMoves = movedSources.size > 0 || unlinkedPoses.size > 0;
+    const insideCustoms = state.customLayers.filter((l) => inside.has(l.id));
+    if (!hasMapMoves && insideCustoms.length === 0) return false;
+
+    if (options?.recordHistory !== false) state.pushHistorySnapshot({ includeMapPoses: true });
+    set((s) => ({
+      mapSources: s.mapSources.map((source) => {
+        const moved = movedSources.get(source.id);
+        return moved ? { ...source, info: { ...source.info, origin: moved.to } } : source;
+      }),
+      mapLayers: s.mapLayers.map((layer) => {
+        const own = unlinkedPoses.get(layer.id);
+        if (own) {
+          return { ...layer, origin_override: own.to, clip: moveClipWithPose(layer.clip, own.from, own.to) };
+        }
+        const moved = !layer.origin_override && movedSources.get(layer.sourceId);
+        return moved ? { ...layer, clip: moveClipWithPose(layer.clip, moved.from, moved.to) } : layer;
+      }),
+      customLayers: s.customLayers.map((layer): CustomLayer => {
+        if (!inside.has(layer.id)) return layer;
+        if (layer.type === 'plugin')
+          return { ...layer, info: { ...layer.info, origin: transformPose(layer.info.origin, transform) } };
+        return { ...layer, editObjects: layer.editObjects.map((o) => transformEditObject(o, transform)) };
+      }),
+      isDirty: true,
+    }));
+    return true;
+  },
 
   setLayerItemsVisible: (ids, visible) =>
     set((state) => {

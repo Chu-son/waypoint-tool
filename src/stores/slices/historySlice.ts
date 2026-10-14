@@ -7,6 +7,7 @@ import {
   AnnotationObject,
   InsertionTarget,
   MapLayerClip,
+  MapSource,
   ProjectMapLayer,
   LayerGroup,
 } from '../../types/store';
@@ -17,6 +18,15 @@ import { allTreeIds, normalizeLayerTree, type LayerTree } from '../../utils/laye
 import { selectedCustomLayerId } from '../../utils/layerSelection';
 
 const MAX_HISTORY_LENGTH = 100;
+
+/** Shared pose of every map source, and the own pose of every unlinked map instance (null when linked). */
+export type MapPoses = {
+  sourceOrigins: Record<string, [number, number, number] | undefined>;
+  overrides: Record<string, [number, number, number] | null>;
+};
+
+/** What a snapshot records beyond the always-recorded state. */
+type SnapshotExtras = { visibility?: boolean; poses?: boolean };
 
 export type HistorySnapshot = {
   nodes: Record<string, WaypointNode>;
@@ -33,6 +43,11 @@ export type HistorySnapshot = {
    * undoing them does not revert visibility toggles made afterwards.
    */
   mapVisibility?: Record<string, boolean>;
+  /**
+   * Poses of the maps at capture time. Only recorded by operations that move maps in bulk (moving a
+   * layer group); other snapshots leave it out, as map poses are not part of ordinary undo.
+   */
+  mapPoses?: MapPoses;
   /** The layer tree at capture time; normalized against the layers that exist when restored. */
   rootLayerIds: string[];
   layerGroups: Record<string, LayerGroup>;
@@ -95,18 +110,39 @@ const restoredLayers = (
  */
 const restoredMapLayers = (state: AppState, snapshot: HistorySnapshot): ProjectMapLayer[] =>
   state.mapLayers.map((layer) => {
-    const restored = layer.id in snapshot.mapClips ? { ...layer, clip: snapshot.mapClips[layer.id] } : layer;
+    let restored = layer.id in snapshot.mapClips ? { ...layer, clip: snapshot.mapClips[layer.id] } : layer;
+    const override = snapshot.mapPoses?.overrides[layer.id];
+    if (override !== undefined) restored = { ...restored, origin_override: override ? [...override] : null };
     const visible = snapshot.mapVisibility?.[layer.id];
     return visible === undefined ? restored : { ...restored, visible };
   });
+
+/** The extras `snapshot` recorded: the opposite snapshot (for redo / undo) records the same ones. */
+const extrasOf = (snapshot: HistorySnapshot): SnapshotExtras => ({
+  visibility: snapshot.mapVisibility !== undefined,
+  poses: snapshot.mapPoses !== undefined,
+});
+
+/** Map sources with the shared poses saved in `snapshot`; without any, they stay as they are. */
+const restoredMapSources = (state: AppState, snapshot: HistorySnapshot): MapSource[] => {
+  const poses = snapshot.mapPoses;
+  if (!poses) return state.mapSources;
+  return state.mapSources.map((source) => {
+    const origin = poses.sourceOrigins[source.id];
+    return origin ? { ...source, info: { ...source.info, origin: [...origin] } } : source;
+  });
+};
 
 export type HistorySlice = {
   historyPast: HistorySnapshot[];
   historyFuture: HistorySnapshot[];
   historyTransactionDepth: number;
 
-  /** `includeMapVisibility` also records which map layers are shown, so undo/redo restores it. */
-  pushHistorySnapshot: (options?: { includeMapVisibility?: boolean }) => void;
+  /**
+   * `includeMapVisibility` also records which map layers and groups are shown, and `includeMapPoses` the
+   * poses of the maps, so that undo/redo restores them.
+   */
+  pushHistorySnapshot: (options?: { includeMapVisibility?: boolean; includeMapPoses?: boolean }) => void;
   beginHistoryTransaction: () => void;
   endHistoryTransaction: () => void;
   runInHistoryTransaction: (fn: () => void) => void;
@@ -129,7 +165,16 @@ export const cloneSelection = (sel: ActiveSelection | undefined): ActiveSelectio
   }
 };
 
-const captureSnapshot = (state: AppState, includeMapVisibility = false): HistorySnapshot => ({
+const capturePoses = (state: AppState): MapPoses => ({
+  sourceOrigins: Object.fromEntries(
+    state.mapSources.map((s) => [s.id, Array.isArray(s.info?.origin) ? [...s.info.origin] : undefined]),
+  ) as MapPoses['sourceOrigins'],
+  overrides: Object.fromEntries(
+    state.mapLayers.map((l) => [l.id, l.origin_override ? [...l.origin_override] : null]),
+  ) as MapPoses['overrides'],
+});
+
+const captureSnapshot = (state: AppState, extras: SnapshotExtras = {}): HistorySnapshot => ({
   nodes: state.nodes,
   rootNodeIds: state.rootNodeIds,
   selectedNodeIds: state.selectedNodeIds,
@@ -140,7 +185,8 @@ const captureSnapshot = (state: AppState, includeMapVisibility = false): History
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
   mapClips: Object.fromEntries(state.mapLayers.map((l) => [l.id, l.clip ? structuredClone(l.clip) : null])),
-  ...(includeMapVisibility
+  ...(extras.poses ? { mapPoses: capturePoses(state) } : {}),
+  ...(extras.visibility
     ? {
         mapVisibility: Object.fromEntries([
           ...state.mapLayers.map((l) => [l.id, l.visible] as const),
@@ -169,7 +215,10 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     if (state.historyTransactionDepth > 0) return;
 
     set((state) => {
-      const nextPast = [...state.historyPast, captureSnapshot(state, options?.includeMapVisibility === true)];
+      const nextPast = [
+        ...state.historyPast,
+        captureSnapshot(state, { visibility: options?.includeMapVisibility, poses: options?.includeMapPoses }),
+      ];
       if (nextPast.length > MAX_HISTORY_LENGTH) {
         nextPast.splice(0, nextPast.length - MAX_HISTORY_LENGTH);
       }
@@ -205,7 +254,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       if (state.historyPast.length === 0) return {};
       const nextPast = [...state.historyPast];
       const snapshot = nextPast.pop()!;
-      const nextFuture = [...state.historyFuture, captureSnapshot(state, snapshot.mapVisibility !== undefined)];
+      const nextFuture = [...state.historyFuture, captureSnapshot(state, extrasOf(snapshot))];
       const restoredTarget = validateAndCorrectInsertionTarget(
         snapshot.insertionTarget ?? null,
         snapshot.rootNodeIds,
@@ -224,6 +273,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selectedAnnotationIds: restoredSelection.type === 'annotations' ? restoredSelection.ids : [],
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
+        mapSources: restoredMapSources(state, snapshot),
         mapLayers: restoredMapLayers(state, snapshot),
         ...restoredLayers(state, snapshot, restoredSelection),
         annotationObjects: snapshot.annotationObjects ?? {},
@@ -243,7 +293,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       if (state.historyFuture.length === 0) return {};
       const nextFuture = [...state.historyFuture];
       const snapshot = nextFuture.pop()!;
-      const nextPast = [...state.historyPast, captureSnapshot(state, snapshot.mapVisibility !== undefined)];
+      const nextPast = [...state.historyPast, captureSnapshot(state, extrasOf(snapshot))];
       const restoredTarget = validateAndCorrectInsertionTarget(
         snapshot.insertionTarget ?? null,
         snapshot.rootNodeIds,
@@ -262,6 +312,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         selectedAnnotationIds: restoredSelection.type === 'annotations' ? restoredSelection.ids : [],
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
+        mapSources: restoredMapSources(state, snapshot),
         mapLayers: restoredMapLayers(state, snapshot),
         ...restoredLayers(state, snapshot, restoredSelection),
         annotationObjects: snapshot.annotationObjects ?? {},

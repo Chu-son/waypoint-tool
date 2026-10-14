@@ -4,6 +4,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { Button } from '../common/Button';
 import { descendantLayerIds, idsHiddenByGroups } from '../../../utils/layerTree';
 import { confirmRemoveLayerItems, ungroupLayerItems } from '../../../services/layerCommands';
+import { LayerGroupPoseSection } from './LayerGroupPoseSection';
 import { LayerInspectorHeader } from './LayerInspectorHeader';
 
 /** Inspector of one layer group: name, visibility, what it holds. */
@@ -67,6 +68,8 @@ export function LayerGroupInspector({ id }: { id: string }) {
           </Button>
         </div>
       </div>
+
+      <LayerGroupPoseSection groupId={id} />
     </div>
   );
 }
