@@ -8,11 +8,12 @@ import {
   InsertionTarget,
   MapLayerClip,
   ProjectMapLayer,
+  LayerGroup,
 } from '../../types/store';
 import { ActiveSelection } from '../../types/selection';
 import type { GeoAlignment } from '../../types/geo';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
-import { reconcileLayerOrder } from '../../utils/layerStack';
+import { normalizeLayerTree, type LayerTree } from '../../utils/layerTree';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -26,13 +27,14 @@ export type HistorySnapshot = {
   /** Use area of every map layer at capture time; layers added afterwards keep their own. */
   mapClips: Record<string, MapLayerClip | null>;
   /**
-   * Visible flag of every map layer at capture time. Only recorded by operations that change map
-   * visibility in bulk (applying a layer visibility set); other snapshots leave it out so that undoing
-   * them does not revert visibility toggles made afterwards.
+   * Visible flag of every map layer and layer group at capture time. Only recorded by operations that
+   * change visibility in bulk (applying a layer visibility set); other snapshots leave it out so that
+   * undoing them does not revert visibility toggles made afterwards.
    */
   mapVisibility?: Record<string, boolean>;
-  /** Stack order at capture time; reconciled against the layers that exist when restored. */
-  layerOrder: string[];
+  /** The layer tree at capture time; normalized against the layers that exist when restored. */
+  rootLayerIds: string[];
+  layerGroups: Record<string, LayerGroup>;
   annotationObjects: Record<string, AnnotationObject>;
   annotationOrder: string[];
   /** Groups and the top-level ids are part of the snapshot so that undoing never leaves a group without its members (or the reverse). */
@@ -42,12 +44,22 @@ export type HistorySnapshot = {
   geoAlignment: GeoAlignment;
 };
 
-/** Restores the stack order saved in `snapshot` for the layers that exist after restoring its custom layers. */
-const restoredLayerOrder = (state: AppState, snapshot: HistorySnapshot): string[] =>
-  reconcileLayerOrder(snapshot.layerOrder, [
+/**
+ * The layer tree saved in `snapshot`, for the layers that exist after restoring its custom layers. Groups
+ * keep their current visible flag unless the snapshot recorded visibility (as for map layers).
+ */
+const restoredLayerTree = (state: AppState, snapshot: HistorySnapshot): LayerTree => {
+  const layerGroups = Object.fromEntries(
+    Object.entries(snapshot.layerGroups).map(([id, group]) => {
+      const visible = snapshot.mapVisibility?.[id] ?? state.layerGroups[id]?.visible ?? group.visible;
+      return [id, visible === group.visible ? group : { ...group, visible }];
+    }),
+  );
+  return normalizeLayerTree({ rootLayerIds: snapshot.rootLayerIds, layerGroups }, [
     ...state.mapLayers.map((l) => l.id),
     ...snapshot.customLayers.map((l) => l.id),
   ]);
+};
 
 /**
  * Map layers with the use areas (and, when recorded, the visibility) saved in `snapshot`; layers the
@@ -100,8 +112,17 @@ const captureSnapshot = (state: AppState, includeMapVisibility = false): History
   anchorNodeId: state.anchorNodeId,
   customLayers: structuredClone(state.customLayers ?? []),
   mapClips: Object.fromEntries(state.mapLayers.map((l) => [l.id, l.clip ? structuredClone(l.clip) : null])),
-  ...(includeMapVisibility ? { mapVisibility: Object.fromEntries(state.mapLayers.map((l) => [l.id, l.visible])) } : {}),
-  layerOrder: [...state.layerOrder],
+  ...(includeMapVisibility
+    ? {
+        mapVisibility: Object.fromEntries([
+          ...state.mapLayers.map((l) => [l.id, l.visible] as const),
+          ...Object.values(state.layerGroups).map((g) => [g.id, g.visible] as const),
+        ]),
+      }
+    : {}),
+  // Immutable store values: shared, not copied.
+  rootLayerIds: state.rootLayerIds,
+  layerGroups: state.layerGroups,
   annotationObjects: structuredClone(state.annotationObjects ?? {}),
   annotationOrder: [...(state.annotationOrder ?? [])],
   annotationGroups: structuredClone(state.annotationGroups ?? {}),
@@ -179,7 +200,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
         mapLayers: restoredMapLayers(state, snapshot),
-        layerOrder: restoredLayerOrder(state, snapshot),
+        ...restoredLayerTree(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         annotationGroups: snapshot.annotationGroups ?? state.annotationGroups,
@@ -220,7 +241,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
         mapLayers: restoredMapLayers(state, snapshot),
-        layerOrder: restoredLayerOrder(state, snapshot),
+        ...restoredLayerTree(state, snapshot),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         annotationGroups: snapshot.annotationGroups ?? state.annotationGroups,

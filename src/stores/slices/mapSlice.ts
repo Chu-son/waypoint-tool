@@ -10,9 +10,23 @@ import {
   PluginCustomLayer,
   EditObject,
   ExportRegion,
+  LayerGroup,
 } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
-import { insertAbove, moveInOrder } from '../../utils/layerStack';
+import {
+  detachFromLayerTree,
+  insertIntoLayerTree,
+  layerOrderOf,
+  moveInLayerTree,
+  placementAbove,
+  removeGroupDeep,
+  ungroupInLayerTree,
+  wrapInLayerGroup,
+  type LayerTree,
+  type LayerTreePlacement,
+} from '../../utils/layerTree';
+import type { DropPosition } from '../../utils/treeOps';
+import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose, sameClip } from '../../utils/mapClip';
 
 /** The pose shared by the linked instances of a source (`[0, 0, 0]` when its metadata has none). */
@@ -27,8 +41,12 @@ export type MapSlice = {
   /** Map instances: each draws one source (or part of it) at a position in the stack. */
   mapLayers: ProjectMapLayer[];
   customLayers: CustomLayer[];
-  /** Ids of every map instance and custom layer, from the top of the stack to the bottom. */
-  layerOrder: string[];
+  /**
+   * The layer tree: the single source of the stacking order. Top-level layers and groups, top of the
+   * stack first; groups hold the rest in `children_ids`. The flat compositing order is `layerOrderOf`.
+   */
+  rootLayerIds: string[];
+  layerGroups: Record<string, LayerGroup>;
   /** Canvas drag that is reshaping a layer's use area (its clip before the drag); null when not dragging. */
   mapClipDrag: {
     layerId: string;
@@ -71,8 +89,26 @@ export type MapSlice = {
   /** Abandons the drag and restores the use area from before it. */
   cancelMapClipDrag: () => void;
   removeMapLayer: (id: string) => void;
-  /** Moves a layer of any kind within the single stack (`fromIndex` / `toIndex` index `layerOrder`). */
+  /**
+   * Moves a layer of any kind within the stack (`fromIndex` / `toIndex` index the flat order) to the
+   * position of the layer now at `toIndex`, joining that layer's group.
+   */
   reorderLayers: (fromIndex: number, toIndex: number) => void;
+
+  /** Moves layers and groups before / after / inside `targetId`. One undo step; returns false when refused. */
+  moveLayerItems: (ids: string[], targetId: string, position: DropPosition) => boolean;
+  /** Wraps layers and groups in a new group where the topmost of them was. One undo step. */
+  groupLayerItems: (ids: string[], name?: string) => string | null;
+  /** Replaces a group by its contents. One undo step. */
+  ungroupLayerGroup: (groupId: string) => void;
+  /**
+   * Deletes a group. `withContents` also deletes every layer inside (map deletions cannot be undone, as
+   * with `removeMapLayer`); otherwise the contents take the group's place.
+   */
+  removeLayerGroup: (groupId: string, options: { withContents: boolean }) => void;
+  renameLayerGroup: (groupId: string, name: string) => void;
+  /** Toggles the group's own flag; the layers inside keep theirs. */
+  setLayerGroupVisible: (groupId: string, visible: boolean) => void;
 
   addManualCustomLayer: (name?: string, is_reference?: boolean) => ManualCustomLayer;
   addPluginCustomLayer: (layer: PluginCustomLayer) => void;
@@ -101,11 +137,45 @@ export type MapSlice = {
   removeExportRegion: (id: string) => void;
 };
 
+const treeOf = (state: LayerTree): LayerTree => ({
+  rootLayerIds: state.rootLayerIds,
+  layerGroups: state.layerGroups,
+});
+
+const TOP_OF_STACK: LayerTreePlacement = { parentId: null, beforeId: null };
+
+/** `tree` with a new layer at `placement`; a layer already in the tree keeps its place. */
+const withNewLayer = (tree: LayerTree, id: string, placement: LayerTreePlacement = TOP_OF_STACK): LayerTree =>
+  layerOrderOf(tree).includes(id) ? tree : insertIntoLayerTree(tree, [id], placement);
+
+/**
+ * The state without the layers `ids` (map instances and custom layers): sources no instance uses any more
+ * go too, and so does the selection of a removed custom layer.
+ */
+const withoutLayers = (state: AppState, ids: readonly string[]): Partial<AppState> => {
+  const removed = new Set(ids);
+  const mapLayers = state.mapLayers.filter((l) => !removed.has(l.id));
+  const usedSources = new Set(mapLayers.map((l) => l.sourceId));
+  const removedSources = new Set(
+    state.mapLayers.filter((l) => removed.has(l.id) && !usedSources.has(l.sourceId)).map((l) => l.sourceId),
+  );
+  const selectionRemoved = state.selection.type === 'custom_layer' && removed.has(state.selection.layerId);
+  return {
+    mapLayers,
+    mapSources: state.mapSources.filter((s) => !removedSources.has(s.id)),
+    customLayers: state.customLayers.filter((l) => !removed.has(l.id)),
+    ...detachFromLayerTree(treeOf(state), ids),
+    ...(state.activeCustomLayerId && removed.has(state.activeCustomLayerId) ? { activeCustomLayerId: null } : {}),
+    ...(selectionRemoved ? { selection: { type: 'none' as const }, selectedEditObjectId: null } : {}),
+  };
+};
+
 export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, get) => ({
   mapSources: [],
   mapLayers: [],
   customLayers: [],
-  layerOrder: [],
+  rootLayerIds: [],
+  layerGroups: {},
   mapClipDrag: null,
   activeCustomLayerId: null,
   defaultMapOpacity: 0.5,
@@ -145,7 +215,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     };
     set((state) => ({
       customLayers: [newLayer, ...state.customLayers],
-      layerOrder: insertAbove(state.layerOrder, newLayer.id, null),
+      ...withNewLayer(treeOf(state), newLayer.id),
       activeCustomLayerId: newLayer.id,
       selection: { type: 'custom_layer', layerId: newLayer.id, selectedObjectId: null },
       selectedNodeIds: [],
@@ -159,7 +229,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     set((state) => {
       return {
         customLayers: [layer, ...state.customLayers],
-        layerOrder: insertAbove(state.layerOrder, layer.id, null),
+        ...withNewLayer(treeOf(state), layer.id),
         activeCustomLayerId: layer.id,
         selection: { type: 'custom_layer', layerId: layer.id, selectedObjectId: null },
         selectedNodeIds: [],
@@ -177,7 +247,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   removeCustomLayer: (id: string) =>
     set((state) => ({
       customLayers: state.customLayers.filter((l) => l.id !== id),
-      layerOrder: state.layerOrder.filter((o) => o !== id),
+      ...detachFromLayerTree(treeOf(state), [id]),
       activeCustomLayerId: state.activeCustomLayerId === id ? null : state.activeCustomLayerId,
       selection:
         state.selection.type === 'custom_layer' && state.selection.layerId === id ? { type: 'none' } : state.selection,
@@ -290,7 +360,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return {
         mapSources: [...state.mapSources, source],
         mapLayers: [layer, ...state.mapLayers],
-        layerOrder: insertAbove(state.layerOrder, layer.id, null),
+        ...withNewLayer(treeOf(state), layer.id),
         isDirty: true,
       };
     }),
@@ -307,7 +377,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     };
     set((state) => ({
       mapLayers: [copy, ...state.mapLayers],
-      layerOrder: insertAbove(state.layerOrder, copy.id, id),
+      ...withNewLayer(treeOf(state), copy.id, placementAbove(treeOf(state), id)),
       isDirty: true,
     }));
     return copy.id;
@@ -404,20 +474,73 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
   removeMapLayer: (id: string) =>
     set((state) => {
-      const removed = state.mapLayers.find((l) => l.id === id);
-      if (!removed) return {};
-      const mapLayers = state.mapLayers.filter((l) => l.id !== id);
-      const stillUsed = mapLayers.some((l) => l.sourceId === removed.sourceId);
-      return {
-        mapLayers,
-        mapSources: stillUsed ? state.mapSources : state.mapSources.filter((s) => s.id !== removed.sourceId),
-        layerOrder: state.layerOrder.filter((o) => o !== id),
-        isDirty: true,
-      };
+      if (!state.mapLayers.some((l) => l.id === id)) return {};
+      return { ...withoutLayers(state, [id]), isDirty: true };
     }),
 
   reorderLayers: (fromIndex: number, toIndex: number) =>
-    set((state) => ({ layerOrder: moveInOrder(state.layerOrder, fromIndex, toIndex), isDirty: true })),
+    set((state) => {
+      const order = layerOrderOf(state);
+      if (fromIndex < 0 || fromIndex >= order.length) return {};
+      const to = Math.max(0, Math.min(order.length - 1, toIndex));
+      if (to === fromIndex) return {};
+      const moved = moveInLayerTree(treeOf(state), [order[fromIndex]], order[to], to > fromIndex ? 'after' : 'before');
+      return moved ? { ...moved, isDirty: true } : {};
+    }),
+
+  moveLayerItems: (ids, targetId, position) => {
+    const moved = moveInLayerTree(treeOf(get()), ids, targetId, position);
+    if (!moved) return false;
+    get().pushHistorySnapshot();
+    set({ ...moved, isDirty: true });
+    return true;
+  },
+
+  groupLayerItems: (ids, name) => {
+    const state = get();
+    const id = uuidv4();
+    const groupName =
+      name ??
+      getNextSequentialName(
+        'Group',
+        Object.values(state.layerGroups).map((g) => g.name),
+      );
+    const wrapped = wrapInLayerGroup(treeOf(state), ids, { id, name: groupName });
+    if (!wrapped) return null;
+    state.pushHistorySnapshot();
+    set({ ...wrapped, isDirty: true });
+    return id;
+  },
+
+  ungroupLayerGroup: (groupId) => {
+    if (!get().layerGroups[groupId]) return;
+    get().pushHistorySnapshot();
+    set((state) => ({ ...ungroupInLayerTree(treeOf(state), groupId), isDirty: true }));
+  },
+
+  removeLayerGroup: (groupId, { withContents }) => {
+    if (!get().layerGroups[groupId]) return;
+    get().pushHistorySnapshot();
+    set((state) => {
+      if (!withContents) return { ...ungroupInLayerTree(treeOf(state), groupId), isDirty: true };
+      const { tree, removedLayerIds } = removeGroupDeep(treeOf(state), groupId);
+      return { ...withoutLayers({ ...state, ...tree }, removedLayerIds), isDirty: true };
+    });
+  },
+
+  renameLayerGroup: (groupId, name) =>
+    set((state) => {
+      const group = state.layerGroups[groupId];
+      if (!group || group.name === name) return {};
+      return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, name } }, isDirty: true };
+    }),
+
+  setLayerGroupVisible: (groupId, visible) =>
+    set((state) => {
+      const group = state.layerGroups[groupId];
+      if (!group || group.visible === visible) return {};
+      return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, visible } }, isDirty: true };
+    }),
 
   setEnableSnapping: (enable: boolean) => set({ enableSnapping: enable }),
   setCursorPosition: (pos) => set({ cursorPosition: pos }),

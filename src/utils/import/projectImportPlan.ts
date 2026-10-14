@@ -1,7 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { AnnotationGroup, AnnotationObject } from '../../types/annotation';
 import type { ExportProfile, ExportTargetItem, ExportTemplate } from '../../types/export';
-import type { CustomLayer, ExportRegion, LayerVisibilitySet, MapSource, ProjectMapLayer } from '../../types/layer';
+import type {
+  CustomLayer,
+  ExportRegion,
+  LayerGroup,
+  LayerVisibilitySet,
+  MapSource,
+  ProjectMapLayer,
+} from '../../types/layer';
 import type { OptionsSchema, OptionValue, WaypointOptions } from '../../types/options';
 import type { StrictProjectData } from '../../types/project';
 import type { WaypointNode } from '../../types/waypoint';
@@ -289,7 +296,9 @@ export interface ProjectImportPlan {
     mapSources: MapSource[];
     mapLayers: ProjectMapLayer[];
     customLayers: CustomLayer[];
-    layerOrder: string[];
+    /** 取り込むレイヤーのツリー（積み順とグループ）。 */
+    rootLayerIds: string[];
+    layerGroups: Record<string, LayerGroup>;
     layerVisibilitySets: LayerVisibilitySet[];
     annotationObjects: AnnotationObject[];
     annotationGroups: Record<string, AnnotationGroup>;
@@ -322,7 +331,8 @@ export function buildProjectImportPlan(
       mapSources: [],
       mapLayers: [],
       customLayers: [],
-      layerOrder: [],
+      rootLayerIds: [],
+      layerGroups: {},
       layerVisibilitySets: [],
       annotationObjects: [],
       annotationGroups: {},
@@ -402,14 +412,15 @@ export function buildProjectImportPlan(
       incoming.map_sources,
       incoming.map_layers,
       incoming.custom_layers,
-      incoming.layer_order,
+      { rootLayerIds: incoming.layer_root_ids, layerGroups: incoming.layer_groups },
       incoming.layer_visibility_sets,
       remapExec,
     );
     plan.data.mapSources = remapped.mapSources;
     plan.data.mapLayers = remapped.mapLayers;
     plan.data.customLayers = remapped.customLayers;
-    plan.data.layerOrder = remapped.layerOrder;
+    plan.data.rootLayerIds = remapped.rootLayerIds;
+    plan.data.layerGroups = remapped.layerGroups;
     plan.data.layerVisibilitySets = remapped.layerVisibilitySets;
     remapped.visibilitySetIdMap.forEach((v, k) => visibilitySetIdMap.set(k, v));
   } else {

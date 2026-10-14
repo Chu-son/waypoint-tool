@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from './appStore';
+import { layerOrderOf } from '../utils/layerTree';
 
 describe('AppStore Zustand Store', () => {
   // Reset store before each test
@@ -11,7 +12,8 @@ describe('AppStore Zustand Store', () => {
     store.selectedNodeIds = [];
     store.mapLayers = [];
     store.mapSources = [];
-    store.layerOrder = [];
+    store.rootLayerIds = [];
+    store.layerGroups = {};
     store.optionsSchema = null;
     store.exportTemplates = [];
     store.isDirty = false;
@@ -131,14 +133,14 @@ describe('AppStore Zustand Store', () => {
     const { addMapLayer, updateMapLayer, removeMapLayer, reorderLayers } = useAppStore.getState();
 
     addMapLayer('Map 1', null, 'base1', 100, 100);
-    const id1 = useAppStore.getState().layerOrder[0];
+    const id1 = layerOrderOf(useAppStore.getState())[0];
 
     addMapLayer('Map 2', null, 'base2', 100, 100);
-    const id2 = useAppStore.getState().layerOrder[0]; // A newly added map goes on top of the stack
+    const id2 = layerOrderOf(useAppStore.getState())[0]; // A newly added map goes on top of the stack
 
     let state = useAppStore.getState();
     expect(state.mapLayers.length).toBe(2);
-    expect(state.layerOrder).toEqual([id2, id1]);
+    expect(layerOrderOf(state)).toEqual([id2, id1]);
     expect(state.isDirty).toBe(true);
 
     updateMapLayer(id1, { visible: false });
@@ -147,11 +149,11 @@ describe('AppStore Zustand Store', () => {
     reorderLayers(0, 1);
     state = useAppStore.getState();
     // Before: [id2, id1]. Move 0 to 1 -> [id1, id2]
-    expect(state.layerOrder).toEqual([id1, id2]);
+    expect(layerOrderOf(state)).toEqual([id1, id2]);
 
     removeMapLayer(id2);
     expect(useAppStore.getState().mapLayers.map((l) => l.id)).toEqual([id1]);
-    expect(useAppStore.getState().layerOrder).toEqual([id1]);
+    expect(layerOrderOf(useAppStore.getState())).toEqual([id1]);
   });
 
   it('should reset isDirty when loading project data', () => {

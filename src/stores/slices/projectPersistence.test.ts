@@ -62,6 +62,10 @@ describe('projectPersistence roundtrip & strict validation', () => {
         },
       ],
       layer_order: ['cust-1', 'map-2', 'map-1'],
+      layer_root_ids: ['cust-1', 'floor-1'],
+      layer_groups: {
+        'floor-1': { id: 'floor-1', name: 'Floor 1', visible: false, children_ids: ['map-2', 'map-1'] },
+      },
       custom_layers: [
         {
           id: 'cust-1',
@@ -108,7 +112,7 @@ describe('projectPersistence roundtrip & strict validation', () => {
         },
       ],
       layer_visibility_sets: [
-        { id: 'vis-1', name: 'Localization', visibility: { 'map-1': true, 'cust-1': false } },
+        { id: 'vis-1', name: 'Localization', visibility: { 'map-1': true, 'cust-1': false, 'floor-1': true } },
         { id: 'vis-2', name: 'Navigation', visibility: { 'map-1': true, 'cust-1': true } },
       ],
       active_layer_visibility_set_id: 'vis-2',
@@ -211,6 +215,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'map_sources',
       'map_layers',
       'layer_order',
+      'layer_root_ids',
+      'layer_groups',
       'custom_layers',
       'annotation_objects',
       'annotation_groups',
@@ -251,6 +257,9 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.root_node_ids).toEqual(fullProjectData.root_node_ids);
     expect(saved.nodes).toEqual(fullProjectData.nodes);
     expect(saved.map_layers).toEqual(fullProjectData.map_layers);
+    expect(saved.layer_order).toEqual(fullProjectData.layer_order);
+    expect(saved.layer_root_ids).toEqual(fullProjectData.layer_root_ids);
+    expect(saved.layer_groups).toEqual(fullProjectData.layer_groups);
     expect(saved.custom_layers).toEqual(fullProjectData.custom_layers);
     expect(saved.annotation_objects).toEqual(fullProjectData.annotation_objects);
     expect(saved.annotation_groups).toEqual(fullProjectData.annotation_groups);
@@ -447,6 +456,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
       map_sources: [],
       map_layers: [],
       layer_order: [],
+      layer_root_ids: [],
+      layer_groups: {},
       custom_layers: [],
       annotation_objects: [],
       annotation_groups: {},

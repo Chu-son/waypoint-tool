@@ -241,6 +241,8 @@ describe('projectMigration', () => {
       'map_sources',
       'map_layers',
       'layer_order',
+      'layer_root_ids',
+      'layer_groups',
       'custom_layers',
       'annotation_objects',
       'annotation_groups',
@@ -279,6 +281,8 @@ describe('projectMigration', () => {
     expect(normalized.root_node_ids).toEqual([]);
     expect(normalized.nodes).toEqual({});
     expect(normalized.map_layers).toEqual([]);
+    expect(normalized.layer_root_ids).toEqual([]);
+    expect(normalized.layer_groups).toEqual({});
     expect(normalized.custom_layers).toEqual([]);
     expect(normalized.annotation_objects).toEqual([]);
     expect(normalized.annotation_groups).toEqual({});

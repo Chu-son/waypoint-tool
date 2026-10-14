@@ -1,16 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   baseMapResolution,
-  insertAbove,
   insertBelowCustomLayers,
-  moveInOrder,
   orderedMapLayers,
   reconcileLayerOrder,
   resolveMapLayers,
   stackEntries,
   stackZIndexes,
 } from './layerStack';
-import { layerStackState, makeManualCustomLayer, makeMap } from '../test/fixtures';
+import { layerOrderOf } from './layerTree';
+import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../test/fixtures';
 
 describe('resolveMapLayers', () => {
   it('joins each instance with the image and pose of its source', () => {
@@ -56,12 +55,12 @@ describe('stack order', () => {
   });
 
   it('skips ids that no longer exist', () => {
-    const entries = stackEntries({ ...stack, layerOrder: ['top', 'ghost', 'bottom'] });
+    const entries = stackEntries({ ...stack, rootLayerIds: ['top', 'ghost', 'bottom'] });
     expect(entries.map((e) => e.layer.id)).toEqual(['top', 'bottom']);
   });
 
   it('numbers compositing z-indexes from the bottom', () => {
-    const z = stackZIndexes(stack.layerOrder);
+    const z = stackZIndexes(layerOrderOf(stack));
     expect(z.get('bottom')).toBe(0);
     expect(z.get('wall')).toBe(1);
     expect(z.get('top')).toBe(2);
@@ -78,19 +77,42 @@ describe('stack order', () => {
   });
 });
 
+describe('layers inside groups', () => {
+  const stack = layerStackState(
+    makeMap('top'),
+    makeLayerGroup('floor', [makeManualCustomLayer('wall'), makeLayerGroup('zone', [makeMap('inner')])], {
+      visible: false,
+    }),
+    makeMap('bottom'),
+  );
+
+  it('composites the stack in tree order, groups flattened', () => {
+    expect(stackEntries(stack).map((e) => e.layer.id)).toEqual(['top', 'wall', 'inner', 'bottom']);
+    expect(orderedMapLayers(stack).map((l) => l.id)).toEqual(['top', 'inner', 'bottom']);
+  });
+
+  it('hides every layer below a hidden group, without touching the layers themselves', () => {
+    const shown = stackEntries(stack).map((e) => [e.layer.id, e.layer.visible]);
+
+    expect(shown).toEqual([
+      ['top', true],
+      ['wall', false],
+      ['inner', false],
+      ['bottom', true],
+    ]);
+    expect(stack.customLayers.find((l) => l.id === 'wall')?.visible).toBe(true);
+  });
+
+  it('takes the base resolution from the top map that is actually shown', () => {
+    const s = layerStackState(
+      makeLayerGroup('hidden', [makeMap('fine', { info: { resolution: 0.02 } })], { visible: false }),
+      makeMap('coarse', { info: { resolution: 0.1 } }),
+    );
+    expect(baseMapResolution(s)).toBe(0.1);
+  });
+});
+
 describe('order edits', () => {
-  it('inserts a layer directly above another, or on top', () => {
-    expect(insertAbove(['a', 'b'], 'x', 'b')).toEqual(['a', 'x', 'b']);
-    expect(insertAbove(['a', 'b'], 'x', null)).toEqual(['x', 'a', 'b']);
-    expect(insertAbove(['a', 'b'], 'x', 'unknown')).toEqual(['x', 'a', 'b']);
-  });
-
-  it('moves a layer and clamps the target', () => {
-    expect(moveInOrder(['a', 'b', 'c'], 0, 2)).toEqual(['b', 'c', 'a']);
-    expect(moveInOrder(['a', 'b', 'c'], 2, -5)).toEqual(['c', 'a', 'b']);
-    expect(moveInOrder(['a', 'b'], 5, 0)).toEqual(['a', 'b']);
-  });
-
   it('reconciles an order with the layers that exist', () => {
     expect(reconcileLayerOrder(['b', 'ghost', 'b', 'a'], ['a', 'b', 'c'])).toEqual(['c', 'b', 'a']);
   });
@@ -98,7 +120,19 @@ describe('order edits', () => {
   it('places temporary layers just below the lowest custom layer', () => {
     const wall = makeManualCustomLayer('wall');
     const temp = makeManualCustomLayer('temp');
-    expect(insertBelowCustomLayers(['wall', 'map'], [wall], [temp])).toEqual(['wall', 'temp', 'map']);
-    expect(insertBelowCustomLayers(['map'], [], [temp])).toEqual(['temp', 'map']);
+    const flat = layerStackState(wall, makeMap('map'));
+    expect(layerOrderOf(insertBelowCustomLayers(flat, [wall], [temp]))).toEqual(['wall', 'temp', 'map']);
+    expect(layerOrderOf(insertBelowCustomLayers(layerStackState(makeMap('map')), [], [temp]))).toEqual(['temp', 'map']);
+  });
+
+  it('places temporary layers inside the group of the lowest custom layer', () => {
+    const wall = makeManualCustomLayer('wall');
+    const temp = makeManualCustomLayer('temp');
+    const grouped = layerStackState(makeLayerGroup('g', [wall]), makeMap('map'));
+
+    const tree = insertBelowCustomLayers(grouped, [wall], [temp]);
+
+    expect(tree.layerGroups.g.children_ids).toEqual(['wall', 'temp']);
+    expect(layerOrderOf(tree)).toEqual(['wall', 'temp', 'map']);
   });
 });

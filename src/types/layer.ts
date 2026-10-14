@@ -155,6 +155,20 @@ export interface ProjectMapLayer {
 export type ResolvedMapLayer = ProjectMapLayer & Pick<MapSource, 'info' | 'image_base64' | 'width' | 'height'>;
 
 /**
+ * A folder in the layer tree. The tree (`rootLayerIds` plus every group's `children_ids`, top of the
+ * stack first) is the single source of the stacking order; flattening it gives the compositing order.
+ * A group only gathers layers: it never changes how they blend.
+ */
+export interface LayerGroup {
+  id: string;
+  name: string;
+  /** Own flag only. A layer is shown when it and every group above it are visible. */
+  visible: boolean;
+  /** Ids of layers (map instances, custom layers) and groups directly inside, top first. */
+  children_ids: string[];
+}
+
+/**
  * A named snapshot of which layers are shown. Only on/off is stored: stack order, opacity and
  * blend mode stay with the layers. A layer with no entry (added after the set was saved) is
  * "undecided" and keeps its current visibility when the set is applied.

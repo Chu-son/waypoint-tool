@@ -165,6 +165,7 @@ describe('buildProjectImportPlan: data gets fresh ids', () => {
       map_layers: [base.layer],
       custom_layers: [custom],
       layer_order: ['c1', 'm1'],
+      layer_root_ids: ['c1', 'm1'],
       layer_visibility_sets: [{ id: 's1', name: 'Set', visibility: { m1: true, c1: false, gone: true } }],
     });
 
@@ -175,8 +176,37 @@ describe('buildProjectImportPlan: data gets fresh ids', () => {
     const [customLayer] = plan.data.customLayers;
     expect(layer.sourceId).toBe(source.id);
     expect(source.id).not.toBe(base.source.id);
-    expect(plan.data.layerOrder).toEqual([customLayer.id, layer.id]);
+    expect(plan.data.rootLayerIds).toEqual([customLayer.id, layer.id]);
     expect(plan.data.layerVisibilitySets[0].visibility).toEqual({ [layer.id]: true, [customLayer.id]: false });
+  });
+
+  it('brings layer groups along under new ids, nesting and set entries included', () => {
+    const base = makeMap('m1');
+    const custom = makeManualCustomLayer('c1');
+    const incoming = project({
+      map_sources: [base.source],
+      map_layers: [base.layer],
+      custom_layers: [custom],
+      layer_order: ['c1', 'm1'],
+      layer_root_ids: ['outer'],
+      layer_groups: {
+        outer: { id: 'outer', name: 'Building', visible: true, children_ids: ['inner', 'm1'] },
+        inner: { id: 'inner', name: 'Floor', visible: false, children_ids: ['c1'] },
+      },
+      layer_visibility_sets: [{ id: 's1', name: 'Set', visibility: { inner: true } }],
+    });
+
+    const plan = buildProjectImportPlan(ctx(project()), incoming, select(['maps']));
+
+    const [layer] = plan.data.mapLayers;
+    const [customLayer] = plan.data.customLayers;
+    const [outerId] = plan.data.rootLayerIds;
+    const outer = plan.data.layerGroups[outerId];
+    const inner = plan.data.layerGroups[outer.children_ids[0]];
+    expect(outerId).not.toBe('outer');
+    expect(outer).toMatchObject({ name: 'Building', children_ids: [inner.id, layer.id] });
+    expect(inner).toMatchObject({ name: 'Floor', visible: false, children_ids: [customLayer.id] });
+    expect(plan.data.layerVisibilitySets[0].visibility).toEqual({ [inner.id]: true });
   });
 });
 

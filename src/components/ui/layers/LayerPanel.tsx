@@ -48,7 +48,8 @@ export function LayerPanel() {
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const updateCustomLayer = useAppStore((state) => state.updateCustomLayer);
   const removeCustomLayer = useAppStore((state) => state.removeCustomLayer);
-  const layerOrder = useAppStore((state) => state.layerOrder);
+  const rootLayerIds = useAppStore((state) => state.rootLayerIds);
+  const layerGroups = useAppStore((state) => state.layerGroups);
   const reorderLayers = useAppStore((state) => state.reorderLayers);
   const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const setActiveCustomLayerId = useAppStore((state) => state.setActiveCustomLayerId);
@@ -86,8 +87,8 @@ export function LayerPanel() {
 
   // One list for every layer, top of the stack first; maps and custom layers can be interleaved.
   const entries = useMemo(
-    () => stackEntries({ mapLayers: mapInstances, customLayers, layerOrder }),
-    [mapInstances, customLayers, layerOrder],
+    () => stackEntries({ mapLayers: mapInstances, customLayers, rootLayerIds, layerGroups }),
+    [mapInstances, customLayers, rootLayerIds, layerGroups],
   );
   const resolvedMapById = useMemo(() => new Map(mapLayers.map((l) => [l.id, l])), [mapLayers]);
   const sharedCountBySource = useMemo(() => {

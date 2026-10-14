@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getAppState, resetAppStore } from '../../test/store';
+import { getAppState, getLayerOrder, resetAppStore } from '../../test/store';
 import { layerStackState, makeManualCustomLayer, makeMap } from '../../test/fixtures';
 import { differsFromSet, undecidedLayerIds } from '../../utils/layerVisibilitySets';
 
@@ -43,14 +43,14 @@ describe('layer visibility sets', () => {
   it('keeps stack order, opacity and blend mode untouched when applying a set', () => {
     getAppState().updateMapLayer('map', { opacity: 0.4, blend_mode: 'merge_obstacles' });
     getAppState().saveLayerVisibilitySet('Any');
-    const orderBefore = [...getAppState().layerOrder];
+    const orderBefore = getLayerOrder();
 
     getAppState().updateCustomLayer('keepout', { visible: false });
     getAppState().reorderLayers(0, 2);
-    const reordered = [...getAppState().layerOrder];
+    const reordered = getLayerOrder();
     getAppState().applyLayerVisibilitySet(setNamed('Any').id);
 
-    expect(getAppState().layerOrder).toEqual(reordered);
+    expect(getLayerOrder()).toEqual(reordered);
     expect(reordered).not.toEqual(orderBefore);
     expect(getAppState().mapLayers[0]).toMatchObject({ opacity: 0.4, blend_mode: 'merge_obstacles' });
   });

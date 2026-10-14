@@ -3,6 +3,7 @@ import { useAppStore } from '../appStore';
 import { normalizeProjectData } from '../serialization/projectSerializer';
 import { BackendAPI } from '../../api';
 import { PluginCustomLayer } from '../../types/store';
+import { layerOrderOf } from '../../utils/layerTree';
 
 // Stub the IPC boundary; individual tests set runPlugin's result.
 beforeEach(() => {
@@ -50,18 +51,18 @@ describe('customLayers and pathCalculator in appStore', () => {
     expect(useAppStore.getState().customLayers).toHaveLength(2);
     expect(useAppStore.getState().customLayers[0].id).toBe('plugin-layer-1');
     expect(useAppStore.getState().customLayers[1].id).toBe(manualLayer.id);
-    expect(useAppStore.getState().layerOrder).toEqual(['plugin-layer-1', manualLayer.id]);
+    expect(layerOrderOf(useAppStore.getState())).toEqual(['plugin-layer-1', manualLayer.id]);
 
     useAppStore.getState().updateCustomLayer('plugin-layer-1', { opacity: 0.9 });
     expect(useAppStore.getState().customLayers[0].opacity).toBe(0.9);
 
     useAppStore.getState().reorderLayers(0, 1);
-    expect(useAppStore.getState().layerOrder).toEqual([manualLayer.id, 'plugin-layer-1']);
+    expect(layerOrderOf(useAppStore.getState())).toEqual([manualLayer.id, 'plugin-layer-1']);
 
     useAppStore.getState().removeCustomLayer('plugin-layer-1');
     expect(useAppStore.getState().customLayers).toHaveLength(1);
     expect(useAppStore.getState().customLayers[0].id).toBe(manualLayer.id);
-    expect(useAppStore.getState().layerOrder).toEqual([manualLayer.id]);
+    expect(layerOrderOf(useAppStore.getState())).toEqual([manualLayer.id]);
   });
 
   it('migrates legacy edit_layers and generated_layers on ingress', () => {

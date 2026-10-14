@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { LayerPanel } from './LayerPanel';
 import { BackendAPI, DialogAPI } from '../../../api';
 import { renderWithStore } from '../../../test/render';
-import { getAppState } from '../../../test/store';
+import { getAppState, getLayerOrder } from '../../../test/store';
 import { layerStackState, makeManualCustomLayer, makeMap } from '../../../test/fixtures';
 
 const EDIT_MAP_LAYER = 'Edit Map Layer (Pose, Opacity, Blend, Use Area, Thresholds)';
@@ -33,7 +33,7 @@ describe('LayerPanel', () => {
 
     fireEvent.click(screen.getAllByTitle('Move Down')[0]);
 
-    expect(getAppState().layerOrder).toEqual(['l2', 'l1']);
+    expect(getLayerOrder()).toEqual(['l2', 'l1']);
   });
 
   it('lets a custom layer sit between two maps', () => {
@@ -42,7 +42,7 @@ describe('LayerPanel', () => {
     // Move the bottom map above the custom layer.
     fireEvent.click(screen.getAllByTitle('Move Up')[2]);
 
-    expect(getAppState().layerOrder).toEqual(['a', 'b', 'wall']);
+    expect(getLayerOrder()).toEqual(['a', 'b', 'wall']);
   });
 
   it('loads a ROS map chosen in the file dialog as a new layer', async () => {
@@ -231,7 +231,8 @@ describe('LayerPanel', () => {
 
       fireEvent.click(screen.getAllByTitle(DUPLICATE_MAP)[1]);
 
-      const { mapLayers, mapSources, layerOrder } = getAppState();
+      const { mapLayers, mapSources } = getAppState();
+      const layerOrder = getLayerOrder();
       expect(mapLayers).toHaveLength(3);
       expect(mapSources).toHaveLength(2);
       expect(layerOrder.slice(0, 2)).toEqual(['l1', layerOrder[1]]);

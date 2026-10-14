@@ -60,8 +60,9 @@ export const createImportSlice: StateCreator<AppState, [], [], ImportSlice> = (s
         exportRegions: [...state.exportRegions, ...data.exportRegions],
         mapSources: [...state.mapSources, ...data.mapSources],
         mapLayers: [...data.mapLayers, ...state.mapLayers],
-        // 取り込んだレイヤーは積み順の一番上に置く。
-        layerOrder: [...data.layerOrder, ...state.layerOrder],
+        // 取り込んだレイヤーは、グループ構成を保ったまま積み順の一番上に置く。
+        rootLayerIds: [...data.rootLayerIds, ...state.rootLayerIds],
+        layerGroups: { ...state.layerGroups, ...data.layerGroups },
         layerVisibilitySets: [...state.layerVisibilitySets, ...data.layerVisibilitySets],
         isDirty: true,
       };

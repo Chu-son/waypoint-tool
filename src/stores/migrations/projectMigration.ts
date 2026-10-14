@@ -15,6 +15,8 @@ import {
 import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { normalizeGeoMap } from './geoMapNormalization';
 import { normalizeMapStack } from './mapStackNormalization';
+import { normalizeLayerTreeData } from './layerTreeNormalization';
+import { layerOrderOf } from '../../utils/layerTree';
 import { normalizeOptionsSchema } from '../../utils/optionSchema';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -284,6 +286,7 @@ export function normalizeV1(raw: any): StrictProjectData {
 
   // 4. マップレイヤー（ソース / インスタンス / 積み順）
   const { mapSources, mapLayers, layerOrder } = normalizeMapStack(data, customLayers, defaultMapOpacity);
+  const layerTree = normalizeLayerTreeData(data, layerOrder);
 
   // 5. アノテーション
   const rawAnnotations = data.annotation_objects ?? data.annotationObjects;
@@ -487,8 +490,12 @@ export function normalizeV1(raw: any): StrictProjectData {
   const activeExportProfileId: string | null =
     typeof rawActiveProfileId === 'string' ? rawActiveProfileId : (exportProfiles[0]?.id ?? null);
 
-  // レイヤー表示セット。存在しないレイヤーのエントリは、ここで取り除く。
-  const existingLayerIds = new Set([...mapLayers.map((l) => l.id), ...customLayers.map((l) => l.id)]);
+  // レイヤー表示セット。存在しないレイヤー・グループのエントリは、ここで取り除く。
+  const existingLayerIds = new Set([
+    ...mapLayers.map((l) => l.id),
+    ...customLayers.map((l) => l.id),
+    ...Object.keys(layerTree.layerGroups),
+  ]);
   const rawVisibilitySets = data.layer_visibility_sets ?? data.layerVisibilitySets;
   const layerVisibilitySets: LayerVisibilitySet[] = Array.isArray(rawVisibilitySets)
     ? rawVisibilitySets
@@ -515,7 +522,9 @@ export function normalizeV1(raw: any): StrictProjectData {
     nodes,
     map_sources: mapSources,
     map_layers: mapLayers,
-    layer_order: layerOrder,
+    layer_order: layerOrderOf(layerTree),
+    layer_root_ids: layerTree.rootLayerIds,
+    layer_groups: layerTree.layerGroups,
     custom_layers: customLayers,
     annotation_objects: annotationObjects,
     annotation_groups: annotationGroups,

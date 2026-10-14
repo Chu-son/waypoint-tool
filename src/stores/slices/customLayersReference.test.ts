@@ -140,7 +140,7 @@ describe('Custom Layers Reference Flag', () => {
     const result = await prepareLayersForExport({
       ...map,
       customLayers: mockCustomLayers as any,
-      layerOrder: [...mockCustomLayers.map((l) => l.id), 'map1'],
+      rootLayerIds: [...mockCustomLayers.map((l) => l.id), 'map1'],
     });
 
     // map1, norm1, norm2 の3つが含まれ、ref1 と ref2 は除外されるべき
