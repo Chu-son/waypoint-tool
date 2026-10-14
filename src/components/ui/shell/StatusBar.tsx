@@ -90,6 +90,8 @@ export const StatusBar: React.FC = () => {
   const isInitialLaunch = useAppStore((state) => state.isInitialLaunch);
   const pluginDataModalState = useAppStore((state) => state.pluginDataModalState);
   const customLayers = useAppStore((state) => state.customLayers);
+  const mapInstances = useAppStore((state) => state.mapLayers);
+  const layerGroups = useAppStore((state) => state.layerGroups);
   const mapLayers = useResolvedMapLayers();
   const enableSnapping = useAppStore((state) => state.enableSnapping);
   const setEnableSnapping = useAppStore((state) => state.setEnableSnapping);
@@ -121,6 +123,8 @@ export const StatusBar: React.FC = () => {
     selection,
     nodes,
     customLayers,
+    mapLayers: mapInstances,
+    layerGroups,
   });
 
   // 直前のマニュアルウェイポイント（相対座標計算用）

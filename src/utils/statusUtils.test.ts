@@ -17,6 +17,8 @@ describe('statusUtils', () => {
     selection: { type: 'none' },
     nodes: {},
     customLayers: [],
+    mapLayers: [],
+    layerGroups: {},
   });
 
   describe('computeStatusInteraction', () => {

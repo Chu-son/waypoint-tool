@@ -9,6 +9,7 @@ import {
 import { PanelTab } from './PanelContainer';
 import { PluginParamsPanel } from '../plugins/PluginParamsPanel';
 import { CustomLayerInspector } from '../properties/CustomLayerInspector';
+import { LayerSelectionInspector } from '../properties/LayerSelectionInspector';
 import { AnnotationInspector } from '../properties/AnnotationInspector';
 import { PipelineInspector } from '../properties/PipelineInspector';
 import { PropertiesPanel } from '../properties/PropertiesPanel';
@@ -114,7 +115,7 @@ describe('PanelRegistry', () => {
       expect(result.current.type).toBe(CustomLayerInspector);
     });
 
-    it('returns CustomLayerInspector when activeCustomLayerId is set and not in add_generator mode', () => {
+    it('inspects the active custom layer when it is set and not in add_generator mode', () => {
       useAppStore.setState({
         activeTool: 'select',
         activePluginId: null,
@@ -132,7 +133,8 @@ describe('PanelRegistry', () => {
       });
 
       const { result } = renderHook(() => useInspectorPanelComponent());
-      expect(result.current.type).toBe(CustomLayerInspector);
+      expect(result.current.type).toBe(LayerSelectionInspector);
+      expect(result.current.props).toEqual({ ids: ['layer-123'] });
     });
 
     it('returns PipelineInspector directly when selected custom layer has pipeline_metadata', () => {
@@ -140,7 +142,7 @@ describe('PanelRegistry', () => {
         activeTool: 'select',
         activePluginId: null,
         activeCustomLayerId: 'pipeline-layer-1',
-        selection: { type: 'custom_layer', layerId: 'pipeline-layer-1', selectedObjectId: null },
+        selection: { type: 'layers', ids: ['pipeline-layer-1'], selectedObjectId: null },
         customLayers: [
           {
             id: 'pipeline-layer-1',
@@ -225,12 +227,9 @@ describe('PanelRegistry', () => {
       expect(el.type).toBe(PluginParamsPanel);
     });
 
-    it('returns CustomLayerInspector when selection is custom_layer', () => {
-      const el = resolveInspectorComponent(
-        { mode: 'select' },
-        { type: 'custom_layer', layerId: 'l1', selectedObjectId: null },
-      );
-      expect(el.type).toBe(CustomLayerInspector);
+    it('returns the layer selection inspector when layers are selected', () => {
+      const el = resolveInspectorComponent({ mode: 'select' }, { type: 'layers', ids: ['l1'], selectedObjectId: null });
+      expect(el.type).toBe(LayerSelectionInspector);
     });
 
     it('returns AnnotationInspector when selection is annotations', () => {

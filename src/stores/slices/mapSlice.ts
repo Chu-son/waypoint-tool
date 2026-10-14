@@ -14,6 +14,7 @@ import {
 } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
 import {
+  allTreeIds,
   detachFromLayerTree,
   insertIntoLayerTree,
   layerOrderOf,
@@ -26,6 +27,7 @@ import {
   type LayerTreePlacement,
 } from '../../utils/layerTree';
 import type { DropPosition } from '../../utils/treeOps';
+import { selectedCustomLayerId } from '../../utils/layerSelection';
 import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose, sameClip } from '../../utils/mapClip';
 
@@ -148,9 +150,34 @@ const TOP_OF_STACK: LayerTreePlacement = { parentId: null, beforeId: null };
 const withNewLayer = (tree: LayerTree, id: string, placement: LayerTreePlacement = TOP_OF_STACK): LayerTree =>
   layerOrderOf(tree).includes(id) ? tree : insertIntoLayerTree(tree, [id], placement);
 
+/** The selection fields for selecting `ids` in the layer tree (see `setSelection`). */
+const layerSelectionOf = (
+  ids: string[],
+  stack: Pick<AppState, 'mapLayers' | 'layerGroups'>,
+  selectedObjectId: string | null = null,
+): Pick<AppState, 'selection' | 'activeCustomLayerId' | 'selectedEditObjectId'> => {
+  if (ids.length === 0) return { selection: { type: 'none' }, activeCustomLayerId: null, selectedEditObjectId: null };
+  const customLayerId = selectedCustomLayerId(ids, stack);
+  const objectId = customLayerId ? selectedObjectId : null;
+  return {
+    selection: { type: 'layers', ids, selectedObjectId: objectId },
+    activeCustomLayerId: customLayerId,
+    selectedEditObjectId: objectId,
+  };
+};
+
+/** The selection without the items of the layer tree that are gone from `tree` (unchanged when none are). */
+const pruneLayerSelection = (state: AppState, tree: LayerTree): Partial<AppState> => {
+  if (state.selection.type !== 'layers') return {};
+  const present = new Set(allTreeIds(tree));
+  const ids = state.selection.ids.filter((id) => present.has(id));
+  if (ids.length === state.selection.ids.length) return {};
+  return layerSelectionOf(ids, { ...state, ...tree }, state.selection.selectedObjectId);
+};
+
 /**
  * The state without the layers `ids` (map instances and custom layers): sources no instance uses any more
- * go too, and so does the selection of a removed custom layer.
+ * go too, and so do removed layers from the selection.
  */
 const withoutLayers = (state: AppState, ids: readonly string[]): Partial<AppState> => {
   const removed = new Set(ids);
@@ -159,14 +186,13 @@ const withoutLayers = (state: AppState, ids: readonly string[]): Partial<AppStat
   const removedSources = new Set(
     state.mapLayers.filter((l) => removed.has(l.id) && !usedSources.has(l.sourceId)).map((l) => l.sourceId),
   );
-  const selectionRemoved = state.selection.type === 'custom_layer' && removed.has(state.selection.layerId);
+  const tree = detachFromLayerTree(treeOf(state), ids);
   return {
     mapLayers,
     mapSources: state.mapSources.filter((s) => !removedSources.has(s.id)),
     customLayers: state.customLayers.filter((l) => !removed.has(l.id)),
-    ...detachFromLayerTree(treeOf(state), ids),
-    ...(state.activeCustomLayerId && removed.has(state.activeCustomLayerId) ? { activeCustomLayerId: null } : {}),
-    ...(selectionRemoved ? { selection: { type: 'none' as const }, selectedEditObjectId: null } : {}),
+    ...tree,
+    ...pruneLayerSelection(state, tree),
   };
 };
 
@@ -216,8 +242,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     set((state) => ({
       customLayers: [newLayer, ...state.customLayers],
       ...withNewLayer(treeOf(state), newLayer.id),
-      activeCustomLayerId: newLayer.id,
-      selection: { type: 'custom_layer', layerId: newLayer.id, selectedObjectId: null },
+      ...layerSelectionOf([newLayer.id], state),
       selectedNodeIds: [],
       selectedAnnotationIds: [],
       isDirty: true,
@@ -230,8 +255,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return {
         customLayers: [layer, ...state.customLayers],
         ...withNewLayer(treeOf(state), layer.id),
-        activeCustomLayerId: layer.id,
-        selection: { type: 'custom_layer', layerId: layer.id, selectedObjectId: null },
+        ...layerSelectionOf([layer.id], state),
         selectedNodeIds: [],
         selectedAnnotationIds: [],
         isDirty: true,
@@ -245,17 +269,17 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     })),
 
   removeCustomLayer: (id: string) =>
-    set((state) => ({
-      customLayers: state.customLayers.filter((l) => l.id !== id),
-      ...detachFromLayerTree(treeOf(state), [id]),
-      activeCustomLayerId: state.activeCustomLayerId === id ? null : state.activeCustomLayerId,
-      selection:
-        state.selection.type === 'custom_layer' && state.selection.layerId === id ? { type: 'none' } : state.selection,
-      isDirty: true,
-    })),
+    set((state) => {
+      if (!state.customLayers.some((l) => l.id === id)) return {};
+      return {
+        ...withoutLayers(state, [id]),
+        ...(state.activeCustomLayerId === id ? { activeCustomLayerId: null } : {}),
+        isDirty: true,
+      };
+    }),
 
   setActiveCustomLayerId: (id: string | null) => {
-    get().setSelection(id ? { type: 'custom_layer', layerId: id, selectedObjectId: null } : { type: 'none' });
+    get().setSelection(id ? { type: 'layers', ids: [id], selectedObjectId: null } : { type: 'none' });
   },
 
   addEditObject: (layerId: string, obj: EditObject) =>
@@ -515,14 +539,21 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   ungroupLayerGroup: (groupId) => {
     if (!get().layerGroups[groupId]) return;
     get().pushHistorySnapshot();
-    set((state) => ({ ...ungroupInLayerTree(treeOf(state), groupId), isDirty: true }));
+    set((state) => {
+      const tree = ungroupInLayerTree(treeOf(state), groupId);
+      return { ...tree, ...pruneLayerSelection(state, tree), isDirty: true };
+    });
   },
 
   removeLayerGroup: (groupId, { withContents }) => {
     if (!get().layerGroups[groupId]) return;
     get().pushHistorySnapshot();
     set((state) => {
-      if (!withContents) return { ...ungroupInLayerTree(treeOf(state), groupId), isDirty: true };
+      if (!withContents) {
+        const tree = ungroupInLayerTree(treeOf(state), groupId);
+        return { ...tree, ...pruneLayerSelection(state, tree), isDirty: true };
+      }
+      // The selection is pruned against the tree without the group, so the group leaves it too.
       const { tree, removedLayerIds } = removeGroupDeep(treeOf(state), groupId);
       return { ...withoutLayers({ ...state, ...tree }, removedLayerIds), isDirty: true };
     });

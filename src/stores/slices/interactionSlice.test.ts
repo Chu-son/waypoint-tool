@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
 import { resetAppStore } from '../../test/store';
+import { makeManualCustomLayer, makeMap } from '../../test/fixtures';
 
 describe('interactionSlice', () => {
   beforeEach(() => {
@@ -69,8 +70,8 @@ describe('interactionSlice', () => {
       expect(state.activeCustomLayerId).toBe('layer-vector-1');
       expect(state.rightPanelActiveTab).toBe('inspector');
       expect(state.selection).toEqual({
-        type: 'custom_layer',
-        layerId: 'layer-vector-1',
+        type: 'layers',
+        ids: ['layer-vector-1'],
         selectedObjectId: null,
       });
     });
@@ -161,22 +162,23 @@ describe('interactionSlice', () => {
       expect(state.rightPanelActiveTab).toBe('inspector');
     });
 
-    it('selecting custom_layer clears nodes and annotations selection', () => {
+    it('selecting a custom layer clears nodes and annotations selection', () => {
       useAppStore.setState({
         selectedNodeIds: ['node-1'],
         selectedAnnotationIds: ['ann-1'],
+        customLayers: [makeManualCustomLayer('layer-vector-1')],
       });
 
       useAppStore.getState().setSelection({
-        type: 'custom_layer',
-        layerId: 'layer-vector-1',
+        type: 'layers',
+        ids: ['layer-vector-1'],
         selectedObjectId: 'obj-polygon-1',
       });
 
       const state = useAppStore.getState();
       expect(state.selection).toEqual({
-        type: 'custom_layer',
-        layerId: 'layer-vector-1',
+        type: 'layers',
+        ids: ['layer-vector-1'],
         selectedObjectId: 'obj-polygon-1',
       });
       expect(state.activeCustomLayerId).toBe('layer-vector-1');
@@ -184,6 +186,19 @@ describe('interactionSlice', () => {
       expect(state.selectedNodeIds).toEqual([]);
       expect(state.selectedAnnotationIds).toEqual([]);
       expect(state.rightPanelActiveTab).toBe('inspector');
+    });
+
+    it('has no custom layer to work on when several layers, or a map, are selected', () => {
+      const { layer: map } = makeMap('m');
+      useAppStore.setState({ customLayers: [makeManualCustomLayer('c')], mapLayers: [map] });
+
+      useAppStore.getState().setSelection({ type: 'layers', ids: ['c', 'm'], selectedObjectId: 'obj' });
+      expect(useAppStore.getState().activeCustomLayerId).toBeNull();
+      expect(useAppStore.getState().selectedEditObjectId).toBeNull();
+      expect(useAppStore.getState().selection).toEqual({ type: 'layers', ids: ['c', 'm'], selectedObjectId: null });
+
+      useAppStore.getState().setSelection({ type: 'layers', ids: ['m'], selectedObjectId: null });
+      expect(useAppStore.getState().activeCustomLayerId).toBeNull();
     });
 
     it('selecting none clears all selections', () => {
@@ -475,7 +490,7 @@ describe('interactionSlice', () => {
       });
       useAppStore.getState().transitionToMode({ mode: 'custom_layer_edit', targetLayerId: 'layer-1' });
       expect(useAppStore.getState().selectedNodeIds).toEqual([]);
-      expect(useAppStore.getState().selection.type).toBe('custom_layer');
+      expect(useAppStore.getState().selection.type).toBe('layers');
 
       // 2. Having selected nodes, transition to annotation_edit -> clears selectedNodeIds
       useAppStore.setState({ selectedNodeIds: ['node-1'], selection: { type: 'nodes', ids: ['node-1'] } });
@@ -485,7 +500,7 @@ describe('interactionSlice', () => {
 
       // 3. Returning from custom_layer_edit to select clears custom_layer selection
       useAppStore.getState().transitionToMode({ mode: 'custom_layer_edit', targetLayerId: 'layer-1' });
-      expect(useAppStore.getState().selection.type).toBe('custom_layer');
+      expect(useAppStore.getState().selection.type).toBe('layers');
       useAppStore.getState().transitionToMode({ mode: 'select' });
       expect(useAppStore.getState().selection.type).toBe('none');
       expect(useAppStore.getState().activeCustomLayerId).toBeNull();

@@ -364,8 +364,8 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
     if (id) {
       const layerId = state.activeCustomLayerId || state.activeEditLayerId || '';
       state.setSelection?.({
-        type: 'custom_layer',
-        layerId,
+        type: 'layers',
+        ids: [layerId],
         selectedObjectId: id,
       });
     }

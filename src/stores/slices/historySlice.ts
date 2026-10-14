@@ -13,7 +13,8 @@ import {
 import { ActiveSelection } from '../../types/selection';
 import type { GeoAlignment } from '../../types/geo';
 import { validateAndCorrectInsertionTarget } from '../../utils/treeUtils';
-import { normalizeLayerTree, type LayerTree } from '../../utils/layerTree';
+import { allTreeIds, normalizeLayerTree, type LayerTree } from '../../utils/layerTree';
+import { selectedCustomLayerId } from '../../utils/layerSelection';
 
 const MAX_HISTORY_LENGTH = 100;
 
@@ -62,6 +63,33 @@ const restoredLayerTree = (state: AppState, snapshot: HistorySnapshot): LayerTre
 };
 
 /**
+ * The layer tree restored from `snapshot`, with the selection it held. Selected layers that no longer
+ * exist (maps removed since: removing a map is not undone) drop out of the selection.
+ */
+const restoredLayers = (
+  state: AppState,
+  snapshot: HistorySnapshot,
+  selection: ActiveSelection,
+): Pick<AppState, 'rootLayerIds' | 'layerGroups' | 'selection' | 'activeCustomLayerId' | 'selectedEditObjectId'> => {
+  const tree = restoredLayerTree(state, snapshot);
+  if (selection.type !== 'layers') {
+    return { ...tree, selection, activeCustomLayerId: null, selectedEditObjectId: null };
+  }
+  const existing = new Set(allTreeIds(tree));
+  const ids = selection.ids.filter((id) => existing.has(id));
+  if (ids.length === 0)
+    return { ...tree, selection: { type: 'none' }, activeCustomLayerId: null, selectedEditObjectId: null };
+  const customLayerId = selectedCustomLayerId(ids, { mapLayers: state.mapLayers, layerGroups: tree.layerGroups });
+  const selectedObjectId = customLayerId ? selection.selectedObjectId : null;
+  return {
+    ...tree,
+    selection: { type: 'layers', ids, selectedObjectId },
+    activeCustomLayerId: customLayerId,
+    selectedEditObjectId: selectedObjectId,
+  };
+};
+
+/**
  * Map layers with the use areas (and, when recorded, the visibility) saved in `snapshot`; layers the
  * snapshot does not know keep theirs.
  */
@@ -96,8 +124,8 @@ export const cloneSelection = (sel: ActiveSelection | undefined): ActiveSelectio
       return { type: 'nodes', ids: [...sel.ids] };
     case 'annotations':
       return { type: 'annotations', ids: [...sel.ids] };
-    case 'custom_layer':
-      return { type: 'custom_layer', layerId: sel.layerId, selectedObjectId: sel.selectedObjectId };
+    case 'layers':
+      return { type: 'layers', ids: [...sel.ids], selectedObjectId: sel.selectedObjectId };
   }
 };
 
@@ -194,13 +222,10 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         rootNodeIds: snapshot.rootNodeIds,
         selectedNodeIds: restoredSelection.type === 'nodes' ? restoredSelection.ids : [],
         selectedAnnotationIds: restoredSelection.type === 'annotations' ? restoredSelection.ids : [],
-        activeCustomLayerId: restoredSelection.type === 'custom_layer' ? restoredSelection.layerId : null,
-        selectedEditObjectId: restoredSelection.type === 'custom_layer' ? restoredSelection.selectedObjectId : null,
-        selection: restoredSelection,
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
         mapLayers: restoredMapLayers(state, snapshot),
-        ...restoredLayerTree(state, snapshot),
+        ...restoredLayers(state, snapshot, restoredSelection),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         annotationGroups: snapshot.annotationGroups ?? state.annotationGroups,
@@ -235,13 +260,10 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         rootNodeIds: snapshot.rootNodeIds,
         selectedNodeIds: restoredSelection.type === 'nodes' ? restoredSelection.ids : [],
         selectedAnnotationIds: restoredSelection.type === 'annotations' ? restoredSelection.ids : [],
-        activeCustomLayerId: restoredSelection.type === 'custom_layer' ? restoredSelection.layerId : null,
-        selectedEditObjectId: restoredSelection.type === 'custom_layer' ? restoredSelection.selectedObjectId : null,
-        selection: restoredSelection,
         anchorNodeId: snapshot.anchorNodeId,
         customLayers: snapshot.customLayers,
         mapLayers: restoredMapLayers(state, snapshot),
-        ...restoredLayerTree(state, snapshot),
+        ...restoredLayers(state, snapshot, restoredSelection),
         annotationObjects: snapshot.annotationObjects ?? {},
         annotationOrder: snapshot.annotationOrder ?? [],
         annotationGroups: snapshot.annotationGroups ?? state.annotationGroups,

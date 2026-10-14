@@ -94,6 +94,34 @@ describe('layer groups', () => {
     expect(getAppState().layerGroups.floor.children_ids).toEqual(['bottom', 'wall', 'mapA']);
   });
 
+  describe('the selection', () => {
+    const select = (ids: string[]) => getAppState().setSelection({ type: 'layers', ids, selectedObjectId: null });
+
+    it('drops a deleted group and its layers, keeping the rest', () => {
+      select(['top', 'floor', 'wall']);
+
+      getAppState().removeLayerGroup('floor', { withContents: true });
+
+      expect(getAppState().selection).toEqual({ type: 'layers', ids: ['top'], selectedObjectId: null });
+    });
+
+    it('drops an ungrouped group', () => {
+      select(['floor']);
+      getAppState().ungroupLayerGroup('floor');
+      expect(getAppState().selection).toEqual({ type: 'none' });
+    });
+
+    it('comes back with undo, without the maps that stay deleted', () => {
+      select(['wall', 'mapA']);
+      getAppState().removeLayerGroup('floor', { withContents: true });
+
+      getAppState().undo();
+
+      expect(getAppState().selection).toEqual({ type: 'layers', ids: ['wall'], selectedObjectId: null });
+      expect(getAppState().activeCustomLayerId).toBe('wall');
+    });
+  });
+
   describe('hiding a group', () => {
     it('hides its layers from drawing without changing their own flags', () => {
       getAppState().setLayerGroupVisible('floor', false);

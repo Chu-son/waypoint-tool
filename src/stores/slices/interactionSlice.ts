@@ -11,6 +11,7 @@ import {
 } from '../../utils/mapElementClipboard';
 import { filterTopLevelIds } from '../../utils/mapElementTreeUtils';
 import { collectDescendantIds, getFlattenedNodeIds } from '../../utils/treeUtils';
+import { selectedCustomLayerId } from '../../utils/layerSelection';
 
 export type CanvasAbortHandler = () => boolean;
 
@@ -177,7 +178,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activePluginId = null;
             updates.pluginInteractionData = {};
             updates.elementCopyState = null;
-            if (state.selection?.type === 'custom_layer') {
+            if (state.selection?.type === 'layers') {
               updates.selection = { type: 'none' };
               updates.activeCustomLayerId = null;
               updates.selectedEditObjectId = null;
@@ -191,7 +192,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.selectedAnnotationIds = [];
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
-            if (state.selection?.type === 'custom_layer' || state.selection?.type === 'annotations') {
+            if (state.selection?.type === 'layers' || state.selection?.type === 'annotations') {
               updates.selection = { type: 'none' };
             }
             break;
@@ -234,8 +235,8 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.activeEditLayerId = normalizedMode.targetLayerId;
             updates.activeCustomLayerId = normalizedMode.targetLayerId;
             updates.selection = {
-              type: 'custom_layer',
-              layerId: normalizedMode.targetLayerId,
+              type: 'layers',
+              ids: [normalizedMode.targetLayerId],
               selectedObjectId: null,
             };
             updates.selectedNodeIds = [];
@@ -254,7 +255,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.selectedAnnotationIds = [];
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
-            if (state.selection?.type === 'custom_layer' || state.selection?.type === 'annotations') {
+            if (state.selection?.type === 'layers' || state.selection?.type === 'annotations') {
               updates.selection = { type: 'none' };
             }
             break;
@@ -266,7 +267,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.selectedAnnotationIds = [];
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
-            if (state.selection?.type === 'custom_layer' || state.selection?.type === 'annotations') {
+            if (state.selection?.type === 'layers' || state.selection?.type === 'annotations') {
               updates.selection = { type: 'none' };
             }
             if (normalizedMode.pluginId) {
@@ -280,7 +281,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.selectedAnnotationIds = [];
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
-            if (state.selection?.type === 'custom_layer' || state.selection?.type === 'annotations') {
+            if (state.selection?.type === 'layers' || state.selection?.type === 'annotations') {
               updates.selection = { type: 'none' };
             }
             updates.elementCopyState = {
@@ -310,7 +311,7 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
             updates.selectedAnnotationIds = [];
             updates.activeCustomLayerId = null;
             updates.selectedEditObjectId = null;
-            if (state.selection?.type === 'custom_layer' || state.selection?.type === 'annotations') {
+            if (state.selection?.type === 'layers' || state.selection?.type === 'annotations') {
               updates.selection = { type: 'none' };
             }
             break;
@@ -373,13 +374,21 @@ export const createInteractionSlice: StateCreator<AppState, [], [], InteractionS
               applyInspectorTabUpdates(state, updates);
             }
             break;
-          case 'custom_layer':
+          case 'layers': {
+            // The custom layer being worked on is the one selected alone; editing a vector object needs it.
+            const customLayerId = selectedCustomLayerId(selection.ids, state);
             updates.selectedNodeIds = [];
             updates.selectedAnnotationIds = [];
-            updates.activeCustomLayerId = selection.layerId;
-            updates.selectedEditObjectId = selection.selectedObjectId;
-            applyInspectorTabUpdates(state, updates);
+            updates.activeCustomLayerId = customLayerId;
+            updates.selectedEditObjectId = customLayerId ? selection.selectedObjectId : null;
+            if (!customLayerId && selection.selectedObjectId) {
+              updates.selection = { ...selection, selectedObjectId: null };
+            }
+            if (selection.ids.length > 0) {
+              applyInspectorTabUpdates(state, updates);
+            }
             break;
+          }
         }
 
         return updates;
