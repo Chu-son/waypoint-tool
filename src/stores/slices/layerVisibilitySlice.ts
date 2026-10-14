@@ -18,7 +18,7 @@ export type LayerVisibilitySlice = {
   overwriteLayerVisibilitySet: (id: string) => void;
   renameLayerVisibilitySet: (id: string, name: string) => void;
   deleteLayerVisibilitySet: (id: string) => void;
-  /** Shows and hides layers as the set says. Layers the set has no entry for keep their visibility. */
+  /** Shows and hides layers and groups as the set says. Items the set has no entry for keep their visibility. */
   applyLayerVisibilitySet: (id: string) => void;
 };
 
@@ -83,6 +83,9 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
     set((state) => ({
       mapLayers: state.mapLayers.map((l) => ({ ...l, visible: next[l.id] })),
       customLayers: state.customLayers.map((l) => ({ ...l, visible: next[l.id] })),
+      layerGroups: Object.fromEntries(
+        Object.entries(state.layerGroups).map(([groupId, g]) => [groupId, { ...g, visible: next[groupId] }]),
+      ),
       activeLayerVisibilitySetId: id,
       isDirty: true,
     }));

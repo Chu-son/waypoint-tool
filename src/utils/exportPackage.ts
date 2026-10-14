@@ -4,21 +4,27 @@
 import type { ExportRegion, ExportTargetItem, ExportTemplate, LayerVisibilitySet } from '../types/store';
 import type { PackageExportMapItem, PackageExportWaypointItem } from '../api/types';
 import type { ResolvedExportFile } from './exportTemplateEngine';
-import type { LayerStack } from './layerStack';
-import { currentLayerVisibility, resolveSetVisibility, undecidedLayerIds } from './layerVisibilitySets';
-
-type StackLayers = Pick<LayerStack, 'mapLayers' | 'customLayers'>;
+import {
+  currentLayerVisibility,
+  effectiveLayerVisibility,
+  resolveSetVisibility,
+  undecidedLayerIds,
+  type StackLayers,
+} from './layerVisibilitySets';
 
 const isMapItem = (item: ExportTargetItem) => item.type === 'map_region' || item.type === 'map_all_regions';
 
-/** Which layers a map item draws: those its layer visibility set shows, or the current display when it names none. */
+/**
+ * Which layers a map item draws: those its layer visibility set shows, or the current display when it
+ * names none. A layer under a hidden group is not drawn.
+ */
 function layerVisibilityFor(
   item: ExportTargetItem,
   sets: LayerVisibilitySet[],
   stack: StackLayers,
 ): Record<string, boolean> {
   const set = sets.find((s) => s.id === item.visibilitySetId);
-  return set ? resolveSetVisibility(set, stack) : currentLayerVisibility(stack);
+  return effectiveLayerVisibility(set ? resolveSetVisibility(set, stack) : currentLayerVisibility(stack), stack);
 }
 
 export interface MapVisibilityProblems {

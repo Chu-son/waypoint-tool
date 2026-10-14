@@ -6,28 +6,56 @@
  */
 import type { LayerVisibilitySet } from '../types/layer';
 import type { LayerStack } from './layerStack';
+import { ancestorGroupIds, buildLayerParentIndex } from './layerTree';
 
-type StackLayers = Pick<LayerStack, 'mapLayers' | 'customLayers'>;
+export type StackLayers = Pick<LayerStack, 'mapLayers' | 'customLayers' | 'rootLayerIds' | 'layerGroups'>;
 
-/** Visible flag of every layer in the stack, by layer id. */
-export function currentLayerVisibility({ mapLayers, customLayers }: StackLayers): Record<string, boolean> {
+/**
+ * Own visible flag of every layer and group in the stack, by id. A group's flag is kept apart from its
+ * children's, so a set restores both; what is actually drawn is `effectiveLayerVisibility`.
+ */
+export function currentLayerVisibility({
+  mapLayers,
+  customLayers,
+  layerGroups,
+}: Pick<StackLayers, 'mapLayers' | 'customLayers' | 'layerGroups'>): Record<string, boolean> {
   const visibility: Record<string, boolean> = {};
+  for (const group of Object.values(layerGroups)) visibility[group.id] = group.visible;
   for (const layer of mapLayers) visibility[layer.id] = layer.visible;
   for (const layer of customLayers) visibility[layer.id] = layer.visible;
   return visibility;
 }
 
 /**
- * Ids of layers the set has no entry for. With `exportableOnly`, reference layers are left out
- * because they never take part in an export.
+ * Whether each layer is drawn: its own flag in `own` AND the flags of every group above it. Groups are
+ * not in the result, since only layers are composited.
+ */
+export function effectiveLayerVisibility(own: Record<string, boolean>, stack: StackLayers): Record<string, boolean> {
+  const parentIndex = buildLayerParentIndex(stack);
+  const effective: Record<string, boolean> = {};
+  for (const layer of [...stack.mapLayers, ...stack.customLayers]) {
+    effective[layer.id] =
+      own[layer.id] === true && ancestorGroupIds(stack, layer.id, parentIndex).every((g) => own[g] !== false);
+  }
+  return effective;
+}
+
+/**
+ * Ids of layers the set has no entry for. A layer under a group the set hides is not undecided: it is
+ * not drawn either way. With `exportableOnly`, reference layers are left out because they never take
+ * part in an export.
  */
 export function undecidedLayerIds(
   set: LayerVisibilitySet,
-  { mapLayers, customLayers }: StackLayers,
+  stack: StackLayers,
   options: { exportableOnly?: boolean } = {},
 ): string[] {
-  const customs = options.exportableOnly ? customLayers.filter((l) => !l.is_reference) : customLayers;
-  return [...mapLayers, ...customs].map((l) => l.id).filter((id) => !(id in set.visibility));
+  const customs = options.exportableOnly ? stack.customLayers.filter((l) => !l.is_reference) : stack.customLayers;
+  const parentIndex = buildLayerParentIndex(stack);
+  return [...stack.mapLayers, ...customs]
+    .map((l) => l.id)
+    .filter((id) => !(id in set.visibility))
+    .filter((id) => !ancestorGroupIds(stack, id, parentIndex).some((g) => set.visibility[g] === false));
 }
 
 /** True when a layer the set decides on is shown differently from what the set says. */

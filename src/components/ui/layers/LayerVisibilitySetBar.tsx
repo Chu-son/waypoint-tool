@@ -17,19 +17,21 @@ type Editing = 'new' | 'rename' | null;
  * set in use has been changed by hand ("modified").
  */
 export function LayerVisibilitySetBar() {
-  const { sets, activeId, mapLayers, customLayers } = useAppStore(
+  const { sets, activeId, mapLayers, customLayers, rootLayerIds, layerGroups } = useAppStore(
     useShallow((state) => ({
       sets: state.layerVisibilitySets,
       activeId: state.activeLayerVisibilitySetId,
       mapLayers: state.mapLayers,
       customLayers: state.customLayers,
+      rootLayerIds: state.rootLayerIds,
+      layerGroups: state.layerGroups,
     })),
   );
   const [editing, setEditing] = useState<Editing>(null);
 
   if (mapLayers.length === 0 && customLayers.length === 0) return null;
 
-  const stack = { mapLayers, customLayers };
+  const stack = { mapLayers, customLayers, rootLayerIds, layerGroups };
   const active = sets.find((s) => s.id === activeId) ?? null;
   const activeUndecided = active ? undecidedLayerIds(active, stack) : [];
 
