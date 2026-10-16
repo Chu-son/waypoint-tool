@@ -43,6 +43,7 @@ export interface PersistedStorageState {
   panelLayout?: PanelLayout;
   leftPanelActiveTab?: string;
   rightPanelActiveTab?: string;
+  autoFocusInspector?: boolean;
   [key: string]: any;
 }
 
@@ -75,6 +76,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   panelLayout: DEFAULT_PANEL_LAYOUT,
   leftPanelActiveTab: 'waypoints',
   rightPanelActiveTab: 'layers',
+  autoFocusInspector: true,
 };
 
 /**
@@ -155,6 +157,7 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     panelLayout: normalizedPanelLayout,
     leftPanelActiveTab: leftTab,
     rightPanelActiveTab: rightTab,
+    autoFocusInspector: state.autoFocusInspector !== false,
     // 参照型や特定型の確実なガード
     recentProjects: Array.isArray(state.recentProjects) ? state.recentProjects : DEFAULT_STORAGE_STATE.recentProjects,
     exportTemplates: Array.isArray(state.exportTemplates)

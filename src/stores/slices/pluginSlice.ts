@@ -566,7 +566,8 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
     const initialSelectedNodeIds = [...get().selectedNodeIds];
     const initialSelection = cloneSelection(get().selection);
     const initialCustomLayers = structuredClone(get().customLayers ?? []);
-    const initialLayerOrder = [...get().layerOrder];
+    const initialRootLayerIds = get().rootLayerIds;
+    const initialLayerGroups = get().layerGroups;
     const initialAnnotationGroups = { ...get().annotationGroups };
     const initialAnnotationObjects = structuredClone(get().annotationObjects ?? {});
     const initialAnnotationOrder = [...(get().annotationOrder ?? [])];
@@ -758,7 +759,7 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
           ? await prepareLayersForExport({
               ...get(),
               customLayers: allAvailableCustomLayers,
-              layerOrder: insertBelowCustomLayers(get().layerOrder, get().customLayers, intermediateLayers),
+              ...insertBelowCustomLayers(get(), get().customLayers, intermediateLayers),
             })
           : undefined;
 
@@ -1160,7 +1161,8 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
         selectedNodeIds: initialSelectedNodeIds,
         selection: initialSelection,
         customLayers: initialCustomLayers,
-        layerOrder: initialLayerOrder,
+        rootLayerIds: initialRootLayerIds,
+        layerGroups: initialLayerGroups,
         annotationGroups: initialAnnotationGroups,
         annotationObjects: initialAnnotationObjects,
         annotationOrder: initialAnnotationOrder,

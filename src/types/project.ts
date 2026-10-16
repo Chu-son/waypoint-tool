@@ -4,6 +4,7 @@ import type { AnnotationGroup, AnnotationObject } from './annotation';
 import type {
   CustomLayer,
   ExportRegion,
+  LayerGroup,
   LayerVisibilitySet,
   MapSource,
   OccupancySettings,
@@ -33,6 +34,9 @@ export interface ProjectData {
   /** Map instances; in files without `map_sources` these are whole maps carrying their own image and info. */
   map_layers?: any[];
   layer_order?: string[];
+  /** The layer tree. Absent in files saved before layer groups; `layer_order` is then the top level. */
+  layer_root_ids?: unknown;
+  layer_groups?: unknown;
   custom_layers?: CustomLayer[];
   annotation_objects?: AnnotationObject[];
   annotation_groups?: Record<string, AnnotationGroup>;
@@ -79,8 +83,14 @@ export interface StrictProjectData {
   nodes: Record<string, WaypointNode>;
   map_sources: MapSource[];
   map_layers: ProjectMapLayer[];
-  /** Ids of every map instance and custom layer, top of the stack first. */
+  /**
+   * Ids of every map instance and custom layer, top of the stack first: the layer tree flattened. Read
+   * only from files without `layer_root_ids`; written for versions that do not know layer groups.
+   */
   layer_order: string[];
+  /** Top level of the layer tree (layer and group ids, top first). */
+  layer_root_ids: string[];
+  layer_groups: Record<string, LayerGroup>;
   custom_layers: CustomLayer[];
   annotation_objects: AnnotationObject[];
   annotation_groups: Record<string, AnnotationGroup>;

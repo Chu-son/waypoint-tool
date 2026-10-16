@@ -1,5 +1,6 @@
 import { CustomLayer, ManualCustomLayer, EditObject, MapLayerClip } from '../types/store';
-import { LayerStack, orderedMapLayers, baseMapResolution, stackZIndexes } from '../utils/layerStack';
+import { LayerStack, orderedMapLayers, baseMapResolution, stackEntries, stackZIndexes } from '../utils/layerStack';
+import { layerOrderOf } from '../utils/layerTree';
 
 /**
  * Converts world coordinates (meters) to pixel coordinates on the map.
@@ -220,7 +221,8 @@ export async function rasterizeManualCustomLayerToExportLayer(
   targetResolution?: number,
   cache?: RasterCache,
 ): Promise<Omit<PreparedExportLayer, 'z_index' | 'visible'> | null> {
-  if (!customLayer.visible || customLayer.editObjects.length === 0) {
+  // Whether the layer is drawn is the caller's decision (an export may show a layer hidden on screen).
+  if (customLayer.editObjects.length === 0) {
     return null;
   }
 
@@ -386,15 +388,17 @@ export type PreparedExportLayer = {
  * export or preview. `z_index` follows the stack order, bottom first, so blending honours the order
  * the user arranged across map and custom layers alike.
  *
- * With `includeHidden`, hidden layers are prepared as well, for callers that decide per export which
- * layers to draw (see `layerVisibility` of an export region). Reference layers are never included.
+ * A layer counts as visible when it and every group above it are visible. With `includeHidden`, hidden
+ * layers are prepared as well, for callers that decide per export which layers to draw (see
+ * `layerVisibility` of an export region). Reference layers are never included.
  */
 export async function prepareLayersForExport(
   stack: LayerStack,
   options: { includeHidden?: boolean; rasterCache?: RasterCache } = {},
 ): Promise<PreparedExportLayer[]> {
-  const { customLayers, layerOrder } = stack;
   const includeHidden = options.includeHidden === true;
+  const layerOrder = layerOrderOf(stack);
+  const customLayers = stackEntries(stack).flatMap((e) => (e.kind === 'custom' ? [e.layer] : []));
   const { rasterCache } = options;
   if (rasterCache) {
     // Let go of the pictures of layers that no longer exist.

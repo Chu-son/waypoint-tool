@@ -5,6 +5,8 @@
  * `useAppStore` and asserting which action was called.
  */
 import { useAppStore, type AppState } from '../stores/appStore';
+import { layerOrderOf } from '../utils/layerTree';
+import { resetPoseEditGuards } from '../services/poseEditGuards';
 
 // Captured when this module is first evaluated (each test file gets a fresh module graph),
 // i.e. before any test has mutated the store.
@@ -17,6 +19,7 @@ export function resetAppStore(overrides: Partial<AppState> = {}): void {
   } catch {
     // localStorage may be unavailable in some environments.
   }
+  resetPoseEditGuards();
   useAppStore.setState({ ...initialState, ...overrides }, true);
 }
 
@@ -32,3 +35,6 @@ export const PAST_WELCOME: Partial<AppState> = {
 
 /** Shorthand for `useAppStore.getState()`. */
 export const getAppState = (): AppState => useAppStore.getState();
+
+/** The compositing order of the layers in the store (the layer tree flattened), top of the stack first. */
+export const getLayerOrder = (): string[] => layerOrderOf(useAppStore.getState());

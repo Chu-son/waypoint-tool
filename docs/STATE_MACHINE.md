@@ -89,7 +89,7 @@ graph TD
 │  [Axis 4: Transient Gesture]  Idle | Panning | Dragging | Rotating | ...    │
 │                               (PointerDown〜Up/Abort の物理的短命状態)        │
 │                                                                             │
-│  [Axis 5: Selection Authority] None | Nodes | Annotations | CustomLayer     │
+│  [Axis 5: Selection Authority] None | Nodes | Annotations | Layers    │
 │                               (単一権限の排他コンテナ: ActiveSelection)       │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -127,7 +127,7 @@ graph TD
 
 #### Axis 5: 選択ドメイン単一権限 (Selection Authority: 排他的単一真実源)
 - **管理スライス**: `interactionSlice.ts` (`selection: ActiveSelection`)
-- **性質**: 右ペインの Inspector 表示および一括編集の対象となる単一の権限コンテナです。ノード、アノテーション、カスタムレイヤーのいずれか1種類のみが権限を保持でき、多重選択は排他的に排除されます。
+- **性質**: 右ペインの Inspector 表示および一括編集の対象となる単一の権限コンテナです。ノード、アノテーション、レイヤー（マップ・カスタムレイヤー・グループ）のいずれか1種類のみが権限を保持でき、他のドメインとの同時選択は排他的に排除されます（同じドメインの中の複数選択は可）。
 
 ---
 
@@ -251,6 +251,8 @@ const unsubscribe = useAppStore.getState().subscribeModeTransition({
 
 ### 4.1 `ActiveSelection` による排他的単一真実源
 
+項目の選択（ノード・アノテーション・レイヤー）で Inspector タブへ切り替えるかどうかは、`uiSlice.autoFocusInspector`（既定オン、localStorage に保存）で決まる。オフのときは、選択してもパネルは今のタブのまま（選択自体は変わる）。Inspector が空のとき（`PropertiesPanel` の「No item selected.」）に切り替えのトグルを置く。ツールのモード（`generator_add` / `annotation_edit` / `custom_layer_edit`）は Inspector で操作するため、設定にかかわらず Inspector を強制する。
+
 右ペインの Inspector やキャンバス上の選択ハイライトは、`interactionSlice.ts` の `selection: ActiveSelection` を単一の真実源とします。
 
 ```typescript
@@ -258,10 +260,12 @@ export type ActiveSelection =
   | { type: 'none' }
   | { type: 'nodes'; ids: string[] }
   | { type: 'annotations'; ids: string[] }
-  | { type: 'custom_layer'; layerId: string; selectedObjectId: string | null };
+  | { type: 'layers'; ids: string[]; selectedObjectId: string | null };
 ```
 
-- **相互排他律**: `nodes` を選択した瞬間に `selectedAnnotationIds` や `activeCustomLayerId` は自動的にクリアされます。同様に、`annotations` を選択した瞬間は `selectedNodeIds` が空配列になります。
+- **`layers`**: レイヤーツリーの項目（マップインスタンス・カスタムレイヤー・グループ。混在できる）の複数選択です。`selectedObjectId` は、手描きレイヤーを 1 つだけ選んでいるときに編集中のベクターオブジェクトを指します。マップでもグループでもない ID を 1 つだけ選んだ場合（新規プラグインレイヤーの `'new'`）は、カスタムレイヤーとして扱います（`utils/layerSelection.ts` の `selectedCustomLayerId` / `layerItemKind`）。
+- **Select への遷移と選択**: `custom_layer_edit`（ベクター編集）から `select` へ戻るときだけ、そのレイヤーの選択を外します。すでに `select` のままレイヤーを選んだ場合（Inspector が手描きレイヤー用にツールを Select へ切り替える場合を含む）は選択を保ちます。`waypoint_add` への遷移は `layers` / `annotations` の選択を外します。
+- **相互排他律**: `nodes` を選択した瞬間に `selectedAnnotationIds` や `layers` の選択は自動的にクリアされます。同様に、`annotations` を選択した瞬間は `selectedNodeIds` が空配列になります。
 - **履歴（Undo / Redo）の統合**: `pushHistorySnapshot()` は `selection` の状態をスナップショットに保存します。Undo または Redo を実行すると、変更されたオブジェクトだけでなく**その瞬間の選択状態（`selection`）も原子的かつ完全に復元**されます。
 
 ### 4.2 Inspector の決定論的ルーティング (Deterministic Inspector Resolution)
@@ -276,7 +280,7 @@ graph TD
     CheckMode -->|annotation_edit| AnnotEditInspector[アノテーション編集プロパティ]
     CheckMode -->|いいえ (select / waypoint_add)| CheckSelection{ActiveSelection.type}
 
-    CheckSelection -->|custom_layer| LayerInspector[カスタムレイヤー Inspector]
+    CheckSelection -->|"layers (1 つ: マップ / 手描き / プラグイン / グループ、複数: まとめ)"| LayerInspector[レイヤー Inspector<br>MapLayerInspector / CustomLayerInspector /<br>LayerGroupInspector / LayerMultiInspector]
     CheckSelection -->|annotations| AnnotInspector[アノテーション Inspector]
     CheckSelection -->|nodes (単一または複数)| NodeInspector[ウェイポイント / グループノード Inspector]
     CheckSelection -->|none| ProjectInspector[プロジェクト設定 / 未選択表示]
@@ -541,7 +545,7 @@ stateDiagram-v2
 - **強制手法**: Discriminated Union 型による型レベル保証、および `transitionToMode` による原子的切替。旧ブール値フラグ（`isMapEditMode`, `isAnnotationEditMode` 等）を直接変更してモードを並立させることは禁止。
 
 ### 7.2 選択単一真実源不変条件 (Selection Single Authority Invariant)
-- **定義**: 右ペインの Inspector 表示権および主たる選択対象（`selection: ActiveSelection`）は、ノード、アノテーション、カスタムレイヤーのうち常に1つのドメインのみに属さなければならない。
+- **定義**: 右ペインの Inspector 表示権および主たる選択対象（`selection: ActiveSelection`）は、ノード、アノテーション、レイヤーのうち常に1つのドメインのみに属さなければならない。
 - **強制手法**: `setSelection` 呼出による他ドメイン選択IDの自動クリア。複数ドメインのオブジェクトを同時に選択状態にすることはアーキテクチャ違反。
 
 ### 7.3 過渡ジェスチャーの原子的ロールバックとポインタ喪失保護不変条件 (Gesture Atomicity & Pointer Loss Protection Invariant)
@@ -702,7 +706,7 @@ graph TB
 | **`waypoint_add`** | (配置待機中) | ・十字カーソル (`crosshair`)<br>・直前ノードからの**スナップ補助線**<br>・距離数値バブル (`2.50 m`) | ・ツリーの次挿入位置に**点滅する挿入バー**を表示 | ・直前のインスペクタまたは<br>`PropertiesPanel` | ・モード: `Add Waypoint`<br>・ヒント: `Click to place, Tab to cycle` | ①寸法入力クリア<br>②拘束解除<br>③`select`復帰 |
 | **`waypoint_add`**<br>(Yaw設定中) | (過渡状態) | ・クリック地点に仮ノード表示<br>・マウス方向へ伸びる**向き矢印** | ・仮ノードがリスト末尾に一時表示 | ・配置中ノードの座標プレビュー | ・ヒント: `Release to confirm Yaw` | 仮ノードを削除し待機へ<br>(Tier 3 Abort) |
 | **`annotation_edit`** | `none` or `annotations` | ・描画カーソル (`crosshair`)<br>・ベクター図形の頂点ハンドル<br>・ドラッグで図形ラバーバンド描画 | ・Layers タブが自動選択<br>・アノテーションツリーがアクティブ | ・**`AnnotationInspector`**<br>（図形タイプ、線幅、塗り色、頂点リスト） | ・モード: `Annotation Edit`<br>・サブツール: `Rect / Line / Point` | ①描画ジェスチャー破棄<br>②選択解除<br>③`select`復帰 |
-| **`custom_layer_edit`**| `custom_layer` | ・ブラシカーソル（円/矩形）<br>・描画プレビューオーバーレイ | ・Layers タブが自動選択<br>・対象カスタムレイヤーが選択 | ・**`CustomLayerInspector`**<br>（FillValue: 0黒/255白、ブラシサイズ、消しゴム） | ・モード: `Custom Layer Edit`<br>・描画値: `Obstacle / Free` | ①描画ジェスチャー破棄<br>②選択解除<br>③`select`復帰 |
+| **`custom_layer_edit`**| `layers`（手描きレイヤー 1 つ） | ・ブラシカーソル（円/矩形）<br>・描画プレビューオーバーレイ | ・Layers タブが自動選択<br>・対象カスタムレイヤーが選択 | ・**`CustomLayerInspector`**<br>（FillValue: 0黒/255白、ブラシサイズ、消しゴム） | ・モード: `Custom Layer Edit`<br>・描画値: `Obstacle / Free` | ①描画ジェスチャー破棄<br>②選択解除<br>③`select`復帰 |
 | **`generator_add`** | `none` or `nodes` | ・プラグインプレビュー点列のオーバーレイ描画 | ・Objects タブ表示 | ・**`PluginParamsPanel`**<br>（プラグイン引数入力UI、実行ボタン） | ・モード: `Generator Add`<br>・プラグイン名表示 | `select` モードへ復帰<br>(Tier 6) |
 | **`export_region_edit`**| (領域選択中) | ・エクスポート矩形領域のバウンディングボックスと四隅ハンドル | ・Layers タブのエクスポート領域リストがハイライト | ・エクスポート領域のプロパティ（出力解像度、範囲サイズ） | ・モード: `Export Region Edit` | 矩形変形中止 → `select` 復帰 |
 

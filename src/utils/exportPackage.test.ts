@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildExportPackageItems, findMapVisibilityProblems, formatSessionTimestamp } from './exportPackage';
 import { resolveExportFiles } from './exportTemplateEngine';
-import { layerStackState, makeManualCustomLayer, makeMap } from '../test/fixtures';
+import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../test/fixtures';
 import type { ExportRegion, ExportTargetItem, ExportTemplate, LayerVisibilitySet } from '../types/store';
 
 const regions: ExportRegion[] = [
@@ -155,6 +155,42 @@ describe('buildExportPackageItems', () => {
       const { mapItems } = build([mapItem({ id: 'a', visibilitySetId: 'p' })], { sets: [partial], stack });
 
       expect(mapItems[0].region.layerVisibility).toEqual({ map: true, keepout: true, draft: false });
+    });
+
+    describe('with layer groups', () => {
+      const grouped = layerStackState(
+        makeMap('map'),
+        makeLayerGroup('walls', [makeManualCustomLayer('wall'), makeManualCustomLayer('door')], { visible: false }),
+      );
+
+      it('does not draw the layers inside a hidden group on the current display', () => {
+        const { mapItems } = build([mapItem({ id: 'a' })], { stack: grouped });
+
+        expect(mapItems[0].region.layerVisibility).toEqual({ map: true, wall: false, door: false });
+      });
+
+      it('draws them when a set shows the group, and not when it hides it', () => {
+        const shown: LayerVisibilitySet = { id: 's', name: 'Shown', visibility: { walls: true } };
+        const hidden: LayerVisibilitySet = { id: 'h', name: 'Hidden', visibility: { walls: false } };
+
+        const { mapItems } = build(
+          [mapItem({ id: 'a', visibilitySetId: 's' }), mapItem({ id: 'b', visibilitySetId: 'h' })],
+          { sets: [shown, hidden], stack: grouped },
+        );
+
+        expect(mapItems.map((m) => m.region.layerVisibility)).toEqual([
+          { map: true, wall: true, door: true },
+          { map: true, wall: false, door: false },
+        ]);
+      });
+
+      it('keeps a layer off when its own flag is off inside a shown group', () => {
+        const stack = layerStackState(makeLayerGroup('walls', [makeManualCustomLayer('wall', { visible: false })]));
+
+        const { mapItems } = build([mapItem({ id: 'a' })], { stack });
+
+        expect(mapItems[0].region.layerVisibility).toEqual({ wall: false });
+      });
     });
   });
 });

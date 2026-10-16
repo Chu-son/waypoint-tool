@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { prepareLayersForExport, getEditLayerBoundingBox, createRasterCache } from './mapRasterize';
-import { layerStackState, makeManualCustomLayer, makeMap } from '../test/fixtures';
+import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../test/fixtures';
 import type { PluginCustomLayer } from '../types/store';
 
 const pluginLayer = (id: string, overrides: Partial<PluginCustomLayer> = {}): PluginCustomLayer => ({
@@ -34,7 +34,7 @@ describe('prepareLayersForExport', () => {
     const stack = layerStackState(makeMap('map-1'), makeMap('map-2'));
     expect(await bottomToTop(stack)).toEqual(['map-2', 'map-1']);
 
-    const reordered = { ...stack, layerOrder: ['map-2', 'map-1'] };
+    const reordered = { ...stack, rootLayerIds: ['map-2', 'map-1'] };
     expect(await bottomToTop(reordered)).toEqual(['map-1', 'map-2']);
   });
 
@@ -138,6 +138,26 @@ describe('prepareLayersForExport with a raster cache', () => {
     id: string,
     options?: Parameters<typeof prepareLayersForExport>[1],
   ) => (await prepareLayersForExport(stack, options)).find((l) => l.id === id)?.image_base64;
+
+  it('leaves out layers inside a hidden group, and prepares them when hidden layers are asked for', async () => {
+    const stack = layerStackState(
+      makeMap('shown'),
+      makeLayerGroup('off', [makeMap('in-group'), makeManualCustomLayer('drawing', { editObjects: [rect('r', 0)] })], {
+        visible: false,
+      }),
+    );
+
+    expect(await bottomToTop(stack)).toEqual(['shown']);
+    const all = await prepareLayersForExport(stack, { includeHidden: true });
+    expect(all.map((l) => l.id).sort()).toEqual(['drawing', 'in-group', 'shown']);
+  });
+
+  it('prepares a hidden hand-drawn layer when hidden layers are asked for (an export set may show it)', async () => {
+    const stack = stackOf(makeManualCustomLayer('drawing', { visible: false, editObjects: [rect('r', 0)] }));
+
+    expect(await pictureOf(stack, 'drawing')).toBeUndefined();
+    expect(await pictureOf(stack, 'drawing', { includeHidden: true })).toMatch(/^data:image\/png/);
+  });
 
   it('draws a custom layer every time without a cache', async () => {
     const stack = stackOf(makeManualCustomLayer('drawing', { editObjects: [rect('r', 0)] }));

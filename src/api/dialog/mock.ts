@@ -1,5 +1,12 @@
 /* eslint-disable no-alert -- browser stand-ins for the native dialogs */
-import { IDialogAPI, MessageDialogOptions, OpenDialogOptions, SaveDialogOptions } from '../types';
+import {
+  ChooseDialogOptions,
+  ChooseResult,
+  IDialogAPI,
+  MessageDialogOptions,
+  OpenDialogOptions,
+  SaveDialogOptions,
+} from '../types';
 
 export class MockDialogAPI implements IDialogAPI {
   async open(options?: OpenDialogOptions): Promise<string | string[] | null> {
@@ -31,6 +38,15 @@ export class MockDialogAPI implements IDialogAPI {
   async ask(message: string, options?: any): Promise<boolean> {
     console.log('[Mock Dialog] ask dialog called:', message, options);
     return window.confirm(`[Mock Ask]\n${message}`);
+  }
+
+  async choose(message: string, options?: ChooseDialogOptions): Promise<ChooseResult> {
+    console.log('[Mock Dialog] choose dialog called:', message, options);
+    const yes = options?.labels?.yes ?? 'Yes';
+    const no = options?.labels?.no ?? 'No';
+    // window.confirm has two buttons: ask for Yes first, then for No (Cancel on the second means cancel).
+    if (window.confirm(`[Mock Choose]\n${message}\n\nOK: ${yes}\nCancel: ${no} / キャンセル`)) return 'yes';
+    return window.confirm(`[Mock Choose]\n「${no}」にしますか？\n\nOK: ${no}\nCancel: キャンセル`) ? 'no' : 'cancel';
   }
 
   async message(message: string, options?: MessageDialogOptions): Promise<void> {

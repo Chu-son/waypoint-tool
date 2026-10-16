@@ -42,6 +42,7 @@ it('Delete removes the selected waypoints', () => {
 | Tauri IPC / ファイルダイアログ / ウィンドウ操作 | `vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue(...)` / `vi.spyOn(DialogAPI, 'ask')` / `vi.spyOn(AppAPI, 'forceExit')`。jsdom では `src/api` が自動で Mock 実装を選ぶ。**`vi.mock('../../api')` によるモジュール全体の差し替えは禁止**（ESLint error。API にメソッドが増えるたびに壊れ、未定義メソッド呼び出しが unhandled error になるため） |
 | PixiJS（WebGL） | `vi.mock('pixi.js', () => import('../../test/mocks/pixi').then((m) => m.pixiJsMock))`（`@pixi/react` も同様） |
 | ブラウザ API（`alert` / `confirm` / クリップボード等） | `vi.spyOn(window, 'confirm')` など。クリップボードは user-event が提供するスタブを使う |
+| 確認ダイアログ（はい／いいえ／キャンセル） | `vi.spyOn(DialogAPI, 'choose').mockResolvedValue('yes' \| 'no' \| 'cancel')`。位置調整の確認の答えは `services/poseEditGuards` が覚えているため、同じレイヤー ID を使い回すテストは `resetAppStore` が忘れさせる（`resetPoseEditGuards`）。 |
 | 時刻・乱数 | 必要な場合のみ `vi.useFakeTimers()` 等 |
 
 - `@tauri-apps/*` を直接モックするのは、まだ `src/api` を経由していない箇所の暫定措置に限る。
@@ -53,6 +54,7 @@ it('Delete removes the selected waypoints', () => {
 - 優先順：`getByRole`（name 付き）→ `getByLabelText` → `getByText` / `getByDisplayValue` → `getByTitle`。
 - `getByTestId`・`querySelector`・`className` は最後の手段。アクセシブルな名前が無い要素は、テストのために testid を足すのではなく **`aria-label` 等を付けて UI 側を改善** する。
 - 操作は `@testing-library/user-event`（`renderWithStore` が返す `user`）を推奨。入力欄の最終値だけが重要な場合は `fireEvent.change` でもよい。
+- ツリー（`TreeView`）のドラッグ&ドロップは jsdom ではポインタの座標が得られず検証できない。ドロップ先の判定は純関数 `computeDropTarget`（`treeCore.test.ts`）と、ツリーの変更（`layerTree.test.ts`。ランダムな操作列で不変条件を確かめる）で検証し、コンポーネントのテストは同じ移動をキーボード（Alt+↑↓）で行う。行の操作ボタンは `aria-label`（「○○ を非表示にする」など）で取る。
 - キャンバス（PixiJS）は jsdom 上で属性付きの不活性な要素として描画される。ビューポートへの pointer イベントと、`pixicontainer[x=..][y=..]` による「その座標に描かれたもの」の特定でツール操作を検証する（`MapCanvasInteractions.test.tsx` 参照）。
 
 ## 5. 共通テスト基盤 (`src/test/`)
@@ -60,9 +62,9 @@ it('Delete removes the selected waypoints', () => {
 | ファイル | 用途 |
 |---|---|
 | `setup.ts` | jest-dom 拡張、pointer capture のポリフィル |
-| `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
+| `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `getLayerOrder()`（積み順 = `layerOrderOf` の結果）, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
 | `render.tsx` | `renderWithStore(ui, state)` → `{ user, ...render結果 }` |
-| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップとカスタムレイヤーを上から順に並べたスタックのストア状態）/ `makeManualCustomLayer` / `makePlugin` |
+| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップ・カスタムレイヤー・`makeLayerGroup` のグループを、上から順に入れ子で並べたスタックのストア状態）/ `makeLayerGroup` / `makeAnnotationGroup` / `makeManualCustomLayer` / `makePlugin` |
 | `mocks/pixi.tsx` | PixiJS スタブ、描画呼び出しを記録する `createGraphicsRecorder()` |
 
 テストデータはファクトリで作り、**テストの意図に関係するフィールドだけ** を上書きする。

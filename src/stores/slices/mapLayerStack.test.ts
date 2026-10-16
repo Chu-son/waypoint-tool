@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getAppState, resetAppStore } from '../../test/store';
+import { getAppState, getLayerOrder, resetAppStore } from '../../test/store';
 import { layerStackState, makeManualCustomLayer, makeMap } from '../../test/fixtures';
 import { orderedMapLayers } from '../../utils/layerStack';
 
@@ -11,7 +11,8 @@ describe('map layer stack', () => {
     const wall = getAppState().addManualCustomLayer('Wall');
     getAppState().addMapLayer('Map 2', { resolution: 0.05 }, 'img2', 10, 10);
 
-    const { layerOrder, mapLayers } = getAppState();
+    const { mapLayers } = getAppState();
+    const layerOrder = getLayerOrder();
     expect(layerOrder).toHaveLength(3);
     expect(layerOrder[0]).toBe(mapLayers[0].id);
     expect(layerOrder[1]).toBe(wall.id);
@@ -24,8 +25,8 @@ describe('map layer stack', () => {
 
     const copyId = getAppState().duplicateMapLayer('b');
 
-    const { mapLayers, mapSources, layerOrder } = getAppState();
-    expect(layerOrder).toEqual(['a', copyId, 'b']);
+    const { mapLayers, mapSources } = getAppState();
+    expect(getLayerOrder()).toEqual(['a', copyId, 'b']);
     expect(mapSources).toHaveLength(2);
     expect(mapLayers.find((l) => l.id === copyId)?.sourceId).toBe('b-source');
 
@@ -123,13 +124,13 @@ describe('map layer stack', () => {
 
     getAppState().pushHistorySnapshot();
     getAppState().removeCustomLayer('wall');
-    expect(getAppState().layerOrder).toEqual(['a', 'b']);
+    expect(getLayerOrder()).toEqual(['a', 'b']);
 
     getAppState().undo();
-    expect(getAppState().layerOrder).toEqual(['a', 'wall', 'b']);
+    expect(getLayerOrder()).toEqual(['a', 'wall', 'b']);
 
     getAppState().redo();
-    expect(getAppState().layerOrder).toEqual(['a', 'b']);
+    expect(getLayerOrder()).toEqual(['a', 'b']);
   });
 
   it('keeps maps added after a history snapshot in the stack when undoing', () => {
@@ -141,8 +142,8 @@ describe('map layer stack', () => {
     getAppState().undo();
 
     expect(getAppState().customLayers[0].opacity).toBe(1);
-    expect(getAppState().layerOrder).toHaveLength(2);
-    expect(getAppState().layerOrder).toContain(getAppState().mapLayers[0].id);
+    expect(getLayerOrder()).toHaveLength(2);
+    expect(getLayerOrder()).toContain(getAppState().mapLayers[0].id);
   });
 });
 

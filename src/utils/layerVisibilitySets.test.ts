@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { layerStackState, makeManualCustomLayer, makeMap } from '../test/fixtures';
+import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../test/fixtures';
 import {
   currentLayerVisibility,
   differsFromSet,
+  effectiveLayerVisibility,
   resolveSetVisibility,
   undecidedLayerIds,
   uniqueSetName,
@@ -37,6 +38,42 @@ describe('layer visibility sets', () => {
 
     expect(undecidedLayerIds(set, stack)).toEqual(['wall', 'note']);
     expect(undecidedLayerIds(set, stack, { exportableOnly: true })).toEqual(['wall']);
+  });
+
+  describe('with groups', () => {
+    const grouped = layerStackState(
+      makeMap('map'),
+      makeLayerGroup('walls', [makeManualCustomLayer('wall'), makeManualCustomLayer('door')], { visible: false }),
+    );
+
+    it('keeps the flag of a group apart from those of its layers', () => {
+      expect(currentLayerVisibility(grouped)).toEqual({ map: true, walls: false, wall: true, door: true });
+    });
+
+    it('draws a layer only when its group is shown too', () => {
+      const own = currentLayerVisibility(grouped);
+
+      expect(effectiveLayerVisibility(own, grouped)).toEqual({ map: true, wall: false, door: false });
+      expect(effectiveLayerVisibility({ ...own, walls: true, door: false }, grouped)).toEqual({
+        map: true,
+        wall: true,
+        door: false,
+      });
+    });
+
+    it('does not call a layer undecided when the set hides its group', () => {
+      const hides = { id: 's', name: 'S', visibility: { map: true, walls: false } };
+      const silent = { id: 't', name: 'T', visibility: { map: true } };
+
+      expect(undecidedLayerIds(hides, grouped)).toEqual([]);
+      expect(undecidedLayerIds(silent, grouped)).toEqual(['wall', 'door']);
+    });
+
+    it('notices a group shown differently from the set', () => {
+      const set = { id: 's', name: 'S', visibility: { walls: true } };
+
+      expect(differsFromSet(set, grouped)).toBe(true);
+    });
   });
 
   it.each([

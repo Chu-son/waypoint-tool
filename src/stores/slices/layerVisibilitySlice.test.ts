@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getAppState, resetAppStore } from '../../test/store';
-import { layerStackState, makeManualCustomLayer, makeMap } from '../../test/fixtures';
+import { getAppState, getLayerOrder, resetAppStore } from '../../test/store';
+import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../../test/fixtures';
 import { differsFromSet, undecidedLayerIds } from '../../utils/layerVisibilitySets';
 
 const visibleIds = () =>
@@ -43,16 +43,51 @@ describe('layer visibility sets', () => {
   it('keeps stack order, opacity and blend mode untouched when applying a set', () => {
     getAppState().updateMapLayer('map', { opacity: 0.4, blend_mode: 'merge_obstacles' });
     getAppState().saveLayerVisibilitySet('Any');
-    const orderBefore = [...getAppState().layerOrder];
+    const orderBefore = getLayerOrder();
 
     getAppState().updateCustomLayer('keepout', { visible: false });
     getAppState().reorderLayers(0, 2);
-    const reordered = [...getAppState().layerOrder];
+    const reordered = getLayerOrder();
     getAppState().applyLayerVisibilitySet(setNamed('Any').id);
 
-    expect(getAppState().layerOrder).toEqual(reordered);
+    expect(getLayerOrder()).toEqual(reordered);
     expect(reordered).not.toEqual(orderBefore);
     expect(getAppState().mapLayers[0]).toMatchObject({ opacity: 0.4, blend_mode: 'merge_obstacles' });
+  });
+
+  describe('with a group', () => {
+    const groupVisible = () => getAppState().layerGroups['walls'].visible;
+
+    beforeEach(() => {
+      resetAppStore(
+        layerStackState(
+          makeMap('map'),
+          makeLayerGroup('walls', [makeManualCustomLayer('wall'), makeManualCustomLayer('door')]),
+        ),
+      );
+    });
+
+    it('brings back the visibility of the group together with its layers, as one undo step', () => {
+      getAppState().saveLayerVisibilitySet('Open');
+      getAppState().setLayerGroupVisible('walls', false);
+      getAppState().updateCustomLayer('door', { visible: false });
+
+      getAppState().applyLayerVisibilitySet(setNamed('Open').id);
+
+      expect(groupVisible()).toBe(true);
+      expect(visibleIds().sort()).toEqual(['door', 'map', 'wall']);
+
+      getAppState().undo();
+      expect(groupVisible()).toBe(false);
+      expect(visibleIds().sort()).toEqual(['map', 'wall']);
+    });
+
+    it('reports a changed group as a modification of the set in use', () => {
+      getAppState().saveLayerVisibilitySet('Open');
+      getAppState().setLayerGroupVisible('walls', false);
+
+      expect(differsFromSet(setNamed('Open'), getAppState())).toBe(true);
+    });
   });
 
   describe('when the layers change after a set was saved', () => {

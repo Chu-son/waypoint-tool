@@ -1,9 +1,17 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { AnnotationGroup, AnnotationObject } from '../../types/annotation';
-import type { CustomLayer, ExportRegion, LayerVisibilitySet, MapSource, ProjectMapLayer } from '../../types/layer';
+import type {
+  CustomLayer,
+  ExportRegion,
+  LayerGroup,
+  LayerVisibilitySet,
+  MapSource,
+  ProjectMapLayer,
+} from '../../types/layer';
 import type { PipelineMetadata } from '../../types/pipeline';
 import type { WaypointNode } from '../../types/waypoint';
 import { remapHierarchicalIds } from '../mapElementTreeUtils';
+import { normalizeLayerTree, type LayerTree } from '../layerTree';
 
 /**
  * 取り込み元プロジェクトのデータを今のプロジェクトへ足すときの ID 付け替え。
@@ -107,26 +115,29 @@ export interface RemappedMaps {
   mapSources: MapSource[];
   mapLayers: ProjectMapLayer[];
   customLayers: CustomLayer[];
-  /** 取り込んだレイヤー（マップとカスタム）の ID を上から順に並べたもの。 */
-  layerOrder: string[];
+  /** 取り込んだレイヤー（マップとカスタム）とグループのツリー。グループ構成は取り込み元のまま。 */
+  rootLayerIds: string[];
+  layerGroups: Record<string, LayerGroup>;
   layerVisibilitySets: LayerVisibilitySet[];
   /** 旧表示セット ID → 新 ID。エクスポートプロファイルの参照付け替えに使う。 */
   visibilitySetIdMap: Map<string, string>;
 }
 
-/** マップ（ソースとインスタンス）、カスタムレイヤー、レイヤー表示セットを新しい ID で複製する。 */
+/** マップ（ソースとインスタンス）、カスタムレイヤー、レイヤーのツリー、レイヤー表示セットを新しい ID で複製する。 */
 export function remapMaps(
   mapSources: readonly MapSource[],
   mapLayers: readonly ProjectMapLayer[],
   customLayers: readonly CustomLayer[],
-  layerOrder: readonly string[],
+  layerTree: LayerTree,
   visibilitySets: readonly LayerVisibilitySet[],
   remapExec: ExecutionIdRemapper,
 ): RemappedMaps {
   const sourceIdMap = new Map(mapSources.map((s) => [s.id, uuidv4()]));
+  // レイヤーとグループの ID を同じ表で振り直す（ツリーと表示セットはどちらも両方を参照する）。
   const layerIdMap = new Map<string, string>();
   mapLayers.forEach((l) => layerIdMap.set(l.id, uuidv4()));
   customLayers.forEach((l) => layerIdMap.set(l.id, uuidv4()));
+  Object.keys(layerTree.layerGroups).forEach((id) => layerIdMap.set(id, uuidv4()));
 
   const newSources = mapSources.map((s) => ({ ...s, id: sourceIdMap.get(s.id)! }));
   const newLayers: ProjectMapLayer[] = mapLayers
@@ -140,13 +151,20 @@ export function remapMaps(
     remapExecutionFields({ ...structuredClone(l), id: layerIdMap.get(l.id)! }, remapExec),
   ) as CustomLayer[];
 
-  const importedIds = new Set([...newLayers.map((l) => l.id), ...newCustomLayers.map((l) => l.id)]);
-  const order = layerOrder.map((id) => layerIdMap.get(id)).filter((id): id is string => !!id && importedIds.has(id));
-  // layer_order に載っていないレイヤーも、取りこぼさないよう末尾に足す。
-  const ordered = new Set(order);
-  importedIds.forEach((id) => {
-    if (!ordered.has(id)) order.push(id);
-  });
+  const importedLayerIds = [...newLayers.map((l) => l.id), ...newCustomLayers.map((l) => l.id)];
+  const mapId = (id: string) => layerIdMap.get(id) ?? id;
+  const remappedGroups = Object.fromEntries(
+    Object.values(layerTree.layerGroups).map((g) => {
+      const id = mapId(g.id);
+      return [id, { ...g, id, children_ids: g.children_ids.map(mapId) }];
+    }),
+  );
+  // 取り込まれなかったレイヤーへの参照は外し、ツリーに載っていないレイヤーは先頭に足す。
+  const tree = normalizeLayerTree(
+    { rootLayerIds: layerTree.rootLayerIds.map(mapId), layerGroups: remappedGroups },
+    importedLayerIds,
+  );
+  const importedIds = new Set([...importedLayerIds, ...Object.keys(tree.layerGroups)]);
 
   const visibilitySetIdMap = new Map<string, string>();
   const newSets = visibilitySets.map((set) => {
@@ -164,7 +182,8 @@ export function remapMaps(
     mapSources: newSources,
     mapLayers: newLayers,
     customLayers: newCustomLayers,
-    layerOrder: order,
+    rootLayerIds: tree.rootLayerIds,
+    layerGroups: tree.layerGroups,
     layerVisibilitySets: newSets,
     visibilitySetIdMap,
   };

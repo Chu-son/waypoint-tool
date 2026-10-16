@@ -46,12 +46,13 @@ export function LayerStack({
 }: LayerStackProps) {
   const mapLayers = useAppStore((state) => state.mapLayers);
   const customLayers = useAppStore((state) => state.customLayers) || [];
-  const layerOrder = useAppStore((state) => state.layerOrder);
+  const rootLayerIds = useAppStore((state) => state.rootLayerIds);
+  const layerGroups = useAppStore((state) => state.layerGroups);
   const resolvedMapLayers = useResolvedMapLayers();
 
   const bottomFirst = useMemo(
-    () => stackEntries({ mapLayers, customLayers, layerOrder }).reverse(),
-    [mapLayers, customLayers, layerOrder],
+    () => stackEntries({ mapLayers, customLayers, rootLayerIds, layerGroups }).reverse(),
+    [mapLayers, customLayers, rootLayerIds, layerGroups],
   );
   // While its use area is being drawn, the map is shown whole so the part being left out stays visible.
   const clipEditLayerId = useAppStore((state) =>

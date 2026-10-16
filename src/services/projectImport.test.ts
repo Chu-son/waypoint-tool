@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DialogAPI } from '../api';
 import { createDefaultProjectData } from '../stores/migrations/projectMigration';
 import {
+  layerStackState,
   makeAnnotationGroup,
   makeManualCustomLayer,
   makeMap,
@@ -10,7 +11,7 @@ import {
   makeWaypoint,
   waypointTree,
 } from '../test/fixtures';
-import { getAppState, resetAppStore } from '../test/store';
+import { getAppState, getLayerOrder, resetAppStore } from '../test/store';
 import type { StrictProjectData } from '../types/project';
 import { schemaItemId } from '../utils/import/optionSchemaMerge';
 import {
@@ -96,12 +97,13 @@ describe('importing from another project', () => {
 
   it('puts imported maps on top of the layer stack under fresh ids', async () => {
     const own = makeMap('own');
-    resetAppStore({ mapSources: [own.source], mapLayers: [own.layer], layerOrder: ['own'] });
+    resetAppStore(layerStackState(own));
     const theirs = makeMap('own'); // same ids as the project we import into
     const incoming = incomingProject({
       map_sources: [theirs.source],
       map_layers: [theirs.layer],
       layer_order: ['own'],
+      layer_root_ids: ['own'],
     });
 
     await importInto(incoming, selection(['maps']));
@@ -110,7 +112,7 @@ describe('importing from another project', () => {
     expect(state.mapLayers).toHaveLength(2);
     expect(state.mapSources).toHaveLength(2);
     const imported = state.mapLayers.find((l) => l.id !== 'own')!;
-    expect(state.layerOrder).toEqual([imported.id, 'own']);
+    expect(getLayerOrder()).toEqual([imported.id, 'own']);
     expect(state.mapSources.some((s) => s.id === imported.sourceId)).toBe(true);
   });
 

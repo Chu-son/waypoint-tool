@@ -609,29 +609,9 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
     set((state) => {
       const group = state.annotationGroups[groupId];
       if (!group) return state;
-      const nextVisible = !group.visible;
-      const newObjects = { ...state.annotationObjects };
-      const newGroups = { ...state.annotationGroups };
-
-      const setVisibilityRecursive = (gid: string, vis: boolean) => {
-        if (newGroups[gid]) {
-          newGroups[gid] = { ...newGroups[gid], visible: vis };
-          (newGroups[gid].children_ids || []).forEach((cid) => {
-            if (newObjects[cid]) {
-              newObjects[cid] = { ...newObjects[cid], visible: vis };
-            }
-            if (newGroups[cid]) {
-              setVisibilityRecursive(cid, vis);
-            }
-          });
-        }
-      };
-
-      setVisibilityRecursive(groupId, nextVisible);
-
+      // Only the group's own flag changes; what is inside keeps its state (see `isAnnotationShown`).
       return {
-        annotationGroups: newGroups,
-        annotationObjects: newObjects,
+        annotationGroups: { ...state.annotationGroups, [groupId]: { ...group, visible: !group.visible } },
         isDirty: true,
       };
     });

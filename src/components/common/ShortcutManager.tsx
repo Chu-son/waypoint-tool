@@ -1,6 +1,17 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { confirmDiscardChanges } from '../../services/projectGuard';
+import {
+  confirmRemoveLayerItems,
+  groupLayerItems,
+  selectedLayerItemIds,
+  ungroupLayerItems,
+} from '../../services/layerCommands';
+import {
+  groupAnnotationItems,
+  selectedAnnotationItemIds,
+  ungroupAnnotationItems,
+} from '../../services/annotationCommands';
 
 /**
  * Global keyboard shortcuts. Reads the store when a key is pressed instead of subscribing to it,
@@ -105,6 +116,8 @@ export function ShortcutManager() {
           removeAnnotationObjects?.(selectedAnnotationIds);
         } else if (selectedNodeIds.length > 0) {
           removeNodes?.(selectedNodeIds);
+        } else if (selectedLayerItemIds().length > 0) {
+          void confirmRemoveLayerItems(selectedLayerItemIds());
         }
       }
 
@@ -185,6 +198,19 @@ export function ShortcutManager() {
             e.preventDefault();
             duplicateSelectedMapElements?.();
             break;
+          case 'g': {
+            // Grouping follows what is selected: layers or annotations.
+            const layerIds = selectedLayerItemIds();
+            const annotationIds = selectedAnnotationItemIds();
+            if (layerIds.length === 0 && annotationIds.length === 0) break;
+            e.preventDefault();
+            if (layerIds.length > 0) {
+              if (e.shiftKey) ungroupLayerItems(layerIds);
+              else groupLayerItems(layerIds);
+            } else if (e.shiftKey) ungroupAnnotationItems(annotationIds);
+            else groupAnnotationItems(annotationIds);
+            break;
+          }
           case 'h':
             e.preventDefault();
             setShowOccupancyHighlight(!showOccupancyHighlight);

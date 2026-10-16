@@ -9,6 +9,7 @@ import { LayerPanel } from '../layers/LayerPanel';
 import { PropertiesPanel } from '../properties/PropertiesPanel';
 import { PluginParamsPanel } from '../plugins/PluginParamsPanel';
 import { CustomLayerInspector } from '../properties/CustomLayerInspector';
+import { LayerSelectionInspector } from '../properties/LayerSelectionInspector';
 import { AnnotationInspector } from '../properties/AnnotationInspector';
 import { PipelineInspector } from '../properties/PipelineInspector';
 import { PipelineMetadata } from '../../../types/pipeline';
@@ -56,8 +57,8 @@ export function resolveInspectorComponent(
   }
 
   // 1. Selection-based inspector resolution takes priority when an object is actively selected
-  if (selection?.type === 'custom_layer') {
-    return <CustomLayerInspector />;
+  if (selection?.type === 'layers' && selection.ids.length > 0) {
+    return <LayerSelectionInspector ids={selection.ids} />;
   }
 
   if (selection?.type === 'annotations') {
@@ -108,11 +109,7 @@ export function useInspectorPanelComponent() {
     if (selectedNodeIds.length > 0) {
       effectiveSelection = { type: 'nodes', ids: selectedNodeIds };
     } else if (activeCustomLayerId) {
-      effectiveSelection = {
-        type: 'custom_layer',
-        layerId: activeCustomLayerId,
-        selectedObjectId: null,
-      };
+      effectiveSelection = { type: 'layers', ids: [activeCustomLayerId], selectedObjectId: null };
     } else if (selectedAnnotationIds.length > 0) {
       effectiveSelection = { type: 'annotations', ids: selectedAnnotationIds };
     }
@@ -120,8 +117,8 @@ export function useInspectorPanelComponent() {
 
   // Detect pipeline-bound artifact target
   let pipelineTarget: PipelineInspectorTarget | null = null;
-  if (effectiveSelection.type === 'custom_layer' && effectiveSelection.layerId) {
-    const layer = customLayers.find((l) => l.id === effectiveSelection.layerId);
+  if (effectiveSelection.type === 'layers' && effectiveSelection.ids.length === 1) {
+    const layer = customLayers.find((l) => l.id === effectiveSelection.ids[0]);
     if (layer?.pipeline_metadata) {
       pipelineTarget = {
         pipelineMetadata: layer.pipeline_metadata,

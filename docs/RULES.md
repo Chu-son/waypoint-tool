@@ -41,8 +41,8 @@
   - **`ui/common/`**: ボタン、入力欄、モーダル枠など、汎用・再利用可能な純粋な表示要素（2ファイル以上で共通利用）。
   - **`ui/shell/`**: アプリの外枠（TopMenu, ToolPanel, StatusBar, PanelContainer/PanelRegistry, ThemeInjector 等）。
   - **`ui/modals/`**: モーダルダイアログ（Export, Import, Settings, Welcome, KeyboardShortcuts 等）。インポートは入口（`ImportHubModal`）と取り込み対象ごとのパネルから成るため、親名のサブディレクトリ `ui/modals/import/` に置く。
-  - **`ui/trees/`**: 階層ツリー（WaypointTree, AnnotationTree とそのパネル）。
-  - **`ui/layers/`**: マップ・カスタムレイヤー・エクスポート領域の一覧パネル。
+  - **`ui/trees/`**: 階層ツリー（WaypointTree, AnnotationTree とそのパネル）。共通のツリー部品は `ui/trees/core/`（`TreeView` / `TreeRow`）。
+  - **`ui/layers/`**: レイヤーツリー（`LayerTree`）とパネル、エクスポート領域の一覧パネル。
   - **`ui/plugins/`**: プラグイン一覧・パラメータ・入力エディタ。
   - **`ui/overlays/`**: キャンバス上に重ねるフローティング UI（MapEdit, Measure, AnnotationEdit, ElementCopy）。
   - **`ui/properties/`**: 右ペインの Inspector（PropertiesPanel とその部品）。
@@ -147,7 +147,7 @@
 - **`setSelection` 経由の義務**:
   選択状態の変更は、必ず `useAppStore.getState().setSelection(...)` を使用すること。
 - **複数ドメイン同時選択の禁止**:
-  ウェイポイントノード（`selectedNodeIds`）とアノテーション（`selectedAnnotationIds`）やカスタムレイヤー（`activeCustomLayerId`）を同時に選択状態にしてはならない。
+  ウェイポイントノード（`selectedNodeIds`）とアノテーション（`selectedAnnotationIds`）やレイヤー（`ActiveSelection` の `layers`: マップ・カスタムレイヤー・グループの複数選択）を同時に選択状態にしてはならない。
   `ActiveSelection`（単一真実源）を介することで、別ドメインが選択された際は直前の選択IDが自動クリアされ、右ペインの Inspector 表示権が一意に保証される。
 
 ### 5.3 階層型エスケープ順序律 (Escape Hierarchy Ladder Rule)
@@ -184,6 +184,8 @@
 
 ### 6.2 ユーザー通知・確認
 - `window.alert` / `window.confirm` を新たに使用しない（ESLint `no-alert`）。ユーザーへの通知・確認は `DialogAPI`（または `services/` の通知ヘルパー）を経由する。
+- 結果が 3 つ（はい／いいえ／キャンセル）になる確認は `chooseAction`（`DialogAPI.choose`）を使い、ボタン名は選択肢の中身で付ける（「はい／いいえ」のままにしない）。キャンセルは何も変えない。
+- 位置調整のように連続して発火する操作（微調整パッドの長押し・数値入力）の確認は、答え（続行）を覚えて 1 回だけ聞く。ダイアログが開いているあいだの繰り返しは捨て、キャンセルされたら長押しの残りも止める（`PoseAdjuster` の `onNudge` が `false` を返す）。
 
 ### 6.3 ストア購読
 - 複数フィールドを購読する場合は `useShallow` でまとめ、不要な再レンダリングを避ける。ストア全体の購読（`useAppStore()` の引数なし呼び出し）は禁止。
@@ -197,4 +199,40 @@
 
 ### 6.5 テスト
 - テストは振る舞いを検証する。ストアのモック禁止、境界のみのモック、共通ヘルパーの利用など詳細は 📖 [TESTING.md](./TESTING.md) に従う。
+
+---
+
+## 7. ツリー操作の標準 (Tree Interaction Standard)
+
+レイヤー・アノテーションなど、階層を持つ一覧は共通の `TreeView`（`src/components/ui/trees/core/`）で作り、操作を揃える。新しいツリーを作るときも、`TreeView` に載せて以下を満たす。ウェイポイントツリーは挿入位置を持つため例外（[ARCHITECTURE.md](./ARCHITECTURE.md) の「ウェイポイントツリー」を参照）だが、選択・リネーム・Alt+↑↓・グループ化は同じ操作にそろえる。
+
+### 7.1 操作
+| 操作 | 動作 |
+|---|---|
+| クリック / Ctrl+クリック / Shift+クリック | 単一選択 / 追加・解除 / 表示順の範囲選択（`useTreeItemSelection`） |
+| ダブルクリック・F2 | 名前を変更（選択が 1 つのとき） |
+| Alt+↑ / Alt+↓ | 選択（同じ親の下にあるもの）を、その親の中で 1 つ上・下へ。端で止まる（親の外へは出ない） |
+| Ctrl+G / Ctrl+Shift+G | 選択をグループ化 / グループを解除（中身は残る）。`services/` のコマンド（`layerCommands.ts`・`annotationCommands.ts`）を通す |
+| Delete・Backspace / Ctrl+D | 削除（中身のあるグループは確認する）/ 複製 |
+| 右クリック | コンテキストメニュー。順序は「グループ化 → 名前を変更 → 解除 → 切り取り・コピー・貼り付け・複製 → 詳細 → 削除」 |
+| ドラッグ&ドロップ | 前・後・中（下表） |
+
+### 7.2 ドロップ（`computeDropTarget`）
+- グループの行は、上 1/4 が「前」、下 1/4 が「後」、残りが「中」。グループ以外は上半分が「前」、下半分が「後」。
+- 開いたグループの「後」は、その子の先頭（真下の行）になる。
+- グループの最後の行の「後」は、ポインタの横位置で外へ出る深さを選ぶ。`TREE_INDENT_PX`（10px）ごとに 1 段外へ出る。
+- 自分自身・自分の子孫の中へは落とせない（`canDrop`）。入れ子は深さ 8 まで（`MAX_LAYER_GROUP_DEPTH`）。
+- 閉じたグループの上に乗せ続けると開く。「中」は、レイヤーではグループの先頭、アノテーションでは末尾に入れる（アノテーションは積み順ではなく番号順のため）。
+
+### 7.3 展開状態と選択
+- 展開状態は `uiSlice.expandedTreeItems[treeId]` に持つ（既定は閉じる）。選択した項目の祖先は `TreeView` が自動で開く。閉じたグループが選択項目を含むときは、行に印を出す。
+- ローカル状態にしない。`treeId` はツリーごとに固定の文字列（`'layers'`・`'annotations'`）。
+
+### 7.4 表示の意味
+- グループの目のボタンは、グループ自身のフラグだけを切り替え、**子の表示設定は書き換えない**。実効表示は「自分 AND 祖先すべて」（レイヤーは `layerTree.idsHiddenByGroups` と `layerVisibilitySets.effectiveLayerVisibility`、アノテーションは `annotationVisibility.isAnnotationShown`）。
+- 描画・当たり判定・スナップ・エクスポートは、実効表示を使う。子の `visible` を直接読まない。祖先が非表示の行は「上のグループが非表示のため表示されていません」の印を出す。
+
+### 7.5 状態の持ち方
+- ツリーは 1 つの形（ルート ID の配列と、グループの `children_ids`）だけを持ち、積み順などはそこから導出する。平らな並びを別に持って同期しない（ずれの原因になる）。
+- ツリーの変更（移動・グループ化・解除・削除）は純関数（`layerTree.ts`・`treeOps.ts`）で行い、ストアのアクションは結果を 1 回の履歴スナップショットにして反映する。
 - リファクタリングの前に対象の振る舞いテストを用意し、テストが通る状態を保ったまま進める。

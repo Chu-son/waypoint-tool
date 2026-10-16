@@ -12,7 +12,11 @@ export interface PoseNudge {
 }
 
 interface PoseAdjusterProps {
-  onNudge: (nudge: PoseNudge) => void;
+  /**
+   * Applies a nudge. Returning `false` (or a promise of `false`) means it was declined: the rest of the
+   * press is ignored. While a returned promise is pending, further repeats are dropped.
+   */
+  onNudge: (nudge: PoseNudge) => void | boolean | Promise<void | boolean>;
   /** Called when a press (or key hold) begins, so the whole gesture can be one Undo entry. */
   onEditStart?: () => void;
   /** Called when the press (or key hold) ends. */
@@ -59,12 +63,16 @@ export function PoseAdjuster({ onNudge, onEditStart, onEditEnd, className }: Pos
   latest.current = { onNudge, onEditStart, onEditEnd, preset };
 
   const isEditing = useRef(false);
+  // `onNudge` declined (the user cancelled a question): the rest of this press or key hold does nothing.
+  const cancelled = useRef(false);
+  const pending = useRef(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const beginEdit = () => {
     if (isEditing.current) return;
     isEditing.current = true;
+    cancelled.current = false;
     latest.current.onEditStart?.();
   };
 
@@ -97,7 +105,22 @@ export function PoseAdjuster({ onNudge, onEditStart, onEditEnd, className }: Pos
       cw: { dx: 0, dy: 0, dyawDeg: -r },
     };
     const { dx, dy, dyawDeg } = delta[direction];
-    latest.current.onNudge({ dx: tidy(dx), dy: tidy(dy), dyawDeg: tidy(dyawDeg) });
+    // While the previous nudge is still being answered (a dialog is open), repeats are dropped, not queued.
+    if (cancelled.current || pending.current) return;
+    const result = latest.current.onNudge({ dx: tidy(dx), dy: tidy(dy), dyawDeg: tidy(dyawDeg) });
+    if (result === false) {
+      cancelled.current = true;
+      stopRepeat();
+    } else if (result instanceof Promise) {
+      pending.current = true;
+      void result.then((accepted) => {
+        pending.current = false;
+        if (accepted === false) {
+          cancelled.current = true;
+          stopRepeat();
+        }
+      });
+    }
   };
 
   const modifierMultiplier = (e: { shiftKey: boolean; altKey: boolean }) => (e.shiftKey ? 10 : e.altKey ? 0.1 : 1);

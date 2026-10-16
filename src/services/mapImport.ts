@@ -14,7 +14,9 @@ export const MAP_FILE_FILTERS: FileFilter[] = [
  *
  * @returns マップを追加したかどうか（キャンセルや失敗なら false。失敗はユーザーに知らせる）。
  */
-export async function importMapFromDialog(options: { fitToMaps?: boolean } = {}): Promise<boolean> {
+export async function importMapFromDialog(
+  options: { fitToMaps?: boolean; atSelection?: boolean } = {},
+): Promise<boolean> {
   try {
     const path = await pickImportFile(MAP_FILE_FILTERS);
     if (!path) return false;
@@ -23,7 +25,9 @@ export async function importMapFromDialog(options: { fitToMaps?: boolean } = {})
     const fileName = path.split(/[/\\]/).pop() || 'Map';
     await store.runWithLoading({ message: 'マップを読み込み中...', detail: fileName, blocking: true }, async () => {
       const mapData = await BackendAPI.loadROSMap(path);
-      store.addMapLayer(fileName, mapData.info, mapData.image_data_b64, mapData.width, mapData.height);
+      store.addMapLayer(fileName, mapData.info, mapData.image_data_b64, mapData.width, mapData.height, {
+        atSelection: options.atSelection,
+      });
       if (options.fitToMaps) store.triggerFitToMaps();
     });
     return true;

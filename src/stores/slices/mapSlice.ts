@@ -10,10 +10,37 @@ import {
   PluginCustomLayer,
   EditObject,
   ExportRegion,
+  LayerGroup,
+  GroupPoseOffset,
 } from '../../types/store';
 import { v4 as uuidv4 } from 'uuid';
-import { insertAbove, moveInOrder } from '../../utils/layerStack';
+import {
+  allTreeIds,
+  descendantLayerIds,
+  detachFromLayerTree,
+  insertIntoLayerTree,
+  layerOrderOf,
+  moveInLayerTree,
+  placementAbove,
+  removeGroupDeep,
+  topLevelInStackOrder,
+  ungroupInLayerTree,
+  wrapInLayerGroup,
+  type LayerTree,
+  type LayerTreePlacement,
+} from '../../utils/layerTree';
+import type { DropPosition } from '../../utils/treeOps';
+import { selectedCustomLayerId } from '../../utils/layerSelection';
+import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose, sameClip } from '../../utils/mapClip';
+import {
+  composeOffset,
+  isIdentityTransform,
+  mapsSharingPoseWithOutside,
+  transformEditObject,
+  transformPose,
+  type RigidTransform,
+} from '../../utils/layerGroupTransform';
 
 /** The pose shared by the linked instances of a source (`[0, 0, 0]` when its metadata has none). */
 const sourceOrigin = (source: MapSource): [number, number, number] => {
@@ -21,14 +48,29 @@ const sourceOrigin = (source: MapSource): [number, number, number] => {
   return Array.isArray(raw) ? [Number(raw[0]) || 0, Number(raw[1]) || 0, Number(raw[2]) || 0] : [0, 0, 0];
 };
 
+/** The group with `pose_offset` set, or removed when there is none. */
+const withPoseOffset = (group: LayerGroup, offset: GroupPoseOffset | undefined): LayerGroup => {
+  const next: LayerGroup = { ...group };
+  if (offset) next.pose_offset = offset;
+  else delete next.pose_offset;
+  return next;
+};
+
+/** What moving a group does to a map it shares with instances outside the group. */
+export type SharedPoseMode = 'move_all' | 'unlink';
+
 export type MapSlice = {
   /** Loaded map files (image + metadata). Shared by every instance in `mapLayers` that references it. */
   mapSources: MapSource[];
   /** Map instances: each draws one source (or part of it) at a position in the stack. */
   mapLayers: ProjectMapLayer[];
   customLayers: CustomLayer[];
-  /** Ids of every map instance and custom layer, from the top of the stack to the bottom. */
-  layerOrder: string[];
+  /**
+   * The layer tree: the single source of the stacking order. Top-level layers and groups, top of the
+   * stack first; groups hold the rest in `children_ids`. The flat compositing order is `layerOrderOf`.
+   */
+  rootLayerIds: string[];
+  layerGroups: Record<string, LayerGroup>;
   /** Canvas drag that is reshaping a layer's use area (its clip before the drag); null when not dragging. */
   mapClipDrag: {
     layerId: string;
@@ -50,7 +92,15 @@ export type MapSlice = {
   showOccupancyHighlight: boolean;
   occupancyHighlightAlpha: number;
 
-  addMapLayer: (name: string, info: any, base64: string, width: number, height: number) => void;
+  /** Adds a map on top of the stack, or with `atSelection` where the user is working (see `placementForNew`). */
+  addMapLayer: (
+    name: string,
+    info: any,
+    base64: string,
+    width: number,
+    height: number,
+    options?: { atSelection?: boolean },
+  ) => void;
   /** Adds another instance of the same map directly above `id` (for using a different part of it). */
   duplicateMapLayer: (id: string) => string | null;
   updateMapLayer: (id: string, updates: Partial<Omit<ProjectMapLayer, 'id' | 'sourceId'>>) => void;
@@ -71,10 +121,54 @@ export type MapSlice = {
   /** Abandons the drag and restores the use area from before it. */
   cancelMapClipDrag: () => void;
   removeMapLayer: (id: string) => void;
-  /** Moves a layer of any kind within the single stack (`fromIndex` / `toIndex` index `layerOrder`). */
+  /**
+   * Moves a layer of any kind within the stack (`fromIndex` / `toIndex` index the flat order) to the
+   * position of the layer now at `toIndex`, joining that layer's group.
+   */
   reorderLayers: (fromIndex: number, toIndex: number) => void;
 
-  addManualCustomLayer: (name?: string, is_reference?: boolean) => ManualCustomLayer;
+  /** Moves layers and groups before / after / inside `targetId`. One undo step; returns false when refused. */
+  moveLayerItems: (ids: string[], targetId: string, position: DropPosition) => boolean;
+  /** Wraps layers and groups in a new group where the topmost of them was. One undo step. */
+  groupLayerItems: (ids: string[], name?: string) => string | null;
+  /** Adds an empty group where the user is working (see `addManualCustomLayer`) and selects it. One undo step. */
+  addLayerGroup: (name?: string) => string;
+  /** Replaces a group by its contents. One undo step. */
+  ungroupLayerGroup: (groupId: string) => void;
+  /**
+   * Deletes a group. `withContents` also deletes every layer inside (map deletions cannot be undone, as
+   * with `removeMapLayer`); otherwise the contents take the group's place.
+   */
+  removeLayerGroup: (groupId: string, options: { withContents: boolean }) => void;
+  renameLayerGroup: (groupId: string, name: string) => void;
+  /** Toggles the group's own flag; the layers inside keep theirs. */
+  setLayerGroupVisible: (groupId: string, visible: boolean) => void;
+  /** Sets the own visible flag of layers and groups alike. */
+  setLayerItemsVisible: (ids: string[], visible: boolean) => void;
+  /**
+   * Moves everything inside a group (at any depth) as one rigid body: map poses, plugin layer poses and
+   * the objects of hand-drawn layers; the use areas of the maps follow. A map shared with instances outside
+   * the group moves for all of them (`move_all`), or only for the group's instances, which are unlinked
+   * from the shared pose (`unlink`). One undo step (none with `recordHistory: false`, for the later steps
+   * of a held nudge); returns false when there is nothing to move.
+   */
+  transformLayerGroup: (
+    groupId: string,
+    transform: RigidTransform,
+    options?: { sharedPose?: SharedPoseMode; recordHistory?: boolean },
+  ) => boolean;
+  /**
+   * Copies map instances (sharing their map) and hand-drawn layers right above the originals, and selects
+   * the copies. Plugin layers are left out: they belong to the plugin run that made them.
+   */
+  duplicateLayerItems: (ids: string[]) => string[];
+
+  /** Adds a hand-drawn layer on top of the stack, or with `atSelection` where the user is working. */
+  addManualCustomLayer: (
+    name?: string,
+    is_reference?: boolean,
+    options?: { atSelection?: boolean },
+  ) => ManualCustomLayer;
   addPluginCustomLayer: (layer: PluginCustomLayer) => void;
   updateCustomLayer: (id: string, updates: Partial<CustomLayer>) => void;
   removeCustomLayer: (id: string) => void;
@@ -101,11 +195,81 @@ export type MapSlice = {
   removeExportRegion: (id: string) => void;
 };
 
+const treeOf = (state: LayerTree): LayerTree => ({
+  rootLayerIds: state.rootLayerIds,
+  layerGroups: state.layerGroups,
+});
+
+const TOP_OF_STACK: LayerTreePlacement = { parentId: null, beforeId: null };
+
+/**
+ * Where a layer the user adds goes: directly above the topmost selected layer (in its group), at the top
+ * of a selected group, or on top of the stack when nothing in the tree is selected.
+ */
+const placementForNew = (state: AppState): LayerTreePlacement => {
+  if (state.selection.type !== 'layers') return TOP_OF_STACK;
+  const [topmost] = topLevelInStackOrder(treeOf(state), state.selection.ids);
+  if (!topmost) return TOP_OF_STACK;
+  if (state.layerGroups[topmost]) return { parentId: topmost, beforeId: null };
+  return placementAbove(treeOf(state), topmost);
+};
+
+/** `tree` with a new layer at `placement`; a layer already in the tree keeps its place. */
+const withNewLayer = (tree: LayerTree, id: string, placement: LayerTreePlacement = TOP_OF_STACK): LayerTree =>
+  layerOrderOf(tree).includes(id) ? tree : insertIntoLayerTree(tree, [id], placement);
+
+/** The selection fields for selecting `ids` in the layer tree (see `setSelection`). */
+const layerSelectionOf = (
+  ids: string[],
+  stack: Pick<AppState, 'mapLayers' | 'layerGroups'>,
+  selectedObjectId: string | null = null,
+): Pick<AppState, 'selection' | 'activeCustomLayerId' | 'selectedEditObjectId'> => {
+  if (ids.length === 0) return { selection: { type: 'none' }, activeCustomLayerId: null, selectedEditObjectId: null };
+  const customLayerId = selectedCustomLayerId(ids, stack);
+  const objectId = customLayerId ? selectedObjectId : null;
+  return {
+    selection: { type: 'layers', ids, selectedObjectId: objectId },
+    activeCustomLayerId: customLayerId,
+    selectedEditObjectId: objectId,
+  };
+};
+
+/** The selection without the items of the layer tree that are gone from `tree` (unchanged when none are). */
+const pruneLayerSelection = (state: AppState, tree: LayerTree): Partial<AppState> => {
+  if (state.selection.type !== 'layers') return {};
+  const present = new Set(allTreeIds(tree));
+  const ids = state.selection.ids.filter((id) => present.has(id));
+  if (ids.length === state.selection.ids.length) return {};
+  return layerSelectionOf(ids, { ...state, ...tree }, state.selection.selectedObjectId);
+};
+
+/**
+ * The state without the layers `ids` (map instances and custom layers): sources no instance uses any more
+ * go too, and so do removed layers from the selection.
+ */
+const withoutLayers = (state: AppState, ids: readonly string[]): Partial<AppState> => {
+  const removed = new Set(ids);
+  const mapLayers = state.mapLayers.filter((l) => !removed.has(l.id));
+  const usedSources = new Set(mapLayers.map((l) => l.sourceId));
+  const removedSources = new Set(
+    state.mapLayers.filter((l) => removed.has(l.id) && !usedSources.has(l.sourceId)).map((l) => l.sourceId),
+  );
+  const tree = detachFromLayerTree(treeOf(state), ids);
+  return {
+    mapLayers,
+    mapSources: state.mapSources.filter((s) => !removedSources.has(s.id)),
+    customLayers: state.customLayers.filter((l) => !removed.has(l.id)),
+    ...tree,
+    ...pruneLayerSelection(state, tree),
+  };
+};
+
 export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, get) => ({
   mapSources: [],
   mapLayers: [],
   customLayers: [],
-  layerOrder: [],
+  rootLayerIds: [],
+  layerGroups: {},
   mapClipDrag: null,
   activeCustomLayerId: null,
   defaultMapOpacity: 0.5,
@@ -130,7 +294,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   setShowOccupancyHighlight: (show: boolean) => set({ showOccupancyHighlight: show }),
   setOccupancyHighlightAlpha: (alpha: number) => set({ occupancyHighlightAlpha: alpha }),
 
-  addManualCustomLayer: (name?: string, is_reference?: boolean) => {
+  addManualCustomLayer: (name, is_reference, options) => {
     const customLayers = get().customLayers;
     const manualCount = customLayers.filter((l) => l.type === 'manual').length + 1;
     const newLayer: ManualCustomLayer = {
@@ -145,9 +309,8 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     };
     set((state) => ({
       customLayers: [newLayer, ...state.customLayers],
-      layerOrder: insertAbove(state.layerOrder, newLayer.id, null),
-      activeCustomLayerId: newLayer.id,
-      selection: { type: 'custom_layer', layerId: newLayer.id, selectedObjectId: null },
+      ...withNewLayer(treeOf(state), newLayer.id, options?.atSelection ? placementForNew(state) : TOP_OF_STACK),
+      ...layerSelectionOf([newLayer.id], state),
       selectedNodeIds: [],
       selectedAnnotationIds: [],
       isDirty: true,
@@ -159,9 +322,8 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     set((state) => {
       return {
         customLayers: [layer, ...state.customLayers],
-        layerOrder: insertAbove(state.layerOrder, layer.id, null),
-        activeCustomLayerId: layer.id,
-        selection: { type: 'custom_layer', layerId: layer.id, selectedObjectId: null },
+        ...withNewLayer(treeOf(state), layer.id),
+        ...layerSelectionOf([layer.id], state),
         selectedNodeIds: [],
         selectedAnnotationIds: [],
         isDirty: true,
@@ -175,17 +337,17 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     })),
 
   removeCustomLayer: (id: string) =>
-    set((state) => ({
-      customLayers: state.customLayers.filter((l) => l.id !== id),
-      layerOrder: state.layerOrder.filter((o) => o !== id),
-      activeCustomLayerId: state.activeCustomLayerId === id ? null : state.activeCustomLayerId,
-      selection:
-        state.selection.type === 'custom_layer' && state.selection.layerId === id ? { type: 'none' } : state.selection,
-      isDirty: true,
-    })),
+    set((state) => {
+      if (!state.customLayers.some((l) => l.id === id)) return {};
+      return {
+        ...withoutLayers(state, [id]),
+        ...(state.activeCustomLayerId === id ? { activeCustomLayerId: null } : {}),
+        isDirty: true,
+      };
+    }),
 
   setActiveCustomLayerId: (id: string | null) => {
-    get().setSelection(id ? { type: 'custom_layer', layerId: id, selectedObjectId: null } : { type: 'none' });
+    get().setSelection(id ? { type: 'layers', ids: [id], selectedObjectId: null } : { type: 'none' });
   },
 
   addEditObject: (layerId: string, obj: EditObject) =>
@@ -240,7 +402,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       isDirty: true,
     })),
 
-  addMapLayer: (name: string, info: any, base64: string, width: number, height: number) =>
+  addMapLayer: (name, info, base64, width, height, options) =>
     set((state) => {
       const occSettings = state.occupancySettings || {
         defaultOccupiedThresh: 0.65,
@@ -290,7 +452,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return {
         mapSources: [...state.mapSources, source],
         mapLayers: [layer, ...state.mapLayers],
-        layerOrder: insertAbove(state.layerOrder, layer.id, null),
+        ...withNewLayer(treeOf(state), layer.id, options?.atSelection ? placementForNew(state) : TOP_OF_STACK),
         isDirty: true,
       };
     }),
@@ -307,7 +469,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     };
     set((state) => ({
       mapLayers: [copy, ...state.mapLayers],
-      layerOrder: insertAbove(state.layerOrder, copy.id, id),
+      ...withNewLayer(treeOf(state), copy.id, placementAbove(treeOf(state), id)),
       isDirty: true,
     }));
     return copy.id;
@@ -404,20 +566,214 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
   removeMapLayer: (id: string) =>
     set((state) => {
-      const removed = state.mapLayers.find((l) => l.id === id);
-      if (!removed) return {};
-      const mapLayers = state.mapLayers.filter((l) => l.id !== id);
-      const stillUsed = mapLayers.some((l) => l.sourceId === removed.sourceId);
+      if (!state.mapLayers.some((l) => l.id === id)) return {};
+      return { ...withoutLayers(state, [id]), isDirty: true };
+    }),
+
+  reorderLayers: (fromIndex: number, toIndex: number) =>
+    set((state) => {
+      const order = layerOrderOf(state);
+      if (fromIndex < 0 || fromIndex >= order.length) return {};
+      const to = Math.max(0, Math.min(order.length - 1, toIndex));
+      if (to === fromIndex) return {};
+      const moved = moveInLayerTree(treeOf(state), [order[fromIndex]], order[to], to > fromIndex ? 'after' : 'before');
+      return moved ? { ...moved, isDirty: true } : {};
+    }),
+
+  moveLayerItems: (ids, targetId, position) => {
+    const moved = moveInLayerTree(treeOf(get()), ids, targetId, position);
+    if (!moved) return false;
+    get().pushHistorySnapshot();
+    set({ ...moved, isDirty: true });
+    return true;
+  },
+
+  groupLayerItems: (ids, name) => {
+    const state = get();
+    const id = uuidv4();
+    const groupName =
+      name ??
+      getNextSequentialName(
+        'Group',
+        Object.values(state.layerGroups).map((g) => g.name),
+      );
+    const wrapped = wrapInLayerGroup(treeOf(state), ids, { id, name: groupName });
+    if (!wrapped) return null;
+    state.pushHistorySnapshot();
+    set({ ...wrapped, isDirty: true });
+    return id;
+  },
+
+  addLayerGroup: (name) => {
+    const state = get();
+    const id = uuidv4();
+    const group: LayerGroup = {
+      id,
+      name:
+        name ??
+        getNextSequentialName(
+          'Group',
+          Object.values(state.layerGroups).map((g) => g.name),
+        ),
+      visible: true,
+      children_ids: [],
+    };
+    const placement = placementForNew(state);
+    state.pushHistorySnapshot();
+    set((s) => ({
+      ...insertIntoLayerTree({ ...treeOf(s), layerGroups: { ...s.layerGroups, [id]: group } }, [id], placement),
+      isDirty: true,
+    }));
+    get().setSelection({ type: 'layers', ids: [id], selectedObjectId: null });
+    return id;
+  },
+
+  ungroupLayerGroup: (groupId) => {
+    if (!get().layerGroups[groupId]) return;
+    get().pushHistorySnapshot();
+    set((state) => {
+      const tree = ungroupInLayerTree(treeOf(state), groupId);
+      return { ...tree, ...pruneLayerSelection(state, tree), isDirty: true };
+    });
+  },
+
+  removeLayerGroup: (groupId, { withContents }) => {
+    if (!get().layerGroups[groupId]) return;
+    get().pushHistorySnapshot();
+    set((state) => {
+      if (!withContents) {
+        const tree = ungroupInLayerTree(treeOf(state), groupId);
+        return { ...tree, ...pruneLayerSelection(state, tree), isDirty: true };
+      }
+      // The selection is pruned against the tree without the group, so the group leaves it too.
+      const { tree, removedLayerIds } = removeGroupDeep(treeOf(state), groupId);
+      return { ...withoutLayers({ ...state, ...tree }, removedLayerIds), isDirty: true };
+    });
+  },
+
+  renameLayerGroup: (groupId, name) =>
+    set((state) => {
+      const group = state.layerGroups[groupId];
+      if (!group || group.name === name) return {};
+      return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, name } }, isDirty: true };
+    }),
+
+  setLayerGroupVisible: (groupId, visible) =>
+    set((state) => {
+      const group = state.layerGroups[groupId];
+      if (!group || group.visible === visible) return {};
+      return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, visible } }, isDirty: true };
+    }),
+
+  transformLayerGroup: (groupId, transform, options) => {
+    const state = get();
+    if (!state.layerGroups[groupId] || isIdentityTransform(transform)) return false;
+    const inside = new Set(descendantLayerIds(state, groupId));
+    const unlinkShared = options?.sharedPose === 'unlink';
+    const sharedWithOutside = new Set(mapsSharingPoseWithOutside(state, groupId).map((l) => l.sourceId));
+    const sourceById = new Map(state.mapSources.map((s) => [s.id, s]));
+
+    // Linked instances move their source's pose, once per source; unlinked ones carry their own pose.
+    const movedSources = new Map<string, { from: [number, number, number]; to: [number, number, number] }>();
+    const unlinkedPoses = new Map<string, { from: [number, number, number]; to: [number, number, number] }>();
+    for (const layer of state.mapLayers) {
+      const source = sourceById.get(layer.sourceId);
+      if (!inside.has(layer.id) || !source) continue;
+      if (layer.origin_override) {
+        unlinkedPoses.set(layer.id, {
+          from: layer.origin_override,
+          to: transformPose(layer.origin_override, transform),
+        });
+      } else if (unlinkShared && sharedWithOutside.has(source.id)) {
+        const from = sourceOrigin(source);
+        unlinkedPoses.set(layer.id, { from, to: transformPose(from, transform) });
+      } else if (!movedSources.has(source.id)) {
+        const from = sourceOrigin(source);
+        movedSources.set(source.id, { from, to: transformPose(from, transform) });
+      }
+    }
+    const hasMapMoves = movedSources.size > 0 || unlinkedPoses.size > 0;
+    const insideCustoms = state.customLayers.filter((l) => inside.has(l.id));
+    if (!hasMapMoves && insideCustoms.length === 0) return false;
+
+    if (options?.recordHistory !== false) state.pushHistorySnapshot({ includeMapPoses: true });
+    set((s) => ({
+      layerGroups: {
+        ...s.layerGroups,
+        [groupId]: withPoseOffset(s.layerGroups[groupId], composeOffset(s.layerGroups[groupId].pose_offset, transform)),
+      },
+      mapSources: s.mapSources.map((source) => {
+        const moved = movedSources.get(source.id);
+        return moved ? { ...source, info: { ...source.info, origin: moved.to } } : source;
+      }),
+      mapLayers: s.mapLayers.map((layer) => {
+        const own = unlinkedPoses.get(layer.id);
+        if (own) {
+          return { ...layer, origin_override: own.to, clip: moveClipWithPose(layer.clip, own.from, own.to) };
+        }
+        const moved = !layer.origin_override && movedSources.get(layer.sourceId);
+        return moved ? { ...layer, clip: moveClipWithPose(layer.clip, moved.from, moved.to) } : layer;
+      }),
+      customLayers: s.customLayers.map((layer): CustomLayer => {
+        if (!inside.has(layer.id)) return layer;
+        if (layer.type === 'plugin')
+          return { ...layer, info: { ...layer.info, origin: transformPose(layer.info.origin, transform) } };
+        return { ...layer, editObjects: layer.editObjects.map((o) => transformEditObject(o, transform)) };
+      }),
+      isDirty: true,
+    }));
+    return true;
+  },
+
+  setLayerItemsVisible: (ids, visible) =>
+    set((state) => {
+      const target = new Set(ids);
+      const layerGroups = { ...state.layerGroups };
+      ids.forEach((id) => {
+        if (layerGroups[id] && layerGroups[id].visible !== visible) layerGroups[id] = { ...layerGroups[id], visible };
+      });
       return {
-        mapLayers,
-        mapSources: stillUsed ? state.mapSources : state.mapSources.filter((s) => s.id !== removed.sourceId),
-        layerOrder: state.layerOrder.filter((o) => o !== id),
+        mapLayers: state.mapLayers.map((l) => (target.has(l.id) && l.visible !== visible ? { ...l, visible } : l)),
+        customLayers: state.customLayers.map((l) =>
+          target.has(l.id) && l.visible !== visible ? ({ ...l, visible } as CustomLayer) : l,
+        ),
+        layerGroups,
         isDirty: true,
       };
     }),
 
-  reorderLayers: (fromIndex: number, toIndex: number) =>
-    set((state) => ({ layerOrder: moveInOrder(state.layerOrder, fromIndex, toIndex), isDirty: true })),
+  duplicateLayerItems: (ids) => {
+    const state = get();
+    const ordered = layerOrderOf(state).filter((id) => ids.includes(id));
+    const manual = state.customLayers.filter(
+      (l): l is ManualCustomLayer => l.type === 'manual' && ordered.includes(l.id),
+    );
+    if (manual.length > 0) state.pushHistorySnapshot();
+    const copies: string[] = [];
+    for (const id of ordered) {
+      if (state.mapLayers.some((l) => l.id === id)) {
+        const copy = get().duplicateMapLayer(id);
+        if (copy) copies.push(copy);
+        continue;
+      }
+      const original = manual.find((l) => l.id === id);
+      if (!original) continue;
+      const copy: ManualCustomLayer = {
+        ...structuredClone(original),
+        id: uuidv4(),
+        name: `${original.name} (copy)`,
+        editObjects: original.editObjects.map((o) => ({ ...structuredClone(o), id: uuidv4() })),
+      };
+      set((s) => ({
+        customLayers: [copy, ...s.customLayers],
+        ...withNewLayer(treeOf(s), copy.id, placementAbove(treeOf(s), id)),
+        isDirty: true,
+      }));
+      copies.push(copy.id);
+    }
+    if (copies.length > 0) get().setSelection({ type: 'layers', ids: copies, selectedObjectId: null });
+    return copies;
+  },
 
   setEnableSnapping: (enable: boolean) => set({ enableSnapping: enable }),
   setCursorPosition: (pos) => set({ cursorPosition: pos }),

@@ -1,6 +1,7 @@
 import type { AppState } from '../appStore';
 import { ExportTemplate, StrictProjectData } from '../../types/store';
 import { migrateAndNormalizeProjectData } from '../migrations/projectMigration';
+import { layerOrderOf } from '../../utils/layerTree';
 
 /**
  * 既存テスト（customLayersReference.test.ts, generatedLayersAndPath.test.ts）のための後方互換ラッパー
@@ -29,7 +30,10 @@ export function buildProjectData(state: AppState): StrictProjectData {
     nodes: state.nodes,
     map_sources: state.mapSources,
     map_layers: state.mapLayers,
-    layer_order: state.layerOrder,
+    // The flat order is still written so that versions without layer groups open the stack correctly.
+    layer_order: layerOrderOf(state),
+    layer_root_ids: state.rootLayerIds,
+    layer_groups: state.layerGroups,
     custom_layers: state.customLayers,
     annotation_objects: annotationObjectsToSave,
     annotation_groups: state.annotationGroups || {},

@@ -34,6 +34,8 @@ export function computeStatusInteraction(
     | 'selection'
     | 'nodes'
     | 'customLayers'
+    | 'mapLayers'
+    | 'layerGroups'
   >,
 ): StatusInteractionInfo {
   // Tier 1: Modal Stack
@@ -164,10 +166,16 @@ export function computeStatusInteraction(
     };
   }
 
-  if (currentSelection?.type === 'custom_layer') {
-    const layer = state.customLayers?.find((l) => l.id === currentSelection.layerId);
+  if (currentSelection?.type === 'layers' && currentSelection.ids.length > 0) {
+    const [id] = currentSelection.ids;
+    const name =
+      state.customLayers?.find((l) => l.id === id)?.name ??
+      state.mapLayers?.find((l) => l.id === id)?.name ??
+      state.layerGroups?.[id]?.name ??
+      'Layer';
     return {
-      modeBadgeText: `レイヤー選択: ${layer?.name || 'Custom Layer'}`,
+      modeBadgeText:
+        currentSelection.ids.length === 1 ? `レイヤー選択: ${name}` : `${currentSelection.ids.length} レイヤー選択中`,
       modeIcon: 'layer',
       modeVariant: 'obstacle',
       escActionLabel: '選択を解除',

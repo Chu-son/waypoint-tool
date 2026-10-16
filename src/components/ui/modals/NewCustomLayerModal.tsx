@@ -35,9 +35,9 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
   const defaultManualName = `Custom Layer ${customLayers.length + 1}`;
 
   const handleCreateManual = () => {
-    selectNodes([]);
     const name = manualLayerName.trim() || defaultManualName;
-    const newLayer = addManualCustomLayer(name, isReferenceManual);
+    // Placed where the user is working in the layer tree; adding selects the new layer (and clears others).
+    const newLayer = addManualCustomLayer(name, isReferenceManual, { atSelection: true });
     setActiveCustomLayerId(newLayer.id);
     setMapEditMode(true);
     setRightPanelActiveTab('inspector');

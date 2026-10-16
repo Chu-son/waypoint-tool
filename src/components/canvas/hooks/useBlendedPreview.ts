@@ -6,6 +6,7 @@ import { cellsToRgba } from '../../../api/backend/blendPreviewCodec';
 import type { BlendPreviewResult } from '../../../api/types';
 import { createRasterCache, prepareLayersForExport, type RasterCache } from '../../../services/mapRasterize';
 import { createTrace, megabytes } from '../../../services/perfTrace';
+import { idsHiddenByGroups, layerOrderOf } from '../../../utils/layerTree';
 
 const LOADING_TASK_ID = 'blended-preview';
 
@@ -34,7 +35,8 @@ function textureFromPreview(result: BlendPreviewResult): Texture {
 export function useBlendedPreview() {
   const mapSources = useAppStore((state) => state.mapSources);
   const mapLayers = useAppStore((state) => state.mapLayers);
-  const layerOrder = useAppStore((state) => state.layerOrder);
+  const rootLayerIds = useAppStore((state) => state.rootLayerIds);
+  const layerGroups = useAppStore((state) => state.layerGroups);
   const customLayers = useAppStore((state) => state.customLayers) || [];
   const occupancySettings = useAppStore((state) => state.occupancySettings);
   const isExportPreview = useAppStore((state) => state.isExportPreview);
@@ -57,8 +59,12 @@ export function useBlendedPreview() {
   // Whether the backend may be holding decoded layers of ours.
   const holdsBackendCache = useRef(false);
 
-  // Changes to blend_mode, stack order, clip, visibility, images, custom layers or occupancy settings.
+  // Changes to blend_mode, stack order, clip, visibility (own or through a group), images, custom layers
+  // or occupancy settings. Renaming or regrouping that changes neither order nor visibility keeps the key.
   const previewSyncKey = useMemo(() => {
+    const tree = { rootLayerIds, layerGroups };
+    const orderKey = layerOrderOf(tree).join(',');
+    const hiddenKey = [...idsHiddenByGroups(tree)].sort().join(',');
     const sourceKey = JSON.stringify(mapSources.map((s) => ({ id: s.id, hasImage: !!s.image_base64, info: s.info })));
     const mapKey = JSON.stringify(
       mapLayers.map((l) => ({
@@ -83,8 +89,8 @@ export function useBlendedPreview() {
       })),
     );
     const occKey = JSON.stringify(occupancySettings);
-    return `${shouldShowBlendedPreview}::${sourceKey}::${mapKey}::${layerOrder.join(',')}::${customKey}::${occKey}`;
-  }, [shouldShowBlendedPreview, mapSources, mapLayers, layerOrder, customLayers, occupancySettings]);
+    return `${shouldShowBlendedPreview}::${sourceKey}::${mapKey}::${orderKey}::${hiddenKey}::${customKey}::${occKey}`;
+  }, [shouldShowBlendedPreview, mapSources, mapLayers, rootLayerIds, layerGroups, customLayers, occupancySettings]);
 
   useEffect(() => {
     if (!shouldShowBlendedPreview) {
@@ -109,8 +115,11 @@ export function useBlendedPreview() {
     // Dev only: prints where the time of this preview went (see `createTrace`).
     const trace = createTrace('Blend Preview');
 
+    // The tree is read here rather than depended on: `previewSyncKey` already covers what of it affects the
+    // blend (order and visibility), so renaming a group does not regenerate the preview.
+    const current = useAppStore.getState();
     latestRequest.current = prepareLayersForExport(
-      { mapSources, mapLayers, customLayers, layerOrder },
+      { mapSources, mapLayers, customLayers, rootLayerIds: current.rootLayerIds, layerGroups: current.layerGroups },
       useCache ? { rasterCache: rasterCache.current } : {},
     )
       .then((layerInputs) => {
@@ -155,7 +164,6 @@ export function useBlendedPreview() {
     previewSyncKey,
     mapSources,
     mapLayers,
-    layerOrder,
     customLayers,
     occupancySettings,
     isExportPreview,

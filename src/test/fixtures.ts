@@ -5,6 +5,7 @@
 import type {
   AnnotationGroup,
   CircleAnnotation,
+  LayerGroup,
   LineAnnotation,
   ManualCustomLayer,
   MapSource,
@@ -132,26 +133,51 @@ export function makeResolvedMapLayer(id: string, overrides: Partial<ResolvedMapL
   return resolveMapLayers([source], [layer])[0];
 }
 
+type StackItem = MapFixture | ManualCustomLayer | PluginCustomLayer;
+
+/** A layer group for `layerStackState`: `items` are listed from the top, and may be groups themselves. */
+export interface LayerGroupFixture {
+  group: { id: string; name?: string; visible?: boolean };
+  items: Array<StackItem | LayerGroupFixture>;
+}
+
+export function makeLayerGroup(
+  id: string,
+  items: Array<StackItem | LayerGroupFixture>,
+  overrides: { name?: string; visible?: boolean } = {},
+): LayerGroupFixture {
+  return { group: { id, ...overrides }, items };
+}
+
 /**
- * Store state for a layer stack. Items are listed from the top of the stack to the bottom, maps
- * (from `makeMap`) and custom layers alike. Maps that share a source pass the same `source`.
+ * Store state for a layer stack. Items are listed from the top of the stack to the bottom: maps
+ * (from `makeMap`), custom layers and groups (from `makeLayerGroup`) alike. Maps that share a source
+ * pass the same `source`.
  */
 export function layerStackState(
-  ...items: Array<MapFixture | ManualCustomLayer | PluginCustomLayer>
-): Pick<AppState, 'mapSources' | 'mapLayers' | 'customLayers' | 'layerOrder'> {
+  ...items: Array<StackItem | LayerGroupFixture>
+): Pick<AppState, 'mapSources' | 'mapLayers' | 'customLayers' | 'rootLayerIds' | 'layerGroups'> {
   const mapSources: MapSource[] = [];
   const mapLayers: ProjectMapLayer[] = [];
   const customLayers: Array<ManualCustomLayer | PluginCustomLayer> = [];
-  for (const item of items) {
-    if ('source' in item) {
-      if (!mapSources.some((s) => s.id === item.source.id)) mapSources.push(item.source);
-      mapLayers.push(item.layer);
-    } else {
+  const layerGroups: Record<string, LayerGroup> = {};
+  const place = (list: Array<StackItem | LayerGroupFixture>): string[] =>
+    list.map((item) => {
+      if ('group' in item) {
+        const { id, name, visible } = item.group;
+        layerGroups[id] = { id, name: name ?? id, visible: visible ?? true, children_ids: place(item.items) };
+        return id;
+      }
+      if ('source' in item) {
+        if (!mapSources.some((s) => s.id === item.source.id)) mapSources.push(item.source);
+        mapLayers.push(item.layer);
+        return item.layer.id;
+      }
       customLayers.push(item);
-    }
-  }
-  const layerOrder = items.map((item) => ('source' in item ? item.layer.id : item.id));
-  return { mapSources, mapLayers, customLayers, layerOrder };
+      return item.id;
+    });
+  const rootLayerIds = place(items);
+  return { mapSources, mapLayers, customLayers, rootLayerIds, layerGroups };
 }
 
 export function makePluginManifest(overrides: Partial<PluginManifest> = {}): PluginManifest {
