@@ -571,7 +571,13 @@ describe('ExportModal UI', () => {
       expect(screen.getByDisplayValue('Map/{{name}}.pgm')).toBeInTheDocument();
     });
 
-    it('keeps the date in file names from the first opening, however much later it reopens', async () => {
+    const exportedPaths = () =>
+      vi.mocked(BackendAPI.executeExportPackage).mock.calls.map(([options]) => ({
+        timestamp: options.session_timestamp,
+        path: options.waypoint_items[0].path,
+      }));
+
+    it('uses the time the dialog was opened for file names, however long ago the app started', async () => {
       vi.useFakeTimers({ toFake: ['Date'] });
       try {
         vi.setSystemTime(new Date(2026, 0, 2, 3, 4, 5));
@@ -585,11 +591,47 @@ describe('ExportModal UI', () => {
         rerender(<ExportModal isOpen={true} onClose={onClose} />);
         await exportOnce(onClose);
 
-        const calls = vi.mocked(BackendAPI.executeExportPackage).mock.calls.map(([options]) => options);
-        expect(calls.map((o) => o.session_timestamp)).toEqual(['20260102_030405', '20260102_030405']);
-        expect(calls.map((o) => o.waypoint_items[0].path)).toEqual([
-          '/mock/export/dir/waypoints/20260102_waypoints.yaml',
-          '/mock/export/dir/waypoints/20260102_waypoints.yaml',
+        expect(exportedPaths()).toEqual([
+          { timestamp: '20260102_030405', path: '/mock/export/dir/waypoints/20260102_waypoints.yaml' },
+          { timestamp: '20260103_090000', path: '/mock/export/dir/waypoints/20260103_waypoints.yaml' },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps the opening time until it is refreshed, so the preview and the written files agree', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date(2026, 0, 2, 3, 4, 5));
+        const onClose = vi.fn();
+        render(<ExportModal isOpen={true} onClose={onClose} />);
+        expect(screen.getByText('20260102_waypoints.yaml')).toBeInTheDocument();
+
+        vi.setSystemTime(new Date(2026, 0, 3, 9, 0, 0));
+        await exportOnce(onClose);
+        expect(exportedPaths()).toEqual([
+          { timestamp: '20260102_030405', path: '/mock/export/dir/waypoints/20260102_waypoints.yaml' },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('takes the current time when the reference time is refreshed', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        vi.setSystemTime(new Date(2026, 0, 2, 3, 4, 5));
+        const onClose = vi.fn();
+        render(<ExportModal isOpen={true} onClose={onClose} />);
+
+        vi.setSystemTime(new Date(2026, 0, 3, 9, 0, 0));
+        fireEvent.click(screen.getByRole('button', { name: '基準時刻を現在時刻に更新' }));
+
+        expect(screen.getByText('20260103_waypoints.yaml')).toBeInTheDocument();
+        await exportOnce(onClose);
+        expect(exportedPaths()).toEqual([
+          { timestamp: '20260103_090000', path: '/mock/export/dir/waypoints/20260103_waypoints.yaml' },
         ]);
       } finally {
         vi.useRealTimers();

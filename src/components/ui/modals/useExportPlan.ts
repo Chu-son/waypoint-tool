@@ -32,8 +32,6 @@ export interface ExportSession {
   /** The item selected last time, selected again when the dialog reopens. */
   selectedItemId: string | null;
   setSelectedItemId: (id: string | null) => void;
-  /** The date and time in output file names and backups; fixed when the app starts. */
-  sessionDate: Date;
 }
 
 interface UseExportPlanOptions {
@@ -116,7 +114,11 @@ export function useExportPlan({ onClose, session }: UseExportPlanOptions) {
   }, [exportProfiles, activeExportProfileId]);
 
   // Local state for UI
-  const { selectedItemId, setSelectedItemId, sessionDate } = session;
+  const { selectedItemId, setSelectedItemId } = session;
+  // The date and time in output file names and backups. The dialog's content is mounted only while it is
+  // open, so this is the time it was opened; the preview and the written files share it until refreshed.
+  const [sessionDate, setSessionDate] = useState(() => new Date());
+  const refreshSessionDate = () => setSessionDate(new Date());
   const [conflictFiles, setConflictFiles] = useState<Set<string>>(new Set());
 
   // Derive project name from project path
@@ -503,9 +505,11 @@ export function useExportPlan({ onClose, session }: UseExportPlanOptions) {
     handleToggleItemEnabled,
     handleUpdateItem,
     inputRef,
+    refreshSessionDate,
     rootDir,
     selectedItem,
     selectedItemId,
+    sessionDate,
     setActiveExportProfileId,
     setSelectedItemId,
     treeNodes,
