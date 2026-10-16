@@ -49,7 +49,7 @@
 - **選択判定は `Set` で行う**: 項目ごとに `selectedIds.includes(id)` を呼ぶと、項目数 × 選択数になる。`useMemo` で `Set` を作ってから判定する。
 - **ツリーの親探索は索引を使う**: `findNodeParentId` は全ノードを走査する。同じツリーで繰り返し呼ぶ箇所では `buildParentIndex` の索引を渡す（`src/utils/treeUtils.ts`）。トップレベルの抽出は `collectTopLevelInOrder` / `excludeDescendantsOfOthers` を使う。
 - **重い計算は入力が変わったときだけ行う**: 差分表示（`diffLines`, `diffValues`）やラベル配置などは `useMemo` にし、名前の入力やチェックの切り替えなど無関係な再描画で作り直さない。
-- **閉じているモーダルの中身はマウントしない**: ただし、閉じても残すべき状態（例: エクスポートの前回選択項目、ファイル名の日時）は、常にマウントされている外側のコンポーネントに置く（`ExportModal`）。
+- **閉じているモーダルの中身はマウントしない**: ただし、閉じても残すべき状態（例: エクスポートの前回選択項目）は、常にマウントされている外側のコンポーネントに置く（`ExportModal`）。
 
 ---
 
@@ -121,6 +121,5 @@
 性能改善の調査中に見つかった、挙動に関する確認事項です。直すと出力が変わるため、性能改善とは別に判断してください。
 
 1. **マップ出力のファイル照合が前方一致**: `src/utils/exportPackage.ts` の `f.fileName.startsWith(region.name)`。リージョン名が別のリージョン名の前方一致（例: `area` と `area_2`）だと、別リージョンのファイルに誤ってマッチし得る。
-2. **エクスポートのファイル名に使う日時がアプリ起動時刻に固定されている**: `ExportModal` の `sessionDate` は最初のマウント時に決まり、アプリを終了するまで変わらない。日時プレースホルダを含むファイル名やバックアップ名は、何度エクスポートしても同じ日時になる。意図した仕様か確認が必要。
-3. **`ExportMapsModal` の `selectedRegions` が初期化後に更新されない**: `useState` の初期値でリージョン一覧から作るため、後から追加したリージョンは選択状態に含まれない。
-4. **フリーハンドの最後の点が取りこぼされる可能性**: `useMapEditFreehand` の `handleFreehandDrawEnd` は、最後に描画された時点の `freehandPoints` を使う。pointermove の state 更新が描画される前に pointerup が届くと、その間の点が確定されない。
+2. **`ExportMapsModal` の `selectedRegions` が初期化後に更新されない**: `useState` の初期値でリージョン一覧から作るため、後から追加したリージョンは選択状態に含まれない。
+3. **フリーハンドの最後の点が取りこぼされる可能性**: `useMapEditFreehand` の `handleFreehandDrawEnd` は、最後に描画された時点の `freehandPoints` を使う。pointermove の state 更新が描画される前に pointerup が届くと、その間の点が確定されない。

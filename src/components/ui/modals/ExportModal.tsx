@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Folder,
   Image as ImageIcon,
+  RefreshCw,
 } from 'lucide-react';
 import { Modal, ModalHeader, ModalContent, ModalFooter } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -20,6 +21,7 @@ import { Label } from '../common/Label';
 import { BrowseInput } from '../common/BrowseInput';
 import { cn } from '../../../utils/cn';
 import { TreeDirectoryNode, TreeFileNode } from '../../../utils/exportTemplateEngine';
+import { formatSessionTimestamp } from '../../../utils/exportPackage';
 import { ExportVisibilitySetField } from './ExportVisibilitySetField';
 import { ExportMapListField } from './ExportMapListField';
 
@@ -34,10 +36,9 @@ interface ExportModalProps {
  */
 export function ExportModal({ isOpen, onClose }: ExportModalProps) {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [sessionDate] = useState(() => new Date());
 
   if (!isOpen) return null;
-  return <ExportModalContent onClose={onClose} session={{ selectedItemId, setSelectedItemId, sessionDate }} />;
+  return <ExportModalContent onClose={onClose} session={{ selectedItemId, setSelectedItemId }} />;
 }
 
 function ExportModalContent({ onClose, session }: { onClose: () => void; session: ExportSession }) {
@@ -62,9 +63,11 @@ function ExportModalContent({ onClose, session }: { onClose: () => void; session
     handleToggleItemEnabled,
     handleUpdateItem,
     inputRef,
+    refreshSessionDate,
     rootDir,
     selectedItem,
     selectedItemId,
+    sessionDate,
     setActiveExportProfileId,
     setSelectedItemId,
     treeNodes,
@@ -166,6 +169,22 @@ function ExportModalContent({ onClose, session }: { onClose: () => void; session
                 出力ツリープレビュー (Virtual Directory)
               </span>
               <div className="flex items-center gap-1">
+                <span
+                  className="text-[10px] font-mono text-text-muted"
+                  title="ファイル名の {{YYYYMMDD}} などと、バックアップ名に使う日時（この画面を開いた時刻）"
+                >
+                  基準時刻 {formatSessionTimestamp(sessionDate)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="h-6 w-6"
+                  aria-label="基準時刻を現在時刻に更新"
+                  title="基準時刻を現在時刻に更新"
+                  onClick={refreshSessionDate}
+                >
+                  <RefreshCw size={12} />
+                </Button>
                 <Button
                   variant="ghost"
                   size="xs"
