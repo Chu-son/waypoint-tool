@@ -223,7 +223,7 @@ sequenceDiagram
     end
 
     rect rgb(255, 255, 240)
-    note over Store,Listeners: 【Phase 4: OnEnter (新モード開始・初期化)】<br>① 新モード固有UI初期化 (例: rightPanelActiveTab = 'inspector')<br>② 登録された onEnter(newMode, prevMode) リスナーを同期呼出
+    note over Store,Listeners: 【Phase 4: OnEnter (新モード開始・初期化)】<br>① 新モード固有UI初期化 (例: activateTab('inspector'))<br>② 登録された onEnter(newMode, prevMode) リスナーを同期呼出
     end
 
     Store-->>Caller: 遷移完了
@@ -251,7 +251,7 @@ const unsubscribe = useAppStore.getState().subscribeModeTransition({
 
 ### 4.1 `ActiveSelection` による排他的単一真実源
 
-項目の選択（ノード・アノテーション・レイヤー）で Inspector タブへ切り替えるかどうかは、`uiSlice.autoFocusInspector`（既定オン、localStorage に保存）で決まる。オフのときは、選択してもパネルは今のタブのまま（選択自体は変わる）。Inspector が空のとき（`PropertiesPanel` の「No item selected.」）に切り替えのトグルを置く。ツールのモード（`generator_add` / `annotation_edit` / `custom_layer_edit`）は Inspector で操作するため、設定にかかわらず Inspector を強制する。
+項目の選択（ノード・アノテーション・レイヤー）で Inspector タブへ切り替えるかどうかは、`uiSlice.autoFocusInspector`（既定オン、localStorage に保存）で決まる。オフのときは、選択してもパネルは今のタブのまま（選択自体は変わる）。切り替えは `activateTab('inspector')` で行い、Inspector がすでに画面に出ているとき（別カラムに置いている場合を含む）は何もしないため、他のカラムのタブは動かない。Inspector が空のとき（`PropertiesPanel` の「No item selected.」）に切り替えのトグルを置く。ツールのモード（`generator_add` / `annotation_edit` / `custom_layer_edit`）は Inspector で操作するため、設定にかかわらず Inspector を強制する。
 
 右ペインの Inspector やキャンバス上の選択ハイライトは、`interactionSlice.ts` の `selection: ActiveSelection` を単一の真実源とします。
 

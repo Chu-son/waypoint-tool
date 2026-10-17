@@ -10,9 +10,20 @@
 - **`FloatingActionBanner`** ([`src/components/ui/common/FloatingActionBanner.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/FloatingActionBanner.tsx))
   - **概要**: モード操作時（コピー、領域選択等）にキャンバス上部に浮遊表示されるバナー通知・アクションUI。
   - **主要Props**: `icon`, `title`, `subtitle`, `valueDisplay`, `statusText`, `actions`
-- **`PanelContainer`** ([`src/components/ui/shell/PanelContainer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/PanelContainer.tsx))
-  - **概要**: 左右サイドパネルを格納し、タブ切り替え、上下分割、タブ右クリックによる反対パネルへの移動（左右ドッキング）・順序並び替え、レイアウト初期化を制御するコンテナ。
-  - **主要Props**: `panels`, `activeTabId`, `onTabChange`, `viewMode`, `onViewModeChange`, `side`, `onMoveTabToPanel`, `onReorderTab`, `onResetLayout`, `onClose`, `closeIcon`
+- **`DockSide`** ([`src/components/ui/shell/DockSide.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/DockSide.tsx))
+  - **概要**: 左右サイドパネル 1 つ分。画面端のレール（`DockRail`）と、表示中のカラム（最大 2 つ）を並べる。カラムごとに幅を持ち、キャンバス側の辺のドラッグ（`useDragResize`）で幅を変える。カラムごとに `ErrorBoundary` で包み、片方が例外を出してももう片方は残る。タブが 1 つもない側は何も描画しない。
+  - **主要Props**: `side`, `dock`（`DockState`）, `tabs`（id → `PanelTab`）, `onTabClick`, `onTabContextMenu`, `onWidthChange`
+- **`DockRail`** ([`src/components/ui/shell/DockRail.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/DockRail.tsx))
+  - **概要**: パネルの外側の辺に常時表示する縦タブ列（約 28px）。ラベルは縦書き（左レールは下から上へ読む向き）。2 つのカラムのタブを区切り線で分ける。WAI-ARIA の vertical tabs（`role=tablist` / `tab`、↑↓・Home・End でフォーカス移動）。
+  - **主要Props**: `side`, `groups`, `onTabClick`, `onTabContextMenu`
+- **`DockTabMenu`** ([`src/components/ui/shell/DockTabMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/shell/DockTabMenu.tsx))
+  - **概要**: レールのタブの右クリックメニュー。同じ側のもう一方のカラム・反対側パネルのカラムへの移動、カラム内の並び替え、レイアウトのリセット。
+  - **主要Props**: `tabId`, `title`, `x`, `y`, `onClose`
+- **`useDragResize`** ([`src/hooks/useDragResize.ts`](file:///home/chuson/develop/waypoint-tool/src/hooks/useDragResize.ts))
+  - **概要**: ペインの幅ドラッグ。ドラッグ中はローカル state だけを更新し、mouseup で `onCommit` を 1 回呼ぶ（設定の書き込みをドラッグ中に走らせない）。幅は 200〜800px にクランプし、カーソルは必ず元に戻す。
+  - **主要Props**: `width`, `direction`（左パネル `1` / 右パネル `-1`）, `onCommit`
+
+> パネルの状態は `uiSlice.dockLayout`（アプリ設定にのみ保存。プロジェクトの未保存扱いにはしない）。操作は `src/utils/dockLayout.ts` の純関数に集約している。
 - **`NumericInput`** ([`src/components/ui/common/NumericInput.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/NumericInput.tsx))
   - **概要**: 数値編集用インプット。入力中の中間状態を許容し、フォーカス外/Enter で確定。`step` 指定時は ↑/↓ キーで増減（Shift ×10、Alt ×0.1）。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`, `onEditStart`, `onEditEnd`

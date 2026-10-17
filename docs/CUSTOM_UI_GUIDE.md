@@ -87,7 +87,6 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
     "leftPanel": {
       "defaultOpen": true,
       "defaultWidth": 340,
-      "viewMode": "tabs",
       "tabs": [
         { "type": "workflow", "id": "workflow", "title": "お掃除手順ガイド" },
         { "type": "builtin", "id": "project", "title": "詳細地点一覧" }
@@ -96,7 +95,6 @@ Custom UI機能を利用することで、Waypoint Toolのコア機能（マッ�
     "rightPanel": {
       "defaultOpen": true,
       "defaultWidth": 320,
-      "viewMode": "tabs",
       "tabs": [
         { "type": "builtin", "id": "inspector", "title": "属性設定" },
         { "type": "builtin", "id": "layers", "title": "マップレイヤー" }
@@ -275,7 +273,8 @@ UI全体のカラーテーマ（背景色、パネル色、ボタン色、テキ
 * **進捗MAX保持とプロジェクト永続化**:
   前のステップに戻っても、一度到達したステップのチェックマークは維持されます。また、プロジェクト保存（`.wptroj`）時にはワークフロー進捗と変数が完全保存・復元されます。
 * **Custom UI レイアウトの優先適用**:
-  Custom UI モード時は、プロジェクトファイルに記録されたレイアウト設定よりも `custom-ui.config.json` の `layout`（`viewMode` 等）が最優先で適用されます。
+  Custom UI モード時は、アプリ設定に保存されたパネル配置よりも `custom-ui.config.json` の `layout`（`tabs` / `defaultWidth` / `defaultOpen`）が優先して適用されます。Custom UI のパネル配置は保存されず、通常モードの配置には影響しません。`tabs` を指定した側は、そのタブが先頭のカラムに並びます（ユーザーはレールの右クリックで 2 カラムに分けることもできます）。
+  なお `viewMode`（`tabs` / `split`）は非推奨です。指定しても無視されます。
 
 ---
 
