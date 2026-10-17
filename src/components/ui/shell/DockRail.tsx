@@ -1,4 +1,4 @@
-import { Fragment, type MouseEvent } from 'react';
+import { Fragment, type KeyboardEvent, type MouseEvent } from 'react';
 import type { DockGroupIndex, DockSide, PanelTab } from '../../../types/ui';
 import { cn } from '../../../utils/cn';
 
@@ -19,6 +19,21 @@ interface DockRailProps {
 }
 
 const SIDE_LABEL: Record<DockSide, string> = { left: 'Left', right: 'Right' };
+
+/** WAI-ARIA tabs (vertical): ↑↓ move focus between the tabs of a column, Home/End jump to its first/last. */
+function moveFocusWithArrows(e: KeyboardEvent<HTMLElement>) {
+  const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'));
+  const current = tabs.indexOf(document.activeElement as HTMLElement);
+  if (current < 0) return;
+  let next: number;
+  if (e.key === 'ArrowDown') next = (current + 1) % tabs.length;
+  else if (e.key === 'ArrowUp') next = (current - 1 + tabs.length) % tabs.length;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = tabs.length - 1;
+  else return;
+  e.preventDefault();
+  tabs[next].focus();
+}
 
 /**
  * The always-visible strip of vertical tabs on the outer edge of a side panel. Clicking a tab shows it, or hides it
@@ -47,15 +62,19 @@ export function DockRail({ side, groups, onTabClick, onTabContextMenu }: DockRai
               aria-orientation="vertical"
               aria-label={`${SIDE_LABEL[side]} panel tabs ${groupIndex + 1}`}
               className="flex flex-col items-stretch gap-1"
+              onKeyDown={moveFocusWithArrows}
             >
               {group.tabs.map((tab) => {
                 const isShown = group.shown && group.activeTab === tab.id;
+                // Only one tab per column is in the tab order: the one shown (or the first, when none is).
+                const isTabStop = group.activeTab !== null ? group.activeTab === tab.id : tab === group.tabs[0];
                 return (
                   <button
                     key={tab.id}
                     type="button"
                     role="tab"
                     aria-selected={isShown}
+                    tabIndex={isTabStop ? 0 : -1}
                     title={tab.title}
                     onClick={() => onTabClick(tab.id)}
                     onContextMenu={onTabContextMenu ? (e) => onTabContextMenu(tab.id, e) : undefined}

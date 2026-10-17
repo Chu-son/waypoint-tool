@@ -102,6 +102,22 @@ describe('DockSide', () => {
     expect(getAppState().dockLayout.right.groups[1].activeTab).toBe('inspector');
   });
 
+  it('moves focus between the tabs of a column with the arrow keys', () => {
+    renderWithStore(<Docks />, PAST_WELCOME);
+
+    tab('LAYERS').focus();
+    fireEvent.keyDown(tab('LAYERS'), { key: 'ArrowDown' });
+    expect(tab('INSPECTOR')).toHaveFocus();
+
+    fireEvent.keyDown(tab('INSPECTOR'), { key: 'ArrowDown' });
+    expect(tab('LAYERS')).toHaveFocus();
+
+    fireEvent.keyDown(tab('LAYERS'), { key: 'End' });
+    expect(tab('INSPECTOR')).toHaveFocus();
+    // Moving focus does not switch the tab
+    expect(screen.getByText('contents of layers')).toBeInTheDocument();
+  });
+
   it('renders nothing for a side that has no tabs', () => {
     renderWithStore(<Docks />, PAST_WELCOME);
     act(() => {

@@ -1,8 +1,9 @@
 import './App.css';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react';
 import { ToolPanel } from './components/ui/shell/ToolPanel';
 import { TopMenu } from './components/ui/shell/TopMenu';
 import { DockSide } from './components/ui/shell/DockSide';
+import { DockTabMenu } from './components/ui/shell/DockTabMenu';
 import { MapCanvas } from './components/canvas/MapCanvas';
 import { SettingsModal } from './components/ui/modals/SettingsModal';
 import { ExportModal } from './components/ui/modals/ExportModal';
@@ -42,6 +43,12 @@ function App() {
   const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
 
+  const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  const openTabMenu = useCallback((tabId: string, e: MouseEvent) => {
+    e.preventDefault();
+    setTabMenu({ tabId, x: e.clientX, y: e.clientY });
+  }, []);
+  const closeTabMenu = useCallback(() => setTabMenu(null), []);
   const clickPanelTab = useAppStore((state) => state.clickPanelTab);
   const setPanelGroupWidth = useAppStore((state) => state.setPanelGroupWidth);
 
@@ -241,6 +248,7 @@ function App() {
           dock={dock}
           tabs={panelTabs}
           onTabClick={clickPanelTab}
+          onTabContextMenu={openTabMenu}
           onWidthChange={(group, width) => setPanelGroupWidth('left', group, width)}
         />
 
@@ -261,9 +269,19 @@ function App() {
           dock={dock}
           tabs={panelTabs}
           onTabClick={clickPanelTab}
+          onTabContextMenu={openTabMenu}
           onWidthChange={(group, width) => setPanelGroupWidth('right', group, width)}
         />
       </div>
+      {tabMenu && (
+        <DockTabMenu
+          tabId={tabMenu.tabId}
+          title={panelTabs.get(tabMenu.tabId)?.title ?? tabMenu.tabId}
+          x={tabMenu.x}
+          y={tabMenu.y}
+          onClose={closeTabMenu}
+        />
+      )}
       <StatusBar />
       <ErrorBoundary fallbackTitle="設定画面の表示中にエラーが発生しました">
         <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setSettingsModalOpen(false)} />
