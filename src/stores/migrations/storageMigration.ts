@@ -1,18 +1,23 @@
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 import { DefaultExportFormat, PluginSetting } from '../../types/store';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
-import type { PanelLayout } from '../../types/ui';
+import type { DockLayout, PanelLayout } from '../../types/ui';
+import {
+  ALL_BUILTIN_PANEL_TAB_IDS,
+  createDefaultDockLayout,
+  dockLayoutFromLegacy,
+  normalizeDockLayout,
+} from '../../utils/dockLayout';
 
 export type { PanelLayout };
+export { ALL_BUILTIN_PANEL_TAB_IDS };
 
-export const STORAGE_VERSION = 3;
+export const STORAGE_VERSION = 4;
 
 export const DEFAULT_PANEL_LAYOUT: PanelLayout = {
   leftTabs: ['waypoints', 'annotations', 'plugins'],
   rightTabs: ['layers', 'inspector'],
 };
-
-export const ALL_BUILTIN_PANEL_TAB_IDS = ['waypoints', 'annotations', 'plugins', 'layers', 'inspector'] as const;
 
 export interface PersistedStorageState {
   defaultMapOpacity?: number;
@@ -40,6 +45,8 @@ export interface PersistedStorageState {
   mapEditFillValue?: number;
   mapEditBrushSize?: number;
   mapEditSubTool?: string;
+  /** The dock layout. `panelLayout` and its siblings below are the pre-dock keys, read only by the v4 migration. */
+  dockLayout?: DockLayout;
   panelLayout?: PanelLayout;
   leftPanelActiveTab?: string;
   rightPanelActiveTab?: string;
@@ -73,6 +80,7 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   mapEditFillValue: 0,
   mapEditBrushSize: 10,
   mapEditSubTool: 'brush',
+  dockLayout: createDefaultDockLayout(),
   panelLayout: DEFAULT_PANEL_LAYOUT,
   leftPanelActiveTab: 'waypoints',
   rightPanelActiveTab: 'layers',
@@ -150,10 +158,24 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
   }
   state.rightPanelActiveTab = rightTab;
 
+  // v4 へのマイグレーション: ドックレイアウト (dockLayout) の導入。
+  // 旧キー (panelLayout / *PanelActiveTab / *PanelWidth) は書き換えない。dev / AppImage / Docker が同じ設定ファイルを共有し、
+  // 旧ビルドは旧キーを読み書きし続けるため。dockLayout があればそれを正とし、なければ旧キーから導出する。
+  const dockLayout =
+    state.dockLayout !== undefined
+      ? normalizeDockLayout(state.dockLayout)
+      : dockLayoutFromLegacy(state.panelLayout, {
+          leftActiveTab: state.leftPanelActiveTab,
+          rightActiveTab: state.rightPanelActiveTab,
+          leftWidth: state.leftPanelWidth,
+          rightWidth: state.rightPanelWidth,
+        });
+
   // 欠落プロパティのデフォルト値補完（浅いマージ + 安全なフォールバック）
   return {
     ...DEFAULT_STORAGE_STATE,
     ...state,
+    dockLayout,
     panelLayout: normalizedPanelLayout,
     leftPanelActiveTab: leftTab,
     rightPanelActiveTab: rightTab,

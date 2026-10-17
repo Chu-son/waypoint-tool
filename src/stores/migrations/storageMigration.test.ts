@@ -8,7 +8,7 @@ describe('storageMigration', () => {
     expect(migrateStorage(undefined, 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage('corrupt', 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage(12345, 0)).toEqual(DEFAULT_STORAGE_STATE);
-    expect(STORAGE_VERSION).toBe(3);
+    expect(STORAGE_VERSION).toBe(4);
     expect(DEFAULT_STORAGE_STATE.pluginSettings).toEqual([]);
     expect(DEFAULT_STORAGE_STATE.panelLayout).toEqual({
       leftTabs: ['waypoints', 'annotations', 'plugins'],
@@ -165,5 +165,57 @@ describe('storageMigration', () => {
     expect(migrated.panelLayout!.leftTabs).toContain('plugins');
     expect(migrated.panelLayout!.rightTabs).toContain('inspector');
     expect(migrated.panelLayout!.rightTabs).toContain('layers');
+  });
+
+  describe('dockLayout (v4)', () => {
+    it('derives the dock layout from the pre-dock settings, keeping tabs, active tabs and widths', () => {
+      const migrated = migrateStorage(
+        {
+          panelLayout: { leftTabs: ['waypoints', 'annotations', 'plugins'], rightTabs: ['inspector', 'layers'] },
+          leftPanelActiveTab: 'annotations',
+          rightPanelActiveTab: 'layers',
+          leftPanelWidth: 400,
+          rightPanelWidth: 350,
+        },
+        3,
+      );
+      expect(migrated.dockLayout!.left.groups[0]).toMatchObject({ activeTab: 'annotations', width: 400 });
+      expect(migrated.dockLayout!.right.groups[0]).toMatchObject({
+        tabs: ['inspector', 'layers'],
+        activeTab: 'layers',
+        width: 350,
+      });
+      expect(migrated.dockLayout!.right.groups[1].tabs).toEqual([]);
+    });
+
+    it('leaves the pre-dock keys as they were, so an older build sharing the file keeps working', () => {
+      const old = {
+        panelLayout: { leftTabs: ['waypoints', 'annotations', 'plugins'], rightTabs: ['layers', 'inspector'] },
+        leftPanelActiveTab: 'plugins',
+        rightPanelActiveTab: 'inspector',
+        leftPanelWidth: 300,
+        rightPanelWidth: 330,
+      };
+      const migrated = migrateStorage(old, 3);
+      expect(migrated).toMatchObject(old);
+    });
+
+    it('trusts a saved dock layout over the pre-dock keys that an older build may have rewritten since', () => {
+      const dockLayout = migrateStorage({}, 3).dockLayout!;
+      dockLayout.right.groups[1] = { tabs: ['inspector'], activeTab: 'inspector', visible: true, width: 300 };
+      dockLayout.right.groups[0].tabs = ['layers'];
+      const migrated = migrateStorage(
+        { dockLayout, panelLayout: { leftTabs: [], rightTabs: ['layers', 'inspector'] } },
+        4,
+      );
+      expect(migrated.dockLayout!.right.groups[1].tabs).toEqual(['inspector']);
+      expect(migrated.dockLayout!.right.groups[0].tabs).toEqual(['layers']);
+    });
+
+    it('repairs a broken saved dock layout and is idempotent', () => {
+      const once = migrateStorage({ dockLayout: { left: { groups: [{ tabs: ['ghost'] }] } } }, 4);
+      expect(once.dockLayout!.left.groups[0].tabs).toEqual(['waypoints', 'annotations', 'plugins']);
+      expect(migrateStorage(once, 4)).toEqual(once);
+    });
   });
 });
