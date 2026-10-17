@@ -1,3 +1,13 @@
+import type { ReactNode } from 'react';
+
+/** A tab that can be docked in a side panel: its label on the rail and the contents shown in a pane. */
+export interface PanelTab {
+  id: string;
+  title: string;
+  icon?: ReactNode;
+  component: ReactNode;
+}
+
 /** Waypoint field that can be copied to other waypoints with Element Copy. */
 export type ElementCopyField = 'x' | 'y' | 'z' | 'yaw';
 export type ElementCopyCoordSystem = 'world' | 'anchor';

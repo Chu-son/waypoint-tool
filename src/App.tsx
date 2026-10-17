@@ -1,8 +1,8 @@
 import './App.css';
-import { useEffect, useCallback, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { ToolPanel } from './components/ui/shell/ToolPanel';
 import { TopMenu } from './components/ui/shell/TopMenu';
-import { PanelContainer, PanelTab } from './components/ui/shell/PanelContainer';
+import { DockSide } from './components/ui/shell/DockSide';
 import { MapCanvas } from './components/canvas/MapCanvas';
 import { SettingsModal } from './components/ui/modals/SettingsModal';
 import { ExportModal } from './components/ui/modals/ExportModal';
@@ -28,27 +28,22 @@ import {
 } from './components/ui/shell/PanelRegistry';
 import { useAppStore } from './stores/appStore';
 import { flushSettings } from './stores/persistence/settingsStorage';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { AppAPI, DialogAPI, BackendAPI } from './api';
-import { Button } from './components/ui/common/Button';
 import { extractProjectName, formatWindowTitle } from './utils/projectUtils';
+import { ALL_BUILTIN_PANEL_TAB_IDS } from './utils/dockLayout';
 
 import { PluginInstance } from './types/store';
+import type { DockState, PanelTab } from './types/ui';
 
 function App() {
   // Sidebar States from Store
-  // Interim wiring: the old PanelContainer shows only the first column of each side until the dock rail replaces it.
   const dockLayout = useAppStore((state) => state.dockLayout);
   const customPanelLayout = useAppStore((state) => state.customPanelLayout);
   const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
 
-  const movePanelTab = useAppStore((state) => state.movePanelTab);
-  const reorderPanelTab = useAppStore((state) => state.reorderPanelTab);
-  const resetPanelLayout = useAppStore((state) => state.resetPanelLayout);
-  const activateTab = useAppStore((state) => state.activateTab);
-  const setLeftPanelOpen = useAppStore((state) => state.setLeftPanelOpen);
-  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const clickPanelTab = useAppStore((state) => state.clickPanelTab);
+  const setPanelGroupWidth = useAppStore((state) => state.setPanelGroupWidth);
 
   const isSettingsModalOpen = useAppStore((state) => state.isSettingsModalOpen);
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
@@ -67,15 +62,12 @@ function App() {
 
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
-  const activeDockLayout = isCustomUiMode && customPanelLayout ? customPanelLayout : dockLayout;
-  const leftGroup = activeDockLayout.left.groups[0];
-  const rightGroup = activeDockLayout.right.groups[0];
-  const leftWidth = leftGroup.width;
-  const rightWidth = rightGroup.width;
-  const setLeftWidth = useCallback((width: number) => useAppStore.getState().setPanelGroupWidth('left', 0, width), []);
-  const setRightWidth = useCallback(
-    (width: number) => useAppStore.getState().setPanelGroupWidth('right', 0, width),
-    [],
+  const dock: DockState = useMemo(
+    () => ({
+      layout: isCustomUiMode && customPanelLayout ? customPanelLayout : dockLayout,
+      open: { left: isLeftPanelOpen, right: isRightPanelOpen },
+    }),
+    [isCustomUiMode, customPanelLayout, dockLayout, isLeftPanelOpen, isRightPanelOpen],
   );
   const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const isDirty = useAppStore((state) => state.isDirty);
@@ -217,77 +209,22 @@ function App() {
     };
   }, []);
 
-  const handleLeftDrag = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = leftWidth;
-
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const newWidth = startWidth + (moveEvent.clientX - startX);
-        setLeftWidth(Math.max(180, Math.min(newWidth, 600)));
-      };
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        document.body.style.cursor = 'default';
-      };
-      document.body.style.cursor = 'col-resize';
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    },
-    [leftWidth],
-  );
-
-  const handleRightDrag = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = rightWidth;
-
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const newWidth = startWidth - (moveEvent.clientX - startX);
-        setRightWidth(Math.max(200, Math.min(newWidth, 800)));
-      };
-      const onMouseUp = () => {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-        document.body.style.cursor = 'default';
-      };
-      document.body.style.cursor = 'col-resize';
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    },
-    [rightWidth],
-  );
-
   const inspectorComponent = useInspectorPanelComponent();
 
-  const defaultLeftPanels: PanelTab[] = useMemo(() => {
-    return leftGroup.tabs
-      .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
-      .filter((tab): tab is PanelTab => tab !== null);
-  }, [leftGroup.tabs, inspectorComponent]);
-
-  const defaultRightPanels: PanelTab[] = useMemo(() => {
-    return rightGroup.tabs
-      .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
-      .filter((tab): tab is PanelTab => tab !== null);
-  }, [rightGroup.tabs, inspectorComponent]);
-
-  const leftPanels = useMemo(() => {
-    if (isCustomUiMode && customUiConfig?.layout?.leftPanel?.tabs) {
-      return resolvePanelTabs(customUiConfig.layout.leftPanel.tabs, defaultLeftPanels, inspectorComponent);
+  // Every tab that can be docked, by id. A Custom UI's own tabs (titles, icons, HTML panels) replace the built-ins.
+  const panelTabs = useMemo(() => {
+    const tabs = new Map<string, PanelTab>();
+    for (const id of ALL_BUILTIN_PANEL_TAB_IDS) {
+      const tab = resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent);
+      if (tab) tabs.set(id, tab);
     }
-    return defaultLeftPanels;
-  }, [isCustomUiMode, customUiConfig, defaultLeftPanels, inspectorComponent]);
-
-  const rightPanels = useMemo(() => {
-    if (isCustomUiMode && customUiConfig?.layout?.rightPanel?.tabs) {
-      return resolvePanelTabs(customUiConfig.layout.rightPanel.tabs, defaultRightPanels, inspectorComponent);
+    if (isCustomUiMode) {
+      for (const defs of [customUiConfig?.layout?.leftPanel?.tabs, customUiConfig?.layout?.rightPanel?.tabs]) {
+        for (const tab of resolvePanelTabs(defs, [], inspectorComponent)) tabs.set(tab.id, tab);
+      }
     }
-    return defaultRightPanels;
-  }, [isCustomUiMode, customUiConfig, defaultRightPanels, inspectorComponent]);
+    return tabs;
+  }, [isCustomUiMode, customUiConfig, inspectorComponent]);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-surface-base text-text-base overflow-hidden font-sans">
@@ -299,109 +236,33 @@ function App() {
         <ToolPanel />
 
         {/* Left Panel */}
-        {isLeftPanelOpen && leftPanels.length > 0 && (
-          <>
-            <div
-              style={{ width: leftWidth }}
-              className="bg-surface-panel border-r border-border-base flex flex-col z-20 shadow-lg relative flex-shrink-0"
-            >
-              <ErrorBoundary fallbackTitle="左サイドバーの表示中にエラーが発生しました">
-                <PanelContainer
-                  panels={leftPanels}
-                  activeTabId={leftGroup.activeTab ?? ''}
-                  onTabChange={activateTab}
-                  viewMode="tabs"
-                  onViewModeChange={() => {}}
-                  onClose={() => setLeftPanelOpen(false)}
-                  closeIcon={<ChevronLeft size={16} />}
-                  side="left"
-                  onMoveTabToPanel={(tabId, side) => movePanelTab(tabId, { side, group: 0 })}
-                  onReorderTab={(side, from, to) => reorderPanelTab(side, 0, from, to)}
-                  onResetLayout={resetPanelLayout}
-                />
-              </ErrorBoundary>
-            </div>
-            {/* Dragger */}
-            <div
-              className="w-1 cursor-col-resize hover:bg-primary-base/50 active:bg-primary-base z-10 transition-colors"
-              onMouseDown={handleLeftDrag}
-            />
-          </>
-        )}
+        <DockSide
+          side="left"
+          dock={dock}
+          tabs={panelTabs}
+          onTabClick={clickPanelTab}
+          onWidthChange={(group, width) => setPanelGroupWidth('left', group, width)}
+        />
 
         {/* Main Center Area */}
-        <div className="flex-1 bg-surface-base relative overflow-hidden flex flex-col">
+        <div className="flex-1 min-w-[320px] bg-surface-base relative overflow-hidden flex flex-col">
           <ElementCopyOverlay />
           <MapEditOverlay />
           <AnnotationEditOverlay />
           <MeasureOverlay />
           <BackgroundLoadingBadge />
-          {/* Top Floating Bar for restoring panels if closed */}
-          <div className="absolute top-4 left-4 right-4 z-10 flex justify-between pointer-events-none">
-            {!isLeftPanelOpen && leftPanels.length > 0 ? (
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={() => setLeftPanelOpen(true)}
-                className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
-                title="Open Left Panel"
-              >
-                <ChevronRight size={16} />
-              </Button>
-            ) : (
-              <div />
-            )}
-
-            {!isRightPanelOpen && rightPanels.length > 0 ? (
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={() => setRightPanelOpen(true)}
-                className="pointer-events-auto bg-surface-panel/80 backdrop-blur shadow-lg border-border-base"
-                title="Open Right Panel"
-              >
-                <ChevronLeft size={16} />
-              </Button>
-            ) : (
-              <div />
-            )}
-          </div>
-
           <div className="flex-1 relative w-full h-full flex items-center justify-center">
             <MapCanvas />
           </div>
         </div>
 
-        {/* Right Panel */}
-        {isRightPanelOpen && rightPanels.length > 0 && (
-          <>
-            {/* Dragger */}
-            <div
-              className="w-1 cursor-col-resize hover:bg-primary-base/50 active:bg-primary-base z-10 transition-colors"
-              onMouseDown={handleRightDrag}
-            />
-            <div
-              style={{ width: rightWidth }}
-              className="bg-surface-panel border-l border-border-base flex flex-col z-20 shadow-lg relative flex-shrink-0"
-            >
-              <ErrorBoundary fallbackTitle="右サイドバーの表示中にエラーが発生しました">
-                <PanelContainer
-                  panels={rightPanels}
-                  activeTabId={rightGroup.activeTab ?? ''}
-                  onTabChange={activateTab}
-                  viewMode="tabs"
-                  onViewModeChange={() => {}}
-                  onClose={() => setRightPanelOpen(false)}
-                  closeIcon={<ChevronRight size={16} />}
-                  side="right"
-                  onMoveTabToPanel={(tabId, side) => movePanelTab(tabId, { side, group: 0 })}
-                  onReorderTab={(side, from, to) => reorderPanelTab(side, 0, from, to)}
-                  onResetLayout={resetPanelLayout}
-                />
-              </ErrorBoundary>
-            </div>
-          </>
-        )}
+        <DockSide
+          side="right"
+          dock={dock}
+          tabs={panelTabs}
+          onTabClick={clickPanelTab}
+          onWidthChange={(group, width) => setPanelGroupWidth('right', group, width)}
+        />
       </div>
       <StatusBar />
       <ErrorBoundary fallbackTitle="設定画面の表示中にエラーが発生しました">
