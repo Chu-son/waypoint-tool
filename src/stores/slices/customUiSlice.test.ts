@@ -66,8 +66,45 @@ describe('customUiSlice', () => {
     expect(state.isWelcomeModalOpen).toBe(false);
     expect(state.isInitialLaunch).toBe(false);
     expect(state.isLeftPanelOpen).toBe(false);
-    expect(state.leftPanelWidth).toBe(400);
-    expect(state.leftPanelViewMode).toBe('split');
+  });
+
+  describe('panel layout', () => {
+    const customConfig = {
+      layout: {
+        leftPanel: { defaultWidth: 400, tabs: [{ type: 'html_inline' as const, id: 'guide', html: '<p>hi</p>' }] },
+      },
+    };
+
+    it('lays the config tabs out in its own layout and leaves the saved layout alone', () => {
+      const saved = useAppStore.getState().dockLayout;
+
+      useAppStore.getState().applyCustomUiConfig(customConfig);
+
+      const custom = useAppStore.getState().customPanelLayout!;
+      expect(custom.left.groups[0]).toMatchObject({ tabs: ['guide'], activeTab: 'guide', width: 400 });
+      // A side the config does not describe keeps the saved arrangement.
+      expect(custom.right.groups[0].tabs).toEqual(saved.right.groups[0].tabs);
+      expect(useAppStore.getState().dockLayout).toBe(saved);
+    });
+
+    it('applies layout changes to the Custom UI layout while it is active, not to the saved one', () => {
+      const saved = useAppStore.getState().dockLayout;
+      useAppStore.getState().applyCustomUiConfig(customConfig);
+
+      useAppStore.getState().setPanelGroupWidth('left', 0, 500);
+      useAppStore.getState().activateTab('guide');
+
+      expect(useAppStore.getState().customPanelLayout!.left.groups[0].width).toBe(500);
+      expect(useAppStore.getState().dockLayout).toBe(saved);
+    });
+
+    it('ignores the deprecated viewMode', () => {
+      useAppStore.getState().applyCustomUiConfig({
+        layout: { leftPanel: { ...customConfig.layout.leftPanel, viewMode: 'split' } },
+      });
+
+      expect(useAppStore.getState().customPanelLayout!.left.groups[1].tabs).toEqual([]);
+    });
   });
 
   it('should detect custom UI preset and switch to it', async () => {

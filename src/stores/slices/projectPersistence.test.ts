@@ -159,8 +159,6 @@ describe('projectPersistence roundtrip & strict validation', () => {
         origin: { kind: 'utm', zone: 54, hemisphere: 'N', easting: 388500.5, northing: 3949000.25 },
         alignment: { dx: 3.5, dy: -2, yawDeg: 12.5 },
       },
-      left_panel_view_mode: 'split',
-      right_panel_view_mode: 'split',
       active_path_calculator_plugin_id: 'dijkstra-plugin',
       path_calculator_params: { tolerance: 0.05 },
       auto_recalculate_path: false,
@@ -230,8 +228,6 @@ describe('projectPersistence roundtrip & strict validation', () => {
       'robot_footprint',
       'occupancy_settings',
       'default_map_opacity',
-      'left_panel_view_mode',
-      'right_panel_view_mode',
       'active_path_calculator_plugin_id',
       'path_calculator_params',
       'auto_recalculate_path',
@@ -274,8 +270,8 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(saved.occupancy_settings).toEqual(fullProjectData.occupancy_settings);
     expect(saved.default_map_opacity).toBe(0.65);
     expect(saved.geo_map).toEqual(fullProjectData.geo_map);
-    expect(saved.left_panel_view_mode).toBe('split');
-    expect(saved.right_panel_view_mode).toBe('split');
+    expect(saved).not.toHaveProperty('left_panel_view_mode');
+    expect(saved).not.toHaveProperty('right_panel_view_mode');
     expect(saved.active_path_calculator_plugin_id).toBe('dijkstra-plugin');
     expect(saved.path_calculator_params).toEqual({ tolerance: 0.05 });
     expect(saved.auto_recalculate_path).toBe(false);
@@ -359,8 +355,6 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(state.defaultExportFormats).toEqual(DEFAULT_EXPORT_FORMATS);
     expect(state.robotFootprint).toEqual(DEFAULT_ROBOT_FOOTPRINT);
     expect(state.occupancySettings).toEqual(DEFAULT_OCCUPANCY_SETTINGS);
-    expect(state.leftPanelViewMode).toBe('tabs');
-    expect(state.rightPanelViewMode).toBe('tabs');
     expect(state.autoRecalculatePath).toBe(true);
     expect(state.currentStepIndex).toBe(0);
     expect(state.workflowVariables).toEqual({});
@@ -388,28 +382,15 @@ describe('projectPersistence roundtrip & strict validation', () => {
     expect(useAppStore.getState().autoRecalculatePath).toBe(true);
   });
 
-  it('respects custom UI layout configuration over loaded project view modes when in custom UI mode', () => {
-    useAppStore.setState({
-      isCustomUiMode: true,
-      customUiConfig: {
-        layout: {
-          leftPanel: { viewMode: 'split' },
-          rightPanel: { viewMode: 'tabs' },
-        },
-      } as any,
-    });
+  it('does not touch the panel layout when an old project with split views is loaded', () => {
+    const layout = useAppStore.getState().dockLayout;
 
     useAppStore.getState().setProjectData({
-      left_panel_view_mode: 'tabs',
+      left_panel_view_mode: 'split',
       right_panel_view_mode: 'split',
-    });
+    } as any);
 
-    const state = useAppStore.getState();
-    expect(state.leftPanelViewMode).toBe('split');
-    expect(state.rightPanelViewMode).toBe('tabs');
-
-    // Clean up
-    useAppStore.setState({ isCustomUiMode: false, customUiConfig: null });
+    expect(useAppStore.getState().dockLayout).toBe(layout);
   });
 
   it('preserves generator node with baseline_waypoints, plugin_id, generator_params, and plugin_data on roundtrip', () => {
@@ -472,8 +453,6 @@ describe('projectPersistence roundtrip & strict validation', () => {
       occupancy_settings: DEFAULT_OCCUPANCY_SETTINGS,
       default_map_opacity: DEFAULT_MAP_OPACITY,
       geo_map: DEFAULT_GEO_MAP,
-      left_panel_view_mode: 'tabs',
-      right_panel_view_mode: 'tabs',
       active_path_calculator_plugin_id: null,
       path_calculator_params: {},
       auto_recalculate_path: true,

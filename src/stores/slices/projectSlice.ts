@@ -288,10 +288,6 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const globalTemplates = state.exportTemplates.filter((t) => t.scope !== 'local');
         const localTemplates = data.export_templates.map((t: any) => ({ ...t, scope: 'local' }));
 
-        const customUiLayout = state.isCustomUiMode && state.customUiConfig ? state.customUiConfig.layout : null;
-        const effectiveLeftViewMode = customUiLayout?.leftPanel?.viewMode ?? data.left_panel_view_mode;
-        const effectiveRightViewMode = customUiLayout?.rightPanel?.viewMode ?? data.right_panel_view_mode;
-
         return {
           rootNodeIds: data.root_node_ids,
           nodes: data.nodes,
@@ -323,8 +319,6 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           robotFootprint: data.robot_footprint,
           occupancySettings: data.occupancy_settings,
           defaultMapOpacity: data.default_map_opacity,
-          leftPanelViewMode: effectiveLeftViewMode,
-          rightPanelViewMode: effectiveRightViewMode,
           activePathCalculatorPluginId: data.active_path_calculator_plugin_id,
           pathCalculatorParams: data.path_calculator_params,
           autoRecalculatePath: data.auto_recalculate_path,
@@ -400,8 +394,6 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
           indexStartIndex: 0,
           exportIntegersAsFloat: true,
           decimalPrecision: 6,
-          leftPanelViewMode: 'tabs',
-          rightPanelViewMode: 'tabs',
           exportTemplates: state.exportTemplates.filter((t) => t.scope !== 'local'),
           currentProjectPath: null,
           isDirty: false,

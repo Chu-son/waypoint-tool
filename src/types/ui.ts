@@ -20,9 +20,6 @@ export interface LegacyPanelLayout {
   rightTabs: string[];
 }
 
-/** @deprecated Removed once `uiSlice` moves to `DockLayout`. */
-export type PanelLayout = LegacyPanelLayout;
-
 export type DockSide = 'left' | 'right';
 /** 0 = the group nearest the canvas, 1 = the group nearest the screen edge (and its rail). */
 export type DockGroupIndex = 0 | 1;

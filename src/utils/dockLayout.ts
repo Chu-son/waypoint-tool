@@ -138,6 +138,34 @@ export function dockLayoutFromLegacy(
   });
 }
 
+export interface CustomSidePanel {
+  tabIds: string[];
+  width?: number;
+}
+
+/**
+ * The layout of a Custom UI: the tabs its config lists go into the first column of that side (the second column is
+ * left empty); a side the config does not list keeps `base`. Tab ids are not checked against the built-in ones, and
+ * the result is never saved.
+ */
+export function createCustomDockLayout(
+  base: DockLayout,
+  custom: Partial<Record<DockSide, CustomSidePanel>>,
+): DockLayout {
+  const layout = createDefaultDockLayout();
+  for (const side of SIDES) {
+    const spec = custom[side];
+    if (!spec || spec.tabIds.length === 0) {
+      layout[side] = { groups: base[side].groups.map((g) => ({ ...g, tabs: [...g.tabs] })) as [DockGroup, DockGroup] };
+      continue;
+    }
+    const width = clampGroupWidth(spec.width ?? base[side].groups[0].width);
+    layout[side].groups[0] = group(spec.tabIds, width);
+    layout[side].groups[1] = emptyGroup(width);
+  }
+  return layout;
+}
+
 export interface DockLocation {
   side: DockSide;
   group: DockGroupIndex;

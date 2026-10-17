@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CanvasContextMenu, CanvasContextMenuTarget } from './CanvasContextMenu';
 import { useAppStore } from '../../stores/appStore';
+import { getVisibleTabs } from '../../test/store';
 
 describe('CanvasContextMenu', () => {
   const mockOnClose = vi.fn();
@@ -36,7 +37,7 @@ describe('CanvasContextMenu', () => {
     fireEvent.click(screen.getByText('一覧リストで位置を表示'));
     expect(useAppStore.getState().treeRevealTarget).toEqual(expect.objectContaining({ type: 'node', id: 'wp-1' }));
     expect(useAppStore.getState().isLeftPanelOpen).toBe(true);
-    expect(useAppStore.getState().leftPanelActiveTab).toBe('waypoints');
+    expect(getVisibleTabs()).toContain('waypoints');
     expect(mockOnClose).toHaveBeenCalled();
   });
 

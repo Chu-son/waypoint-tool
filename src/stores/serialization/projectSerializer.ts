@@ -47,8 +47,6 @@ export function buildProjectData(state: AppState): StrictProjectData {
     robot_footprint: state.robotFootprint,
     occupancy_settings: state.occupancySettings,
     default_map_opacity: state.defaultMapOpacity,
-    left_panel_view_mode: state.leftPanelViewMode,
-    right_panel_view_mode: state.rightPanelViewMode,
     active_path_calculator_plugin_id: state.activePathCalculatorPluginId,
     path_calculator_params: state.pathCalculatorParams,
     auto_recalculate_path: state.autoRecalculatePath,

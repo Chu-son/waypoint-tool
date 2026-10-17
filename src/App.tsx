@@ -37,21 +37,16 @@ import { PluginInstance } from './types/store';
 
 function App() {
   // Sidebar States from Store
-  const panelLayout = useAppStore((state) => state.panelLayout);
-  const leftPanelActiveTab = useAppStore((state) => state.leftPanelActiveTab);
-  const rightPanelActiveTab = useAppStore((state) => state.rightPanelActiveTab);
-  const leftPanelViewMode = useAppStore((state) => state.leftPanelViewMode);
-  const rightPanelViewMode = useAppStore((state) => state.rightPanelViewMode);
+  // Interim wiring: the old PanelContainer shows only the first column of each side until the dock rail replaces it.
+  const dockLayout = useAppStore((state) => state.dockLayout);
+  const customPanelLayout = useAppStore((state) => state.customPanelLayout);
   const isLeftPanelOpen = useAppStore((state) => state.isLeftPanelOpen);
   const isRightPanelOpen = useAppStore((state) => state.isRightPanelOpen);
 
-  const moveTabToPanel = useAppStore((state) => state.moveTabToPanel);
-  const reorderTab = useAppStore((state) => state.reorderTab);
+  const movePanelTab = useAppStore((state) => state.movePanelTab);
+  const reorderPanelTab = useAppStore((state) => state.reorderPanelTab);
   const resetPanelLayout = useAppStore((state) => state.resetPanelLayout);
-  const setLeftPanelActiveTab = useAppStore((state) => state.setLeftPanelActiveTab);
-  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
-  const setLeftPanelViewMode = useAppStore((state) => state.setLeftPanelViewMode);
-  const setRightPanelViewMode = useAppStore((state) => state.setRightPanelViewMode);
+  const activateTab = useAppStore((state) => state.activateTab);
   const setLeftPanelOpen = useAppStore((state) => state.setLeftPanelOpen);
   const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
 
@@ -70,13 +65,18 @@ function App() {
   const isWelcomeModalOpen = useAppStore((state) => state.isWelcomeModalOpen);
   const setWelcomeModalOpen = useAppStore((state) => state.setWelcomeModalOpen);
 
-  const leftWidth = useAppStore((state) => state.leftPanelWidth);
-  const rightWidth = useAppStore((state) => state.rightPanelWidth);
-  const setLeftWidth = useAppStore((state) => state.setLeftPanelWidth);
-  const setRightWidth = useAppStore((state) => state.setRightPanelWidth);
-
   const customUiConfig = useAppStore((state) => state.customUiConfig);
   const isCustomUiMode = useAppStore((state) => state.isCustomUiMode);
+  const activeDockLayout = isCustomUiMode && customPanelLayout ? customPanelLayout : dockLayout;
+  const leftGroup = activeDockLayout.left.groups[0];
+  const rightGroup = activeDockLayout.right.groups[0];
+  const leftWidth = leftGroup.width;
+  const rightWidth = rightGroup.width;
+  const setLeftWidth = useCallback((width: number) => useAppStore.getState().setPanelGroupWidth('left', 0, width), []);
+  const setRightWidth = useCallback(
+    (width: number) => useAppStore.getState().setPanelGroupWidth('right', 0, width),
+    [],
+  );
   const currentProjectPath = useAppStore((state) => state.currentProjectPath);
   const isDirty = useAppStore((state) => state.isDirty);
   const getEffectiveBrandName = useAppStore((state) => state.getEffectiveBrandName);
@@ -264,16 +264,16 @@ function App() {
   const inspectorComponent = useInspectorPanelComponent();
 
   const defaultLeftPanels: PanelTab[] = useMemo(() => {
-    return (panelLayout?.leftTabs || [])
+    return leftGroup.tabs
       .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
       .filter((tab): tab is PanelTab => tab !== null);
-  }, [panelLayout?.leftTabs, inspectorComponent]);
+  }, [leftGroup.tabs, inspectorComponent]);
 
   const defaultRightPanels: PanelTab[] = useMemo(() => {
-    return (panelLayout?.rightTabs || [])
+    return rightGroup.tabs
       .map((id) => resolveBuiltinPanelTab(id, undefined, undefined, inspectorComponent))
       .filter((tab): tab is PanelTab => tab !== null);
-  }, [panelLayout?.rightTabs, inspectorComponent]);
+  }, [rightGroup.tabs, inspectorComponent]);
 
   const leftPanels = useMemo(() => {
     if (isCustomUiMode && customUiConfig?.layout?.leftPanel?.tabs) {
@@ -308,15 +308,15 @@ function App() {
               <ErrorBoundary fallbackTitle="左サイドバーの表示中にエラーが発生しました">
                 <PanelContainer
                   panels={leftPanels}
-                  activeTabId={leftPanelActiveTab}
-                  onTabChange={setLeftPanelActiveTab}
-                  viewMode={leftPanelViewMode}
-                  onViewModeChange={setLeftPanelViewMode}
+                  activeTabId={leftGroup.activeTab ?? ''}
+                  onTabChange={activateTab}
+                  viewMode="tabs"
+                  onViewModeChange={() => {}}
                   onClose={() => setLeftPanelOpen(false)}
                   closeIcon={<ChevronLeft size={16} />}
                   side="left"
-                  onMoveTabToPanel={moveTabToPanel}
-                  onReorderTab={reorderTab}
+                  onMoveTabToPanel={(tabId, side) => movePanelTab(tabId, { side, group: 0 })}
+                  onReorderTab={(side, from, to) => reorderPanelTab(side, 0, from, to)}
                   onResetLayout={resetPanelLayout}
                 />
               </ErrorBoundary>
@@ -387,15 +387,15 @@ function App() {
               <ErrorBoundary fallbackTitle="右サイドバーの表示中にエラーが発生しました">
                 <PanelContainer
                   panels={rightPanels}
-                  activeTabId={rightPanelActiveTab}
-                  onTabChange={setRightPanelActiveTab}
-                  viewMode={rightPanelViewMode}
-                  onViewModeChange={setRightPanelViewMode}
+                  activeTabId={rightGroup.activeTab ?? ''}
+                  onTabChange={activateTab}
+                  viewMode="tabs"
+                  onViewModeChange={() => {}}
                   onClose={() => setRightPanelOpen(false)}
                   closeIcon={<ChevronRight size={16} />}
                   side="right"
-                  onMoveTabToPanel={moveTabToPanel}
-                  onReorderTab={reorderTab}
+                  onMoveTabToPanel={(tabId, side) => movePanelTab(tabId, { side, group: 0 })}
+                  onReorderTab={(side, from, to) => reorderPanelTab(side, 0, from, to)}
                   onResetLayout={resetPanelLayout}
                 />
               </ErrorBoundary>

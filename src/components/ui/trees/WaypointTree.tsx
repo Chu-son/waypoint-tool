@@ -50,8 +50,7 @@ export function WaypointTree() {
   const ungroupNode = useAppStore((state) => state.ungroupNode);
   const renameNode = useAppStore((state) => state.renameNode);
   const removeNodes = useAppStore((state) => state.removeNodes);
-  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
-  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const activateTab = useAppStore((state) => state.activateTab);
   const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
   const anchorNodeId = useAppStore((state) => state.anchorNodeId);
   const setAnchorNode = useAppStore((state) => state.setAnchorNode);
@@ -266,10 +265,7 @@ export function WaypointTree() {
     selectedIds: selectedNodeIds,
     selectFn: selectNodes,
     visibleIds: selectableIds,
-    onInspect: () => {
-      setRightPanelActiveTab('inspector');
-      setRightPanelOpen(true);
-    },
+    onInspect: () => activateTab('inspector'),
     elementCopyState,
     onElementCopySelect: (id) => {
       selectNodes([id]);
@@ -607,8 +603,7 @@ export function WaypointTree() {
                     icon={<Layers size={13} className="text-text-muted" />}
                     onSelect={() => {
                       selectNodes([contextNodeId]);
-                      setRightPanelActiveTab('inspector');
-                      setRightPanelOpen(true);
+                      activateTab('inspector');
                     }}
                   >
                     インスペクターを開く

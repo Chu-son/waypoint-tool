@@ -2,7 +2,7 @@ import { screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { AnnotationTree } from './AnnotationTree';
 import { renderWithStore } from '../../../test/render';
-import { getAppState } from '../../../test/store';
+import { getAppState, getVisibleTabs } from '../../../test/store';
 import { makeAnnotationGroup, makeLineAnnotation, makePointAnnotation } from '../../../test/fixtures';
 import type { AnnotationGroup, AnnotationObject } from '../../../types/store';
 import type { AppState } from '../../../stores/appStore';
@@ -38,7 +38,7 @@ describe('AnnotationTree', () => {
     fireEvent.click(screen.getByText('Start Point'));
 
     expect(getAppState().selectedAnnotationIds).toEqual(['point-1']);
-    expect(getAppState().rightPanelActiveTab).toBe('inspector');
+    expect(getVisibleTabs()).toContain('inspector');
     expect(getAppState().isRightPanelOpen).toBe(true);
   });
 

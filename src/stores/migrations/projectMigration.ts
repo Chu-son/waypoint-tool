@@ -366,12 +366,8 @@ export function normalizeV1(raw: any): StrictProjectData {
         : DEFAULT_OCCUPANCY_SETTINGS.defaultNegate,
   };
 
-  // 9. パネルビューモード & 経路計算
-  const leftPanelViewMode =
-    data.left_panel_view_mode === 'split' || data.leftPanelViewMode === 'split' ? 'split' : 'tabs';
-  const rightPanelViewMode =
-    data.right_panel_view_mode === 'split' || data.rightPanelViewMode === 'split' ? 'split' : 'tabs';
-
+  // 9. 経路計算
+  // (旧ファイルの left/right_panel_view_mode は読み捨てる。パネルのレイアウトはアプリ設定で、プロジェクトには持たない)
   const activePathCalculatorPluginId =
     typeof (data.active_path_calculator_plugin_id ?? data.activePathCalculatorPluginId) === 'string'
       ? (data.active_path_calculator_plugin_id ?? data.activePathCalculatorPluginId)
@@ -536,8 +532,6 @@ export function normalizeV1(raw: any): StrictProjectData {
     robot_footprint: robotFootprint,
     occupancy_settings: occupancySettings,
     default_map_opacity: defaultMapOpacity,
-    left_panel_view_mode: leftPanelViewMode,
-    right_panel_view_mode: rightPanelViewMode,
     active_path_calculator_plugin_id: activePathCalculatorPluginId,
     path_calculator_params: pathCalculatorParams,
     auto_recalculate_path: autoRecalculatePath,

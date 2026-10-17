@@ -6,6 +6,8 @@
  */
 import { useAppStore, type AppState } from '../stores/appStore';
 import { layerOrderOf } from '../utils/layerTree';
+import { visibleTabIds } from '../utils/dockLayout';
+import { getDockState } from '../stores/dockAccess';
 import { resetPoseEditGuards } from '../services/poseEditGuards';
 
 // Captured when this module is first evaluated (each test file gets a fresh module graph),
@@ -38,3 +40,6 @@ export const getAppState = (): AppState => useAppStore.getState();
 
 /** The compositing order of the layers in the store (the layer tree flattened), top of the stack first. */
 export const getLayerOrder = (): string[] => layerOrderOf(useAppStore.getState());
+
+/** The panel tabs whose contents are on screen right now (across both side panels and all columns). */
+export const getVisibleTabs = (): string[] => visibleTabIds(getDockState(useAppStore.getState()));

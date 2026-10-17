@@ -86,8 +86,7 @@ export function AnnotationTree() {
   const setShowAnnotations = useAppStore((state) => state.setShowAnnotations);
   const showAnnotationLabels = useAppStore((state) => state.showAnnotationLabels);
   const setShowAnnotationLabels = useAppStore((state) => state.setShowAnnotationLabels);
-  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
-  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const activateTab = useAppStore((state) => state.activateTab);
   const openPluginDataModal = useAppStore((state) => state.openPluginDataModal);
   const copySelectedMapElements = useAppStore((state) => state.copySelectedMapElements);
   const cutSelectedMapElements = useAppStore((state) => state.cutSelectedMapElements);
@@ -116,8 +115,7 @@ export function AnnotationTree() {
   const select = (ids: string[]) => {
     selectAnnotationObjects(ids);
     if (ids.length > 0 && useAppStore.getState().autoFocusInspector) {
-      setRightPanelActiveTab('inspector');
-      setRightPanelOpen(true);
+      activateTab('inspector');
     }
   };
 

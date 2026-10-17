@@ -12,6 +12,8 @@ import {
 import { filterTopLevelIds } from '../../utils/mapElementTreeUtils';
 import { collectDescendantIds, getFlattenedNodeIds } from '../../utils/treeUtils';
 import { selectedCustomLayerId } from '../../utils/layerSelection';
+import { activateTab } from '../../utils/dockLayout';
+import { applyDockOperation } from '../dockAccess';
 
 export type CanvasAbortHandler = () => boolean;
 
@@ -52,14 +54,11 @@ export interface InteractionSlice {
  */
 function applyInspectorTabUpdates(state: AppState, updates: Partial<AppState>, force = false) {
   if (!force && !state.autoFocusInspector) return;
-  const isLeft = state.panelLayout?.leftTabs?.includes('inspector');
-  if (isLeft) {
-    updates.leftPanelActiveTab = 'inspector';
-    updates.isLeftPanelOpen = true;
-  } else {
-    updates.rightPanelActiveTab = 'inspector';
-    updates.isRightPanelOpen = true;
-  }
+  // Does nothing while the Inspector is already on screen (e.g. in a second column), so it never disturbs the layout.
+  Object.assign(
+    updates,
+    applyDockOperation(state, (dock) => activateTab(dock, 'inspector')),
+  );
 }
 
 export const createInteractionSlice: StateCreator<AppState, [], [], InteractionSlice> = (set, get) => {

@@ -1,11 +1,15 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { CustomUiConfig } from '../../types/customUi';
+import type { DockLayout } from '../../types/ui';
+import { createCustomDockLayout } from '../../utils/dockLayout';
 import { BackendAPI } from '../../api';
 
 export type CustomUISlice = {
   customUiConfig: CustomUiConfig | null;
   isCustomUiMode: boolean;
+  /** Panel layout while a Custom UI is active. Not saved; null when the config has no `layout`. */
+  customPanelLayout: DockLayout | null;
   customUiPresetType: 'dev' | 'sample' | null;
   customUiPresetPath: string | null;
   setCustomUiConfig: (config: CustomUiConfig | null) => void;
@@ -22,6 +26,7 @@ export type CustomUISlice = {
 export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> = (set, get) => ({
   customUiConfig: null,
   isCustomUiMode: false,
+  customPanelLayout: null,
   customUiPresetType: null,
   customUiPresetPath: null,
 
@@ -39,42 +44,25 @@ export const createCustomUISlice: StateCreator<AppState, [], [], CustomUISlice> 
     set({
       customUiConfig: config,
       isCustomUiMode: true,
+      customPanelLayout: null,
     });
 
-    // Apply window layout settings from Custom UI config if present
+    // Apply window layout settings from Custom UI config if present. The panel layout goes into its own
+    // `customPanelLayout`, so it neither reads nor overwrites the user's saved layout.
     const layout = config.layout;
     if (layout) {
       const updates: Partial<AppState> = {};
 
-      if (layout.leftPanel) {
-        if (typeof layout.leftPanel.defaultOpen === 'boolean') {
-          updates.isLeftPanelOpen = layout.leftPanel.defaultOpen;
-        }
-        if (typeof layout.leftPanel.defaultWidth === 'number') {
-          updates.leftPanelWidth = layout.leftPanel.defaultWidth;
-        }
-        if (layout.leftPanel.viewMode) {
-          updates.leftPanelViewMode = layout.leftPanel.viewMode;
-        }
-        if (layout.leftPanel.tabs && layout.leftPanel.tabs.length > 0) {
-          updates.leftPanelActiveTab = layout.leftPanel.tabs[0].id;
-        }
+      const tabIds = (tabs?: Array<{ id: string }>) => (tabs ?? []).map((t) => t.id);
+      updates.customPanelLayout = createCustomDockLayout(get().dockLayout, {
+        left: { tabIds: tabIds(layout.leftPanel?.tabs), width: layout.leftPanel?.defaultWidth },
+        right: { tabIds: tabIds(layout.rightPanel?.tabs), width: layout.rightPanel?.defaultWidth },
+      });
+      if (typeof layout.leftPanel?.defaultOpen === 'boolean') updates.isLeftPanelOpen = layout.leftPanel.defaultOpen;
+      if (typeof layout.rightPanel?.defaultOpen === 'boolean') {
+        updates.isRightPanelOpen = layout.rightPanel.defaultOpen;
       }
-
-      if (layout.rightPanel) {
-        if (typeof layout.rightPanel.defaultOpen === 'boolean') {
-          updates.isRightPanelOpen = layout.rightPanel.defaultOpen;
-        }
-        if (typeof layout.rightPanel.defaultWidth === 'number') {
-          updates.rightPanelWidth = layout.rightPanel.defaultWidth;
-        }
-        if (layout.rightPanel.viewMode) {
-          updates.rightPanelViewMode = layout.rightPanel.viewMode;
-        }
-        if (layout.rightPanel.tabs && layout.rightPanel.tabs.length > 0) {
-          updates.rightPanelActiveTab = layout.rightPanel.tabs[0].id;
-        }
-      }
+      // `viewMode` is accepted in the config but no longer has an effect.
 
       // Welcome modal suppression
       if (layout.showWelcomeModal === false) {

@@ -94,7 +94,12 @@
           "properties": {
             "defaultOpen": { "type": "boolean" },
             "defaultWidth": { "type": "number" },
-            "viewMode": { "type": "string", "enum": ["tabs", "split"] },
+            "viewMode": {
+              "type": "string",
+              "enum": ["tabs", "split"],
+              "deprecated": true,
+              "description": "Deprecated: accepted but ignored."
+            },
             "tabs": {
               "type": "array",
               "items": {
@@ -118,7 +123,12 @@
           "properties": {
             "defaultOpen": { "type": "boolean" },
             "defaultWidth": { "type": "number" },
-            "viewMode": { "type": "string", "enum": ["tabs", "split"] },
+            "viewMode": {
+              "type": "string",
+              "enum": ["tabs", "split"],
+              "deprecated": true,
+              "description": "Deprecated: accepted but ignored."
+            },
             "tabs": {
               "type": "array",
               "items": {
