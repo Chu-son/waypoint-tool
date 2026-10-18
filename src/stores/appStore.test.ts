@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAppStore } from './appStore';
 import { layerOrderOf } from '../utils/layerTree';
+import { getVisibleTabs } from '../test/store';
 
 describe('AppStore Zustand Store', () => {
   // Reset store before each test
@@ -378,34 +379,28 @@ describe('AppStore Zustand Store', () => {
     expect(state.robotFootprint).toEqual({ type: 'circular', radius: 0.3 });
   });
 
-  // --- パネル表示モード (Tab / Split View) ---
+  // --- パネルのレイアウトはアプリ設定で、プロジェクトの読み込み・リセットでは変わらない ---
 
-  it('should restore and reset panel view modes in setProjectData and resetProject', () => {
-    const { setProjectData, resetProject, setLeftPanelViewMode, setRightPanelViewMode } = useAppStore.getState();
+  it('should leave the panel layout alone in setProjectData and resetProject', () => {
+    const { setProjectData, resetProject, movePanelTab } = useAppStore.getState();
 
-    setLeftPanelViewMode('split');
-    setRightPanelViewMode('tabs');
-    expect(useAppStore.getState().leftPanelViewMode).toBe('split');
-    expect(useAppStore.getState().rightPanelViewMode).toBe('tabs');
+    movePanelTab('inspector', { side: 'right', group: 1 });
+    const layout = useAppStore.getState().dockLayout;
 
     setProjectData({
       root_node_ids: [],
       nodes: {},
-      left_panel_view_mode: 'tabs',
+      // An old project file: the retired split view of the side panels. It no longer has any effect.
+      left_panel_view_mode: 'split',
       right_panel_view_mode: 'split',
-    });
-
-    let state = useAppStore.getState();
-    expect(state.leftPanelViewMode).toBe('tabs');
-    expect(state.rightPanelViewMode).toBe('split');
+    } as any);
+    expect(useAppStore.getState().dockLayout).toBe(layout);
 
     resetProject();
-    state = useAppStore.getState();
-    expect(state.leftPanelViewMode).toBe('tabs');
-    expect(state.rightPanelViewMode).toBe('tabs');
+    expect(useAppStore.getState().dockLayout).toBe(layout);
   });
 
-  it('should prioritize Custom UI layout settings over project file and restore workflow_state', () => {
+  it('should restore workflow_state when loading a project in Custom UI mode', () => {
     const { setProjectData } = useAppStore.getState();
 
     useAppStore.setState({
@@ -421,8 +416,6 @@ describe('AppStore Zustand Store', () => {
     setProjectData({
       root_node_ids: [],
       nodes: {},
-      left_panel_view_mode: 'tabs', // Should be ignored because Custom UI is 'split'
-      right_panel_view_mode: 'split', // Should be ignored because Custom UI is 'tabs'
       workflow_state: {
         current_step_index: 3,
         max_reached_step_index: 4,
@@ -432,8 +425,6 @@ describe('AppStore Zustand Store', () => {
     });
 
     const state = useAppStore.getState();
-    expect(state.leftPanelViewMode).toBe('split');
-    expect(state.rightPanelViewMode).toBe('tabs');
     expect(state.currentStepIndex).toBe(3);
     expect(state.maxReachedStepIndex).toBe(4);
     expect(state.workflowVariables['restoredKey']).toBe('hello');
@@ -509,6 +500,6 @@ describe('AppStore Zustand Store', () => {
 
     // Switching to add_generator opens inspector
     store.setActiveTool('add_generator');
-    expect(useAppStore.getState().rightPanelActiveTab).toBe('inspector');
+    expect(getVisibleTabs()).toContain('inspector');
   });
 });

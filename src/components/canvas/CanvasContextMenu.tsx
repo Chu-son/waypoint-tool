@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useAppStore } from '../../stores/appStore';
 import { ListTree, Folder, Layers } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { useClampedMenuPosition } from '../../hooks/useClampedMenuPosition';
 
 export interface CanvasContextMenuTarget {
   type: 'node' | 'annotation';
@@ -55,11 +56,8 @@ export function CanvasContextMenu({ x, y, target, onClose }: CanvasContextMenuPr
     };
   }, [onClose]);
 
-  // ウィンドウ外へのはみ出し防止位置調整
-  const menuWidth = 230;
-  const menuHeight = 110;
-  const adjustedX = typeof window !== 'undefined' ? Math.max(8, Math.min(x, window.innerWidth - menuWidth - 8)) : x;
-  const adjustedY = typeof window !== 'undefined' ? Math.max(8, Math.min(y, window.innerHeight - menuHeight - 8)) : y;
+  // ウィンドウ外へのはみ出し防止（実寸を測って補正する）
+  const position = useClampedMenuPosition(menuRef, x, y);
 
   const handleReveal = () => {
     revealInTree(target.type, target.id);
@@ -83,7 +81,7 @@ export function CanvasContextMenu({ x, y, target, onClose }: CanvasContextMenuPr
   return (
     <div
       ref={menuRef}
-      style={{ top: adjustedY, left: adjustedX }}
+      style={position}
       className="fixed z-[9999] bg-surface-panel/95 border border-border-base rounded-xl shadow-2xl py-1 min-w-[210px] text-xs text-text-base select-none backdrop-blur-md flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100"
     >
       {/* Header Info */}

@@ -56,13 +56,7 @@ describe('App Integration', () => {
 
     render(<App />);
 
-    // Switch to Layers tab and click "Load ROS Map (YAML)"
-    const layersTab = screen.getByText('Layers');
-    act(() => {
-      layersTab.click();
-    });
-
-    // The button should now be visible
+    // The Layers panel is shown by default, so "Load Map" is already visible
     const loadMapBtn = screen.getByText('Load Map');
     act(() => {
       loadMapBtn.click();
@@ -111,17 +105,25 @@ describe('App Integration', () => {
   it('switches between Inspector and Layers tabs', async () => {
     render(<App />);
 
-    // Default tab is Inspector
-    expect(screen.getByText('Inspector')).toBeInTheDocument();
-
-    // Click Layers tab
-    const layersTab = screen.getByText('Layers');
-    act(() => {
-      layersTab.click();
-    });
-
-    // Layers panel content should be visible
+    // Layers is the tab shown by default
     expect(screen.getByText('Load Map')).toBeInTheDocument();
+
+    act(() => {
+      screen.getByRole('tab', { name: 'Inspector' }).click();
+    });
+    expect(screen.queryByText('Load Map')).not.toBeInTheDocument();
+
+    act(() => {
+      screen.getByRole('tab', { name: 'Layers' }).click();
+    });
+    expect(screen.getByText('Load Map')).toBeInTheDocument();
+
+    // Clicking the tab that is shown closes the panel; the rail stays so it can be reopened
+    act(() => {
+      screen.getByRole('tab', { name: 'Layers' }).click();
+    });
+    expect(screen.queryByText('Load Map')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Layers' })).toBeInTheDocument();
   });
 
   // --- 要件2: Waypoint編集 ---

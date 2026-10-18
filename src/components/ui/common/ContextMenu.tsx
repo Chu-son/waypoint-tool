@@ -2,9 +2,12 @@ import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../../../utils/cn';
 import { useClickOutside } from '../../../hooks/useClickOutside';
+import { useClampedMenuPosition } from '../../../hooks/useClampedMenuPosition';
 
 /**
- * Right-click menu shown at a fixed screen position. Closes when the user presses outside it.
+ * Right-click menu shown at a fixed screen position, kept inside the window (it opens on the other side of the
+ * pointer, or scrolls, when it would not fit). Closes when the user presses outside it or presses Escape.
+ * Build every right-click menu on this component rather than positioning a `fixed` element by hand.
  *
  *   {menu && (
  *     <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
@@ -27,13 +30,22 @@ export interface ContextMenuProps extends React.HTMLAttributes<HTMLDivElement> {
 export function ContextMenu({ x, y, onClose, className, children, style, ...props }: ContextMenuProps) {
   const ref = React.useRef<HTMLDivElement>(null);
   useClickOutside(ref, onClose);
+  const position = useClampedMenuPosition(ref, x, y);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   return (
     <ContextMenuCloseContext.Provider value={onClose}>
       <div
         ref={ref}
         role="menu"
-        style={{ top: y, left: x, ...style }}
+        style={{ ...position, ...style }}
         className={cn(
           'fixed z-[9999] bg-surface-panel border border-border-base rounded-xl shadow-xl py-1 min-w-[190px] text-xs text-text-base select-none backdrop-blur-md flex flex-col gap-0.5',
           className,

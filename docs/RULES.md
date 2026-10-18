@@ -39,7 +39,7 @@
   - 例: `ShortcutManager` など。
 - **`ui/`**: 画面を構成するUIコンポーネント全般。**`ui/` 直下にはファイルを置かず**、必ず以下のいずれかのサブディレクトリに配置する。
   - **`ui/common/`**: ボタン、入力欄、モーダル枠など、汎用・再利用可能な純粋な表示要素（2ファイル以上で共通利用）。
-  - **`ui/shell/`**: アプリの外枠（TopMenu, ToolPanel, StatusBar, PanelContainer/PanelRegistry, ThemeInjector 等）。
+  - **`ui/shell/`**: アプリの外枠（TopMenu, ToolPanel, StatusBar, DockSide/DockRail/PanelRegistry, ThemeInjector 等）。
   - **`ui/modals/`**: モーダルダイアログ（Export, Import, Settings, Welcome, KeyboardShortcuts 等）。インポートは入口（`ImportHubModal`）と取り込み対象ごとのパネルから成るため、親名のサブディレクトリ `ui/modals/import/` に置く。
   - **`ui/trees/`**: 階層ツリー（WaypointTree, AnnotationTree とそのパネル）。共通のツリー部品は `ui/trees/core/`（`TreeView` / `TreeRow`）。
   - **`ui/layers/`**: レイヤーツリー（`LayerTree`）とパネル、エクスポート領域の一覧パネル。

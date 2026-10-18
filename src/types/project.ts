@@ -53,8 +53,6 @@ export interface ProjectData {
   robot_footprint?: RobotFootprint;
   occupancy_settings?: OccupancySettings;
   default_map_opacity?: number;
-  left_panel_view_mode?: 'tabs' | 'split';
-  right_panel_view_mode?: 'tabs' | 'split';
   active_path_calculator_plugin_id?: string | null;
   path_calculator_params?: Record<string, any>;
   auto_recalculate_path?: boolean;
@@ -104,8 +102,6 @@ export interface StrictProjectData {
   robot_footprint: RobotFootprint;
   occupancy_settings: OccupancySettings;
   default_map_opacity: number;
-  left_panel_view_mode: 'tabs' | 'split';
-  right_panel_view_mode: 'tabs' | 'split';
   active_path_calculator_plugin_id: string | null;
   path_calculator_params: Record<string, any>;
   auto_recalculate_path: boolean;

@@ -1,5 +1,5 @@
 import { ReactNode, ReactElement } from 'react';
-import { PanelTab } from './PanelContainer';
+import type { PanelTab } from '../../../types/ui';
 import { CustomUiPanelTabDef } from '../../../types/customUi';
 import { ObjectsPanel } from '../trees/ObjectsPanel';
 import { WaypointTreePanel } from '../trees/WaypointTreePanel';

@@ -74,6 +74,7 @@ export interface CustomUiPanelTabDef {
 export interface CustomUiPanelContainerLayout {
   defaultOpen?: boolean;
   defaultWidth?: number;
+  /** @deprecated Accepted but ignored: tabs are shown one at a time, and users split a panel from the tab rail. */
   viewMode?: 'tabs' | 'split';
   tabs?: CustomUiPanelTabDef[];
 }

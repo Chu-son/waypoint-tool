@@ -2,8 +2,17 @@ import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { v4 as uuidv4 } from 'uuid';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
-import { DEFAULT_PANEL_LAYOUT } from '../migrations/storageMigration';
-import type { ElementCopyState, PanelLayout } from '../../types/ui';
+import {
+  activateTab as activateDockTab,
+  clickTab,
+  createDefaultDockLayout,
+  moveTab,
+  reorderTab,
+  setGroupWidth,
+  setPanelOpen,
+} from '../../utils/dockLayout';
+import { applyDockOperation } from '../dockAccess';
+import type { DockGroupIndex, DockLayout, DockSide, ElementCopyState } from '../../types/ui';
 import type { ImportCategory } from '../../types/modal';
 
 export interface TreeRevealTarget {
@@ -64,21 +73,21 @@ export type UISlice = {
   setTreeItemExpanded: (treeId: string, id: string, expanded: boolean) => void;
   expandTreeItems: (treeId: string, ids: string[]) => void;
 
-  leftPanelWidth: number;
-  rightPanelWidth: number;
   showProperties: boolean;
-  panelLayout: PanelLayout;
-  leftPanelActiveTab: string;
-  rightPanelActiveTab: string;
+  /** Which tab lives in which column of which side panel, with the column widths. Saved with the app settings. */
+  dockLayout: DockLayout;
   /** Selecting an item brings the Inspector forward. Off: the panel stays where the user left it. */
   autoFocusInspector: boolean;
-  leftPanelViewMode: 'tabs' | 'split';
-  rightPanelViewMode: 'tabs' | 'split';
+  /** Whether each side panel is open. Session only. */
   isLeftPanelOpen: boolean;
   isRightPanelOpen: boolean;
 
-  moveTabToPanel: (tabId: string, targetPanel: 'left' | 'right') => void;
-  reorderTab: (panel: 'left' | 'right', fromIndex: number, toIndex: number) => void;
+  /** What a click on a rail tab does: show it, hide its column, or close the panel (see `clickTab`). */
+  clickPanelTab: (tabId: string) => void;
+  movePanelTab: (tabId: string, target: { side: DockSide; group: DockGroupIndex }, index?: number) => void;
+  reorderPanelTab: (side: DockSide, group: DockGroupIndex, fromIndex: number, toIndex: number) => void;
+  setPanelGroupWidth: (side: DockSide, group: DockGroupIndex, width: number) => void;
+  /** Brings a tab on screen; does nothing when it already is. */
   activateTab: (tabId: string) => void;
   resetPanelLayout: () => void;
 
@@ -126,15 +135,9 @@ export type UISlice = {
   setEnableBlendCache: (enabled: boolean) => void;
   setIsDirty: (dirty: boolean) => void;
 
-  setLeftPanelActiveTab: (tab: string) => void;
-  setRightPanelActiveTab: (tab: string) => void;
   setAutoFocusInspector: (enabled: boolean) => void;
-  setLeftPanelViewMode: (mode: 'tabs' | 'split') => void;
-  setRightPanelViewMode: (mode: 'tabs' | 'split') => void;
   setLeftPanelOpen: (open: boolean) => void;
   setRightPanelOpen: (open: boolean) => void;
-  setLeftPanelWidth: (width: number) => void;
-  setRightPanelWidth: (width: number) => void;
   setShowProperties: (show: boolean) => void;
   resetWindowLayout: () => void;
 
@@ -283,16 +286,10 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
 
   treeRevealTarget: null,
 
-  panelLayout: DEFAULT_PANEL_LAYOUT,
-  leftPanelActiveTab: 'waypoints',
-  rightPanelActiveTab: 'layers',
+  dockLayout: createDefaultDockLayout(),
   autoFocusInspector: true,
-  leftPanelViewMode: 'tabs',
-  rightPanelViewMode: 'tabs',
   isLeftPanelOpen: true,
   isRightPanelOpen: true,
-  leftPanelWidth: 280,
-  rightPanelWidth: 320,
   showProperties: true,
 
   isSettingsModalOpen: false,
@@ -465,136 +462,24 @@ export const createUISlice: StateCreator<AppState, [], [], UISlice> = (set, get)
       return { expandedTreeItems: { ...state.expandedTreeItems, [treeId]: [...current, ...added] } };
     }),
 
-  moveTabToPanel: (tabId, targetPanel) => {
-    const state = get();
-    const currentLayout = state.panelLayout;
-    const sourcePanel = targetPanel === 'left' ? 'right' : 'left';
-    const sourceKey = sourcePanel === 'left' ? 'leftTabs' : 'rightTabs';
-    const targetKey = targetPanel === 'left' ? 'leftTabs' : 'rightTabs';
+  // The side-panel layout belongs to the app, not to the project: none of these mark the project dirty.
+  clickPanelTab: (tabId) => set((state) => applyDockOperation(state, (dock) => clickTab(dock, tabId))),
+  movePanelTab: (tabId, target, index) =>
+    set((state) => applyDockOperation(state, (dock) => moveTab(dock, tabId, target, index))),
+  reorderPanelTab: (side, group, fromIndex, toIndex) =>
+    set((state) => applyDockOperation(state, (dock) => reorderTab(dock, side, group, fromIndex, toIndex))),
+  setPanelGroupWidth: (side, group, width) =>
+    set((state) => applyDockOperation(state, (dock) => setGroupWidth(dock, side, group, width))),
+  activateTab: (tabId) => set((state) => applyDockOperation(state, (dock) => activateDockTab(dock, tabId))),
 
-    if (!currentLayout[sourceKey].includes(tabId)) {
-      return;
-    }
+  resetPanelLayout: () => set({ dockLayout: createDefaultDockLayout(), isLeftPanelOpen: true, isRightPanelOpen: true }),
 
-    const nextSourceTabs = currentLayout[sourceKey].filter((t) => t !== tabId);
-    const nextTargetTabs = [...currentLayout[targetKey], tabId];
-
-    const nextLayout: PanelLayout = {
-      ...currentLayout,
-      [sourceKey]: nextSourceTabs,
-      [targetKey]: nextTargetTabs,
-    };
-
-    const updates: Partial<AppState> = {
-      panelLayout: nextLayout,
-      isDirty: true,
-    };
-
-    // 移動先パネルを開き、移動したタブをアクティブにする
-    if (targetPanel === 'left') {
-      updates.isLeftPanelOpen = true;
-      updates.leftPanelActiveTab = tabId;
-    } else {
-      updates.isRightPanelOpen = true;
-      updates.rightPanelActiveTab = tabId;
-    }
-
-    // 移動元パネルのアクティブタブが移動対象だった場合、残りの先頭タブに切り替える
-    if (sourcePanel === 'left') {
-      if (state.leftPanelActiveTab === tabId) {
-        updates.leftPanelActiveTab = nextSourceTabs[0] || '';
-      }
-      if (nextSourceTabs.length === 0) {
-        updates.isLeftPanelOpen = false;
-      }
-    } else {
-      if (state.rightPanelActiveTab === tabId) {
-        updates.rightPanelActiveTab = nextSourceTabs[0] || '';
-      }
-      if (nextSourceTabs.length === 0) {
-        updates.isRightPanelOpen = false;
-      }
-    }
-
-    set(updates as any);
-  },
-
-  reorderTab: (panel, fromIndex, toIndex) => {
-    const state = get();
-    const key = panel === 'left' ? 'leftTabs' : 'rightTabs';
-    const tabs = [...state.panelLayout[key]];
-    if (fromIndex < 0 || fromIndex >= tabs.length || toIndex < 0 || toIndex >= tabs.length || fromIndex === toIndex) {
-      return;
-    }
-    const [moved] = tabs.splice(fromIndex, 1);
-    tabs.splice(toIndex, 0, moved);
-    set({
-      panelLayout: {
-        ...state.panelLayout,
-        [key]: tabs,
-      },
-      isDirty: true,
-    });
-  },
-
-  activateTab: (tabId) => {
-    const state = get();
-    const normalizedTabId = tabId === 'project' ? 'waypoints' : tabId;
-
-    if (state.panelLayout.leftTabs.includes(normalizedTabId)) {
-      set({
-        isLeftPanelOpen: true,
-        leftPanelActiveTab: normalizedTabId,
-      });
-    } else if (state.panelLayout.rightTabs.includes(normalizedTabId)) {
-      set({
-        isRightPanelOpen: true,
-        rightPanelActiveTab: normalizedTabId,
-      });
-    } else {
-      // 未知またはカスタムタブの場合は現在右パネルで開く
-      set({
-        isRightPanelOpen: true,
-        rightPanelActiveTab: normalizedTabId,
-      });
-    }
-  },
-
-  resetPanelLayout: () => {
-    set({
-      panelLayout: {
-        leftTabs: [...DEFAULT_PANEL_LAYOUT.leftTabs],
-        rightTabs: [...DEFAULT_PANEL_LAYOUT.rightTabs],
-      },
-      leftPanelActiveTab: 'waypoints',
-      rightPanelActiveTab: 'layers',
-      isLeftPanelOpen: true,
-      isRightPanelOpen: true,
-      isDirty: true,
-    });
-  },
-
-  setLeftPanelActiveTab: (tab) => set({ leftPanelActiveTab: tab }),
-  setRightPanelActiveTab: (tab) => set({ rightPanelActiveTab: tab }),
   setAutoFocusInspector: (enabled) => set({ autoFocusInspector: enabled }),
-  setLeftPanelViewMode: (mode) => set({ leftPanelViewMode: mode, isDirty: true }),
-  setRightPanelViewMode: (mode) => set({ rightPanelViewMode: mode, isDirty: true }),
-  setLeftPanelOpen: (open) => set({ isLeftPanelOpen: open }),
-  setRightPanelOpen: (open) => set({ isRightPanelOpen: open }),
-  setLeftPanelWidth: (width) => set({ leftPanelWidth: width, isDirty: true }),
-  setRightPanelWidth: (width) => set({ rightPanelWidth: width, isDirty: true }),
+  setLeftPanelOpen: (open) => set((state) => applyDockOperation(state, (dock) => setPanelOpen(dock, 'left', open))),
+  setRightPanelOpen: (open) => set((state) => applyDockOperation(state, (dock) => setPanelOpen(dock, 'right', open))),
   setShowProperties: (show) => set({ showProperties: show, isDirty: true }),
 
-  resetWindowLayout: () => {
-    get().resetPanelLayout();
-    set({
-      leftPanelViewMode: 'tabs',
-      rightPanelViewMode: 'tabs',
-      leftPanelWidth: 280,
-      rightPanelWidth: 320,
-      isDirty: true,
-    });
-  },
+  resetWindowLayout: () => get().resetPanelLayout(),
 
   setSettingsModalOpen: (open, tab) => {
     if (open) {

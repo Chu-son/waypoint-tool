@@ -21,8 +21,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
   const setActivePlugin = useAppStore((state) => state.setActivePlugin);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
   const setMapEditMode = useAppStore((state) => state.setMapEditMode);
-  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
-  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const activateTab = useAppStore((state) => state.activateTab);
   const selectNodes = useAppStore((state) => state.selectNodes);
 
   const [manualLayerName, setManualLayerName] = useState('');
@@ -40,8 +39,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
     const newLayer = addManualCustomLayer(name, isReferenceManual, { atSelection: true });
     setActiveCustomLayerId(newLayer.id);
     setMapEditMode(true);
-    setRightPanelActiveTab('inspector');
-    setRightPanelOpen(true);
+    activateTab('inspector');
     setManualLayerName('');
     setIsReferenceManual(false);
     onClose();
@@ -52,8 +50,7 @@ export function NewCustomLayerModal({ isOpen, onClose }: NewCustomLayerModalProp
     setActiveCustomLayerId('new');
     setActivePlugin(pluginId);
     setActiveTool('add_generator');
-    setRightPanelActiveTab('inspector');
-    setRightPanelOpen(true);
+    activateTab('inspector');
     onClose();
   };
 

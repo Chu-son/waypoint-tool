@@ -6,7 +6,7 @@ import {
   resolveInspectorComponent,
   resolveBuiltinPanelTab,
 } from './PanelRegistry';
-import { PanelTab } from './PanelContainer';
+import type { PanelTab } from '../../../types/ui';
 import { PluginParamsPanel } from '../plugins/PluginParamsPanel';
 import { CustomLayerInspector } from '../properties/CustomLayerInspector';
 import { LayerSelectionInspector } from '../properties/LayerSelectionInspector';

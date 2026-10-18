@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
-import { resetAppStore } from '../../test/store';
+import { getVisibleTabs, resetAppStore } from '../../test/store';
 import { makeManualCustomLayer, makeMap } from '../../test/fixtures';
 
 describe('interactionSlice', () => {
   beforeEach(() => {
     // Start past the first-launch welcome modal that a fresh store opens.
-    resetAppStore({ isInitialLaunch: false, isWelcomeModalOpen: false, modalStack: [], rightPanelActiveTab: 'layers' });
+    resetAppStore({ isInitialLaunch: false, isWelcomeModalOpen: false, modalStack: [] });
   });
 
   describe('Mode Transitions', () => {
@@ -39,7 +39,7 @@ describe('interactionSlice', () => {
       expect(state.appMode.mode).toBe('generator_add');
       expect(state.activeTool).toBe('add_generator');
       expect(state.activePluginId).toBe('path-gen-plugin');
-      expect(state.rightPanelActiveTab).toBe('inspector');
+      expect(getVisibleTabs()).toContain('inspector');
     });
 
     it('transitions to annotation_edit mode and activates annotation subtool', () => {
@@ -53,7 +53,7 @@ describe('interactionSlice', () => {
       expect(state.activeTool).toBe('select');
       expect(state.isAnnotationEditMode).toBe(true);
       expect(state.activeAnnotationSubTool).toBe('rect');
-      expect(state.rightPanelActiveTab).toBe('inspector');
+      expect(getVisibleTabs()).toContain('inspector');
     });
 
     it('transitions to custom_layer_edit mode and activates map edit subtool', () => {
@@ -68,7 +68,7 @@ describe('interactionSlice', () => {
       expect(state.isMapEditMode).toBe(true);
       expect(state.mapEditSubTool).toBe('circle');
       expect(state.activeCustomLayerId).toBe('layer-vector-1');
-      expect(state.rightPanelActiveTab).toBe('inspector');
+      expect(getVisibleTabs()).toContain('inspector');
       expect(state.selection).toEqual({
         type: 'layers',
         ids: ['layer-vector-1'],
@@ -159,7 +159,7 @@ describe('interactionSlice', () => {
       expect(state.selectedNodeIds).toEqual([]);
       expect(state.activeCustomLayerId).toBeNull();
       expect(state.selectedEditObjectId).toBeNull();
-      expect(state.rightPanelActiveTab).toBe('inspector');
+      expect(getVisibleTabs()).toContain('inspector');
     });
 
     it('selecting a custom layer clears nodes and annotations selection', () => {
@@ -185,7 +185,7 @@ describe('interactionSlice', () => {
       expect(state.selectedEditObjectId).toBe('obj-polygon-1');
       expect(state.selectedNodeIds).toEqual([]);
       expect(state.selectedAnnotationIds).toEqual([]);
-      expect(state.rightPanelActiveTab).toBe('inspector');
+      expect(getVisibleTabs()).toContain('inspector');
     });
 
     it('has no custom layer to work on when several layers, or a map, are selected', () => {

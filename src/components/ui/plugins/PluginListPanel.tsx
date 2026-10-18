@@ -160,8 +160,7 @@ export function PluginListPanel() {
   const activeTool = useAppStore((state) => state.activeTool);
   const setSettingsModalOpen = useAppStore((state) => state.setSettingsModalOpen);
   const selectNodes = useAppStore((state) => state.selectNodes);
-  const setRightPanelActiveTab = useAppStore((state) => state.setRightPanelActiveTab);
-  const setRightPanelOpen = useAppStore((state) => state.setRightPanelOpen);
+  const activateTab = useAppStore((state) => state.activateTab);
   const setActivePathCalculatorPluginId = useAppStore((state) => state.setActivePathCalculatorPluginId);
 
   const [filterCategory, setFilterCategory] = useState<FilterCategory>('all');
@@ -212,8 +211,7 @@ export function PluginListPanel() {
       selectNodes([]);
       setActivePlugin(plugin.id);
       setActiveTool('add_generator');
-      setRightPanelActiveTab('inspector');
-      setRightPanelOpen(true);
+      activateTab('inspector');
     }
   };
 

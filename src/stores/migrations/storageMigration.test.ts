@@ -8,12 +8,10 @@ describe('storageMigration', () => {
     expect(migrateStorage(undefined, 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage('corrupt', 0)).toEqual(DEFAULT_STORAGE_STATE);
     expect(migrateStorage(12345, 0)).toEqual(DEFAULT_STORAGE_STATE);
-    expect(STORAGE_VERSION).toBe(3);
+    expect(STORAGE_VERSION).toBe(4);
     expect(DEFAULT_STORAGE_STATE.pluginSettings).toEqual([]);
-    expect(DEFAULT_STORAGE_STATE.panelLayout).toEqual({
-      leftTabs: ['waypoints', 'annotations', 'plugins'],
-      rightTabs: ['layers', 'inspector'],
-    });
+    expect(DEFAULT_STORAGE_STATE.dockLayout!.left.groups[0].tabs).toEqual(['waypoints', 'annotations', 'plugins']);
+    expect(DEFAULT_STORAGE_STATE.dockLayout!.right.groups[0].tabs).toEqual(['layers', 'inspector']);
   });
 
   it('promotes defaultExportFormats string array to object array on v0 migration', () => {
@@ -133,37 +131,93 @@ describe('storageMigration', () => {
     expect(migrated.pluginSettings).toEqual(validSettings);
   });
 
-  it('migrates v2 state to v3 with panelLayout normalization and project tab expansion', () => {
-    const v2StateWithProject = {
-      panelLayout: {
-        leftTabs: ['project', 'plugins'],
-        rightTabs: ['layers', 'inspector'],
+  it('expands the retired project tab of a v2 layout into waypoints and annotations', () => {
+    const migrated = migrateStorage(
+      {
+        panelLayout: { leftTabs: ['project', 'plugins'], rightTabs: ['layers', 'inspector'] },
+        leftPanelActiveTab: 'project',
+        rightPanelActiveTab: 'inspector',
       },
-      leftPanelActiveTab: 'project',
-      rightPanelActiveTab: 'inspector',
-    };
-    const migrated = migrateStorage(v2StateWithProject, 2);
-    expect(migrated.panelLayout).toEqual({
-      leftTabs: ['waypoints', 'annotations', 'plugins'],
-      rightTabs: ['layers', 'inspector'],
+      2,
+    );
+    expect(migrated.dockLayout!.left.groups[0]).toMatchObject({
+      tabs: ['waypoints', 'annotations', 'plugins'],
+      activeTab: 'waypoints',
     });
-    expect(migrated.leftPanelActiveTab).toBe('waypoints');
-    expect(migrated.rightPanelActiveTab).toBe('inspector');
+    expect(migrated.dockLayout!.right.groups[0]).toMatchObject({
+      tabs: ['layers', 'inspector'],
+      activeTab: 'inspector',
+    });
   });
 
-  it('ensures missing builtin tabs are supplemented in panelLayout', () => {
-    const partialLayoutState = {
-      panelLayout: {
-        leftTabs: ['waypoints'],
-        rightTabs: ['inspector'],
-      },
-    };
-    const migrated = migrateStorage(partialLayoutState, 2);
-    expect(migrated.panelLayout).toBeDefined();
-    expect(migrated.panelLayout!.leftTabs).toContain('waypoints');
-    expect(migrated.panelLayout!.leftTabs).toContain('annotations');
-    expect(migrated.panelLayout!.leftTabs).toContain('plugins');
-    expect(migrated.panelLayout!.rightTabs).toContain('inspector');
-    expect(migrated.panelLayout!.rightTabs).toContain('layers');
+  it('puts built-in tabs missing from an old layout back in their default places', () => {
+    const migrated = migrateStorage({ panelLayout: { leftTabs: ['waypoints'], rightTabs: ['inspector'] } }, 2);
+    expect(migrated.dockLayout!.left.groups[0].tabs).toEqual(['waypoints', 'annotations', 'plugins']);
+    expect(migrated.dockLayout!.right.groups[0].tabs).toEqual(['inspector', 'layers']);
+  });
+
+  describe('dockLayout (v4)', () => {
+    it('derives the dock layout from the pre-dock settings, keeping tabs, active tabs and widths', () => {
+      const migrated = migrateStorage(
+        {
+          panelLayout: { leftTabs: ['waypoints', 'annotations', 'plugins'], rightTabs: ['inspector', 'layers'] },
+          leftPanelActiveTab: 'annotations',
+          rightPanelActiveTab: 'layers',
+          leftPanelWidth: 400,
+          rightPanelWidth: 350,
+        },
+        3,
+      );
+      expect(migrated.dockLayout!.left.groups[0]).toMatchObject({ activeTab: 'annotations', width: 400 });
+      expect(migrated.dockLayout!.right.groups[0]).toMatchObject({
+        tabs: ['inspector', 'layers'],
+        activeTab: 'layers',
+        width: 350,
+      });
+      expect(migrated.dockLayout!.right.groups[1].tabs).toEqual([]);
+    });
+
+    it('does not carry the pre-dock keys into the state', () => {
+      const migrated = migrateStorage(
+        {
+          panelLayout: { leftTabs: ['waypoints', 'annotations', 'plugins'], rightTabs: ['layers', 'inspector'] },
+          leftPanelActiveTab: 'plugins',
+          rightPanelActiveTab: 'inspector',
+          leftPanelWidth: 300,
+          rightPanelWidth: 330,
+          leftPanelViewMode: 'split',
+        },
+        3,
+      );
+      for (const key of [
+        'panelLayout',
+        'leftPanelActiveTab',
+        'rightPanelActiveTab',
+        'leftPanelWidth',
+        'rightPanelWidth',
+        'leftPanelViewMode',
+      ]) {
+        expect(migrated).not.toHaveProperty(key);
+      }
+      expect(migrated.dockLayout!.left.groups[0]).toMatchObject({ activeTab: 'plugins', width: 300 });
+    });
+
+    it('trusts a saved dock layout over the pre-dock keys that an older build may have rewritten since', () => {
+      const dockLayout = migrateStorage({}, 3).dockLayout!;
+      dockLayout.right.groups[1] = { tabs: ['inspector'], activeTab: 'inspector', visible: true, width: 300 };
+      dockLayout.right.groups[0].tabs = ['layers'];
+      const migrated = migrateStorage(
+        { dockLayout, panelLayout: { leftTabs: [], rightTabs: ['layers', 'inspector'] } },
+        4,
+      );
+      expect(migrated.dockLayout!.right.groups[1].tabs).toEqual(['inspector']);
+      expect(migrated.dockLayout!.right.groups[0].tabs).toEqual(['layers']);
+    });
+
+    it('repairs a broken saved dock layout and is idempotent', () => {
+      const once = migrateStorage({ dockLayout: { left: { groups: [{ tabs: ['ghost'] }] } } }, 4);
+      expect(once.dockLayout!.left.groups[0].tabs).toEqual(['waypoints', 'annotations', 'plugins']);
+      expect(migrateStorage(once, 4)).toEqual(once);
+    });
   });
 });

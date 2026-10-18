@@ -1,18 +1,21 @@
 import { DEFAULT_EXPORT_FORMATS, DEFAULT_MAP_OPACITY } from './projectMigration';
 import { DefaultExportFormat, PluginSetting } from '../../types/store';
 import { VALID_DARK_THEME_PRESET_IDS } from '../../utils/themePresets';
-import type { PanelLayout } from '../../types/ui';
+import type { DockLayout } from '../../types/ui';
+import { createDefaultDockLayout, dockLayoutFromLegacy, normalizeDockLayout } from '../../utils/dockLayout';
 
-export type { PanelLayout };
+export const STORAGE_VERSION = 4;
 
-export const STORAGE_VERSION = 3;
-
-export const DEFAULT_PANEL_LAYOUT: PanelLayout = {
-  leftTabs: ['waypoints', 'annotations', 'plugins'],
-  rightTabs: ['layers', 'inspector'],
-};
-
-export const ALL_BUILTIN_PANEL_TAB_IDS = ['waypoints', 'annotations', 'plugins', 'layers', 'inspector'] as const;
+/** Settings keys written before the dock layout existed; they are read once to derive `dockLayout`. */
+const PRE_DOCK_KEYS = [
+  'panelLayout',
+  'leftPanelActiveTab',
+  'rightPanelActiveTab',
+  'leftPanelWidth',
+  'rightPanelWidth',
+  'leftPanelViewMode',
+  'rightPanelViewMode',
+] as const;
 
 export interface PersistedStorageState {
   defaultMapOpacity?: number;
@@ -32,17 +35,11 @@ export interface PersistedStorageState {
   enableBlendCache?: boolean;
   themeMode?: 'dark' | 'light';
   themePreset?: string;
-  leftPanelViewMode?: 'tabs' | 'split';
-  rightPanelViewMode?: 'tabs' | 'split';
-  leftPanelWidth?: number;
-  rightPanelWidth?: number;
   showProperties?: boolean;
   mapEditFillValue?: number;
   mapEditBrushSize?: number;
   mapEditSubTool?: string;
-  panelLayout?: PanelLayout;
-  leftPanelActiveTab?: string;
-  rightPanelActiveTab?: string;
+  dockLayout?: DockLayout;
   autoFocusInspector?: boolean;
   [key: string]: any;
 }
@@ -65,17 +62,11 @@ export const DEFAULT_STORAGE_STATE: PersistedStorageState = {
   enableBlendCache: true,
   themeMode: 'light',
   themePreset: 'default',
-  leftPanelViewMode: 'tabs',
-  rightPanelViewMode: 'tabs',
-  leftPanelWidth: 320,
-  rightPanelWidth: 320,
   showProperties: true,
   mapEditFillValue: 0,
   mapEditBrushSize: 10,
   mapEditSubTool: 'brush',
-  panelLayout: DEFAULT_PANEL_LAYOUT,
-  leftPanelActiveTab: 'waypoints',
-  rightPanelActiveTab: 'layers',
+  dockLayout: createDefaultDockLayout(),
   autoFocusInspector: true,
 };
 
@@ -127,36 +118,26 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     }
   }
 
-  // v3 へのマイグレーション: パネルレイアウト (panelLayout) とアクティブタブの導入・正規化
-  const normalizedPanelLayout = normalizePanelLayout(state.panelLayout);
-  state.panelLayout = normalizedPanelLayout;
-
-  // アクティブタブの安全な正規化
-  let leftTab = typeof state.leftPanelActiveTab === 'string' ? state.leftPanelActiveTab : 'waypoints';
-  if (leftTab === 'project') {
-    leftTab = 'waypoints';
-  }
-  if (!normalizedPanelLayout.leftTabs.includes(leftTab) && normalizedPanelLayout.leftTabs.length > 0) {
-    leftTab = normalizedPanelLayout.leftTabs[0];
-  }
-  state.leftPanelActiveTab = leftTab;
-
-  let rightTab = typeof state.rightPanelActiveTab === 'string' ? state.rightPanelActiveTab : 'layers';
-  if (rightTab === 'project') {
-    rightTab = 'layers';
-  }
-  if (!normalizedPanelLayout.rightTabs.includes(rightTab) && normalizedPanelLayout.rightTabs.length > 0) {
-    rightTab = normalizedPanelLayout.rightTabs[0];
-  }
-  state.rightPanelActiveTab = rightTab;
+  // v4 へのマイグレーション: パネルレイアウトを dockLayout に置き換える。
+  // dockLayout があればそれを正とし、なければ旧キーから導出する。
+  // 旧キーは状態に持ち込まない。dev / AppImage / Docker が同じ設定ファイルを共有するため、旧ビルドが読む旧キーは
+  // 設定ファイル側にそのまま残る (settingsStorage が、このビルドで永続化しないキーを書き戻す)。
+  const dockLayout =
+    state.dockLayout !== undefined
+      ? normalizeDockLayout(state.dockLayout)
+      : dockLayoutFromLegacy(state.panelLayout, {
+          leftActiveTab: state.leftPanelActiveTab,
+          rightActiveTab: state.rightPanelActiveTab,
+          leftWidth: state.leftPanelWidth,
+          rightWidth: state.rightPanelWidth,
+        });
+  for (const key of PRE_DOCK_KEYS) delete state[key];
 
   // 欠落プロパティのデフォルト値補完（浅いマージ + 安全なフォールバック）
   return {
     ...DEFAULT_STORAGE_STATE,
     ...state,
-    panelLayout: normalizedPanelLayout,
-    leftPanelActiveTab: leftTab,
-    rightPanelActiveTab: rightTab,
+    dockLayout,
     autoFocusInspector: state.autoFocusInspector !== false,
     // 参照型や特定型の確実なガード
     recentProjects: Array.isArray(state.recentProjects) ? state.recentProjects : DEFAULT_STORAGE_STATE.recentProjects,
@@ -182,62 +163,4 @@ export function migrateStorage(persistedState: unknown, version: number): Persis
     })(),
     defaultMapOpacity: typeof state.defaultMapOpacity === 'number' ? state.defaultMapOpacity : DEFAULT_MAP_OPACITY,
   };
-}
-
-/**
- * 任意の入力から PanelLayout を安全に正規化します。
- * 旧 'project' タブの 'waypoints' + 'annotations' 展開や重複排除、必須ビルトインタブの欠落補完を行います。
- */
-export function normalizePanelLayout(rawLayout: any): PanelLayout {
-  if (!rawLayout || typeof rawLayout !== 'object') {
-    return {
-      leftTabs: [...DEFAULT_PANEL_LAYOUT.leftTabs],
-      rightTabs: [...DEFAULT_PANEL_LAYOUT.rightTabs],
-    };
-  }
-
-  const expandAndFilter = (tabs: any[]): string[] => {
-    if (!Array.isArray(tabs)) return [];
-    const result: string[] = [];
-    for (const t of tabs) {
-      if (typeof t !== 'string') continue;
-      if (t === 'project') {
-        if (!result.includes('waypoints')) result.push('waypoints');
-        if (!result.includes('annotations')) result.push('annotations');
-      } else {
-        if (!result.includes(t)) result.push(t);
-      }
-    }
-    return result;
-  };
-
-  let leftTabs = expandAndFilter(rawLayout.leftTabs);
-  let rightTabs = expandAndFilter(rawLayout.rightTabs);
-
-  // 左右での重複排除（先に登場した方を優先）
-  const seen = new Set<string>();
-  leftTabs = leftTabs.filter((id) => {
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-  rightTabs = rightTabs.filter((id) => {
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-
-  // 必須ビルトインタブが左右どちらにも存在しない場合の補完
-  for (const tabId of ALL_BUILTIN_PANEL_TAB_IDS) {
-    if (!seen.has(tabId)) {
-      if (DEFAULT_PANEL_LAYOUT.leftTabs.includes(tabId)) {
-        leftTabs.push(tabId);
-      } else {
-        rightTabs.push(tabId);
-      }
-      seen.add(tabId);
-    }
-  }
-
-  return { leftTabs, rightTabs };
 }

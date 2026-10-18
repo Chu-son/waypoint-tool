@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { NewCustomLayerModal } from './NewCustomLayerModal';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance } from '../../../types/store';
+import { getVisibleTabs } from '../../../test/store';
+import { createDefaultDockLayout } from '../../../utils/dockLayout';
 
 describe('NewCustomLayerModal', () => {
   const mockPlugin: PluginInstance = {
@@ -25,7 +27,7 @@ describe('NewCustomLayerModal', () => {
       plugins: { 'test-layer-plugin': mockPlugin },
       customLayers: [],
       activeCustomLayerId: null,
-      rightPanelActiveTab: 'layers',
+      dockLayout: createDefaultDockLayout(),
     });
   });
 
@@ -41,7 +43,7 @@ describe('NewCustomLayerModal', () => {
 
     expect(useAppStore.getState().customLayers).toHaveLength(1);
     expect(useAppStore.getState().customLayers[0].type).toBe('manual');
-    expect(useAppStore.getState().rightPanelActiveTab).toBe('inspector');
+    expect(getVisibleTabs()).toContain('inspector');
     expect(handleClose).toHaveBeenCalled();
   });
 
@@ -56,7 +58,7 @@ describe('NewCustomLayerModal', () => {
 
     expect(useAppStore.getState().activeCustomLayerId).toBe('new');
     expect(useAppStore.getState().activePluginId).toBe('test-layer-plugin');
-    expect(useAppStore.getState().rightPanelActiveTab).toBe('inspector');
+    expect(getVisibleTabs()).toContain('inspector');
     expect(handleClose).toHaveBeenCalled();
   });
 });

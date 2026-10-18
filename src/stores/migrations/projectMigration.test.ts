@@ -161,8 +161,9 @@ describe('projectMigration', () => {
     expect(normalized.root_node_ids).toEqual(['n1']);
     expect(normalized.map_sources[0].image_base64).toBe('b64string');
     expect(normalized.annotation_objects[0].id).toBe('ann-1');
-    expect(normalized.left_panel_view_mode).toBe('split');
-    expect(normalized.right_panel_view_mode).toBe('tabs');
+    // The retired panel view mode is dropped: the panel layout is not part of the project.
+    expect(normalized).not.toHaveProperty('left_panel_view_mode');
+    expect(normalized).not.toHaveProperty('right_panel_view_mode');
     expect(normalized.active_path_calculator_plugin_id).toBe('plug-1');
     expect(normalized.path_calculator_params).toEqual({ step: 1 });
     expect(normalized.auto_recalculate_path).toBe(false);
@@ -256,8 +257,6 @@ describe('projectMigration', () => {
       'robot_footprint',
       'occupancy_settings',
       'default_map_opacity',
-      'left_panel_view_mode',
-      'right_panel_view_mode',
       'active_path_calculator_plugin_id',
       'path_calculator_params',
       'auto_recalculate_path',
@@ -294,8 +293,6 @@ describe('projectMigration', () => {
     expect(normalized.robot_footprint).toEqual(DEFAULT_ROBOT_FOOTPRINT);
     expect(normalized.occupancy_settings).toEqual(DEFAULT_OCCUPANCY_SETTINGS);
     expect(normalized.default_map_opacity).toBe(DEFAULT_MAP_OPACITY);
-    expect(normalized.left_panel_view_mode).toBe('tabs');
-    expect(normalized.right_panel_view_mode).toBe('tabs');
     expect(normalized.active_path_calculator_plugin_id).toBeNull();
     expect(normalized.path_calculator_params).toEqual({});
     expect(normalized.auto_recalculate_path).toBe(true);
