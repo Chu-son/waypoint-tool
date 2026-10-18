@@ -91,7 +91,7 @@
   - **概要**: ON/OFF 状態を保持するアクセシブルなカスタムトグルスイッチ部品。
   - **主要Props**: `checked`, `onChange`, `disabled`, `title`
 - **`ContextMenu`** / **`ContextMenuItem`** / **`ContextMenuSeparator`** ([`src/components/ui/common/ContextMenu.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/ContextMenu.tsx))
-  - **概要**: 右クリックメニュー。指定座標に固定表示し、外側クリックで閉じる。項目は選択後に自動でメニューを閉じる（`role="menu"` / `menuitem`）。ツリー・レイヤーパネルのメニューはすべてこれを使うこと。
+  - **概要**: 右クリックメニュー。指定座標に固定表示し、外側クリックと Esc で閉じる。表示後に実寸を測り、ウィンドウからはみ出すときはポインタの反対側（左・上）に開く（画面より高ければ内部スクロール。`useClampedMenuPosition` / `utils/menuPosition.ts`）。項目は選択後に自動でメニューを閉じる（`role="menu"` / `menuitem`）。ツリー・レイヤーパネル・パネルのタブ（`DockTabMenu`）のメニューはすべてこれを使うこと。独自のメニューを `fixed` で置くときも `useClampedMenuPosition` で位置を補正すること。
   - **主要Props**: `ContextMenu`: `x`, `y`, `onClose` / `ContextMenuItem`: `icon`, `onSelect`, `tone` (`default` | `danger`), `emphasis` (`normal` | `strong`)
 - **`TextDiffView`** ([`src/components/ui/common/TextDiffView.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/TextDiffView.tsx))
   - **概要**: 行単位の差分（`utils/diff/lineDiff.ts` の `DiffLine[]`）を、追加（緑）・削除（赤）で色分けして表示する。変更行の前後だけを残し、それ以外の変更なし行は「N lines unchanged」に畳む。`role="group"` で `aria-label` を持つ。

@@ -4,6 +4,7 @@ import type { ElementCopyField } from '../../../types/ui';
 import { Button } from '../common/Button';
 import { FieldLabel } from '../common/FieldLabel';
 import { cn } from '../../../utils/cn';
+import { useClampedMenuPosition } from '../../../hooks/useClampedMenuPosition';
 import { Anchor } from 'lucide-react';
 
 interface ElementCopyContextMenuProps {
@@ -82,11 +83,12 @@ export function ElementCopyContextMenu({
   }, [onClose]);
 
   const fieldUpper = field.toUpperCase();
+  const clamped = useClampedMenuPosition(menuRef, position.x, position.y);
 
   return (
     <div
       ref={menuRef}
-      style={{ top: position.y, left: position.x }}
+      style={clamped}
       className="fixed z-[9999] bg-surface-panel border border-border-base rounded-lg shadow-xl py-1 min-w-[220px] text-xs text-text-base select-none"
     >
       <div className="px-3 py-1.5 border-b border-border-base mb-1">
