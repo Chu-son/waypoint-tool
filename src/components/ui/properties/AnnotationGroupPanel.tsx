@@ -8,6 +8,8 @@ import { PluginPropertyEditor } from '../plugins/PluginPropertyEditor';
 import { PluginInputEditor } from '../plugins/PluginInputEditor';
 import { Trash2, Wand2, Folder, Unlink, RefreshCcw } from 'lucide-react';
 import { InternalPropertiesSection } from './InternalPropertiesSection';
+import { BasePoseSection } from './BasePoseSection';
+import { useSyncPluginInputs } from '../../../hooks/useSyncPluginInputs';
 
 export function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
   const plugins = useAppStore((state) => state.plugins);
@@ -29,12 +31,8 @@ export function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
     if (group.generator_params?.properties) {
       setGenParams({ ...group.generator_params.properties });
     }
-    if (group.generator_params?.interaction_data) {
-      Object.entries(group.generator_params.interaction_data).forEach(([key, val]) => {
-        updatePluginInteractionData(key, val);
-      });
-    }
   }, [group.id]);
+  useSyncPluginInputs(group.id, plugin?.manifest.inputs, group.generator_params?.interaction_data);
 
   useEffect(() => {
     useAppStore.getState().setPluginActiveProperties(genParams);
@@ -112,6 +110,8 @@ export function AnnotationGroupPanel({ group }: { group: AnnotationGroup }) {
           onChange={(e) => updateAnnotationGroup(group.id, { name: e.target.value })}
         />
       </div>
+
+      <BasePoseSection domain="annotation" id={group.id} />
 
       {/* Generator Controls */}
       {isGenerator && plugin && (

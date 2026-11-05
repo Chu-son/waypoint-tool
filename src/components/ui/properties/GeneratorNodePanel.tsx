@@ -12,6 +12,8 @@ import { confirmAction } from '../../../services/notify';
 import { Play, Settings2, RefreshCcw, BoxSelect, Undo2 } from 'lucide-react';
 import { WaypointNode, GeneratorModificationSummary, GeneratorStash } from '../../../types/store';
 import { InternalPropertiesSection } from './InternalPropertiesSection';
+import { BasePoseSection } from './BasePoseSection';
+import { useSyncPluginInputs } from '../../../hooks/useSyncPluginInputs';
 
 interface GeneratorNodePanelProps {
   node: WaypointNode;
@@ -64,12 +66,8 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
 
   useEffect(() => {
     if (node.generator_params?.properties) setGenParams({ ...node.generator_params.properties });
-    if (node.generator_params?.interaction_data) {
-      Object.entries(node.generator_params.interaction_data).forEach(([key, val]) => {
-        updatePluginInteractionData(key, val);
-      });
-    }
   }, [node.id]);
+  useSyncPluginInputs(node.id, plugin?.manifest.inputs, node.generator_params?.interaction_data);
 
   useEffect(() => {
     useAppStore.getState().setPluginActiveProperties(genParams);
@@ -175,6 +173,8 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
             );
           })}
 
+          <BasePoseSection domain="node" id={node.id} />
+
           {/* Internal Properties (Read-only Metadata) */}
           <InternalPropertiesSection
             data={node.plugin_data}
@@ -217,7 +217,7 @@ export function GeneratorNodePanel({ node }: GeneratorNodePanelProps) {
         <div className="space-y-4 flex-1">
           <AlertBox variant="warning" title="プラグイン未ロード">
             プラグイン "{pluginId || '(未指定)'}" が見つからないか、読み込まれていません。
-            パラメータの再編集・再生成はできませんが、独立したWaypointへの展開 (Explode) は可能です。
+            パラメータの再編集・再生成・基準位置の調整はできませんが、独立したWaypointへの展開 (Explode) は可能です。
           </AlertBox>
 
           {node.plugin_data && Object.keys(node.plugin_data).length > 0 && (
