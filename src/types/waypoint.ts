@@ -1,4 +1,4 @@
-import type { Transform } from './geometry';
+import type { Pose2D, Transform } from './geometry';
 import type { WaypointOptions } from './options';
 import type { PipelineMetadata } from './pipeline';
 
@@ -73,6 +73,11 @@ export type WaypointNode = {
   /** `needs: ["waypoint_range"]` のジェネレーターが置き換えた元の部分木。「元に戻す」で使う */
   source_snapshot?: SourceSnapshot;
   pipeline_metadata?: PipelineMetadata;
+  /**
+   * Groups and generators: the reference pose that moves with the contents when the whole is moved. Set on
+   * the first such move; until then the centre of the contents (heading 0) stands in for it.
+   */
+  base_pose?: Pose2D;
 };
 
 export interface InsertionTarget {

@@ -13,6 +13,8 @@ import {
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { AnnotationClipboardPayload } from '../../utils/mapElementClipboard';
+import type { RigidTransform } from '../../utils/rigidTransform';
+import { commitClearBasePose, commitGroupMove, type GroupMoveOptions } from '../groupMove';
 
 export interface AnnotationSlice {
   annotationObjects: Record<string, AnnotationObject>;
@@ -58,6 +60,10 @@ export interface AnnotationSlice {
   duplicateAnnotations: (ids: string[]) => string[];
   pasteAnnotations: (payload: AnnotationClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setAnnotationObjects: (objects: AnnotationObject[], groups?: AnnotationGroup[], rootIds?: string[]) => void;
+  /** Moves an annotation group as one body, like `transformNodeGroup`. False when there is nothing to move. */
+  transformAnnotationGroup: (id: string, transform: RigidTransform, options?: GroupMoveOptions) => boolean;
+  /** Puts the reference pose of an annotation group back on the centre of its contents (contents stay). */
+  clearAnnotationBasePose: (id: string) => void;
 }
 
 export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSlice> = (set, get) => ({
@@ -73,6 +79,10 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   defaultAnnotationColor: DEFAULT_ANNOTATION_COLOR,
   showAnnotations: true,
   showAnnotationLabels: true,
+
+  transformAnnotationGroup: (id, transform, options) => commitGroupMove(get, set, 'annotation', id, transform, options),
+
+  clearAnnotationBasePose: (id) => commitClearBasePose(get, set, 'annotation', id),
 
   setAnnotationEditMode: (enabled: boolean) => {
     const state = get();

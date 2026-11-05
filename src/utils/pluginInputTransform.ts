@@ -2,7 +2,7 @@
  * Moving the coordinates a user gave a plugin (its interaction inputs) along with a rigid move of what the
  * plugin produced, so running it again puts the output where it was moved to.
  */
-import type { PluginInputDef, PluginManifest } from '../types/plugin';
+import type { PluginInputDef, PluginInstance, PluginManifest } from '../types/plugin';
 import { rotateQuaternionAboutZ } from './transformUtils';
 import { transformPoint, type RigidTransform } from './rigidTransform';
 
@@ -93,4 +93,61 @@ export function transformInteractionData(
     next[key] = moveInputValue(input, data[key], t);
   }
   return next ?? data;
+}
+
+/**
+ * How the output of one stored run follows a move. Pipeline outputs are re-run from the pipeline's own
+ * inputs, and without the plugin the input types are unknown: neither has inputs that can move.
+ */
+export function followingOf(
+  item: { plugin_id?: string; pipeline_metadata?: unknown },
+  plugins: Record<string, PluginInstance>,
+): MoveFollowing {
+  if (item.pipeline_metadata) return 'none';
+  const plugin = item.plugin_id ? plugins[item.plugin_id] : undefined;
+  return plugin ? moveFollowing(plugin.manifest) : 'none';
+}
+
+/**
+ * Moved copies of stored inputs, keyed by the original object. Outputs of one run may share the same
+ * stored object; each is moved once and every output gets the same moved copy.
+ */
+export type MovedInputs = Map<object, unknown>;
+
+/** What a move of stored plugin outputs needs besides the transform. */
+export interface MoveContext {
+  plugins: Record<string, PluginInstance>;
+  moved: MovedInputs;
+}
+
+function movedOnce<T extends object>(original: T, moved: MovedInputs, move: () => T): T {
+  const cached = moved.get(original);
+  if (cached) return cached as T;
+  const next = move();
+  moved.set(original, next);
+  return next;
+}
+
+/** Stored interaction data of a run after the move (see `transformInteractionData`). */
+export function moveStoredInputs(
+  data: Record<string, unknown> | undefined,
+  inputs: PluginInputDef[],
+  t: RigidTransform,
+  moved: MovedInputs,
+): Record<string, unknown> | undefined {
+  if (!data) return data;
+  return movedOnce(data, moved, () => transformInteractionData(inputs, data, t) ?? data);
+}
+
+/** Stored `generator_params` (the run's context) with its `interaction_data` moved. */
+export function moveGeneratorParams<T extends { interaction_data?: Record<string, unknown> }>(
+  params: T,
+  inputs: PluginInputDef[],
+  t: RigidTransform,
+  moved: MovedInputs,
+): T {
+  return movedOnce(params, moved, () => ({
+    ...params,
+    interaction_data: moveStoredInputs(params.interaction_data, inputs, t, moved),
+  }));
 }

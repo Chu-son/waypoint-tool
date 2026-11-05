@@ -17,6 +17,8 @@ import {
 } from '../../utils/treeUtils';
 import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from '../../utils/mapElementTreeUtils';
 import { WaypointClipboardPayload } from '../../utils/mapElementClipboard';
+import type { RigidTransform } from '../../utils/rigidTransform';
+import { commitClearBasePose, commitGroupMove, type GroupMoveOptions } from '../groupMove';
 
 /**
  * Replaces `targetId` with `replacementIds` at the same position in its parent's children (or in
@@ -82,6 +84,13 @@ export type NodeSlice = {
   duplicateNodes: (ids: string[]) => string[];
   pasteWaypoints: (payload: WaypointClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setInsertionTarget: (target: InsertionTarget | null) => void;
+  /**
+   * Moves a group or generator with everything in it (and the other outputs of the plugin runs inside) as
+   * one body, carrying its reference pose. False when there is nothing to move.
+   */
+  transformNodeGroup: (id: string, transform: RigidTransform, options?: GroupMoveOptions) => boolean;
+  /** Puts the reference pose of a group or generator back on the centre of its contents (contents stay). */
+  clearNodeBasePose: (id: string) => void;
 };
 
 export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, get) => ({
@@ -92,6 +101,10 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
   anchorNodeId: null,
 
   setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
+
+  transformNodeGroup: (id, transform, options) => commitGroupMove(get, set, 'node', id, transform, options),
+
+  clearNodeBasePose: (id) => commitClearBasePose(get, set, 'node', id),
 
   setInsertionTarget: (target: InsertionTarget | null) =>
     set((state) => ({
