@@ -4,6 +4,7 @@ import {
   yawToQuaternion,
   applyElementPaste,
   calculateAnchorRelativeTransform,
+  rotateQuaternionAboutZ,
 } from './transformUtils';
 import { WaypointNode } from '../types/store';
 import type { ElementCopyState } from '../types/ui';
@@ -14,6 +15,16 @@ describe('transformUtils', () => {
     const q = yawToQuaternion(yaw);
     const convertedYaw = quaternionToYaw(q);
     expect(convertedYaw).toBeCloseTo(yaw);
+  });
+
+  it('rotateQuaternionAboutZ adds to the yaw and keeps roll and pitch', () => {
+    const tilted = { qx: Math.sin(0.2), qy: 0, qz: 0, qw: Math.cos(0.2) };
+
+    const turned = rotateQuaternionAboutZ(tilted, Math.PI / 2);
+
+    expect(quaternionToYaw(rotateQuaternionAboutZ(yawToQuaternion(0.3), 0.5))).toBeCloseTo(0.8);
+    expect(Math.hypot(turned.qx, turned.qy)).toBeCloseTo(Math.sin(0.2));
+    expect(rotateQuaternionAboutZ({}, 0)).toEqual({ qx: 0, qy: 0, qz: 0, qw: 1 });
   });
 
   it('calculateAnchorRelativeTransform calculates relative offset correctly', () => {

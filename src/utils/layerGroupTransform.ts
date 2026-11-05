@@ -5,14 +5,24 @@
 import type { CustomLayer, EditObject, GroupPoseOffset, ProjectMapLayer, ResolvedMapLayer } from '../types/layer';
 import { descendantLayerIds, type LayerTree } from './layerTree';
 import { mapWorldBounds, type WorldBounds } from './mapClip';
-import { transformPoint, wrapAngle, type RigidTransform } from './rigidTransform';
+import {
+  circleLikeBounds,
+  composePose,
+  lineLikeBounds,
+  rectLikeBounds,
+  transformBetweenPoses,
+  transformCircleLike,
+  transformLineLike,
+  transformPoint,
+  transformRectLike,
+  unionBounds,
+  type RigidTransform,
+} from './rigidTransform';
 
 export { isIdentityTransform, transformPoint, transformPose, type Pose, type RigidTransform } from './rigidTransform';
 
 const NO_OFFSET: GroupPoseOffset = { x: 0, y: 0, yaw: 0 };
-const EPSILON = 1e-9;
-
-const tidy = (v: number): number => (Math.abs(v) < EPSILON ? 0 : Math.round(v * 1e9) / 1e9);
+const ORIGIN = { x: 0, y: 0 };
 
 /** True when the offset moves nothing. */
 export const isZeroOffset = (offset: GroupPoseOffset | undefined): boolean =>
@@ -20,15 +30,8 @@ export const isZeroOffset = (offset: GroupPoseOffset | undefined): boolean =>
 
 /** The offset after applying `t` on top of `offset` (an absent offset is zero). Zero results come back as `undefined`. */
 export function composeOffset(offset: GroupPoseOffset | undefined, t: RigidTransform): GroupPoseOffset | undefined {
-  const o = offset ?? NO_OFFSET;
-  const cos = Math.cos(t.dyaw);
-  const sin = Math.sin(t.dyaw);
-  // p'' = c + R(dyaw)(p' - c) + d with p' = R(yaw)p + o
-  const next = {
-    x: tidy(cos * o.x - sin * o.y + (t.pivot.x - (cos * t.pivot.x - sin * t.pivot.y) + t.dx)),
-    y: tidy(sin * o.x + cos * o.y + (t.pivot.y - (sin * t.pivot.x + cos * t.pivot.y) + t.dy)),
-    yaw: tidy(wrapAngle(o.yaw + t.dyaw)),
-  };
+  // The offset is where the origin pose of the contents has gone, so it moves like any pose.
+  const next = composePose(offset ?? NO_OFFSET, t);
   return isZeroOffset(next) ? undefined : next;
 }
 
@@ -37,33 +40,17 @@ export function composeOffset(offset: GroupPoseOffset | undefined, t: RigidTrans
  * `composeOffset` gives `target` back. Used to turn a typed offset into a move.
  */
 export function transformBetweenOffsets(current: GroupPoseOffset | undefined, target: GroupPoseOffset): RigidTransform {
-  const o = current ?? NO_OFFSET;
-  const dyaw = wrapAngle(target.yaw - o.yaw);
-  const cos = Math.cos(dyaw);
-  const sin = Math.sin(dyaw);
-  return {
-    dx: target.x - (cos * o.x - sin * o.y),
-    dy: target.y - (sin * o.x + cos * o.y),
-    dyaw,
-    pivot: { x: 0, y: 0 },
-  };
+  return transformBetweenPoses(current ?? NO_OFFSET, target, ORIGIN);
 }
 
 export function transformEditObject(object: EditObject, t: RigidTransform): EditObject {
   switch (object.type) {
-    case 'rect': {
-      const c = transformPoint({ x: object.cx, y: object.cy }, t);
-      return { ...object, cx: c.x, cy: c.y, angle: object.angle + t.dyaw };
-    }
-    case 'circle': {
-      const c = transformPoint({ x: object.cx, y: object.cy }, t);
-      return { ...object, cx: c.x, cy: c.y };
-    }
-    case 'line': {
-      const a = transformPoint({ x: object.x1, y: object.y1 }, t);
-      const b = transformPoint({ x: object.x2, y: object.y2 }, t);
-      return { ...object, x1: a.x, y1: a.y, x2: b.x, y2: b.y };
-    }
+    case 'rect':
+      return transformRectLike(object, t);
+    case 'circle':
+      return transformCircleLike(object, t);
+    case 'line':
+      return transformLineLike(object, t);
     case 'freehand':
       return { ...object, points: object.points.map((p) => transformPoint(p, t)) };
   }
@@ -71,29 +58,12 @@ export function transformEditObject(object: EditObject, t: RigidTransform): Edit
 
 const editObjectBounds = (object: EditObject): WorldBounds => {
   switch (object.type) {
-    case 'rect': {
-      const cos = Math.abs(Math.cos(object.angle));
-      const sin = Math.abs(Math.sin(object.angle));
-      const halfW = (object.width * cos + object.height * sin) / 2;
-      const halfH = (object.width * sin + object.height * cos) / 2;
-      return { minX: object.cx - halfW, minY: object.cy - halfH, maxX: object.cx + halfW, maxY: object.cy + halfH };
-    }
+    case 'rect':
+      return rectLikeBounds(object);
     case 'circle':
-      return {
-        minX: object.cx - object.radius,
-        minY: object.cy - object.radius,
-        maxX: object.cx + object.radius,
-        maxY: object.cy + object.radius,
-      };
-    case 'line': {
-      const half = (object.lineWidth ?? 0) / 2;
-      return {
-        minX: Math.min(object.x1, object.x2) - half,
-        minY: Math.min(object.y1, object.y2) - half,
-        maxX: Math.max(object.x1, object.x2) + half,
-        maxY: Math.max(object.y1, object.y2) + half,
-      };
-    }
+      return circleLikeBounds(object);
+    case 'line':
+      return lineLikeBounds(object, (object.lineWidth ?? 0) / 2);
     case 'freehand': {
       const xs = object.points.map((p) => p.x);
       const ys = object.points.map((p) => p.y);
@@ -121,13 +91,7 @@ export function groupWorldBounds(
       boxes.push(mapWorldBounds({ info: layer.info, width: layer.info.width, height: layer.info.height }));
     else boxes.push(...layer.editObjects.filter(hasExtent).map(editObjectBounds));
   }
-  if (boxes.length === 0) return null;
-  return {
-    minX: Math.min(...boxes.map((b) => b.minX)),
-    minY: Math.min(...boxes.map((b) => b.minY)),
-    maxX: Math.max(...boxes.map((b) => b.maxX)),
-    maxY: Math.max(...boxes.map((b) => b.maxY)),
-  };
+  return unionBounds(boxes);
 }
 
 /**

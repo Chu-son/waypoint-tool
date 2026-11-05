@@ -1,3 +1,4 @@
+import type { Pose2D } from './geometry';
 import type { PipelineMetadata } from './pipeline';
 
 // --- Custom Layers (Manual & Plugin) ---
@@ -174,11 +175,7 @@ export interface LayerGroup {
 }
 
 /** A rigid transform around the world origin: a point `p` goes to `R(yaw)·p + (x, y)`. Meters and radians. */
-export interface GroupPoseOffset {
-  x: number;
-  y: number;
-  yaw: number;
-}
+export type GroupPoseOffset = Pose2D;
 
 /**
  * A named snapshot of which layers are shown. Only on/off is stored: stack order, opacity and
