@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { BackendAPI } from '../api';
+import type { PluginInstance } from '../types/plugin';
 import { getAppState, resetAppStore } from '../test/store';
 import {
   makeAnnotationGroup,
@@ -335,6 +337,60 @@ describe('moving an annotation group', () => {
     );
 
     expect(pasted?.elementType === 'annotation' && pasted.annotationGroups.g.base_pose).toBeUndefined();
+  });
+});
+
+describe('running a moved generator again', () => {
+  const sent = (call: number) => vi.mocked(BackendAPI.runPlugin).mock.calls[call][1] as Record<string, any>;
+  const rerun = (plugin: PluginInstance, genId: string) =>
+    getAppState().executeGeneratorPlugin({
+      plugin,
+      properties: {},
+      // What the generator panel loads into its input editor.
+      interactionData: getAppState().nodes[genId].generator_params!.interaction_data,
+      existingExecutionId: getAppState().nodes[genId].source_execution_id,
+      targetParentWaypointId: genId,
+    });
+
+  beforeEach(() => {
+    vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue({ waypoints: [{ x: 0, y: 0 }] });
+  });
+
+  it('hands the plugin the moved inputs', async () => {
+    resetAppStore({ plugins: { gen: pointPlugin } });
+    const first = await getAppState().executeGeneratorPlugin({
+      plugin: pointPlugin,
+      properties: {},
+      interactionData: { goal: { x: 1, y: 0, qx: 0, qy: 0, qz: 0, qw: 1 } },
+    });
+    const genId = first.parentWaypointId!;
+
+    getAppState().transformNodeGroup(genId, shift(5, 2));
+    await rerun(pointPlugin, genId);
+
+    expect(sent(1).interaction_data.goal).toMatchObject({ x: 6, y: 2 });
+  });
+
+  it('hands a waypoint-range plugin the moved original points', async () => {
+    const ranged = makePlugin('ranged', { needs: ['waypoint_range'], inputs: [] });
+    resetAppStore({
+      ...waypointTree([
+        makeWaypoint('s', { transform: makeTransform(0, 0) }),
+        makeWaypoint('e', { transform: makeTransform(2, 0) }),
+      ]),
+      plugins: { ranged },
+    });
+    const first = await getAppState().executeGeneratorPlugin({
+      plugin: ranged,
+      properties: {},
+      placement: { type: 'replace_ids', ids: ['s', 'e'] },
+    });
+    const genId = first.parentWaypointId!;
+
+    getAppState().transformNodeGroup(genId, shift(0, 3));
+    await rerun(ranged, genId);
+
+    expect(sent(1).waypoint_range.map((p: { transform: { y: number } }) => p.transform.y)).toEqual([3, 3]);
   });
 });
 
