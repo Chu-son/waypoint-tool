@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { Button } from '../common/Button';
 import { Folder, Unlink, Edit2, BoxSelect, Target, Layers } from 'lucide-react';
 import { WaypointNode } from '../../../types/store';
+import { BasePoseSection } from './BasePoseSection';
 
 interface GroupNodePanelProps {
   node: WaypointNode;
@@ -131,6 +132,8 @@ export function GroupNodePanel({ node }: GroupNodePanelProps) {
             )}
           </div>
         </div>
+
+        <BasePoseSection domain="node" id={node.id} />
 
         {/* アクション */}
         <div className="pt-4 mt-auto border-t border-border-base space-y-2">

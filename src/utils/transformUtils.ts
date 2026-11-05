@@ -29,6 +29,23 @@ export function yawToQuaternion(yaw: number): { qx: number; qy: number; qz: numb
   };
 }
 
+/**
+ * Turns an orientation by `dyaw` about the world Z axis (left-multiplies by that rotation), keeping any
+ * roll and pitch. Missing components count as the identity.
+ */
+export function rotateQuaternionAboutZ(
+  q: Partial<Pick<Transform, 'qx' | 'qy' | 'qz' | 'qw'>>,
+  dyaw: number,
+): { qx: number; qy: number; qz: number; qw: number } {
+  const qx = q.qx ?? 0;
+  const qy = q.qy ?? 0;
+  const qz = q.qz ?? 0;
+  const qw = q.qw ?? 1;
+  const s = Math.sin(dyaw / 2);
+  const c = Math.cos(dyaw / 2);
+  return { qx: c * qx - s * qy, qy: c * qy + s * qx, qz: c * qz + s * qw, qw: c * qw - s * qz };
+}
+
 export function calculateAnchorRelativeTransform(
   targetTransform: Partial<Transform>,
   anchorTransform: Partial<Transform>,

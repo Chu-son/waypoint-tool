@@ -1,4 +1,5 @@
 import { WaypointNode, AnnotationObject, AnnotationGroup } from '../types/store';
+import { normalizeBasePoses } from './basePoseNormalization';
 
 export type MapElementType = 'waypoint' | 'annotation';
 
@@ -63,7 +64,7 @@ export function validateAndParseClipboardEnvelope(rawText: string): MapElementCl
 
     if (payload.elementType === 'waypoint') {
       if (Array.isArray(payload.topLevelIds) && payload.nodes && typeof payload.nodes === 'object') {
-        return payload;
+        return { ...payload, nodes: normalizeBasePoses(payload.nodes) };
       }
     } else if (payload.elementType === 'annotation') {
       if (
@@ -73,7 +74,7 @@ export function validateAndParseClipboardEnvelope(rawText: string): MapElementCl
         payload.annotationGroups &&
         typeof payload.annotationGroups === 'object'
       ) {
-        return payload;
+        return { ...payload, annotationGroups: normalizeBasePoses(payload.annotationGroups) };
       }
     }
 

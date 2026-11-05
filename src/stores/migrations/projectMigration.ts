@@ -16,6 +16,7 @@ import { DEFAULT_PATH_COLOR } from '../../utils/colorPresets';
 import { normalizeGeoMap } from './geoMapNormalization';
 import { normalizeMapStack } from './mapStackNormalization';
 import { normalizeLayerTreeData } from './layerTreeNormalization';
+import { normalizeBasePoses } from '../../utils/basePoseNormalization';
 import { layerOrderOf } from '../../utils/layerTree';
 import { normalizeOptionsSchema } from '../../utils/optionSchema';
 import { v4 as uuidv4 } from 'uuid';
@@ -515,7 +516,7 @@ export function normalizeV1(raw: any): StrictProjectData {
   return {
     version: 1,
     root_node_ids: rootNodeIds,
-    nodes,
+    nodes: normalizeBasePoses(nodes),
     map_sources: mapSources,
     map_layers: mapLayers,
     layer_order: layerOrderOf(layerTree),
@@ -523,7 +524,7 @@ export function normalizeV1(raw: any): StrictProjectData {
     layer_groups: layerTree.layerGroups,
     custom_layers: customLayers,
     annotation_objects: annotationObjects,
-    annotation_groups: annotationGroups,
+    annotation_groups: normalizeBasePoses(annotationGroups),
     root_annotation_ids: rootAnnotationIds,
     export_regions: exportRegions,
     options_schema: optionsSchema,

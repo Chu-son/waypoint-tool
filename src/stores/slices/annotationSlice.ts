@@ -11,8 +11,10 @@ import {
   getNextSequentialName,
 } from '../../utils/treeUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
-import { resolveMapElementName } from '../../utils/mapElementTreeUtils';
+import { isRunIdUsedBy, resolveMapElementName, runIdRenewer } from '../../utils/mapElementTreeUtils';
 import { AnnotationClipboardPayload } from '../../utils/mapElementClipboard';
+import type { RigidTransform } from '../../utils/rigidTransform';
+import { commitClearBasePose, commitGroupMove, type GroupMoveOptions } from '../groupMove';
 
 export interface AnnotationSlice {
   annotationObjects: Record<string, AnnotationObject>;
@@ -58,6 +60,10 @@ export interface AnnotationSlice {
   duplicateAnnotations: (ids: string[]) => string[];
   pasteAnnotations: (payload: AnnotationClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setAnnotationObjects: (objects: AnnotationObject[], groups?: AnnotationGroup[], rootIds?: string[]) => void;
+  /** Moves an annotation group as one body, like `transformNodeGroup`. False when there is nothing to move. */
+  transformAnnotationGroup: (id: string, transform: RigidTransform, options?: GroupMoveOptions) => boolean;
+  /** Puts the reference pose of an annotation group back on the centre of its contents (contents stay). */
+  clearAnnotationBasePose: (id: string) => void;
 }
 
 export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSlice> = (set, get) => ({
@@ -73,6 +79,10 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
   defaultAnnotationColor: DEFAULT_ANNOTATION_COLOR,
   showAnnotations: true,
   showAnnotationLabels: true,
+
+  transformAnnotationGroup: (id, transform, options) => commitGroupMove(get, set, 'annotation', id, transform, options),
+
+  clearAnnotationBasePose: (id) => commitClearBasePose(get, set, 'annotation', id),
 
   setAnnotationEditMode: (enabled: boolean) => {
     const state = get();
@@ -651,6 +661,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
       );
 
       const createdObjectIds: string[] = [];
+      const renewRunId = runIdRenewer(isRunIdUsedBy(state.annotationObjects, state.annotationGroups));
 
       // オブジェクトのディープコピー（オフセットなし）
       const cloneObject = (origId: string, parentGroupId?: string): AnnotationObject | null => {
@@ -664,6 +675,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
           name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: true }) || `${orig.name} (Copy)`,
           group_id: parentGroupId,
         };
+        if (dup.source_execution_id) dup.source_execution_id = renewRunId(dup.source_execution_id);
 
         // オフセットは加算せず元座標を維持
 
@@ -699,6 +711,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
           parent_id: parentGroupId,
           children_ids: newChildIds,
         };
+        if (dupGroup.source_execution_id) dupGroup.source_execution_id = renewRunId(dupGroup.source_execution_id);
 
         nextGroups[newId] = dupGroup;
         return dupGroup;
@@ -794,6 +807,8 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
         ].filter(Boolean) as string[],
       );
 
+      const renewRunId = runIdRenewer(isRunIdUsedBy(state.annotationObjects, state.annotationGroups));
+
       // 1. 全要素に新規UUIDを発行
       const idMap = new Map<string, string>();
       Object.keys(payload.annotationObjects).forEach((oid) => idMap.set(oid, uuidv4()));
@@ -811,6 +826,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
           group_id: newGroupId,
           name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: false }) || orig.name,
         };
+        if (cloned.source_execution_id) cloned.source_execution_id = renewRunId(cloned.source_execution_id);
         nextObjects[newId] = cloned;
       });
 
@@ -827,6 +843,7 @@ export const createAnnotationSlice: StateCreator<AppState, [], [], AnnotationSli
           children_ids: newChildIds,
           name: resolveMapElementName(orig.name, { existingNames, forceCopySuffix: false }) || orig.name,
         };
+        if (cloned.source_execution_id) cloned.source_execution_id = renewRunId(cloned.source_execution_id);
         nextGroups[newId] = cloned;
       });
 

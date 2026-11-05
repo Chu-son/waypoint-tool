@@ -1,3 +1,4 @@
+import type { Pose2D } from './geometry';
 import type { WaypointOptions } from './options';
 import type { PipelineMetadata } from './pipeline';
 
@@ -71,4 +72,6 @@ export interface AnnotationGroup {
   generator_params?: Record<string, any>;
   plugin_data?: Record<string, any>;
   pipeline_metadata?: PipelineMetadata;
+  /** The reference pose that moves with the contents (see `WaypointNode.base_pose`). */
+  base_pose?: Pose2D;
 }

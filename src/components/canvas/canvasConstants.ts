@@ -41,6 +41,8 @@ export const CANVAS_EXPORT_REGION_COLOR = 0x10b981;
 export const CANVAS_MEASURE_COLOR = 0x10b981;
 /** Origin marker of the geographic base map while it is being aligned. */
 export const CANVAS_GEO_ANCHOR_COLOR = 0xf59e0b;
+/** Reference pose of the waypoint or annotation group shown in the inspector. */
+export const CANVAS_BASE_POSE_COLOR = 0xa78bfa;
 /** Outline and handles of the use area of a map layer while it is being edited. */
 export const CANVAS_CLIP_EDIT_COLOR = 0x38bdf8;
 export const CANVAS_MEASURE_LIGHT_COLOR = 0x34d399;

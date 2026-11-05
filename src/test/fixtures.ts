@@ -37,6 +37,28 @@ export function makeGroup(id: string, childrenIds: string[], overrides: Partial<
 }
 
 /**
+ * A generator holding `children` (pass them to `waypointTree` too), with its baseline taken from their
+ * current poses, so it starts out "not edited by hand".
+ */
+export function makeGenerator(
+  id: string,
+  children: WaypointNode[],
+  overrides: Partial<WaypointNode> = {},
+): WaypointNode {
+  return {
+    id,
+    type: 'generator',
+    name: id,
+    plugin_id: 'gen',
+    source_execution_id: `run-${id}`,
+    generator_params: { properties: {}, interaction_data: {} },
+    children_ids: children.map((c) => c.id),
+    baseline_waypoints: children.map((c) => ({ transform: { ...c.transform! } })),
+    ...overrides,
+  };
+}
+
+/**
  * Build the `nodes` / `rootNodeIds` pair for a waypoint tree. Nodes listed as children of a
  * group are excluded from the roots automatically.
  *
@@ -85,6 +107,21 @@ export function makeAnnotationGroup(
 
 export function makeManualCustomLayer(id: string, overrides: Partial<ManualCustomLayer> = {}): ManualCustomLayer {
   return { id, name: id, type: 'manual', visible: true, opacity: 1, editObjects: [], ...overrides };
+}
+
+export function makePluginLayer(id: string, overrides: Partial<PluginCustomLayer> = {}): PluginCustomLayer {
+  return {
+    id,
+    name: id,
+    type: 'plugin',
+    visible: true,
+    opacity: 1,
+    plugin_id: 'gen',
+    params: {},
+    image_base64: '',
+    info: { resolution: 0.05, origin: [0, 0, 0], width: 10, height: 10 },
+    ...overrides,
+  };
 }
 
 /** One loaded map: its source (image + metadata) and a map instance that draws it. */

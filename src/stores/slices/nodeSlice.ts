@@ -15,8 +15,16 @@ import {
   mapInsertionTarget,
   collectTopLevelInOrder,
 } from '../../utils/treeUtils';
-import { filterTopLevelIds, remapHierarchicalIds, resolveMapElementName } from '../../utils/mapElementTreeUtils';
+import {
+  filterTopLevelIds,
+  isRunIdUsedBy,
+  remapHierarchicalIds,
+  resolveMapElementName,
+  runIdRenewer,
+} from '../../utils/mapElementTreeUtils';
 import { WaypointClipboardPayload } from '../../utils/mapElementClipboard';
+import type { RigidTransform } from '../../utils/rigidTransform';
+import { commitClearBasePose, commitGroupMove, type GroupMoveOptions } from '../groupMove';
 
 /**
  * Replaces `targetId` with `replacementIds` at the same position in its parent's children (or in
@@ -82,6 +90,13 @@ export type NodeSlice = {
   duplicateNodes: (ids: string[]) => string[];
   pasteWaypoints: (payload: WaypointClipboardPayload, options?: { asGroup?: boolean }) => string[];
   setInsertionTarget: (target: InsertionTarget | null) => void;
+  /**
+   * Moves a group or generator with everything in it (and the other outputs of the plugin runs inside) as
+   * one body, carrying its reference pose. False when there is nothing to move.
+   */
+  transformNodeGroup: (id: string, transform: RigidTransform, options?: GroupMoveOptions) => boolean;
+  /** Puts the reference pose of a group or generator back on the centre of its contents (contents stay). */
+  clearNodeBasePose: (id: string) => void;
 };
 
 export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, get) => ({
@@ -92,6 +107,10 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
   anchorNodeId: null,
 
   setAnchorNode: (id: string | null) => set({ anchorNodeId: id }),
+
+  transformNodeGroup: (id, transform, options) => commitGroupMove(get, set, 'node', id, transform, options),
+
+  clearNodeBasePose: (id) => commitClearBasePose(get, set, 'node', id),
 
   setInsertionTarget: (target: InsertionTarget | null) =>
     set((state) => ({
@@ -604,11 +623,13 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
           .filter(Boolean) as string[],
       );
 
+      const renewRunId = runIdRenewer(isRunIdUsedBy(state.nodes));
       const remapResult = remapHierarchicalIds(topLevelIds, state.nodes, {
         onCloneItem: (cloned) => {
           if (cloned.name) {
             cloned.name = resolveMapElementName(cloned.name, { existingNames, forceCopySuffix: true });
           }
+          if (cloned.source_execution_id) cloned.source_execution_id = renewRunId(cloned.source_execution_id);
           // オフセットは加算せず元座標をそのまま維持
         },
       });
@@ -680,12 +701,14 @@ export const createNodeSlice: StateCreator<AppState, [], [], NodeSlice> = (set, 
       );
 
       // 1. クリップボード内のノード群のIDを新規UUIDへ再採番
+      const renewRunId = runIdRenewer(isRunIdUsedBy(state.nodes));
       const remapResult = remapHierarchicalIds(payload.topLevelIds, payload.nodes, {
         onCloneItem: (cloned) => {
           if (cloned.name) {
             // 同名が存在すれば (Copy) を付加、別ウィンドウ等で同名がなければ元の名前を維持
             cloned.name = resolveMapElementName(cloned.name, { existingNames, forceCopySuffix: false });
           }
+          if (cloned.source_execution_id) cloned.source_execution_id = renewRunId(cloned.source_execution_id);
         },
       });
 

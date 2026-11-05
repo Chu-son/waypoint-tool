@@ -288,6 +288,8 @@ graph TD
 
 この決定論的パイプラインにより、複数の要素が同時に Inspector の表示権を奪い合う競合（Race Condition）を完全に排除しています。
 
+**基準位置のマーカー**: Inspector がウェイポイントのグループ／ジェネレーター（`nodes` 選択の先頭がそれで、残りがすべてその子孫）か、アノテーションのグループ（`annotations` 選択が 1 つでグループ）を表示しているあいだだけ、キャンバスにその基準位置のマーカー（`BasePoseMarkerLayer`）を描きます。判定は `basePoseTarget`（`stores/groupMove.ts`）の 1 か所で、`generator_add` / `plugin_interaction` / `custom_layer_edit` / `annotation_edit` のように専用の Inspector を出すモードと、パイプラインの出力（`PipelineInspector`）では描きません。
+
 ---
 
 ## 5. 階層型エスケープ・パイプライン (Tier 1〜Tier 7 Cancellation Ladder)
@@ -445,6 +447,11 @@ stateDiagram-v2
         Panning --> SelectIdle : Pointer Up
         SelectIdle --> DraggingNodes : Left Drag on Node
         DraggingNodes --> SelectIdle : Pointer Up (Commit) / Esc (Rollback)
+        note right of DraggingNodes
+            選択がグループ／ジェネレーターの中身全体なら
+            グループの一括移動（基準位置・入力も動く）。
+            Esc は開始前の状態へ戻す
+        end note
         SelectIdle --> RotatingYaw : Drag Yaw Handle
         RotatingYaw --> SelectIdle : Pointer Up (Commit) / Esc (Rollback)
         SelectIdle --> MarqueeSelecting : Shift + Left Drag
