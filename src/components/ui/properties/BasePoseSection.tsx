@@ -1,8 +1,8 @@
 import { useMemo, useRef } from 'react';
-import { useShallow } from 'zustand/react/shallow';
 import { Crosshair, Move, RotateCcw, RotateCw } from 'lucide-react';
-import { useAppStore, type AppState } from '../../../stores/appStore';
+import { useAppStore } from '../../../stores/appStore';
 import { effectiveBasePose, groupMoveScope, type GroupDomain } from '../../../stores/groupMove';
+import { useBasePose } from '../../../hooks/useBasePose';
 import { followingOf } from '../../../utils/pluginInputTransform';
 import { transformBetweenPoses, type RigidTransform } from '../../../utils/rigidTransform';
 import type { Pose2D } from '../../../types/geometry';
@@ -13,9 +13,6 @@ import { PoseAdjuster, type PoseNudge } from '../common/PoseAdjuster';
 import { PropertySectionHeader } from './PropertySectionHeader';
 
 const toRadians = (deg: number) => (deg * Math.PI) / 180;
-
-const itemOf = (state: AppState, domain: GroupDomain, id: string) =>
-  domain === 'node' ? state.nodes[id] : state.annotationGroups[id];
 
 /** What the user should know before moving: how a rerun treats the move, and what else moves along. */
 function useNotes(domain: GroupDomain, id: string) {
@@ -48,9 +45,7 @@ function useNotes(domain: GroupDomain, id: string) {
  * the reference pose. A held nudge or a number being typed is one undo step.
  */
 export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: string }) {
-  // Compared field by field: the centre of the contents is computed anew on every store change.
-  const pose = useAppStore(useShallow((state) => effectiveBasePose(state, domain, id)));
-  const isStored = useAppStore((state) => !!itemOf(state, domain, id)?.base_pose);
+  const { pose, isStored } = useBasePose(domain, id);
   const notes = useNotes(domain, id);
   // A held nudge, a number being typed or a turn records one undo step: only its first move does.
   const gestureRecorded = useRef(false);

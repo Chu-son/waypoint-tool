@@ -1,8 +1,6 @@
 import { memo, useCallback } from 'react';
 import * as PIXI from 'pixi.js';
-import { useShallow } from 'zustand/react/shallow';
-import { useAppStore } from '../../../stores/appStore';
-import { basePoseTarget, effectiveBasePose } from '../../../stores/groupMove';
+import { useBasePose, useBasePoseTarget } from '../../../hooks/useBasePose';
 import { CANVAS_BASE_POSE_COLOR } from '../canvasConstants';
 
 /**
@@ -11,13 +9,9 @@ import { CANVAS_BASE_POSE_COLOR } from '../canvasConstants';
  * faint while the pose is only the centre of the contents (not stored yet, so it follows edits).
  */
 export const BasePoseMarkerLayer = memo(function BasePoseMarkerLayer({ scale }: { scale: number }) {
-  const target = useAppStore(useShallow(basePoseTarget));
-  const pose = useAppStore(useShallow((state) => (target ? effectiveBasePose(state, target.domain, target.id) : null)));
-  const isStored = useAppStore((state) => {
-    if (!target) return false;
-    const item = target.domain === 'node' ? state.nodes[target.id] : state.annotationGroups[target.id];
-    return !!item?.base_pose;
-  });
+  const target = useBasePoseTarget();
+  // With no target the id matches nothing, so there is no pose to draw.
+  const { pose, isStored } = useBasePose(target?.domain ?? 'node', target?.id ?? '');
 
   const yaw = pose?.yaw ?? 0;
   const draw = useCallback(

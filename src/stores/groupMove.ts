@@ -124,14 +124,18 @@ export function planGroupMove(
   const layerIds = new Set(scope.layerIds);
   return {
     movesWaypoints: scope.nodeIds.length > 0,
-    nodes: { ...state.nodes, ...movedNodes },
-    annotationGroups: { ...state.annotationGroups, ...movedAnnotations.groups },
-    annotationObjects: { ...state.annotationObjects, ...movedAnnotations.objects },
+    // A domain with nothing moved keeps its map, so what depends on it (layers, memos) is not rebuilt.
+    nodes: withChanges(state.nodes, movedNodes),
+    annotationGroups: withChanges(state.annotationGroups, movedAnnotations.groups),
+    annotationObjects: withChanges(state.annotationObjects, movedAnnotations.objects),
     customLayers: layerIds.size
       ? state.customLayers.map((layer) => (layerIds.has(layer.id) ? movePluginLayer(layer, t, ctx) : layer))
       : state.customLayers,
   };
 }
+
+const withChanges = <T>(items: Record<string, T>, changes: Record<string, T>): Record<string, T> =>
+  Object.keys(changes).length > 0 ? { ...items, ...changes } : items;
 
 /** Modes whose inspector is not the selection's, so no group pose is being adjusted. */
 const MODES_WITH_OWN_INSPECTOR = new Set([

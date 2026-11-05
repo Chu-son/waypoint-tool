@@ -109,6 +109,7 @@
 - **`PluginCard`** (`ui/settings/PluginCard.tsx`): PluginsTab の 1 プラグイン分（有効化・並び替え・アイコン・インタプリタ上書き・SDK/依存状態）。**`ManualLayerTools`** (`ui/properties/ManualLayerTools.tsx`): 手動ベクターレイヤーの描画ツール・塗り種別・描画オブジェクト一覧。
 - **`useTreeItemSelection`** / **`useTreeReveal`**: ツリーのクリック・Shift 範囲選択、および選択要素までの自動展開・スクロール。
 - **`useResponsiveContainer`**: コンテナ幅に応じたレスポンシブ表示切り替え。
+- **`useBasePose(domain, id)`** / **`useBasePoseTarget()`**: グループの基準位置（と保存済みか）、Inspector が対象にしているグループ。ウェイポイント・アノテーション・選択が変わったときだけ計算し直す（カーソル位置の更新のたびに子孫を走査しない）。`BasePoseSection` と `BasePoseMarkerLayer` が使う。
 - **`useSyncPluginInputs(id, inputs, saved)`**: プラグインの出力（ジェネレーター・アノテーショングループ）の保存済み入力 `interaction_data` を、開いたときと、保存値が変わったとき（一括移動・Undo/Redo）に入力欄（`pluginInteractionData`）へ読み込む。プラグインの入力ごとに丸ごと置き換える。プロパティ（`genParams`）は対象外なので、編集中の値は移動で戻らない。`GeneratorNodePanel` と `AnnotationGroupPanel` が使う。
 
 

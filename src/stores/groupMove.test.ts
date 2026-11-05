@@ -137,6 +137,16 @@ describe('moving a waypoint group', () => {
     expect(node('site').base_pose).toBeUndefined();
   });
 
+  it('leaves the annotations and layers as they were (same objects), as nothing there moves', () => {
+    const before = getAppState();
+
+    getAppState().transformNodeGroup('site', shift(1, 0));
+
+    expect(getAppState().annotationObjects).toBe(before.annotationObjects);
+    expect(getAppState().annotationGroups).toBe(before.annotationGroups);
+    expect(getAppState().customLayers).toBe(before.customLayers);
+  });
+
   it('records history only when asked, so a held nudge is one step', () => {
     getAppState().transformNodeGroup('site', shift(1, 0));
     getAppState().transformNodeGroup('site', shift(1, 0), { recordHistory: false });
@@ -354,6 +364,14 @@ describe('moving an annotation group', () => {
     // Shapes span x -3..2 (the circle reaches -3), y -2..2: centre (-0.5, 0).
     expect(getAppState().annotationGroups.g.base_pose).toEqual({ x: 0.5, y: 0, yaw: 0 });
     expect(getAppState().annotationGroups.inner.base_pose).toBeUndefined();
+  });
+
+  it('leaves the waypoints as they were (same object), as none of them moves', () => {
+    const before = getAppState().nodes;
+
+    getAppState().transformAnnotationGroup('g', shift(1, 0));
+
+    expect(getAppState().nodes).toBe(before);
   });
 
   it('is one undo step', () => {
