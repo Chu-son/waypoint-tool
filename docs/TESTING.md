@@ -64,7 +64,7 @@ it('Delete removes the selected waypoints', () => {
 | `setup.ts` | jest-dom 拡張、pointer capture のポリフィル |
 | `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `getLayerOrder()`（積み順 = `layerOrderOf` の結果）, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
 | `render.tsx` | `renderWithStore(ui, state)` → `{ user, ...render結果 }` |
-| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップ・カスタムレイヤー・`makeLayerGroup` のグループを、上から順に入れ子で並べたスタックのストア状態）/ `makeLayerGroup` / `makeAnnotationGroup` / `makeManualCustomLayer` / `makePlugin` |
+| `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップ・カスタムレイヤー・`makeLayerGroup` のグループを、上から順に入れ子で並べたスタックのストア状態）/ `makeLayerGroup` / `makeAnnotationGroup` / `makeManualCustomLayer` / `makePluginLayer`（プラグインレイヤー）/ `makePlugin` / `makeGenerator`（子のウェイポイントを受け取り、その現在の姿勢をベースラインにした「手動編集なし」のジェネレーター。子は `waypointTree` にも渡す） |
 | `mocks/pixi.tsx` | PixiJS スタブ、描画呼び出しを記録する `createGraphicsRecorder()` |
 
 テストデータはファクトリで作り、**テストの意図に関係するフィールドだけ** を上書きする。

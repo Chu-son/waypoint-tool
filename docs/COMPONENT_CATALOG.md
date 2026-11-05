@@ -28,7 +28,7 @@
   - **概要**: 数値編集用インプット。入力中の中間状態を許容し、フォーカス外/Enter で確定。`step` 指定時は ↑/↓ キーで増減（Shift ×10、Alt ×0.1）。
   - **主要Props**: `value`, `onChange`, `step`, `min`, `max`, `precision`, `onEditStart`, `onEditEnd`
 - **`PoseAdjuster`** ([`src/components/ui/common/PoseAdjuster.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/PoseAdjuster.tsx))
-  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`onNudge` が `false`（または `false` の Promise）を返すと「断られた」とみなし、その押下のあいだ以降の繰り返しを止める。Promise が未解決のあいだの繰り返しは捨てる（確認ダイアログが重ならない）。`MapPoseSection`（マップレイヤーの Inspector）、`LayerGroupPoseSection`（グループの一括位置調整）、`GeoMapCard` で共用。
+  - **概要**: 位置・回転を目視で合わせるためのナッジパッド。↑↓←→ 移動と CCW/CW 回転ボタン（長押しでリピート）、粗/中/細のステップ切替。フォーカス中は矢印キーで移動、Q/E で回転、Shift ×10・Alt ×0.1。座標系はワールド軸（+X 右, +Y 上, +yaw 反時計回り）の相対量 `PoseNudge` を通知するだけで、値の保持や適用は呼び出し側が行う。`onNudge` が `false`（または `false` の Promise）を返すと「断られた」とみなし、その押下のあいだ以降の繰り返しを止める。Promise が未解決のあいだの繰り返しは捨てる（確認ダイアログが重ならない）。`MapPoseSection`（マップレイヤーの Inspector）、`LayerGroupPoseSection`（グループの一括位置調整）、`BasePoseSection`（ウェイポイント・アノテーションのグループの基準位置）、`GeoMapCard` で共用。
   - **主要Props**: `onNudge`, `onEditStart`, `onEditEnd`（押下/キー保持の一連操作を Undo 1 エントリにまとめるために使う）
 - **`LoadingOverlay`** ([`src/components/ui/common/LoadingOverlay.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/LoadingOverlay.tsx))
   - **概要**: 重い非同期処理（プラグイン実行、マージプレビュー生成、インポート/エクスポート等）実行時に全画面を半透明ブラー暗転させて操作をブロックする共通ローディングオーバーレイ。`document.body` へポータル描画し、モーダルより前面（`z-[60]`）に出るため、モーダルから開始した処理でも見える。`message` / `detail`（改行可）を表示し、3 秒を超えると経過秒数も出す。
@@ -109,6 +109,7 @@
 - **`PluginCard`** (`ui/settings/PluginCard.tsx`): PluginsTab の 1 プラグイン分（有効化・並び替え・アイコン・インタプリタ上書き・SDK/依存状態）。**`ManualLayerTools`** (`ui/properties/ManualLayerTools.tsx`): 手動ベクターレイヤーの描画ツール・塗り種別・描画オブジェクト一覧。
 - **`useTreeItemSelection`** / **`useTreeReveal`**: ツリーのクリック・Shift 範囲選択、および選択要素までの自動展開・スクロール。
 - **`useResponsiveContainer`**: コンテナ幅に応じたレスポンシブ表示切り替え。
+- **`useSyncPluginInputs(id, inputs, saved)`**: プラグインの出力（ジェネレーター・アノテーショングループ）の保存済み入力 `interaction_data` を、開いたときと、保存値が変わったとき（一括移動・Undo/Redo）に入力欄（`pluginInteractionData`）へ読み込む。プラグインの入力ごとに丸ごと置き換える。プロパティ（`genParams`）は対象外なので、編集中の値は移動で戻らない。`GeneratorNodePanel` と `AnnotationGroupPanel` が使う。
 
 
 ---
@@ -131,8 +132,13 @@
   - **概要**: Option Schema の `TypeSpec` に従って値を再帰的に編集するコンポーネント（`CustomOptionsGroup` / `AnnotationCustomOptionsGroup`、および設定画面の `FieldEditor`（既定値・グローバル値の編集）が共用）。`list` は要素の追加・削除・並べ替え（構造体要素はカード、スカラー要素は行ごとの入力 + カンマ区切り貼り付け）、`object` は固定フィールド入力、`map` はキーの追加・リネーム・削除、`union` はバリアント選択（`switchUnionVariant` で同名フィールドを引き継ぐ）+ フィールド入力、`any` は JSON テキスト編集を行う。値が明示的に設定されているフィールドには「既定値に戻す」ボタンを、未設定のフィールドには「既定」バッジを表示する（`showResetControl` で無効化可）。`spec.presets` が1件以上あれば、型別コントロールの上にプリセット選択（`PresetSelector`）を出す。参照中は下のコントロールを読み取り専用にし、「カスタム値」への切り替えで参照先の値をコピーして編集を続けられる（`preset_only` では「カスタム値」自体を出さない）。カスタム値がいずれかのプリセットと完全に一致すれば「参照にする」を提示する。複数選択（`mixed`）でも、複合型を含めプリセット選択自体は出し、選択中の全ノードへ一括設定できる。 `defaultGlobal`（既定値が連動しているグローバル名）を受け取り、未設定時の「既定: 値（グローバル name）」表示に出所を添える。boolean は未設定時にチェックボックスの横へ同じ表示を出す。`ValueEditTransactionContext`（既定は no-op）経由で Undo/Redo トランザクションの実装を注入でき、Inspector はストアの `historySlice` と連動した実装を providing する。構造を変える操作は1回のトランザクションにまとめ、テキスト入力は focus/blur でトランザクションの開始・終了を行う。
   - **主要Props**: `spec`, `value`, `onChange`, `name`, `defaultValue`, `disabled`, `mixed`, `showResetControl`
 - **`GeneratorNodePanel`** ([`src/components/ui/properties/GeneratorNodePanel.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/GeneratorNodePanel.tsx))
-  - **概要**: 生成されたジェネレーターノードの再編集・引数調整・Waypoint展開 (Explode) を行うUI。範囲を置き換えて作られたジェネレーター（`source_snapshot` を持つもの）には、元のグループ階層ごと戻す「元に戻す」ボタンを表示する。手動編集がある場合は破棄の確認を挟む。
+  - **概要**: 生成されたジェネレーターノードの再編集・引数調整・Waypoint展開 (Explode) を行うUI。範囲を置き換えて作られたジェネレーター（`source_snapshot` を持つもの）には、元のグループ階層ごと戻す「元に戻す」ボタンを表示する。手動編集がある場合は破棄の確認を挟む。`BasePoseSection` で中身ごと一括移動できる（プラグインが読み込まれていないときは不可）。
   - **主要Props**: `nodeId`
+- **`GroupNodePanel`** / **`AnnotationGroupPanel`** ([`src/components/ui/properties/`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/))
+  - **概要**: ウェイポイントのグループ、アノテーションのグループ（手動・プラグイン生成）の名前・子要素・解除・再生成などを扱うパネル。どちらも `BasePoseSection` で中身ごと一括移動できる。
+- **`BasePoseSection`** ([`src/components/ui/properties/BasePoseSection.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/BasePoseSection.tsx))
+  - **概要**: ウェイポイントのグループ／ジェネレーター、アノテーションのグループの **基準位置**（`base_pose`。未設定なら中身の中心・向き 0°）と、それを動かして中身ごと一括移動する操作。基準 X / Y / Yaw の入力（入力値が新しい基準位置になり、基準位置まわりに回して平行移動する）、±90°、微調整パッド（ワールド軸に沿って動き、基準位置まわりに回る）、「基準位置を中身の中心に置き直す」（中身は動かさない）。押し続けや入力中は 1 回の Undo にまとめる。再実行のふるまい（`moveFollowing` の partial / none）、同じ実行の出力も動くこと、パイプラインの出力を含むことを `AlertBox` で知らせる。中身が空なら表示しない。ストアを直接読むので、パネルは `domain` と `id` を渡すだけ。レイヤーグループの `LayerGroupPoseSection`（累積の移動量）とは別物で、表示の意味も違う。
+  - **主要Props**: `domain`（`'node' | 'annotation'`）, `id`
 - **`CustomLayerInspector`** ([`src/components/ui/properties/CustomLayerInspector.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/properties/CustomLayerInspector.tsx))
   - **概要**: 手動ベクター描画レイヤー（直線・矩形・円形・ブラシ）のツール設定や、プラグイン生成マップレイヤーの新規作成・パラメータ編集・再生成・透過度・ブレンドモード調整を行う統合インスペクターUI。
   - **主要Props**: なし（選択中のカスタムレイヤー（`selectedCustomLayerId`）と連動）
@@ -317,6 +323,7 @@
 9. **`SnappingGuideLayer`**: 直交スナップガイド線および数値入力 HUD（最前面）
 10. **`GeoAlignMarkerLayer`**: 背景地図の位置合わせ中だけ、地図の原点位置と東方向のマーカーを描画
 11. **`MapClipEditLayer`**: マップの使用領域を編集中（`map_clip_edit`）だけ、対象レイヤーの領域を半透明の枠で描画し、各矩形の 8 つのリサイズハンドルを置く
+12. **`BasePoseMarkerLayer`**: Inspector の対象がウェイポイントのグループ／ジェネレーター、アノテーションのグループのあいだだけ、その基準位置と向きのマーカーを描画（`GeoAlignMarkerLayer` の直後に置く）
 
 ### Canvas 補助モジュール (`src/components/canvas/`)
 - **`MapLayerSprite`** (`MapLayerSprite.tsx`): 占有格子画像 1 枚を ROS 原点に合わせて描画し、占有ハイライトフィルタを適用。マップインスタンスに使用領域（`clip`）があるときは、ワールド座標の矩形和集合を Pixi マスク（`utils/clipMask.ts`）として適用する。
@@ -331,6 +338,9 @@
   - **主要Props**: `scale`, `position`
 - **`GeoAlignMarkerLayer`** ([`src/components/canvas/layers/GeoAlignMarkerLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/GeoAlignMarkerLayer.tsx))
   - **概要**: `geo_map_align` モード中に、背景地図の原点位置（回転の軸）と地図の東方向を示すマーカーを描画。
+  - **主要Props**: `scale`
+- **`BasePoseMarkerLayer`** ([`src/components/canvas/layers/BasePoseMarkerLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/BasePoseMarkerLayer.tsx))
+  - **概要**: Inspector の対象（`basePoseTarget`）のグループの基準位置に輪と向きの矢印を描く。基準位置が未保存（中身の中心を使っている）あいだは薄く描く。色は `CANVAS_BASE_POSE_COLOR`。
   - **主要Props**: `scale`
 - **`AnnotationLayer`** ([`src/components/canvas/layers/AnnotationLayer.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/canvas/layers/AnnotationLayer.tsx))
   - **概要**: Point (円), OrientedPoint (矢印), Line (線分), Rect (矩形), Circle (円形) のアノテーション図形、色枠線、半透明塗りつぶし、変形操作ハンドル、テキストラベルの高速 WebGL 描画およびインタラクション。
@@ -373,7 +383,11 @@
 - **差分・取り込みの純粋関数** (`src/utils/diff/`, `src/utils/import/`): `diff/lineDiff`（行単位の LCS 差分・変更の前後だけを残す折りたたみ）, `diff/itemDiff`（キーで突き合わせた項目単位の差分 `diffByKey`・キー順に依存しない表示用テキスト）, `import/optionSchemaMerge`（スキーマを options / globals / definitions の項目名で突き合わせ、採否に応じてマージ）, `import/idRemap`（取り込むデータの ID 振り直しと、子・親・ソース・レイヤー順・表示セット・実行 ID の参照の付け替え）, `import/projectImportPlan`（取り込みカテゴリの定義・テンプレート／プロファイルの突き合わせ・取り込み計画 `buildProjectImportPlan`）
 - **`transformUtils`** ([`src/utils/transformUtils.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/transformUtils.ts))
   - **概要**: Quaternion ⇔ Yaw 変換、アンカー点基準の相対座標算出演算関数群。
-  - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `calculateAnchorRelativeTransform`
+  - **主要関数**: `quaternionToYaw`, `yawToQuaternion`, `rotateQuaternionAboutZ`（ロール・ピッチを保ったまま向きを回す）, `calculateAnchorRelativeTransform`
+- **一括移動の純粋関数** (`src/utils/`): `rigidTransform`（平面の剛体変換 `RigidTransform`・`transformPoint` / `transformPose`、姿勢の合成 `composePose` と「現在 → 目標」の変換 `transformBetweenPoses`、手描きオブジェクトとアノテーションで共通の rect / circle / line の変換と外接矩形）, `layerGroupTransform`（レイヤーグループの一括移動。剛体変換は `rigidTransform` のものを再エクスポート）, `waypointGroupTransform`（ウェイポイントのグループ／ジェネレーターの移動、基準位置の実効値 `effectiveNodeBasePose`、グループ丸ごとの選択の判定 `wholeGroupSelected`）, `annotationGroupTransform`（アノテーションの各図形の移動、基準位置の実効値 `effectiveAnnotationBasePose`）, `pluginInputTransform`（manifest の入力型だけを根拠に座標入力を動かす `transformInteractionData`、再実行が移動に付いてくるかの判定 `moveFollowing` / `followingOf`、同じ実行の出力で共有された入力を 1 回だけ動かす `moveGeneratorParams`）, `basePoseNormalization`（読み込みと貼り付けの境界で不正な姿勢を落とす `normalizePose2D` / `normalizeBasePoses`）
+- **`groupMove`** ([`src/stores/groupMove.ts`](file:///home/chuson/develop/waypoint-tool/src/stores/groupMove.ts))
+  - **概要**: ウェイポイントのグループ／ジェネレーター、アノテーションのグループの一括移動。同じプラグイン実行の出力（ジェネレーター・アノテーショングループ・プラグインレイヤー）も一緒に動かすため、スライスをまたぐ処理としてスライスの外に置く。スライスの `transformNodeGroup` / `transformAnnotationGroup` / `clearNodeBasePose` / `clearAnnotationBasePose` はここへ委ねる。
+  - **主要関数**: `planGroupMove`（移動後の状態を返す純関数）, `commitGroupMove` / `commitClearBasePose`（履歴 1 回で反映）, `groupMoveScope`（一緒に動く範囲）, `effectiveBasePose`, `basePoseTarget`（Inspector とマーカーが対象にするグループ）
 - **`conditionalStyles`** ([`src/utils/conditionalStyles.ts`](file:///home/chuson/develop/waypoint-tool/src/utils/conditionalStyles.ts))
   - **概要**: マップ要素（Waypoint, Path, Footprint, Annotation）の属性・オプション値を評価し、オーバーレイスタイルをカスケーディング合成・描画する純粋関数群。プロパティパスは `options.navigation.is_through_point` のように `object` フィールドまで辿れる。条件ツリーは rule / group に加え、list の要素・map の値へサブ条件を適用する `collection`（`any` / `all` / `none`、サブ条件は要素からの相対パス）を評価する。
   - **主要関数**: `resolveWaypointConditionalStyle`, `resolvePathConditionalStyle`, `resolveFootprintConditionalStyle`, `resolveAnnotationConditionalStyle`, `evaluateConditionGroup`, `drawDashedLine`, `parseColorSafe`
