@@ -8,7 +8,7 @@ import { computePointsBoundingBox } from './geometry';
 import { followingOf, moveGeneratorParams, type MoveContext } from './pluginInputTransform';
 import { composePose, transformPoint, type RigidTransform } from './rigidTransform';
 import { rotateQuaternionAboutZ } from './transformUtils';
-import { collectDescendantIds } from './treeUtils';
+import { collectDescendantIds, excludeDescendantsOfOthers } from './treeUtils';
 
 /** A waypoint pose after the move: the position turns and shifts, the heading turns, the height stays. */
 export function moveWaypointTransform(tf: Transform, t: RigidTransform): Transform {
@@ -60,6 +60,20 @@ export function moveNodes(
   ctx: MoveContext,
 ): Record<string, WaypointNode> {
   return Object.fromEntries(ids.map((id) => [id, moveNode(nodes[id], t, ctx)]));
+}
+
+/**
+ * The group or generator whose whole contents are exactly `ids` (it and everything inside it), so dragging
+ * that selection moves the group as one body. Null for any other selection.
+ */
+export function wholeGroupSelected(nodes: Record<string, WaypointNode>, ids: string[]): string | null {
+  const roots = excludeDescendantsOfOthers(ids, nodes);
+  if (roots.length !== 1) return null;
+  const root = nodes[roots[0]];
+  if (!root || root.type === 'manual') return null;
+  const contents = nodeSubtreeIds(nodes, [root.id]);
+  const selected = new Set(ids);
+  return contents.length === selected.size && contents.every((id) => selected.has(id)) ? root.id : null;
 }
 
 const pointsInside = (nodes: Record<string, WaypointNode>, id: string) =>

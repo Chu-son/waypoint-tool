@@ -3,7 +3,8 @@ import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, useMem
 import { Application, extend, useApplication } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import type { ClipHandle } from '../../utils/mapClip';
-import { useAppStore } from '../../stores/appStore';
+import { useAppStore, type AppState } from '../../stores/appStore';
+import { wholeGroupSelected } from '../../utils/waypointGroupTransform';
 import { useResolvedMapLayers } from '../../hooks/useResolvedMapLayers';
 import { v4 as uuidv4 } from 'uuid';
 import { ManualCustomLayer, EditObject, WaypointNode } from '../../types/store';
@@ -20,6 +21,7 @@ import { AnnotationLayer } from './layers/AnnotationLayer';
 import { MeasureLayer } from './layers/MeasureLayer';
 import { GeoTileLayer } from './layers/GeoTileLayer';
 import { GeoAlignMarkerLayer } from './layers/GeoAlignMarkerLayer';
+import { BasePoseMarkerLayer } from './layers/BasePoseMarkerLayer';
 import { useGeoMapAlign } from './hooks/useGeoMapAlign';
 import { useMapClipEdit } from './hooks/useMapClipEdit';
 import { MapClipEditLayer } from './layers/MapClipEditLayer';
@@ -230,6 +232,16 @@ function MapCanvasView() {
       string,
       { x: number; y: number; z?: number; qx: number; qy: number; qz: number; qw: number }
     >;
+    /**
+     * Set when the selection is a whole group or generator: the drag moves it as one body (reference pose,
+     * generator inputs and other outputs of the same run included). `applied` is the shift done so far;
+     * `before` is put back on Escape.
+     */
+    group?: {
+      id: string;
+      applied: { dx: number; dy: number };
+      before: Pick<AppState, 'nodes' | 'annotationObjects' | 'annotationGroups' | 'customLayers'>;
+    };
   } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const latestMousePos = useRef({ x: 0, y: 0 }); // Track screen mouse pos constantly
@@ -292,11 +304,16 @@ function MapCanvasView() {
   const abort = useCallback((): boolean => {
     // 1. Dragging node(s): rollback initial positions & cancel transaction
     if (interactionMode.current === 'drag_node' && movingNodesState.current) {
-      const rollback: Record<string, Partial<WaypointNode>> = {};
-      Object.entries(movingNodesState.current.initialTransforms).forEach(([id, initTr]) => {
-        rollback[id] = { transform: { ...initTr } };
-      });
-      updateNodes(rollback, { skipRecalculate: true });
+      const { group } = movingNodesState.current;
+      if (group) {
+        useAppStore.setState(group.before);
+      } else {
+        const rollback: Record<string, Partial<WaypointNode>> = {};
+        Object.entries(movingNodesState.current.initialTransforms).forEach(([id, initTr]) => {
+          rollback[id] = { transform: { ...initTr } };
+        });
+        updateNodes(rollback, { skipRecalculate: true });
+      }
       useAppStore.getState().endHistoryTransaction();
       movingNodesState.current = null;
       activeNodeId.current = null;
@@ -1422,10 +1439,23 @@ function MapCanvasView() {
       lastMousePos.current = { x: e.clientX, y: e.clientY };
     } else if (interactionMode.current === 'drag_node') {
       if (movingNodesState.current) {
-        const { activeId, startWorldPos, initialTransforms } = movingNodesState.current;
+        const { activeId, startWorldPos, initialTransforms, group } = movingNodesState.current;
         const activeInitial = initialTransforms[activeId];
         const dx = activeInitial ? worldX - activeInitial.x : worldX - startWorldPos.x;
         const dy = activeInitial ? worldY - activeInitial.y : worldY - startWorldPos.y;
+
+        if (group) {
+          // History was recorded when the drag began; the path is recalculated when it ends.
+          useAppStore
+            .getState()
+            .transformNodeGroup(
+              group.id,
+              { dx: dx - group.applied.dx, dy: dy - group.applied.dy, dyaw: 0, pivot: { x: 0, y: 0 } },
+              { recordHistory: false, skipRecalculate: true },
+            );
+          group.applied = { dx, dy };
+          return;
+        }
 
         const updates: Record<string, Partial<WaypointNode>> = {};
         Object.entries(initialTransforms).forEach(([id, initTr]) => {
@@ -1996,10 +2026,24 @@ function MapCanvasView() {
         initialTransforms[nodeId] = { ...allNodes[nodeId].transform };
       }
 
+      const store = useAppStore.getState();
+      const groupId = wholeGroupSelected(allNodes, store.selectedNodeIds);
       movingNodesState.current = {
         activeId: nodeId,
         startWorldPos: worldPos,
         initialTransforms,
+        group: groupId
+          ? {
+              id: groupId,
+              applied: { dx: 0, dy: 0 },
+              before: {
+                nodes: store.nodes,
+                annotationObjects: store.annotationObjects,
+                annotationGroups: store.annotationGroups,
+                customLayers: store.customLayers,
+              },
+            }
+          : undefined,
       };
 
       if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
@@ -2228,6 +2272,9 @@ function MapCanvasView() {
 
           {/* Origin marker of the geo base map while aligning it */}
           <GeoAlignMarkerLayer scale={scale} />
+
+          {/* Reference pose of the group in the inspector */}
+          <BasePoseMarkerLayer scale={scale} />
 
           {/* Render Snapping Guide */}
           <SnappingGuideLayer scale={scale} snapState={snapState} snapInput={snapInput} />

@@ -16,6 +16,7 @@ import {
   waypointTree,
 } from '../test/fixtures';
 import { buildProjectData } from './serialization/projectSerializer';
+import { basePoseTarget } from './groupMove';
 import { migrateAndNormalizeProjectData } from './migrations/projectMigration';
 import { detectGeneratorModifications } from '../utils/generatorStashUtils';
 import { validateAndParseClipboardEnvelope } from '../utils/mapElementClipboard';
@@ -334,5 +335,41 @@ describe('moving an annotation group', () => {
     );
 
     expect(pasted?.elementType === 'annotation' && pasted.annotationGroups.g.base_pose).toBeUndefined();
+  });
+});
+
+describe('basePoseTarget', () => {
+  beforeEach(() => {
+    resetAppStore({
+      ...waypointTree([makeGroup('g', ['a', 'b']), makeWaypoint('a'), makeWaypoint('b')]),
+      annotationObjects: { dot: makePointAnnotation('dot', { group_id: 'ag' }) },
+      annotationGroups: { ag: makeAnnotationGroup('ag', ['dot']) },
+      rootAnnotationIds: ['ag'],
+    });
+  });
+
+  it('is the waypoint group selected with its contents', () => {
+    getAppState().selectNodes(['g']);
+
+    expect(basePoseTarget(getAppState())).toEqual({ domain: 'node', id: 'g' });
+  });
+
+  it('is nothing for a few waypoints picked inside a group', () => {
+    getAppState().selectNodes(['a', 'b']);
+
+    expect(basePoseTarget(getAppState())).toBeNull();
+  });
+
+  it('is the one annotation group selected', () => {
+    getAppState().selectAnnotationObjects(['ag']);
+
+    expect(basePoseTarget(getAppState())).toEqual({ domain: 'annotation', id: 'ag' });
+  });
+
+  it('is nothing while a mode shows its own inspector', () => {
+    getAppState().selectNodes(['g']);
+    resetAppStore({ ...getAppState(), appMode: { mode: 'annotation_edit', subTool: 'select', targetGroupId: null } });
+
+    expect(basePoseTarget(getAppState())).toBeNull();
   });
 });

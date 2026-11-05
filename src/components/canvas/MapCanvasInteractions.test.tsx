@@ -11,6 +11,7 @@ import { renderWithStore } from '../../test/render';
 import { getAppState, PAST_WELCOME } from '../../test/store';
 import {
   layerStackState,
+  makeGenerator,
   makeGroup,
   makeMap,
   makePlugin,
@@ -21,6 +22,7 @@ import {
 import { useAppStore } from '../../stores/appStore';
 import { DEFAULT_GEO_MAP } from '../../stores/migrations/geoMapNormalization';
 import { quaternionToYaw } from '../../utils/transformUtils';
+import { detectGeneratorModifications } from '../../utils/generatorStashUtils';
 import { CLIP_HANDLES } from '../../utils/mapClip';
 import type { AppState } from '../../stores/appStore';
 
@@ -450,6 +452,93 @@ describe('MapCanvas tools', () => {
       escape();
 
       expect(getAppState().nodes.a.transform).toMatchObject({ x: 10, y: 20 });
+    });
+
+    describe('when the selection is a whole group', () => {
+      const p = makeWaypoint('p', { transform: makeTransform(50, 20) });
+      const groupWithGenerator = () => ({
+        ...waypointTree([
+          makeGroup('g', ['a', 'gen']),
+          makeWaypoint('a', { transform: makeTransform(10, 20) }),
+          makeGenerator('gen', [p], {
+            generator_params: { properties: {}, interaction_data: { goal: { x: 50, y: 20 } } },
+          }),
+          p,
+        ]),
+        plugins: { gen: makePlugin('gen', { inputs: [{ id: 'goal', name: 'goal', label: 'Goal', type: 'point' }] }) },
+      });
+
+      it('moves the group as one body: its reference pose and generator inputs come along', () => {
+        const { pointer, container } = renderCanvas(groupWithGenerator());
+        act(() => getAppState().selectNodes(['g', 'gen', 'p']));
+
+        fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(20, 25);
+        pointer.move(30, 30);
+        pointer.up(30, 30);
+
+        const { nodes } = getAppState();
+        expect(nodes.a.transform).toMatchObject({ x: 30, y: 30 });
+        expect(nodes.p.transform).toMatchObject({ x: 70, y: 30 });
+        expect(nodes.g.base_pose).toEqual({ x: 50, y: 30, yaw: 0 });
+        expect(nodes.gen.generator_params!.interaction_data.goal).toMatchObject({ x: 70, y: 30 });
+        expect(detectGeneratorModifications(nodes.gen, nodes).hasModifications).toBe(false);
+      });
+
+      it('undoes the whole drag in one step', () => {
+        const { pointer, container } = renderCanvas(groupWithGenerator());
+        act(() => getAppState().selectNodes(['g', 'gen', 'p']));
+
+        fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(20, 25);
+        pointer.move(30, 30);
+        pointer.up(30, 30);
+        act(() => getAppState().undo());
+
+        expect(getAppState().nodes.a.transform).toMatchObject({ x: 10, y: 20 });
+        expect(getAppState().nodes.g.base_pose).toBeUndefined();
+      });
+
+      it('puts everything back when Escape is pressed mid-drag', () => {
+        const { pointer, container } = renderCanvas(groupWithGenerator());
+        act(() => getAppState().selectNodes(['g', 'gen', 'p']));
+
+        fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(30, 30);
+        escape();
+
+        const { nodes } = getAppState();
+        expect(nodes.p.transform).toMatchObject({ x: 50, y: 20 });
+        expect(nodes.g.base_pose).toBeUndefined();
+        expect(nodes.gen.generator_params!.interaction_data.goal).toMatchObject({ x: 50, y: 20 });
+      });
+
+      it('marks the reference pose of the selected group, and follows it when the group moves', () => {
+        const { pointer, container } = renderCanvas(groupWithGenerator());
+        const markerAt = (x: number, y: number) => container.querySelector(`pixigraphics[x="${x}"][y="${y}"]`);
+        expect(markerAt(30, 20)).toBeNull();
+
+        act(() => getAppState().selectNodes(['g']));
+        // The centre of the waypoints (10..50, 20) until the group is moved.
+        expect(markerAt(30, 20)).not.toBeNull();
+
+        fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(20, 30);
+        pointer.up(20, 30);
+        expect(markerAt(40, 30)).not.toBeNull();
+      });
+
+      it('moves only the points when just part of the group is selected', () => {
+        const { pointer, container } = renderCanvas(groupWithGenerator());
+        act(() => getAppState().selectNodes(['a', 'p']));
+
+        fireEvent.pointerDown(waypointAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(20, 20);
+        pointer.up(20, 20);
+
+        expect(getAppState().nodes.g.base_pose).toBeUndefined();
+        expect(getAppState().nodes.gen.generator_params!.interaction_data.goal).toMatchObject({ x: 50 });
+      });
     });
   });
 

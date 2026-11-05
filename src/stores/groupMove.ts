@@ -6,10 +6,12 @@
  */
 import type { AppState } from './appStore';
 import type { CustomLayer } from '../types/layer';
+import type { Pose2D } from '../types/geometry';
 import { followingOf, moveStoredInputs, type MoveContext } from '../utils/pluginInputTransform';
 import { composePose, isIdentityTransform, transformPose, type RigidTransform } from '../utils/rigidTransform';
 import { annotationSubtreeIds, effectiveAnnotationBasePose, moveAnnotations } from '../utils/annotationGroupTransform';
 import { effectiveNodeBasePose, moveNodes, nodeSubtreeIds } from '../utils/waypointGroupTransform';
+import { collectDescendantIds } from '../utils/treeUtils';
 
 export type GroupDomain = 'node' | 'annotation';
 
@@ -73,6 +75,17 @@ export function groupMoveScope(state: MoveSource, domain: GroupDomain, id: strin
   return { nodeIds, ...annotations, layerIds: siblings.layerIds };
 }
 
+/** The reference pose of `id` (stored, or the centre of its contents); null when it holds nothing to move. */
+export function effectiveBasePose(
+  state: Pick<AppState, 'nodes' | 'annotationGroups' | 'annotationObjects'>,
+  domain: GroupDomain,
+  id: string,
+): Pose2D | null {
+  return domain === 'node'
+    ? effectiveNodeBasePose(state.nodes, id)
+    : effectiveAnnotationBasePose(state.annotationGroups, state.annotationObjects, id);
+}
+
 function movePluginLayer(layer: CustomLayer, t: RigidTransform, ctx: MoveContext): CustomLayer {
   if (layer.type !== 'plugin') return layer;
   const next = { ...layer, info: { ...layer.info, origin: transformPose(layer.info.origin, t) } };
@@ -97,10 +110,7 @@ export function planGroupMove(
   id: string,
   t: RigidTransform,
 ): GroupMoveResult | null {
-  const pose =
-    domain === 'node'
-      ? effectiveNodeBasePose(state.nodes, id)
-      : effectiveAnnotationBasePose(state.annotationGroups, state.annotationObjects, id);
+  const pose = effectiveBasePose(state, domain, id);
   if (!pose) return null;
 
   const scope = groupMoveScope(state, domain, id);
@@ -121,6 +131,37 @@ export function planGroupMove(
       ? state.customLayers.map((layer) => (layerIds.has(layer.id) ? movePluginLayer(layer, t, ctx) : layer))
       : state.customLayers,
   };
+}
+
+/** Modes whose inspector is not the selection's, so no group pose is being adjusted. */
+const MODES_WITH_OWN_INSPECTOR = new Set([
+  'generator_add',
+  'plugin_interaction',
+  'custom_layer_edit',
+  'annotation_edit',
+]);
+
+/**
+ * The group whose reference pose the inspector shows: a waypoint group or generator selected with its
+ * contents, or one annotation group. Pipeline outputs have the pipeline inspector instead. Null otherwise.
+ */
+export function basePoseTarget(
+  state: Pick<AppState, 'appMode' | 'selection' | 'nodes' | 'annotationGroups'>,
+): { domain: GroupDomain; id: string } | null {
+  if (MODES_WITH_OWN_INSPECTOR.has(state.appMode.mode)) return null;
+  const { selection } = state;
+  if (selection.type === 'nodes') {
+    const [first, ...rest] = selection.ids;
+    const node = state.nodes[first];
+    if (!node || node.type === 'manual' || node.pipeline_metadata) return null;
+    const inside = new Set(collectDescendantIds(first, state.nodes));
+    return rest.every((id) => inside.has(id)) ? { domain: 'node', id: first } : null;
+  }
+  if (selection.type === 'annotations' && selection.ids.length === 1) {
+    const group = state.annotationGroups[selection.ids[0]];
+    return group && !group.pipeline_metadata ? { domain: 'annotation', id: group.id } : null;
+  }
+  return null;
 }
 
 type GetState = () => AppState;

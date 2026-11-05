@@ -2,9 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Crosshair, Move, RotateCcw, RotateCw } from 'lucide-react';
 import { useAppStore, type AppState } from '../../../stores/appStore';
-import { groupMoveScope, type GroupDomain } from '../../../stores/groupMove';
-import { effectiveAnnotationBasePose } from '../../../utils/annotationGroupTransform';
-import { effectiveNodeBasePose } from '../../../utils/waypointGroupTransform';
+import { effectiveBasePose, groupMoveScope, type GroupDomain } from '../../../stores/groupMove';
 import { followingOf } from '../../../utils/pluginInputTransform';
 import { transformBetweenPoses, type RigidTransform } from '../../../utils/rigidTransform';
 import type { Pose2D } from '../../../types/geometry';
@@ -15,11 +13,6 @@ import { PoseAdjuster, type PoseNudge } from '../common/PoseAdjuster';
 import { PropertySectionHeader } from './PropertySectionHeader';
 
 const toRadians = (deg: number) => (deg * Math.PI) / 180;
-
-const poseOf = (state: AppState, domain: GroupDomain, id: string): Pose2D | null =>
-  domain === 'node'
-    ? effectiveNodeBasePose(state.nodes, id)
-    : effectiveAnnotationBasePose(state.annotationGroups, state.annotationObjects, id);
 
 const itemOf = (state: AppState, domain: GroupDomain, id: string) =>
   domain === 'node' ? state.nodes[id] : state.annotationGroups[id];
@@ -56,7 +49,7 @@ function useNotes(domain: GroupDomain, id: string) {
  */
 export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: string }) {
   // Compared field by field: the centre of the contents is computed anew on every store change.
-  const pose = useAppStore(useShallow((state) => poseOf(state, domain, id)));
+  const pose = useAppStore(useShallow((state) => effectiveBasePose(state, domain, id)));
   const isStored = useAppStore((state) => !!itemOf(state, domain, id)?.base_pose);
   const notes = useNotes(domain, id);
   // A held nudge, a number being typed or a turn records one undo step: only its first move does.
@@ -73,7 +66,7 @@ export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: strin
 
   const move = (build: (current: Pose2D) => RigidTransform) => {
     const state = useAppStore.getState();
-    const current = poseOf(state, domain, id);
+    const current = effectiveBasePose(state, domain, id);
     if (!current) return;
     const recordHistory = !gestureRecorded.current;
     gestureRecorded.current = true;
