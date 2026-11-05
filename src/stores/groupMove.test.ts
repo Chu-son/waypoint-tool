@@ -255,6 +255,50 @@ describe('outputs of the same plugin run', () => {
     expect(other.info.origin).toEqual([0, 0, 0]);
   });
 
+  it.each([
+    ['duplicated', () => getAppState().duplicateNodes(['gen'])],
+    [
+      'pasted',
+      () =>
+        getAppState().pasteWaypoints({
+          elementType: 'waypoint',
+          topLevelIds: ['gen'],
+          nodes: { gen: node('gen'), p: node('p') },
+        }),
+    ],
+  ])('do not include a %s copy, which moves on its own', (_, copy) => {
+    const [copyId] = copy();
+
+    getAppState().transformNodeGroup(copyId, shift(5, 0));
+
+    expect(xyOf('p')).toEqual({ x: 0, y: 0 });
+    expect(getAppState().annotationObjects.dot).toMatchObject({ x: 0 });
+    expect((getAppState().customLayers[0] as PluginCustomLayer).info.origin).toEqual([1, 1, 0]);
+  });
+
+  it('keep a generator that was cut and pasted back in its run', () => {
+    const clipboard = {
+      elementType: 'waypoint' as const,
+      topLevelIds: ['gen'],
+      nodes: { gen: node('gen'), p: node('p') },
+    };
+    getAppState().removeNodes(['gen']);
+    const [pastedId] = getAppState().pasteWaypoints(clipboard);
+
+    getAppState().transformNodeGroup(pastedId, shift(5, 0));
+
+    expect(getAppState().annotationObjects.dot).toMatchObject({ x: 5 });
+  });
+
+  it('do not include a copy of the annotation group', () => {
+    const [copyId] = getAppState().duplicateAnnotations(['anno']);
+
+    getAppState().transformAnnotationGroup(copyId, shift(5, 0));
+
+    expect(xyOf('p')).toEqual({ x: 0, y: 0 });
+    expect(getAppState().annotationObjects.dot).toMatchObject({ x: 0 });
+  });
+
   it('still share one moved copy of the inputs they shared', () => {
     getAppState().transformNodeGroup('gen', shift(1, 0));
 

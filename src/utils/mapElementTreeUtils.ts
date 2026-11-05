@@ -1,6 +1,33 @@
 import { v4 as uuidv4 } from 'uuid';
 
 /**
+ * Run ids (`source_execution_id`) for copied plugin outputs. A copy whose original is still in the tree
+ * (`isTaken`) is a run of its own: it gets a new id, so moving or regenerating it does not reach the
+ * outputs of the original run. Copies of one run share the new id. A run id no longer in use (after a cut)
+ * is kept, so a moved item stays tied to the other outputs of its run.
+ */
+export function runIdRenewer(isTaken: (runId: string) => boolean): (runId: string | undefined) => string | undefined {
+  const renewed = new Map<string, string>();
+  return (runId) => {
+    if (!runId || !isTaken(runId)) return runId;
+    let next = renewed.get(runId);
+    if (!next) {
+      next = uuidv4();
+      renewed.set(runId, next);
+    }
+    return next;
+  };
+}
+
+/** `isTaken` for `runIdRenewer`: whether any of the items carries the run id. */
+export function isRunIdUsedBy(
+  ...collections: Record<string, { source_execution_id?: string }>[]
+): (runId: string) => boolean {
+  const used = new Set(collections.flatMap((items) => Object.values(items).map((item) => item.source_execution_id)));
+  return (runId) => used.has(runId);
+}
+
+/**
  * 選択されたID群から、親も選択されているような子孫IDを除外し、
  * ツリー全体の走査順（flatOrderedIds）を維持した最上位要素IDリストを返す。
  */
