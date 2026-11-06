@@ -36,11 +36,9 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
       .getState()
       .transitionToMode(isDrawing ? { mode: 'select' } : { mode: 'map_clip_edit', layerId: layer.id });
 
-  // A button press is one undo step; typing in a number field is one step from focus to blur.
-  const commit = (clip: MapLayerClip | null) => {
-    useAppStore.getState().pushHistorySnapshot();
-    onChange(clip);
-  };
+  // A button press is one undo step (the store records it); typing in a number field is one step from
+  // focus to blur.
+  const commit = (clip: MapLayerClip | null) => onChange(clip);
   const setRects = (next: ClipRect[]) => commit({ rects: next });
   const updateRect = (index: number, updates: Partial<ClipRect>) =>
     onChange({ rects: rects.map((r, i) => (i === index ? { ...r, ...updates } : r)) });

@@ -1,6 +1,5 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
-import type { HistorySnapshot } from './historySlice';
 import {
   MapSource,
   MapLayerClip,
@@ -32,7 +31,8 @@ import {
 import type { DropPosition } from '../../utils/treeOps';
 import { selectedCustomLayerId } from '../../utils/layerSelection';
 import { getNextSequentialName } from '../../utils/treeUtils';
-import { moveClipWithPose, sameClip } from '../../utils/mapClip';
+import { moveClipWithPose } from '../../utils/mapClip';
+import { changesAny } from '../../utils/shallowChanges';
 import {
   composeOffset,
   isIdentityTransform,
@@ -72,12 +72,7 @@ export type MapSlice = {
   rootLayerIds: string[];
   layerGroups: Record<string, LayerGroup>;
   /** Canvas drag that is reshaping a layer's use area (its clip before the drag); null when not dragging. */
-  mapClipDrag: {
-    layerId: string;
-    initial: MapLayerClip | null;
-    snapshotPushed: boolean;
-    redoStack: HistorySnapshot[];
-  } | null;
+  mapClipDrag: { layerId: string; initial: MapLayerClip | null } | null;
   activeCustomLayerId: string | null;
   defaultMapOpacity: number;
   setDefaultMapOpacity: (opacity: number) => void;
@@ -475,11 +470,15 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     return copy.id;
   },
 
-  updateMapLayer: (id, updates) =>
+  updateMapLayer: (id, updates) => {
+    const layer = get().mapLayers.find((l) => l.id === id);
+    if (!layer || !changesAny(layer, updates)) return;
+    get().pushHistorySnapshot();
     set((state) => ({
       mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...updates } : l)),
       isDirty: true,
-    })),
+    }));
+  },
 
   updateMapSource: (id, updates) =>
     set((state) => ({
@@ -524,15 +523,13 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return { mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...next } : l)), isDirty: true };
     }),
 
+  // The whole drag is one history transaction: a drag that changed nothing leaves no undo step, and
+  // cancelling puts back the state from before it.
   beginMapClipDrag: (layerId) => {
     const layer = get().mapLayers.find((l) => l.id === layerId);
     if (!layer || get().mapClipDrag) return;
-    const before = get().historyPast.length;
-    const redoStack = get().historyFuture;
-    get().pushHistorySnapshot();
-    set((state) => ({
-      mapClipDrag: { layerId, initial: layer.clip, snapshotPushed: state.historyPast.length > before, redoStack },
-    }));
+    get().beginHistoryTransaction();
+    set({ mapClipDrag: { layerId, initial: layer.clip } });
   },
 
   updateMapClipDrag: (clip) => {
@@ -542,26 +539,15 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
   },
 
   endMapClipDrag: () => {
-    const drag = get().mapClipDrag;
-    if (!drag) return;
-    const current = get().mapLayers.find((l) => l.id === drag.layerId)?.clip ?? null;
-    // 変わっていなければ、開始時に積んだ履歴を取り除き、消えたやり直し履歴も戻す
-    const unchanged = sameClip(drag.initial, current);
-    set((state) =>
-      unchanged && drag.snapshotPushed
-        ? { mapClipDrag: null, historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack }
-        : { mapClipDrag: null },
-    );
+    if (!get().mapClipDrag) return;
+    set({ mapClipDrag: null });
+    get().endHistoryTransaction();
   },
 
   cancelMapClipDrag: () => {
-    const drag = get().mapClipDrag;
-    if (!drag) return;
-    set((state) => ({
-      mapClipDrag: null,
-      mapLayers: state.mapLayers.map((l) => (l.id === drag.layerId ? { ...l, clip: drag.initial } : l)),
-      ...(drag.snapshotPushed ? { historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack } : {}),
-    }));
+    if (!get().mapClipDrag) return;
+    set({ mapClipDrag: null });
+    get().cancelHistoryTransaction();
   },
 
   removeMapLayer: (id: string) =>
@@ -658,12 +644,12 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, name } }, isDirty: true };
     }),
 
-  setLayerGroupVisible: (groupId, visible) =>
-    set((state) => {
-      const group = state.layerGroups[groupId];
-      if (!group || group.visible === visible) return {};
-      return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, visible } }, isDirty: true };
-    }),
+  setLayerGroupVisible: (groupId, visible) => {
+    const group = get().layerGroups[groupId];
+    if (!group || group.visible === visible) return;
+    get().pushHistorySnapshot();
+    set((state) => ({ layerGroups: { ...state.layerGroups, [groupId]: { ...group, visible } }, isDirty: true }));
+  },
 
   transformLayerGroup: (groupId, transform, options) => {
     const state = get();
@@ -696,7 +682,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     const insideCustoms = state.customLayers.filter((l) => inside.has(l.id));
     if (!hasMapMoves && insideCustoms.length === 0) return false;
 
-    if (options?.recordHistory !== false) state.pushHistorySnapshot({ includeMapPoses: true });
+    if (options?.recordHistory !== false) state.pushHistorySnapshot();
     set((s) => ({
       layerGroups: {
         ...s.layerGroups,

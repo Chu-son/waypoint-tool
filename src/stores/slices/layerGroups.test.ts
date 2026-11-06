@@ -131,14 +131,16 @@ describe('layer groups', () => {
       expect(getAppState().layerGroups.floor.visible).toBe(false);
     });
 
-    it('is not reverted by undoing an unrelated edit made before it', () => {
+    it('is undone in one step of its own, leaving the edit made before it', () => {
       getAppState().moveLayerItems(['bottom'], 'top', 'before');
       getAppState().setLayerGroupVisible('floor', false);
 
+      const moved = getAppState().rootLayerIds;
+
       getAppState().undo();
 
-      expect(getAppState().rootLayerIds).toEqual(['top', 'floor', 'bottom']);
-      expect(getAppState().layerGroups.floor.visible).toBe(false);
+      expect(getAppState().rootLayerIds).toEqual(moved);
+      expect(getAppState().layerGroups.floor.visible).toBe(true);
     });
   });
 });

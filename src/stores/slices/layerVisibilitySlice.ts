@@ -78,7 +78,7 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
     const current = currentLayerVisibility(get());
     const changes = Object.keys(next).some((layerId) => next[layerId] !== current[layerId]);
     // Only a real change is an undo step; re-applying the set that is already in effect is not.
-    if (changes) get().pushHistorySnapshot({ includeMapVisibility: true });
+    if (changes) get().pushHistorySnapshot();
 
     set((state) => ({
       mapLayers: state.mapLayers.map((l) => ({ ...l, visible: next[l.id] })),

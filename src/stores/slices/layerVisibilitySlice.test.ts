@@ -161,12 +161,13 @@ describe('layer visibility sets', () => {
       expect(getAppState().historyPast).toHaveLength(pastBefore);
     });
 
-    it('does not bring back a map visibility toggle when an unrelated edit is undone', () => {
-      getAppState().pushHistorySnapshot();
+    it('undoes and redoes a manual visibility toggle as a step of its own', () => {
       getAppState().updateMapLayer('map', { visible: false });
 
       getAppState().undo();
+      expect(getAppState().mapLayers[0].visible).toBe(true);
 
+      getAppState().redo();
       expect(getAppState().mapLayers[0].visible).toBe(false);
     });
   });

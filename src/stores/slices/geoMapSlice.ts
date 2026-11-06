@@ -1,6 +1,5 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
-import type { HistorySnapshot } from './historySlice';
 import type { BasemapId, BasemapSource, GeoAlignment, GeoMapSettings, GeoOrigin } from '../../types/geo';
 import { convertOrigin } from '../../utils/geo/geoTransform';
 import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
@@ -8,7 +7,7 @@ import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 export type GeoMapSlice = {
   geoMap: GeoMapSettings;
   /** キャンバス上のドラッグ調整中の状態（開始時の位置合わせ）。ドラッグ中でなければ null。 */
-  geoAlignDrag: { initial: GeoAlignment; snapshotPushed: boolean; redoStack: HistorySnapshot[] } | null;
+  geoAlignDrag: { initial: GeoAlignment } | null;
 
   setGeoMapEnabled: (enabled: boolean) => void;
   setGeoMapOpacity: (opacity: number) => void;
@@ -60,45 +59,29 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
 
     resetGeoAlignment: () => get().setGeoAlignment({ dx: 0, dy: 0, yawDeg: 0 }),
 
+    // ドラッグ全体を 1 つの履歴トランザクションにする。動かなければ履歴は残らず、中断すれば開始前に戻る。
     beginGeoAlignDrag: () => {
       if (get().geoAlignDrag) return;
-      const before = get().historyPast.length;
-      const redoStack = get().historyFuture;
-      get().pushHistorySnapshot();
-      set((state) => ({
-        geoAlignDrag: {
-          initial: state.geoMap.alignment,
-          snapshotPushed: state.historyPast.length > before,
-          redoStack,
-        },
-      }));
+      get().beginHistoryTransaction();
+      set({ geoAlignDrag: { initial: get().geoMap.alignment } });
     },
 
     updateGeoAlignDrag: (alignment) => {
       if (!get().geoAlignDrag || !isFiniteAlignment(alignment)) return;
+      if (sameAlignment(alignment, get().geoMap.alignment)) return;
       patchGeoMap({ alignment });
     },
 
     endGeoAlignDrag: () => {
-      const drag = get().geoAlignDrag;
-      if (!drag) return;
-      // 動いていなければ、開始時に積んだ履歴を取り除き、消えたやり直し履歴も戻す
-      const unchanged = sameAlignment(drag.initial, get().geoMap.alignment);
-      set((state) =>
-        unchanged && drag.snapshotPushed
-          ? { geoAlignDrag: null, historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack }
-          : { geoAlignDrag: null },
-      );
+      if (!get().geoAlignDrag) return;
+      set({ geoAlignDrag: null });
+      get().endHistoryTransaction();
     },
 
     cancelGeoAlignDrag: () => {
-      const drag = get().geoAlignDrag;
-      if (!drag) return;
-      set((state) => ({
-        geoAlignDrag: null,
-        geoMap: { ...state.geoMap, alignment: drag.initial },
-        ...(drag.snapshotPushed ? { historyPast: state.historyPast.slice(0, -1), historyFuture: drag.redoStack } : {}),
-      }));
+      if (!get().geoAlignDrag) return;
+      set({ geoAlignDrag: null });
+      get().cancelHistoryTransaction();
     },
   };
 };
