@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { Move, RotateCcw, RotateCw } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { descendantLayerIds } from '../../../utils/layerTree';
 import {
   groupWorldBounds,
@@ -37,8 +38,6 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
   const customLayers = useAppStore((state) => state.customLayers);
 
   const [pivotMode, setPivotMode] = useState<PivotMode>('center');
-  // A held nudge or a number being typed records one undo step: only its first move does.
-  const gestureRecorded = useRef(false);
   // The user cancelled a question while typing a number: the rest of that edit does nothing.
   const declined = useRef(false);
   // A question is open (hidden group, shared maps); numbers typed meanwhile wait for its answer.
@@ -73,9 +72,9 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
   };
 
   /** Moves the group after the questions (hidden, shared maps) are answered. Resolves to false when cancelled. */
-  const apply = (buildTransform: () => RigidTransform, recordHistory = true): boolean | Promise<boolean> => {
+  const apply = (buildTransform: () => RigidTransform): boolean | Promise<boolean> => {
     const move = (sharedPose: SharedPoseMode) => {
-      useAppStore.getState().transformLayerGroup(groupId, buildTransform(), { sharedPose, recordHistory });
+      useAppStore.getState().transformLayerGroup(groupId, buildTransform(), { sharedPose });
       return true;
     };
     // With nothing to ask, move at once: several edits in a row must see each other's result.
@@ -88,17 +87,11 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
     })();
   };
 
-  const recordsHistory = () => {
-    const record = !gestureRecorded.current;
-    gestureRecorded.current = true;
-    return record;
-  };
-
   const turnAroundPivot = (dyawDeg: number) =>
-    apply(() => ({ dx: 0, dy: 0, dyaw: toRadians(dyawDeg), pivot: pivotOf() }), recordsHistory());
+    apply(() => ({ dx: 0, dy: 0, dyaw: toRadians(dyawDeg), pivot: pivotOf() }));
 
   const nudge = ({ dx, dy, dyawDeg }: PoseNudge) =>
-    apply(() => ({ dx, dy, dyaw: toRadians(dyawDeg), pivot: pivotOf() }), recordsHistory());
+    apply(() => ({ dx, dy, dyaw: toRadians(dyawDeg), pivot: pivotOf() }));
 
   /** A typed value is the new total: the group moves by the difference from the total at that moment. */
   const setTotal = (changes: Partial<typeof shown>) => {
@@ -116,7 +109,7 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
         yaw: changes.yawDeg === undefined ? (current?.yaw ?? 0) : toRadians(changes.yawDeg),
       });
     };
-    const result = apply(build, recordsHistory());
+    const result = apply(build);
     if (result instanceof Promise) {
       asking.current = true;
       void result.then((accepted) => {
@@ -128,9 +121,10 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
       });
     }
   };
+  /** Typing a number is one edit, one undo step (a move answered after it ends is a step of its own). */
   const startTyping = () => {
-    gestureRecorded.current = false;
     declined.current = false;
+    historyEditHandlers.onEditStart();
   };
 
   return (
@@ -167,10 +161,7 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           variant="secondary"
           size="sm"
           className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
-          onClick={() => {
-            gestureRecorded.current = false;
-            void turnAroundPivot(-90);
-          }}
+          onClick={() => void turnAroundPivot(-90)}
           title="グループを反時計回りに 90° 回す"
         >
           <RotateCcw size={12} />
@@ -181,10 +172,7 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           variant="secondary"
           size="sm"
           className="h-7 text-[10px] text-text-muted hover:text-text-base gap-1"
-          onClick={() => {
-            gestureRecorded.current = false;
-            void turnAroundPivot(90);
-          }}
+          onClick={() => void turnAroundPivot(90)}
           title="グループを時計回りに 90° 回す"
         >
           <RotateCw size={12} />
@@ -205,7 +193,7 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           className="h-6 px-1.5 text-[10px] text-text-muted hover:text-text-base gap-1"
           disabled={isZeroOffset(offset)}
           onClick={() => {
-            startTyping();
+            declined.current = false;
             setTotal({ x: 0, y: 0, yawDeg: 0 });
           }}
           title="動かした分をすべて元に戻す"
@@ -222,6 +210,7 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           step={0.05}
           precision={3}
           onEditStart={startTyping}
+          onEditEnd={historyEditHandlers.onEditEnd}
           onChange={(x) => setTotal({ x })}
         />
         <LabeledNumericInput
@@ -230,6 +219,7 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           step={0.05}
           precision={3}
           onEditStart={startTyping}
+          onEditEnd={historyEditHandlers.onEditEnd}
           onChange={(y) => setTotal({ y })}
         />
         <LabeledNumericInput
@@ -238,16 +228,12 @@ export function LayerGroupPoseSection({ groupId }: { groupId: string }) {
           step={1}
           precision={1}
           onEditStart={startTyping}
+          onEditEnd={historyEditHandlers.onEditEnd}
           onChange={(yawDeg) => setTotal({ yawDeg })}
         />
       </div>
 
-      <PoseAdjuster
-        onNudge={nudge}
-        onEditStart={() => {
-          gestureRecorded.current = false;
-        }}
-      />
+      <PoseAdjuster onNudge={nudge} {...historyEditHandlers} />
 
       {hasPlugin && (
         <p className="text-[10px] text-text-muted/80">

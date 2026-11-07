@@ -1,5 +1,6 @@
 import { RotateCcw, FlipHorizontal2, RotateCw } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { WaypointNode, Transform } from '../../../types/store';
 import { quaternionToYaw, yawToQuaternion } from '../../../utils/transformUtils';
 import type { ElementCopyField } from '../../../types/ui';
@@ -159,8 +160,7 @@ export function TransformGroup({
           placeholder={isMultiSelection ? 'Mixed' : ''}
           isCopying={isCopyingField?.('x')}
           onContextMenu={(e) => onContextMenuLabel?.('x', e)}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('x', val)}
         />
         <TransformField
@@ -171,8 +171,7 @@ export function TransformGroup({
           placeholder={isMultiSelection ? 'Mixed' : ''}
           isCopying={isCopyingField?.('y')}
           onContextMenu={(e) => onContextMenuLabel?.('y', e)}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('y', val)}
         />
         <TransformField
@@ -183,8 +182,7 @@ export function TransformGroup({
           placeholder={isMultiSelection ? 'Mixed' : ''}
           isCopying={isCopyingField?.('z')}
           onContextMenu={(e) => onContextMenuLabel?.('z', e)}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('z', val)}
         />
         <div className="col-span-3 grid grid-cols-2 gap-2">
@@ -197,8 +195,7 @@ export function TransformGroup({
             step="0.01"
             isCopying={isCopyingField?.('yaw')}
             onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            {...historyEditHandlers}
             onChange={(val) => handleYawChange(val, false)}
           />
           <TransformField
@@ -210,8 +207,7 @@ export function TransformGroup({
             step="1"
             isCopying={isCopyingField?.('yaw')}
             onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            {...historyEditHandlers}
             onChange={(val) => handleYawChange(val, true)}
           />
         </div>

@@ -145,13 +145,13 @@ export type MapSlice = {
    * Moves everything inside a group (at any depth) as one rigid body: map poses, plugin layer poses and
    * the objects of hand-drawn layers; the use areas of the maps follow. A map shared with instances outside
    * the group moves for all of them (`move_all`), or only for the group's instances, which are unlinked
-   * from the shared pose (`unlink`). One undo step (none with `recordHistory: false`, for the later steps
-   * of a held nudge); returns false when there is nothing to move.
+   * from the shared pose (`unlink`). One undo step (a held nudge runs in one transaction); returns false
+   * when there is nothing to move.
    */
   transformLayerGroup: (
     groupId: string,
     transform: RigidTransform,
-    options?: { sharedPose?: SharedPoseMode; recordHistory?: boolean },
+    options?: { sharedPose?: SharedPoseMode },
   ) => boolean;
   /**
    * Copies map instances (sharing their map) and hand-drawn layers right above the originals, and selects
@@ -691,7 +691,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       const insideCustoms = state.customLayers.filter((l) => inside.has(l.id));
       if (!hasMapMoves && insideCustoms.length === 0) return false;
 
-      if (options?.recordHistory !== false) state.pushHistorySnapshot();
+      state.pushHistorySnapshot();
       set((s) => ({
         layerGroups: {
           ...s.layerGroups,

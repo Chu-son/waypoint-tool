@@ -1,16 +1,10 @@
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditTransactions } from '../../../stores/history/historyEditHandlers';
 import { AnnotationObject, OptionDef, OptionValue } from '../../../types/store';
 import { FieldLabel } from '../common/FieldLabel';
 import { Label } from '../common/Label';
-import { OptionValueEditor, ValueEditTransactionContext, ValueEditTransactions } from './OptionValueEditor';
+import { OptionValueEditor, ValueEditTransactionContext } from './OptionValueEditor';
 import { resolveOptionsSchema } from '../../../utils/optionSchema';
-
-/** アノテーションの Inspector で使う、ストアの Undo 履歴と連動したトランザクション実装。 */
-const storeValueEditTransactions: ValueEditTransactions = {
-  begin: () => useAppStore.getState().beginHistoryTransaction(),
-  end: () => useAppStore.getState().endHistoryTransaction(),
-  run: (fn) => useAppStore.getState().runInHistoryTransaction(fn),
-};
 
 export function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject }) {
   const rawOptionsSchema = useAppStore((state) => state.optionsSchema);
@@ -30,7 +24,7 @@ export function AnnotationCustomOptionsGroup({ obj }: { obj: AnnotationObject })
         </span>
       </div>
 
-      <ValueEditTransactionContext.Provider value={storeValueEditTransactions}>
+      <ValueEditTransactionContext.Provider value={historyEditTransactions}>
         <div className="space-y-2">
           {optionsSchema.options.map((opt: OptionDef) => (
             <div key={`${obj.id}:${opt.name}`} className="space-y-1">

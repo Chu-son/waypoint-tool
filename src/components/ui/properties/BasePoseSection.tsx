@@ -1,6 +1,7 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Crosshair, Move, RotateCcw, RotateCw } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { effectiveBasePose, groupMoveScope, type GroupDomain } from '../../../stores/groupMove';
 import { useBasePose } from '../../../hooks/useBasePose';
 import { followingOf } from '../../../utils/pluginInputTransform';
@@ -47,8 +48,6 @@ function useNotes(domain: GroupDomain, id: string) {
 export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: string }) {
   const { pose, isStored } = useBasePose(domain, id);
   const notes = useNotes(domain, id);
-  // A held nudge, a number being typed or a turn records one undo step: only its first move does.
-  const gestureRecorded = useRef(false);
 
   if (!pose) return null;
   if (notes.pluginMissing) {
@@ -63,20 +62,12 @@ export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: strin
     const state = useAppStore.getState();
     const current = effectiveBasePose(state, domain, id);
     if (!current) return;
-    const recordHistory = !gestureRecorded.current;
-    gestureRecorded.current = true;
     const t = build(current);
-    if (domain === 'node') state.transformNodeGroup(id, t, { recordHistory });
-    else state.transformAnnotationGroup(id, t, { recordHistory });
-  };
-  const startGesture = () => {
-    gestureRecorded.current = false;
+    if (domain === 'node') state.transformNodeGroup(id, t);
+    else state.transformAnnotationGroup(id, t);
   };
 
-  const turn = (dyawDeg: number) => {
-    startGesture();
-    move((current) => ({ dx: 0, dy: 0, dyaw: toRadians(dyawDeg), pivot: current }));
-  };
+  const turn = (dyawDeg: number) => move((current) => ({ dx: 0, dy: 0, dyaw: toRadians(dyawDeg), pivot: current }));
   const nudge = ({ dx, dy, dyawDeg }: PoseNudge) =>
     move((current) => ({ dx, dy, dyaw: toRadians(dyawDeg), pivot: current }));
   /** A typed value is the new reference pose: the group moves (and turns around it) to get there. */
@@ -105,7 +96,7 @@ export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: strin
           value={pose.x}
           step={0.05}
           precision={3}
-          onEditStart={startGesture}
+          {...historyEditHandlers}
           onChange={(x) => setPose({ x })}
         />
         <LabeledNumericInput
@@ -113,7 +104,7 @@ export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: strin
           value={pose.y}
           step={0.05}
           precision={3}
-          onEditStart={startGesture}
+          {...historyEditHandlers}
           onChange={(y) => setPose({ y })}
         />
         <LabeledNumericInput
@@ -121,7 +112,7 @@ export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: strin
           value={(pose.yaw * 180) / Math.PI}
           step={1}
           precision={1}
-          onEditStart={startGesture}
+          {...historyEditHandlers}
           onChange={(deg) => setPose({ yaw: toRadians(deg) })}
         />
       </div>
@@ -152,7 +143,7 @@ export function BasePoseSection({ domain, id }: { domain: GroupDomain; id: strin
       </div>
 
       <div title="移動はワールドの X / Y 軸に沿い、回転は基準位置を中心にします">
-        <PoseAdjuster onNudge={nudge} onEditStart={startGesture} />
+        <PoseAdjuster onNudge={nudge} {...historyEditHandlers} />
       </div>
 
       <Button

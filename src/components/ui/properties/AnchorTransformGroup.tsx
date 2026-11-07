@@ -1,4 +1,5 @@
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { WaypointNode } from '../../../types/store';
 import { quaternionToYaw, yawToQuaternion, calculateAnchorRelativeTransform } from '../../../utils/transformUtils';
 import type { ElementCopyField } from '../../../types/ui';
@@ -82,8 +83,7 @@ export function AnchorTransformGroup({
           variant="anchor"
           isCopying={isCopyingField?.('x')}
           onContextMenu={(e) => onContextMenuLabel?.('x', e)}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('x', val)}
         />
         <TransformField
@@ -94,8 +94,7 @@ export function AnchorTransformGroup({
           variant="anchor"
           isCopying={isCopyingField?.('y')}
           onContextMenu={(e) => onContextMenuLabel?.('y', e)}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('y', val)}
         />
         <TransformField
@@ -106,8 +105,7 @@ export function AnchorTransformGroup({
           variant="anchor"
           isCopying={isCopyingField?.('z')}
           onContextMenu={(e) => onContextMenuLabel?.('z', e)}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('z', val)}
         />
         <div className="col-span-3 grid grid-cols-2 gap-2">
@@ -120,8 +118,7 @@ export function AnchorTransformGroup({
             variant="anchor"
             isCopying={isCopyingField?.('yaw')}
             onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            {...historyEditHandlers}
             onChange={(val) => handleYawChange(val, false)}
           />
           <TransformField
@@ -133,8 +130,7 @@ export function AnchorTransformGroup({
             variant="anchor"
             isCopying={isCopyingField?.('yaw')}
             onContextMenu={(e) => onContextMenuLabel?.('yaw', e)}
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            {...historyEditHandlers}
             onChange={(val) => handleYawChange(val, true)}
           />
         </div>
