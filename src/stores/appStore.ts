@@ -18,6 +18,7 @@ import { LayerVisibilitySlice, createLayerVisibilitySlice } from './slices/layer
 import { ImportSlice, createImportSlice } from './slices/importSlice';
 import { STORAGE_VERSION, migrateStorage } from './migrations/storageMigration';
 import { settingsStorage } from './persistence/settingsStorage';
+import { historyGuard } from './history/historyGuard';
 
 export type AppState = NodeSlice &
   UISlice &
@@ -37,7 +38,7 @@ export type AppState = NodeSlice &
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get, api) => ({
+    historyGuard((set, get, api) => ({
       ...createNodeSlice(set, get, api),
       ...createUISlice(set, get, api),
       ...createPluginSlice(set, get, api),
@@ -53,7 +54,7 @@ export const useAppStore = create<AppState>()(
       ...createGeoMapSlice(set, get, api),
       ...createLayerVisibilitySlice(set, get, api),
       ...createImportSlice(set, get, api),
-    }),
+    })),
     {
       name: 'waypoint-tool-storage',
       // Settings live in a file shared by every launch method (see settingsStorage.ts). Reading it is

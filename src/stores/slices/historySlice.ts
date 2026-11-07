@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { ActiveSelection } from '../../types/selection';
 import { captureSnapshot, matchesSnapshot, restoreSnapshot, type HistorySnapshot } from '../history/historyModel';
+import { setWithoutHistoryOf } from '../history/historyGuard';
 
 export type { HistorySnapshot } from '../history/historyModel';
 
@@ -62,6 +63,9 @@ const warn = (message: string) => {
 };
 
 export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = (set, get) => {
+  /** Putting a recorded state back is not a change to record. */
+  const setRestoring = setWithoutHistoryOf(set);
+
   /** A transaction left open by mistake would silence every later change; undo and redo close it. */
   const closeLeakedTransaction = () => {
     if (get().historyTransactionDepth === 0) return;
@@ -122,7 +126,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         return;
       }
       const open = state.historyTransaction;
-      set({
+      setRestoring({
         ...(open?.entry ? { ...restoreSnapshot(state, open.entry), isDirty: open.dirty } : {}),
         historyPast: open ? withoutLast(state.historyPast, open.entry) : state.historyPast,
         historyFuture: open ? open.future : state.historyFuture,
@@ -144,7 +148,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     undo: () => {
       get().abortCanvasGestures?.();
       closeLeakedTransaction();
-      set((state) => {
+      setRestoring((state) => {
         if (state.historyPast.length === 0) return {};
         const snapshot = state.historyPast[state.historyPast.length - 1];
         return {
@@ -159,7 +163,7 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     redo: () => {
       get().abortCanvasGestures?.();
       closeLeakedTransaction();
-      set((state) => {
+      setRestoring((state) => {
         if (state.historyFuture.length === 0) return {};
         const snapshot = state.historyFuture[state.historyFuture.length - 1];
         return {

@@ -1,5 +1,6 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
+import { setWithoutHistoryOf } from '../history/historyGuard';
 import type { StrictProjectData } from '../../types/project';
 import type { ProjectImportPlan } from '../../utils/import/projectImportPlan';
 
@@ -41,59 +42,65 @@ function settingsPatchToState(patch: Partial<StrictProjectData>): Partial<AppSta
   return out;
 }
 
-export const createImportSlice: StateCreator<AppState, [], [], ImportSlice> = (set, get) => ({
-  applyProjectImport: (plan) => {
-    get().abortCanvasGestures?.();
-    const { data } = plan;
+export const createImportSlice: StateCreator<AppState, [], [], ImportSlice> = (set, get) => {
+  const setWithoutHistory = setWithoutHistoryOf(set);
+  return {
+    applyProjectImport: (plan) => {
+      get().abortCanvasGestures?.();
+      const { data } = plan;
 
-    // 1. 設定・テンプレート・プロファイル（Undo の対象外）。アクティブなプロファイルは切り替えない。
-    set((state) => {
-      const updatedTemplates = new Map(plan.templates.update.map((u) => [u.id, u.template]));
-      const updatedProfiles = new Map(plan.exportProfiles.update.map((u) => [u.id, u.profile]));
-      return {
-        ...settingsPatchToState(plan.settingsPatch),
-        exportTemplates: [...state.exportTemplates.map((t) => updatedTemplates.get(t.id) ?? t), ...plan.templates.add],
-        exportProfiles: [
-          ...state.exportProfiles.map((p) => updatedProfiles.get(p.id) ?? p),
-          ...plan.exportProfiles.add,
-        ],
-        exportRegions: [...state.exportRegions, ...data.exportRegions],
-        mapSources: [...state.mapSources, ...data.mapSources],
-        mapLayers: [...data.mapLayers, ...state.mapLayers],
-        // 取り込んだレイヤーは、グループ構成を保ったまま積み順の一番上に置く。
-        rootLayerIds: [...data.rootLayerIds, ...state.rootLayerIds],
-        layerGroups: { ...state.layerGroups, ...data.layerGroups },
-        layerVisibilitySets: [...state.layerVisibilitySets, ...data.layerVisibilitySets],
-        isDirty: true,
-      };
-    });
+      // 1. 設定・テンプレート・プロファイルと、マップ・領域・表示セット（Undo の対象外）。アクティブなプロファイルは切り替えない。
+      setWithoutHistory((state) => {
+        const updatedTemplates = new Map(plan.templates.update.map((u) => [u.id, u.template]));
+        const updatedProfiles = new Map(plan.exportProfiles.update.map((u) => [u.id, u.profile]));
+        return {
+          ...settingsPatchToState(plan.settingsPatch),
+          exportTemplates: [
+            ...state.exportTemplates.map((t) => updatedTemplates.get(t.id) ?? t),
+            ...plan.templates.add,
+          ],
+          exportProfiles: [
+            ...state.exportProfiles.map((p) => updatedProfiles.get(p.id) ?? p),
+            ...plan.exportProfiles.add,
+          ],
+          exportRegions: [...state.exportRegions, ...data.exportRegions],
+          mapSources: [...state.mapSources, ...data.mapSources],
+          mapLayers: [...data.mapLayers, ...state.mapLayers],
+          // 取り込んだレイヤーは、グループ構成を保ったまま積み順の一番上に置く。
+          rootLayerIds: [...data.rootLayerIds, ...state.rootLayerIds],
+          layerGroups: { ...state.layerGroups, ...data.layerGroups },
+          layerVisibilitySets: [...state.layerVisibilitySets, ...data.layerVisibilitySets],
+          isDirty: true,
+        };
+      });
 
-    // 2. Undo で戻せるデータ。設定を先に反映してからスナップショットを取るので、Undo が設定を巻き戻すことはない。
-    const hasUndoableData =
-      data.rootNodeIds.length > 0 ||
-      data.annotationObjects.length > 0 ||
-      Object.keys(data.annotationGroups).length > 0 ||
-      data.customLayers.length > 0;
-    if (hasUndoableData) {
-      get().pushHistorySnapshot();
-      set((state) => ({
-        nodes: { ...state.nodes, ...data.nodes },
-        rootNodeIds: [...state.rootNodeIds, ...data.rootNodeIds],
-        annotationObjects: {
-          ...state.annotationObjects,
-          ...Object.fromEntries(data.annotationObjects.map((a) => [a.id, a])),
-        },
-        annotationGroups: { ...state.annotationGroups, ...data.annotationGroups },
-        rootAnnotationIds: [...state.rootAnnotationIds, ...data.rootAnnotationIds],
-        annotationOrder: [...state.annotationOrder, ...data.annotationObjects.map((a) => a.id)],
-        customLayers: [...state.customLayers, ...data.customLayers],
-        isDirty: true,
-      }));
-    }
+      // 2. Undo で戻せるデータ。設定を先に反映してからスナップショットを取るので、Undo が設定を巻き戻すことはない。
+      const hasUndoableData =
+        data.rootNodeIds.length > 0 ||
+        data.annotationObjects.length > 0 ||
+        Object.keys(data.annotationGroups).length > 0 ||
+        data.customLayers.length > 0;
+      if (hasUndoableData) {
+        get().pushHistorySnapshot();
+        set((state) => ({
+          nodes: { ...state.nodes, ...data.nodes },
+          rootNodeIds: [...state.rootNodeIds, ...data.rootNodeIds],
+          annotationObjects: {
+            ...state.annotationObjects,
+            ...Object.fromEntries(data.annotationObjects.map((a) => [a.id, a])),
+          },
+          annotationGroups: { ...state.annotationGroups, ...data.annotationGroups },
+          rootAnnotationIds: [...state.rootAnnotationIds, ...data.rootAnnotationIds],
+          annotationOrder: [...state.annotationOrder, ...data.annotationObjects.map((a) => a.id)],
+          customLayers: [...state.customLayers, ...data.customLayers],
+          isDirty: true,
+        }));
+      }
 
-    const pathChanged = 'active_path_calculator_plugin_id' in plan.settingsPatch || data.rootNodeIds.length > 0;
-    if (pathChanged && get().activePathCalculatorPluginId) {
-      void get().recalculatePath({ immediate: true });
-    }
-  },
-});
+      const pathChanged = 'active_path_calculator_plugin_id' in plan.settingsPatch || data.rootNodeIds.length > 0;
+      if (pathChanged && get().activePathCalculatorPluginId) {
+        void get().recalculatePath({ immediate: true });
+      }
+    },
+  };
+};
