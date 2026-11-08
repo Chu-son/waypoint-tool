@@ -871,6 +871,113 @@ describe('MapCanvas tools', () => {
         const [layer] = getAppState().customLayers;
         expect(layer.type === 'manual' && layer.editObjects[0]).toMatchObject({ cx: 30, cy: 40 });
       });
+
+      describe('rotating a rectangle', () => {
+        const rotating = () => ({
+          ...editing(),
+          selection: { type: 'layers' as const, ids: ['wall'], selectedObjectId: 's' },
+          selectedEditObjectId: 's',
+        });
+        const angleOfShape = () => {
+          const [layer] = getAppState().customLayers;
+          return layer.type === 'manual' ? (layer.editObjects[0] as { angle: number }).angle : NaN;
+        };
+        const grabHandle = (container: HTMLElement) =>
+          fireEvent.pointerDown(container.querySelector('pixigraphics[cursor="grab"]')!, {
+            button: 0,
+            pointerId: 1,
+            ...toScreen(30, 60),
+          });
+
+        it('undoes a whole rotation in one step', () => {
+          const { pointer, container } = renderCanvas(rotating());
+
+          grabHandle(container);
+          pointer.move(60, 40);
+          pointer.move(60, 70);
+          pointer.up(60, 70);
+          expect(angleOfShape()).toBeCloseTo(Math.PI / 4, 5);
+          expect(getAppState().historyPast).toHaveLength(1);
+          act(() => getAppState().undo());
+
+          expect(angleOfShape()).toBe(0);
+        });
+
+        it('puts a rotated rectangle back on Escape', () => {
+          const { pointer, container } = renderCanvas(rotating());
+
+          grabHandle(container);
+          pointer.move(60, 70);
+          expect(angleOfShape()).toBeCloseTo(Math.PI / 4, 5);
+          escape();
+
+          expect(angleOfShape()).toBe(0);
+          expectNothingRecorded();
+        });
+      });
+
+      describe.each(['rect', 'circle', 'line', 'freehand'] as const)('drawing a %s', (tool) => {
+        const objectsOf = (id: string) => {
+          const layer = getAppState().customLayers.find((l) => l.id === id);
+          return layer?.type === 'manual' ? layer.editObjects : [];
+        };
+        const drawing = () => ({ ...editing(), mapEditSubTool: tool });
+
+        it('undoes the drawing in one step, and redoes it', () => {
+          const { pointer } = renderCanvas(drawing());
+
+          pointer.down(-50, -50);
+          pointer.move(-40, -40);
+          pointer.move(-20, -20);
+          pointer.up(-20, -20);
+          expect(objectsOf('wall')).toHaveLength(2);
+          expect(getAppState().historyPast).toHaveLength(1);
+
+          act(() => getAppState().undo());
+          expect(objectsOf('wall')).toEqual([shape]);
+          act(() => getAppState().redo());
+          expect(objectsOf('wall')).toHaveLength(2);
+        });
+
+        it('removes the layer it had to create along with the drawing', () => {
+          const { pointer } = renderCanvas({ isMapEditMode: true, mapEditSubTool: tool });
+
+          pointer.down(-50, -50);
+          pointer.move(-20, -20);
+          pointer.up(-20, -20);
+          expect(getAppState().customLayers).toHaveLength(1);
+          expect(getAppState().historyPast).toHaveLength(1);
+          act(() => getAppState().undo());
+
+          expect(getAppState().customLayers).toHaveLength(0);
+          expect(getAppState().activeCustomLayerId).toBeNull();
+        });
+
+        it('discards the drawing and the layer it created on Escape', () => {
+          const { pointer } = renderCanvas({ isMapEditMode: true, mapEditSubTool: tool });
+
+          pointer.down(-50, -50);
+          pointer.move(-20, -20);
+          expect(getAppState().customLayers).toHaveLength(1);
+          escape();
+          pointer.up(-20, -20);
+
+          expect(getAppState().customLayers).toHaveLength(0);
+          expectNothingRecorded();
+        });
+      });
+
+      describe.each(['rect', 'circle', 'line'] as const)('a %s too small to keep', (tool) => {
+        it('takes back the layer it created and records nothing', () => {
+          const { pointer } = renderCanvas({ isMapEditMode: true, mapEditSubTool: tool });
+
+          pointer.down(-50, -50);
+          pointer.up(-50, -50);
+
+          expect(getAppState().customLayers).toHaveLength(0);
+          expectNothingRecorded();
+        });
+      });
     });
   });
 });

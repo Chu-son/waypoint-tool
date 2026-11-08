@@ -260,8 +260,18 @@ const withoutLayers = (state: AppState, ids: readonly string[]): Partial<AppStat
   };
 };
 
+const manualLayerOf = (state: AppState, layerId: string) => {
+  const layer = state.customLayers.find((l) => l.id === layerId);
+  return layer?.type === 'manual' ? layer : undefined;
+};
+
 export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, get) => {
   const setWithoutHistory = setWithoutHistoryOf(set);
+  const setEditObjects = (layerId: string, editObjects: EditObject[]) =>
+    set((state) => ({
+      customLayers: state.customLayers.map((l) => (l.id === layerId ? ({ ...l, editObjects } as CustomLayer) : l)),
+      isDirty: true,
+    }));
   return {
     mapSources: [],
     mapLayers: [],
@@ -348,41 +358,33 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       get().setSelection(id ? { type: 'layers', ids: [id], selectedObjectId: null } : { type: 'none' });
     },
 
-    addEditObject: (layerId: string, obj: EditObject) =>
-      set((state) => ({
-        customLayers: state.customLayers.map((l) => {
-          if (l.id === layerId && l.type === 'manual') {
-            return { ...l, editObjects: [...l.editObjects, obj] };
-          }
-          return l;
-        }),
-        isDirty: true,
-      })),
+    addEditObject: (layerId: string, obj: EditObject) => {
+      const layer = manualLayerOf(get(), layerId);
+      if (!layer) return;
+      get().pushHistorySnapshot();
+      setEditObjects(layerId, [...layer.editObjects, obj]);
+    },
 
-    removeEditObject: (layerId: string, objId: string) =>
-      set((state) => ({
-        customLayers: state.customLayers.map((l) => {
-          if (l.id === layerId && l.type === 'manual') {
-            return { ...l, editObjects: l.editObjects.filter((o) => o.id !== objId) };
-          }
-          return l;
-        }),
-        isDirty: true,
-      })),
+    removeEditObject: (layerId: string, objId: string) => {
+      const layer = manualLayerOf(get(), layerId);
+      if (!layer?.editObjects.some((o) => o.id === objId)) return;
+      get().pushHistorySnapshot();
+      setEditObjects(
+        layerId,
+        layer.editObjects.filter((o) => o.id !== objId),
+      );
+    },
 
-    updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) =>
-      set((state) => ({
-        customLayers: state.customLayers.map((l) => {
-          if (l.id === layerId && l.type === 'manual') {
-            return {
-              ...l,
-              editObjects: l.editObjects.map((o) => (o.id === objId ? ({ ...o, ...updates } as EditObject) : o)),
-            };
-          }
-          return l;
-        }),
-        isDirty: true,
-      })),
+    updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => {
+      const layer = manualLayerOf(get(), layerId);
+      const target = layer?.editObjects.find((o) => o.id === objId);
+      if (!layer || !target || !changesAny(target, updates)) return;
+      get().pushHistorySnapshot();
+      setEditObjects(
+        layerId,
+        layer.editObjects.map((o) => (o.id === objId ? ({ ...o, ...updates } as EditObject) : o)),
+      );
+    },
 
     addExportRegion: (region) =>
       set((state) => ({

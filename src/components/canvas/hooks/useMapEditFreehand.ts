@@ -3,6 +3,7 @@ import { useAppStore } from '../../../stores/appStore';
 import { useResolvedMapLayers } from '../../../hooks/useResolvedMapLayers';
 import { FreehandEditObject } from '../../../types/store';
 import { v4 as uuidv4 } from 'uuid';
+import { useMapEditDrawGesture } from './useMapEditDrawGesture';
 
 /**
  * Ramer-Douglas-Peucker point simplification algorithm.
@@ -40,14 +41,11 @@ function simplifyPoints(points: Array<{ x: number; y: number }>, epsilon: number
 }
 
 export function useMapEditFreehand() {
-  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const activeMapLayerId = useAppStore((state) => state.activeMapLayerId);
   const mapLayers = useResolvedMapLayers();
   const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
   const mapEditBrushSize = useAppStore((state) => state.mapEditBrushSize); // in pixels
-  const addEditObject = useAppStore((state) => state.addEditObject);
-  const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
-  const pushHistorySnapshot = useAppStore((state) => state.pushHistorySnapshot);
+  const draw = useMapEditDrawGesture();
 
   const [isFreehandDrawing, setIsFreehandDrawing] = useState(false);
   const [freehandPoints, setFreehandPoints] = useState<Array<{ x: number; y: number }>>([]);
@@ -62,21 +60,19 @@ export function useMapEditFreehand() {
   const resolution = getResolution();
   const brushRadiusWorld = mapEditBrushSize * resolution;
 
+  const clearDrawing = useCallback(() => {
+    setIsFreehandDrawing(false);
+    setFreehandPoints([]);
+  }, []);
+
   const handleFreehandDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
-      const state = useAppStore.getState();
-      let targetLayer = state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual');
-      if (!targetLayer) {
-        targetLayer = state.customLayers.find((l) => l.type === 'manual') || state.addManualCustomLayer();
-      }
-      if (state.activeCustomLayerId !== targetLayer.id) {
-        state.setActiveCustomLayerId(targetLayer.id);
-      }
+      draw.begin(clearDrawing);
       setIsFreehandDrawing(true);
       setFreehandPoints([worldPos]);
       setBrushPreviewPos(worldPos);
     },
-    [activeCustomLayerId],
+    [draw, clearDrawing],
   );
 
   const handleFreehandDrawMove = useCallback(
@@ -99,45 +95,21 @@ export function useMapEditFreehand() {
   );
 
   const handleFreehandDrawEnd = useCallback(() => {
-    const state = useAppStore.getState();
-    const targetLayer =
-      state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') ||
-      state.customLayers.find((l) => l.type === 'manual');
-    const targetLayerId = targetLayer?.id;
-    if (!isFreehandDrawing || !targetLayerId || freehandPoints.length === 0) {
-      setIsFreehandDrawing(false);
-      setFreehandPoints([]);
-      return;
-    }
-
     // Simplify points using Douglas-Peucker
     const epsilon = Math.max(0.002, brushRadiusWorld * 0.1);
-    const simplified = simplifyPoints(freehandPoints, epsilon);
-
-    const newObj: FreehandEditObject = {
-      id: uuidv4(),
-      type: 'freehand',
-      fillValue: mapEditFillValue,
-      points: simplified,
-      brushRadius: brushRadiusWorld,
-    };
-
-    addEditObject(targetLayerId, newObj);
-    setSelectedEditObjectId(newObj.id);
-    pushHistorySnapshot();
-
-    setIsFreehandDrawing(false);
-    setFreehandPoints([]);
-  }, [
-    isFreehandDrawing,
-    activeCustomLayerId,
-    freehandPoints,
-    brushRadiusWorld,
-    mapEditFillValue,
-    addEditObject,
-    setSelectedEditObjectId,
-    pushHistorySnapshot,
-  ]);
+    draw.finish(
+      isFreehandDrawing && freehandPoints.length > 0
+        ? {
+            id: uuidv4(),
+            type: 'freehand',
+            fillValue: mapEditFillValue,
+            points: simplifyPoints(freehandPoints, epsilon),
+            brushRadius: brushRadiusWorld,
+          }
+        : null,
+    );
+    clearDrawing();
+  }, [draw, clearDrawing, isFreehandDrawing, freehandPoints, brushRadiusWorld, mapEditFillValue]);
 
   const freehandPreview: FreehandEditObject | null =
     isFreehandDrawing && freehandPoints.length > 0

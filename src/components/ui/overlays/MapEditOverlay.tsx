@@ -1,4 +1,5 @@
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { FloatingActionBanner } from '../common/FloatingActionBanner';
 import { Button } from '../common/Button';
 import { Slider } from '../common/Slider';
@@ -15,7 +16,6 @@ export function MapEditOverlay() {
   const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
   const updateEditObject = useAppStore((state) => state.updateEditObject);
   const removeEditObject = useAppStore((state) => state.removeEditObject);
-  const pushHistorySnapshot = useAppStore((state) => state.pushHistorySnapshot);
 
   const mapEditSubTool = useAppStore((state) => state.mapEditSubTool);
   const setMapEditSubTool = useAppStore((state) => state.setMapEditSubTool);
@@ -41,7 +41,6 @@ export function MapEditOverlay() {
     setMapEditFillValue(val);
     if (activeCustomLayerId && selectedEditObjectId) {
       updateEditObject(activeCustomLayerId, selectedEditObjectId, { fillValue: val });
-      pushHistorySnapshot();
     }
   };
 
@@ -49,7 +48,6 @@ export function MapEditOverlay() {
     if (activeCustomLayerId && selectedEditObjectId) {
       removeEditObject(activeCustomLayerId, selectedEditObjectId);
       setSelectedEditObjectId(null);
-      pushHistorySnapshot();
     }
   };
 
@@ -118,6 +116,7 @@ export function MapEditOverlay() {
                 max="255"
                 step="1"
                 value={currentFillValue}
+                {...historyEditHandlers}
                 onChange={(e) => handleFillValueChange(parseInt(e.target.value, 10))}
               />
             </div>
