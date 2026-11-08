@@ -29,14 +29,16 @@ describe('moving a layer group', () => {
       layerStackState(
         makeLayerGroup('site', [
           makeMap('mapA', { info: { origin: [1, 0, 0] } }),
-          makeLayerGroup('inner', [makeManualCustomLayer('wall'), plugin]),
+          makeLayerGroup('inner', [
+            makeManualCustomLayer('wall', {
+              editObjects: [{ id: 'c', type: 'circle', fillValue: 0, cx: 2, cy: 2, radius: 1 }],
+            }),
+            plugin,
+          ]),
         ]),
         makeMap('outside', { info: { origin: [5, 5, 0] } }),
       ),
     );
-    getAppState().updateCustomLayer('wall', {
-      editObjects: [{ id: 'c', type: 'circle', fillValue: 0, cx: 2, cy: 2, radius: 1 }],
-    });
   });
 
   it('moves maps, hand-drawn objects and plugin layers at any depth, and nothing outside', () => {

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { CustomLayerInspector } from './CustomLayerInspector';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance, ManualCustomLayer, PluginCustomLayer } from '../../../types/store';
 import { BackendAPI, DialogAPI } from '../../../api';
+import { getAppState, resetAppStore } from '../../../test/store';
+import { makePluginLayer } from '../../../test/fixtures';
 
 beforeEach(() => {
   vi.spyOn(BackendAPI, 'runPlugin').mockResolvedValue({
@@ -143,6 +145,87 @@ describe('CustomLayerInspector', () => {
     await vi.waitFor(() => {
       expect(BackendAPI.runPlugin).toHaveBeenCalled();
       expect(screen.queryByText('Generating...')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('undo', () => {
+    const layer = makePluginLayer('generated', {
+      name: 'Drivable',
+      plugin_id: 'test-layer-plugin',
+      opacity: 0.7,
+      image_base64: 'before',
+    });
+    const storedLayer = () => getAppState().customLayers[0] as PluginCustomLayer;
+
+    beforeEach(() =>
+      resetAppStore({
+        plugins: { 'test-layer-plugin': mockPlugin },
+        customLayers: [layer],
+        selection: { type: 'layers', ids: ['generated'], selectedObjectId: null },
+        activeCustomLayerId: 'generated',
+        activePluginId: 'test-layer-plugin',
+      }),
+    );
+
+    it('undoes typing a name in one step and shows the restored name', () => {
+      render(<CustomLayerInspector />);
+      const input = screen.getByPlaceholderText('Layer Name');
+
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: 'D' } });
+      fireEvent.change(input, { target: { value: 'Dr' } });
+      fireEvent.blur(input);
+
+      expect(getAppState().historyPast).toHaveLength(1);
+      act(() => getAppState().undo());
+      expect(storedLayer().name).toBe('Drivable');
+      expect(input).toHaveValue('Drivable');
+    });
+
+    it('undoes an opacity drag in one step and shows the restored opacity', () => {
+      render(<CustomLayerInspector />);
+      const slider = screen.getByRole('slider');
+
+      fireEvent.pointerDown(slider, { button: 0 });
+      fireEvent.change(slider, { target: { value: '0.5' } });
+      fireEvent.change(slider, { target: { value: '0.2' } });
+      fireEvent.pointerUp(window);
+
+      expect(getAppState().historyPast).toHaveLength(1);
+      act(() => getAppState().undo());
+      expect(storedLayer().opacity).toBe(0.7);
+      expect(slider).toHaveValue('0.7');
+    });
+
+    it('undoes a re-generation and the appearance kept across it in one step', async () => {
+      vi.mocked(BackendAPI.runPlugin).mockResolvedValue({
+        name: 'Generated Overlay',
+        image_base64: 'after',
+        info: { resolution: 0.05, origin: [0, 0, 0] },
+      });
+      render(<CustomLayerInspector />);
+
+      fireEvent.click(screen.getByText('Re-generate Layer'));
+
+      await vi.waitFor(() => expect(storedLayer().image_base64).toBe('after'));
+      await vi.waitFor(() => expect(getAppState().historyTransactionDepth).toBe(0));
+      expect(storedLayer().name).toBe('Drivable');
+      expect(getAppState().historyPast).toHaveLength(1);
+
+      act(() => getAppState().undo());
+
+      expect(storedLayer().image_base64).toBe('before');
+    });
+
+    it('leaves no undo step and no open transaction when the generation fails', async () => {
+      vi.mocked(BackendAPI.runPlugin).mockRejectedValue(new Error('plugin crashed'));
+      render(<CustomLayerInspector />);
+
+      fireEvent.click(screen.getByText('Re-generate Layer'));
+
+      await vi.waitFor(() => expect(BackendAPI.runPlugin).toHaveBeenCalled());
+      await vi.waitFor(() => expect(getAppState().historyTransactionDepth).toBe(0));
+      expect(getAppState().historyPast).toHaveLength(0);
     });
   });
 });

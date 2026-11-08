@@ -117,11 +117,6 @@ export type MapSlice = {
   /** Abandons the drag and restores the use area from before it. */
   cancelMapClipDrag: () => void;
   removeMapLayer: (id: string) => void;
-  /**
-   * Moves a layer of any kind within the stack (`fromIndex` / `toIndex` index the flat order) to the
-   * position of the layer now at `toIndex`, joining that layer's group.
-   */
-  reorderLayers: (fromIndex: number, toIndex: number) => void;
 
   /** Moves layers and groups before / after / inside `targetId`. One undo step; returns false when refused. */
   moveLayerItems: (ids: string[], targetId: string, position: DropPosition) => boolean;
@@ -315,6 +310,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
         is_reference: is_reference ?? false,
         editObjects: [],
       };
+      get().pushHistorySnapshot();
       set((state) => ({
         customLayers: [newLayer, ...state.customLayers],
         ...withNewLayer(treeOf(state), newLayer.id, options?.atSelection ? placementForNew(state) : TOP_OF_STACK),
@@ -326,33 +322,37 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return newLayer;
     },
 
-    addPluginCustomLayer: (layer: PluginCustomLayer) =>
-      set((state) => {
-        return {
-          customLayers: [layer, ...state.customLayers],
-          ...withNewLayer(treeOf(state), layer.id),
-          ...layerSelectionOf([layer.id], state),
-          selectedNodeIds: [],
-          selectedAnnotationIds: [],
-          isDirty: true,
-        };
-      }),
+    addPluginCustomLayer: (layer: PluginCustomLayer) => {
+      get().pushHistorySnapshot();
+      set((state) => ({
+        customLayers: [layer, ...state.customLayers],
+        ...withNewLayer(treeOf(state), layer.id),
+        ...layerSelectionOf([layer.id], state),
+        selectedNodeIds: [],
+        selectedAnnotationIds: [],
+        isDirty: true,
+      }));
+    },
 
-    updateCustomLayer: (id: string, updates: Partial<CustomLayer>) =>
+    updateCustomLayer: (id: string, updates: Partial<CustomLayer>) => {
+      const layer = get().customLayers.find((l) => l.id === id);
+      if (!layer || !changesAny(layer, updates)) return;
+      get().pushHistorySnapshot();
       set((state) => ({
         customLayers: state.customLayers.map((l) => (l.id === id ? ({ ...l, ...updates } as CustomLayer) : l)),
         isDirty: true,
-      })),
+      }));
+    },
 
-    removeCustomLayer: (id: string) =>
-      set((state) => {
-        if (!state.customLayers.some((l) => l.id === id)) return {};
-        return {
-          ...withoutLayers(state, [id]),
-          ...(state.activeCustomLayerId === id ? { activeCustomLayerId: null } : {}),
-          isDirty: true,
-        };
-      }),
+    removeCustomLayer: (id: string) => {
+      if (!get().customLayers.some((l) => l.id === id)) return;
+      get().pushHistorySnapshot();
+      set((state) => ({
+        ...withoutLayers(state, [id]),
+        ...(state.activeCustomLayerId === id ? { activeCustomLayerId: null } : {}),
+        isDirty: true,
+      }));
+    },
 
     setActiveCustomLayerId: (id: string | null) => {
       get().setSelection(id ? { type: 'layers', ids: [id], selectedObjectId: null } : { type: 'none' });
@@ -562,21 +562,6 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
         return { ...withoutLayers(state, [id]), isDirty: true };
       }),
 
-    reorderLayers: (fromIndex: number, toIndex: number) =>
-      set((state) => {
-        const order = layerOrderOf(state);
-        if (fromIndex < 0 || fromIndex >= order.length) return {};
-        const to = Math.max(0, Math.min(order.length - 1, toIndex));
-        if (to === fromIndex) return {};
-        const moved = moveInLayerTree(
-          treeOf(state),
-          [order[fromIndex]],
-          order[to],
-          to > fromIndex ? 'after' : 'before',
-        );
-        return moved ? { ...moved, isDirty: true } : {};
-      }),
-
     moveLayerItems: (ids, targetId, position) => {
       const moved = moveInLayerTree(treeOf(get()), ids, targetId, position);
       if (!moved) return false;
@@ -648,12 +633,12 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       });
     },
 
-    renameLayerGroup: (groupId, name) =>
-      set((state) => {
-        const group = state.layerGroups[groupId];
-        if (!group || group.name === name) return {};
-        return { layerGroups: { ...state.layerGroups, [groupId]: { ...group, name } }, isDirty: true };
-      }),
+    renameLayerGroup: (groupId, name) => {
+      const group = get().layerGroups[groupId];
+      if (!group || group.name === name) return;
+      get().pushHistorySnapshot();
+      set((state) => ({ layerGroups: { ...state.layerGroups, [groupId]: { ...group, name } }, isDirty: true }));
+    },
 
     setLayerGroupVisible: (groupId, visible) => {
       const group = get().layerGroups[groupId];
@@ -725,22 +710,21 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       return true;
     },
 
-    setLayerItemsVisible: (ids, visible) =>
-      set((state) => {
-        const target = new Set(ids);
-        const layerGroups = { ...state.layerGroups };
-        ids.forEach((id) => {
-          if (layerGroups[id] && layerGroups[id].visible !== visible) layerGroups[id] = { ...layerGroups[id], visible };
-        });
-        return {
-          mapLayers: state.mapLayers.map((l) => (target.has(l.id) && l.visible !== visible ? { ...l, visible } : l)),
-          customLayers: state.customLayers.map((l) =>
-            target.has(l.id) && l.visible !== visible ? ({ ...l, visible } as CustomLayer) : l,
-          ),
-          layerGroups,
-          isDirty: true,
-        };
-      }),
+    setLayerItemsVisible: (ids, visible) => {
+      const target = new Set(ids);
+      const changes = (item: { id: string; visible: boolean }) => target.has(item.id) && item.visible !== visible;
+      const { mapLayers, customLayers, layerGroups } = get();
+      if (![...mapLayers, ...customLayers, ...Object.values(layerGroups)].some(changes)) return;
+      get().pushHistorySnapshot();
+      set((state) => ({
+        mapLayers: state.mapLayers.map((l) => (changes(l) ? { ...l, visible } : l)),
+        customLayers: state.customLayers.map((l) => (changes(l) ? ({ ...l, visible } as CustomLayer) : l)),
+        layerGroups: Object.fromEntries(
+          Object.entries(state.layerGroups).map(([id, g]) => [id, changes(g) ? { ...g, visible } : g]),
+        ),
+        isDirty: true,
+      }));
+    },
 
     duplicateLayerItems: (ids) => {
       const state = get();

@@ -46,7 +46,7 @@ describe('layer visibility sets', () => {
     const orderBefore = getLayerOrder();
 
     getAppState().updateCustomLayer('keepout', { visible: false });
-    getAppState().reorderLayers(0, 2);
+    getAppState().moveLayerItems([orderBefore[0]], orderBefore[2], 'after');
     const reordered = getLayerOrder();
     getAppState().applyLayerVisibilitySet(setNamed('Any').id);
 

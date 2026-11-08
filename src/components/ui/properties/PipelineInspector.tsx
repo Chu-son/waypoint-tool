@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { PipelineMetadata } from '../../../types/pipeline';
 import { extractPipelineParameters } from '../../../utils/pipelineParameterExtractor';
 import { PluginInputEditor } from '../plugins/PluginInputEditor';
@@ -378,6 +379,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                 <Label className="text-[10px] font-semibold text-text-muted">Layer Name</Label>
                 <Input
                   value={targetLayer.name}
+                  {...historyEditHandlers}
                   onChange={(e) => updateCustomLayer(targetLayer.id, { name: e.target.value })}
                   className="h-7 text-xs bg-surface-base"
                   placeholder="Layer Name"
@@ -412,6 +414,7 @@ export const PipelineInspector: React.FC<PipelineInspectorProps> = ({
                   max={1}
                   step={0.01}
                   value={targetLayer.opacity ?? 1.0}
+                  {...historyEditHandlers}
                   onChange={(e) => updateCustomLayer(targetLayer.id, { opacity: parseFloat(e.target.value) })}
                 />
               </div>

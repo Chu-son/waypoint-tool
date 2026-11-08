@@ -89,8 +89,8 @@ describe('layer groups', () => {
     expect(getAppState().layerGroups.floor.children_ids).toEqual(['wall', copy, 'mapA']);
   });
 
-  it('reorders by flat index, joining the group of the layer it lands on', () => {
-    getAppState().reorderLayers(3, 1);
+  it('joins the group of the layer it is moved next to', () => {
+    getAppState().moveLayerItems(['bottom'], 'wall', 'before');
     expect(getAppState().layerGroups.floor.children_ids).toEqual(['bottom', 'wall', 'mapA']);
   });
 
