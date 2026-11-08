@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import type { GeoOrigin } from '../../../types/geo';
 import { convertOrigin } from '../../../utils/geo/geoTransform';
 import { utmZoneFromLon } from '../../../utils/geo/utm';
@@ -37,6 +38,7 @@ export function GeoOriginFields({ origin, onChange, onChangeKind }: GeoOriginFie
       {origin.kind === 'latlon' ? (
         <div className="grid grid-cols-2 gap-1.5">
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Latitude (°)"
             value={origin.lat}
             precision={8}
@@ -45,6 +47,7 @@ export function GeoOriginFields({ origin, onChange, onChangeKind }: GeoOriginFie
             onChange={(lat) => onChange({ ...origin, lat })}
           />
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Longitude (°)"
             value={origin.lon}
             precision={8}
@@ -56,6 +59,7 @@ export function GeoOriginFields({ origin, onChange, onChangeKind }: GeoOriginFie
       ) : (
         <div className="grid grid-cols-2 gap-1.5">
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="UTM zone"
             value={origin.zone}
             precision={0}
@@ -78,12 +82,14 @@ export function GeoOriginFields({ origin, onChange, onChangeKind }: GeoOriginFie
             </Select>
           </div>
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Easting (m)"
             value={origin.easting}
             precision={3}
             onChange={(easting) => onChange({ ...origin, easting })}
           />
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Northing (m)"
             value={origin.northing}
             precision={3}

@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { ChevronDown, ChevronUp, Globe, Move, RotateCcw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import type { BasemapId, GeoAlignment } from '../../../types/geo';
 import { BASEMAP_CHOICES, isValidTileTemplate, resolveBasemap } from '../../../utils/geo/basemapPresets';
 import { Button } from '../common/Button';
@@ -101,6 +102,7 @@ export function GeoMapCard() {
                 <div className="flex flex-col gap-1">
                   <FieldLabel htmlFor={urlId}>Tile URL template</FieldLabel>
                   <Input
+                    {...historyEditHandlers}
                     id={urlId}
                     value={customBasemap.urlTemplate}
                     onChange={(e) => updateCustomBasemap({ urlTemplate: e.target.value })}
@@ -116,6 +118,7 @@ export function GeoMapCard() {
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <LabeledNumericInput
+                    {...historyEditHandlers}
                     label="Max zoom"
                     value={customBasemap.maxZoom}
                     precision={0}
@@ -128,6 +131,7 @@ export function GeoMapCard() {
                       Attribution
                     </FieldLabel>
                     <Input
+                      {...historyEditHandlers}
                       id={attributionId}
                       value={customBasemap.attribution}
                       onChange={(e) => updateCustomBasemap({ attribution: e.target.value })}
@@ -139,6 +143,7 @@ export function GeoMapCard() {
             )}
 
             <Slider
+              {...historyEditHandlers}
               label="Opacity"
               valueDisplay={`${Math.round(geoMap.opacity * 100)}%`}
               min="0"

@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import type { BasemapId, BasemapSource, GeoAlignment, GeoMapSettings, GeoOrigin } from '../../types/geo';
 import { convertOrigin } from '../../utils/geo/geoTransform';
+import { changesAny } from '../../utils/shallowChanges';
 import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 
 export type GeoMapSlice = {
@@ -33,8 +34,12 @@ const isFiniteAlignment = (a: GeoAlignment) =>
 const sameAlignment = (a: GeoAlignment, b: GeoAlignment) => a.dx === b.dx && a.dy === b.dy && a.yawDeg === b.yawDeg;
 
 export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (set, get) => {
-  const patchGeoMap = (patch: Partial<GeoMapSettings>) =>
+  // 変更はすべてここを通る。変化がなければ何もせず、あれば変更前を記録する（トランザクション内では 1 件にまとまる）。
+  const patchGeoMap = (patch: Partial<GeoMapSettings>) => {
+    if (!changesAny(get().geoMap, patch)) return;
+    get().pushHistorySnapshot();
     set((state) => ({ geoMap: { ...state.geoMap, ...patch }, isDirty: true }));
+  };
 
   return {
     geoMap: DEFAULT_GEO_MAP,
@@ -43,17 +48,17 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
     setGeoMapEnabled: (enabled) => patchGeoMap({ enabled }),
     setGeoMapOpacity: (opacity) => patchGeoMap({ opacity: Math.max(0, Math.min(1, opacity)) }),
     setBasemap: (basemapId) => patchGeoMap({ basemapId }),
-    updateCustomBasemap: (updates) =>
-      set((state) => ({
-        geoMap: { ...state.geoMap, customBasemap: { ...state.geoMap.customBasemap, ...updates } },
-        isDirty: true,
-      })),
-    setGeoOrigin: (origin) => patchGeoMap({ origin }),
+    updateCustomBasemap: (updates) => {
+      const { customBasemap } = get().geoMap;
+      if (changesAny(customBasemap, updates)) patchGeoMap({ customBasemap: { ...customBasemap, ...updates } });
+    },
+    setGeoOrigin: (origin) => {
+      if (changesAny(get().geoMap.origin, origin)) patchGeoMap({ origin });
+    },
     setGeoOriginKind: (kind) => patchGeoMap({ origin: convertOrigin(get().geoMap.origin, kind) }),
 
     setGeoAlignment: (alignment) => {
       if (!isFiniteAlignment(alignment) || sameAlignment(alignment, get().geoMap.alignment)) return;
-      get().pushHistorySnapshot();
       patchGeoMap({ alignment });
     },
 

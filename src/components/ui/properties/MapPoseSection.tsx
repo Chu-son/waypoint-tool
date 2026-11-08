@@ -1,4 +1,5 @@
 import { RotateCcw, RotateCw, FlipHorizontal2, Move } from 'lucide-react';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { Button } from '../common/Button';
 import { ToggleSwitch } from '../common/ToggleSwitch';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
@@ -119,6 +120,7 @@ export function MapPoseSection({ layer, sharedCount, onSetOrigin, onSetPoseLinke
 
       <div className="grid grid-cols-3 gap-1.5">
         <LabeledNumericInput
+          {...historyEditHandlers}
           label="ΔX (m)"
           value={deltaX}
           step={0.05}
@@ -126,6 +128,7 @@ export function MapPoseSection({ layer, sharedCount, onSetOrigin, onSetPoseLinke
           onChange={(val) => setDelta({ deltaX: val })}
         />
         <LabeledNumericInput
+          {...historyEditHandlers}
           label="ΔY (m)"
           value={deltaY}
           step={0.05}
@@ -133,6 +136,7 @@ export function MapPoseSection({ layer, sharedCount, onSetOrigin, onSetPoseLinke
           onChange={(val) => setDelta({ deltaY: val })}
         />
         <LabeledNumericInput
+          {...historyEditHandlers}
           label="ΔYaw (°)"
           value={deltaYawDeg}
           step={1}
@@ -142,6 +146,7 @@ export function MapPoseSection({ layer, sharedCount, onSetOrigin, onSetPoseLinke
       </div>
 
       <PoseAdjuster
+        {...historyEditHandlers}
         onNudge={({ dx, dy, dyawDeg }) =>
           setDelta({ deltaX: deltaX + dx, deltaY: deltaY + dy, deltaYawDeg: deltaYawDeg + dyawDeg })
         }

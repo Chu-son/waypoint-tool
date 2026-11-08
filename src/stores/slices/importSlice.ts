@@ -10,7 +10,8 @@ export type ImportSlice = {
    * `plan.optionsSchema` は検証と確認が要るため、呼び出し側が先に `applyOptionsSchema` で適用しておく。
    *
    * 設定 → 履歴スナップショット → データ の順に反映するので、Undo 1 回で戻るのはデータ（ウェイポイント、
-   * アノテーション、カスタムレイヤー）だけで、設定とマップは戻らない（マップの追加は元々 Undo の対象外）。
+   * アノテーション、カスタムレイヤー、エクスポート領域、表示セット、背景地図）だけで、設定とマップは戻らない
+   * （マップの追加は元々 Undo の対象外）。
    */
   applyProjectImport: (plan: ProjectImportPlan) => void;
 };
@@ -38,7 +39,6 @@ function settingsPatchToState(patch: Partial<StrictProjectData>): Partial<AppSta
   if (patch.conditional_styles_enabled !== undefined) out.conditionalStylesEnabled = patch.conditional_styles_enabled;
   if (patch.occupancy_settings !== undefined) out.occupancySettings = patch.occupancy_settings;
   if (patch.default_map_opacity !== undefined) out.defaultMapOpacity = patch.default_map_opacity;
-  if (patch.geo_map !== undefined) out.geoMap = patch.geo_map;
   return out;
 }
 
@@ -49,7 +49,7 @@ export const createImportSlice: StateCreator<AppState, [], [], ImportSlice> = (s
       get().abortCanvasGestures?.();
       const { data } = plan;
 
-      // 1. 設定・テンプレート・プロファイルと、マップ・領域・表示セット（Undo の対象外）。アクティブなプロファイルは切り替えない。
+      // 1. 設定・テンプレート・プロファイルと、マップ（Undo の対象外）。アクティブなプロファイルは切り替えない。
       setWithoutHistory((state) => {
         const updatedTemplates = new Map(plan.templates.update.map((u) => [u.id, u.template]));
         const updatedProfiles = new Map(plan.exportProfiles.update.map((u) => [u.id, u.profile]));
@@ -63,26 +63,31 @@ export const createImportSlice: StateCreator<AppState, [], [], ImportSlice> = (s
             ...state.exportProfiles.map((p) => updatedProfiles.get(p.id) ?? p),
             ...plan.exportProfiles.add,
           ],
-          exportRegions: [...state.exportRegions, ...data.exportRegions],
           mapSources: [...state.mapSources, ...data.mapSources],
           mapLayers: [...data.mapLayers, ...state.mapLayers],
           // 取り込んだレイヤーは、グループ構成を保ったまま積み順の一番上に置く。
           rootLayerIds: [...data.rootLayerIds, ...state.rootLayerIds],
           layerGroups: { ...state.layerGroups, ...data.layerGroups },
-          layerVisibilitySets: [...state.layerVisibilitySets, ...data.layerVisibilitySets],
           isDirty: true,
         };
       });
 
       // 2. Undo で戻せるデータ。設定を先に反映してからスナップショットを取るので、Undo が設定を巻き戻すことはない。
+      const importedGeoMap = plan.settingsPatch.geo_map;
       const hasUndoableData =
         data.rootNodeIds.length > 0 ||
         data.annotationObjects.length > 0 ||
         Object.keys(data.annotationGroups).length > 0 ||
-        data.customLayers.length > 0;
+        data.customLayers.length > 0 ||
+        data.exportRegions.length > 0 ||
+        data.layerVisibilitySets.length > 0 ||
+        importedGeoMap !== undefined;
       if (hasUndoableData) {
         get().pushHistorySnapshot();
         set((state) => ({
+          ...(importedGeoMap !== undefined ? { geoMap: importedGeoMap } : {}),
+          exportRegions: [...state.exportRegions, ...data.exportRegions],
+          layerVisibilitySets: [...state.layerVisibilitySets, ...data.layerVisibilitySets],
           nodes: { ...state.nodes, ...data.nodes },
           rootNodeIds: [...state.rootNodeIds, ...data.rootNodeIds],
           annotationObjects: {

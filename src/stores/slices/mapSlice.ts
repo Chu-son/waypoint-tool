@@ -32,7 +32,7 @@ import type { DropPosition } from '../../utils/treeOps';
 import { selectedCustomLayerId } from '../../utils/layerSelection';
 import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose } from '../../utils/mapClip';
-import { changesAny } from '../../utils/shallowChanges';
+import { changesAny, changesAnyWithin } from '../../utils/shallowChanges';
 import { setWithoutHistoryOf } from '../history/historyGuard';
 import {
   composeOffset,
@@ -386,21 +386,32 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       );
     },
 
-    addExportRegion: (region) =>
+    addExportRegion: (region) => {
+      get().pushHistorySnapshot();
       set((state) => ({
         exportRegions: [...state.exportRegions, region],
         isDirty: true,
-      })),
-    updateExportRegion: (id, updates) =>
+      }));
+    },
+
+    updateExportRegion: (id, updates) => {
+      const region = get().exportRegions.find((r) => r.id === id);
+      if (!region || !changesAnyWithin(region, updates, 'rect')) return;
+      get().pushHistorySnapshot();
       set((state) => ({
         exportRegions: state.exportRegions.map((r) => (r.id === id ? { ...r, ...updates } : r)),
         isDirty: true,
-      })),
-    removeExportRegion: (id) =>
+      }));
+    },
+
+    removeExportRegion: (id) => {
+      if (!get().exportRegions.some((r) => r.id === id)) return;
+      get().pushHistorySnapshot();
       set((state) => ({
         exportRegions: state.exportRegions.filter((r) => r.id !== id),
         isDirty: true,
-      })),
+      }));
+    },
 
     // マップの追加・複製・削除は Undo の対象外（Undo はマップを id ごとに戻すので、増減には影響しない）。
     addMapLayer: (name, info, base64, width, height, options) =>
@@ -486,48 +497,54 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       }));
     },
 
-    updateMapSource: (id, updates) =>
+    updateMapSource: (id, updates) => {
+      const source = get().mapSources.find((s) => s.id === id);
+      if (!source || !changesAnyWithin(source, updates, 'info')) return;
+      get().pushHistorySnapshot();
       set((state) => ({
         mapSources: state.mapSources.map((s) => (s.id === id ? { ...s, ...updates } : s)),
         isDirty: true,
-      })),
+      }));
+    },
 
-    setMapLayerOrigin: (id, origin) =>
-      set((state) => {
-        const layer = state.mapLayers.find((l) => l.id === id);
-        const source = layer && state.mapSources.find((s) => s.id === layer.sourceId);
-        if (!layer || !source) return {};
-        if (layer.origin_override) {
-          return {
-            mapLayers: state.mapLayers.map((l) =>
-              l.id === id
-                ? { ...l, origin_override: origin, clip: moveClipWithPose(l.clip, layer.origin_override!, origin) }
-                : l,
-            ),
-            isDirty: true,
-          };
-        }
-        const from = sourceOrigin(source);
-        return {
-          mapSources: state.mapSources.map((s) => (s.id === source.id ? { ...s, info: { ...s.info, origin } } : s)),
+    setMapLayerOrigin: (id, origin) => {
+      const { mapLayers, mapSources } = get();
+      const layer = mapLayers.find((l) => l.id === id);
+      const source = layer && mapSources.find((s) => s.id === layer.sourceId);
+      if (!layer || !source) return;
+      const from = layer.origin_override ?? sourceOrigin(source);
+      if (origin.every((value, i) => value === from[i])) return;
+      get().pushHistorySnapshot();
+      if (layer.origin_override) {
+        set((state) => ({
           mapLayers: state.mapLayers.map((l) =>
-            l.sourceId === source.id && !l.origin_override ? { ...l, clip: moveClipWithPose(l.clip, from, origin) } : l,
+            l.id === id ? { ...l, origin_override: origin, clip: moveClipWithPose(l.clip, from, origin) } : l,
           ),
           isDirty: true,
-        };
-      }),
+        }));
+        return;
+      }
+      set((state) => ({
+        mapSources: state.mapSources.map((s) => (s.id === source.id ? { ...s, info: { ...s.info, origin } } : s)),
+        mapLayers: state.mapLayers.map((l) =>
+          l.sourceId === source.id && !l.origin_override ? { ...l, clip: moveClipWithPose(l.clip, from, origin) } : l,
+        ),
+        isDirty: true,
+      }));
+    },
 
-    setMapLayerPoseLinked: (id, linked) =>
-      set((state) => {
-        const layer = state.mapLayers.find((l) => l.id === id);
-        const source = layer && state.mapSources.find((s) => s.id === layer.sourceId);
-        if (!layer || !source || linked === !layer.origin_override) return {};
-        const shared = sourceOrigin(source);
-        const next: Partial<ProjectMapLayer> = linked
-          ? { origin_override: null, clip: moveClipWithPose(layer.clip, layer.origin_override!, shared) }
-          : { origin_override: shared };
-        return { mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...next } : l)), isDirty: true };
-      }),
+    setMapLayerPoseLinked: (id, linked) => {
+      const { mapLayers, mapSources } = get();
+      const layer = mapLayers.find((l) => l.id === id);
+      const source = layer && mapSources.find((s) => s.id === layer.sourceId);
+      if (!layer || !source || linked === !layer.origin_override) return;
+      const shared = sourceOrigin(source);
+      const next: Partial<ProjectMapLayer> = linked
+        ? { origin_override: null, clip: moveClipWithPose(layer.clip, layer.origin_override!, shared) }
+        : { origin_override: shared };
+      get().pushHistorySnapshot();
+      set((state) => ({ mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...next } : l)), isDirty: true }));
+    },
 
     // The whole drag is one history transaction: a drag that changed nothing leaves no undo step, and
     // cancelling puts back the state from before it.

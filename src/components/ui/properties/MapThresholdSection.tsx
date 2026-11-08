@@ -1,5 +1,6 @@
 import { RotateCcw } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { Button } from '../common/Button';
 import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
@@ -64,6 +65,7 @@ export function MapThresholdSection({ layer, onUpdate }: MapThresholdSectionProp
       </div>
 
       <Slider
+        {...historyEditHandlers}
         label="Occupied Thresh"
         valueDisplay={occThresh.toFixed(2)}
         min="0"
@@ -73,6 +75,7 @@ export function MapThresholdSection({ layer, onUpdate }: MapThresholdSectionProp
         onChange={(e) => onUpdate({ occupied_thresh: Math.max(parseFloat(e.target.value), freeThresh) })}
       />
       <Slider
+        {...historyEditHandlers}
         label="Free Thresh"
         valueDisplay={freeThresh.toFixed(2)}
         min="0"
