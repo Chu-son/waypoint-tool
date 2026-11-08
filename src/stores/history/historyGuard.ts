@@ -4,7 +4,7 @@
  * The store wraps every `set` of its slices with {@link historyGuard}. A `set` that changes a value listed in
  * `HISTORY_FIELDS` must either
  *   - run inside a history transaction, or
- *   - directly follow a `pushHistorySnapshot()` that recorded the state it changes (one `set` per record), or
+ *   - be the first change after a `pushHistorySnapshot()` (one changing `set` per record), or
  *   - be marked as deliberately not undoable with {@link withoutHistory} (loading a project, adding a map, …).
  * Anything else is a violation: undo would revert it together with an unrelated step.
  *
@@ -12,7 +12,8 @@
  * mutated in place. In tests every recorded snapshot is deep-frozen, which turns such a mutation into a
  * TypeError at the line that does it.
  *
- * Enabled in tests and development builds; production builds pass `set` through untouched.
+ * Enabled in tests, where a violation fails the test (src/test/setup.ts), and in development builds, where it
+ * logs a warning; production builds pass `set` through untouched.
  *
  * `useAppStore.setState` is not guarded: it is how tests arrange the state they start from.
  */
@@ -20,29 +21,22 @@ import type { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { changedKeys, type HistoryKey, type HistorySnapshot } from './historyModel';
 
-export type HistoryGuardMode = 'off' | 'report' | 'strict';
-
 export type HistoryViolation = { keys: HistoryKey[]; stack: string };
 
 const isTest = import.meta.env?.MODE === 'test';
 const isDev = !!import.meta.env?.DEV;
 
-let mode: HistoryGuardMode = isTest || isDev ? 'report' : 'off';
+const enabled = isTest || isDev;
 let excludedDepth = 0;
 let violations: HistoryViolation[] = [];
+/** A record was just made and no change has used it yet; it allows exactly one change. */
+let recordPending = false;
 
-export function configureHistoryGuard(next: HistoryGuardMode): void {
-  mode = next;
-}
-
-export function getHistoryGuardMode(): HistoryGuardMode {
-  return mode;
-}
-
-/** The violations found since the last call, which clears them. */
+/** The violations found since the last call, which clears them and starts observing afresh. */
 export function takeHistoryViolations(): HistoryViolation[] {
   const taken = violations;
   violations = [];
+  recordPending = false;
   return taken;
 }
 
@@ -83,12 +77,6 @@ export function deepFreeze(value: unknown): void {
 
 const lastEntry = (state: AppState): HistorySnapshot | undefined => state.historyPast[state.historyPast.length - 1];
 
-/** True when the newest entry recorded exactly `state`, i.e. the change from `state` was recorded. */
-const recorded = (state: AppState): boolean => {
-  const entry = lastEntry(state);
-  return !!entry && changedKeys(entry, state).length === 0;
-};
-
 const report = (keys: HistoryKey[]) => {
   const stack = new Error().stack ?? '';
   violations.push({ keys, stack });
@@ -98,14 +86,22 @@ const report = (keys: HistoryKey[]) => {
 type Inspect = (before: AppState, after: AppState) => void;
 
 const inspect: Inspect = (before, after) => {
-  if (isTest) {
-    const entry = lastEntry(after);
-    if (entry && entry !== lastEntry(before)) deepFreeze(entry);
+  const entry = lastEntry(after);
+  const entryChanged = entry !== lastEntry(before);
+  if (isTest && entry && entryChanged) deepFreeze(entry);
+
+  const allowed = recordPending;
+  if (entryChanged) {
+    // Undo, redo and closing a transaction also move the newest entry; only a plain record allows a change.
+    recordPending =
+      !!entry && excludedDepth === 0 && before.historyTransactionDepth === 0 && after.historyTransactionDepth === 0;
   }
+
   if (excludedDepth > 0 || before.historyTransactionDepth > 0) return;
   const keys = changedKeys(before, after);
-  if (keys.length === 0 || recorded(before)) return;
-  report(keys);
+  if (keys.length === 0) return;
+  if (allowed) recordPending = false;
+  else report(keys);
 };
 
 /** Store middleware: checks each `set` of the slices against the rules above. */
@@ -113,7 +109,7 @@ export const historyGuard =
   (config: StateCreator<AppState, [], []>): StateCreator<AppState, [], []> =>
   (set, get, api) => {
     const guardedSet = ((...args: Parameters<typeof set>) => {
-      if (mode === 'off') return set(...args);
+      if (!enabled) return set(...args);
       const before = get();
       set(...args);
       inspect(before, get());

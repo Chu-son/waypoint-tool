@@ -7,6 +7,12 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
+// Only the store records undo steps; UI code opens and closes transactions (docs/ARCHITECTURE.md).
+const noHistoryRecordingInUi = {
+  selector: ":matches(MemberExpression[property.name='pushHistorySnapshot'], Property[key.name='pushHistorySnapshot'])",
+  message: 'Record undo steps in store actions. UI code only marks operations, e.g. with historyEditHandlers.',
+};
+
 export default tseslint.config(
   {
     ignores: ['dist/**', 'src-tauri/**', 'rust_plugins/**', 'python_sdk/**', 'node_modules/**', 'coverage/**'],
@@ -102,12 +108,21 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/components/**/*.{ts,tsx}', 'src/hooks/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': ['error', noHistoryRecordingInUi],
+    },
+  },
+  {
     // Design system: canvas colors come from canvasConstants.ts (docs/DESIGN_SYSTEM.md).
+    // A later block replaces this rule's list instead of extending it, so the UI restriction is repeated.
     files: ['src/components/canvas/**/*.{ts,tsx}'],
     ignores: ['src/components/canvas/canvasConstants.ts', 'src/**/*.test.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
+        noHistoryRecordingInUi,
         {
           selector: 'Literal[raw=/^0x[0-9a-fA-F]{6}$/]',
           message: 'Use a named color from canvas/canvasConstants.ts instead of a hex literal.',

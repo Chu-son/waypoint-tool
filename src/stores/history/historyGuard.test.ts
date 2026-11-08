@@ -63,6 +63,18 @@ describe('the guard against unrecorded undoable changes', () => {
     expect(reportedKeys()).toEqual([['geoMap']]);
   });
 
+  it('reports a change even when the state happens to match the newest entry again', () => {
+    const store = makeStore();
+    const { nodes } = store.getState();
+    actions(store).record();
+    actions(store).rename('x');
+    store.setState({ nodes });
+
+    actions(store).rename('y');
+
+    expect(reportedKeys()).toEqual([['nodes']]);
+  });
+
   it('accepts any number of changes inside a transaction', () => {
     const store = makeStore();
     actions(store).open();
