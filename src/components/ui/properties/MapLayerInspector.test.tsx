@@ -1,4 +1,5 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react';
+import { useMapClipEdit } from '../../canvas/hooks/useMapClipEdit';
 import { describe, it, expect, vi } from 'vitest';
 import { DialogAPI } from '../../../api';
 import { MapLayerInspector } from './MapLayerInspector';
@@ -208,6 +209,23 @@ describe('MapLayerInspector', () => {
       getAppState().undo();
       expect(getAppState().mapLayers[0].clip?.rects[0].width).toBe(2.5);
 
+      getAppState().undo();
+      expect(getAppState().mapLayers[0].clip).toEqual({ rects: [{ x: 0, y: 0, width: 5, height: 5 }] });
+    });
+
+    it('lets a canvas drag change the area while a field is being edited', () => {
+      open();
+      toggleClip();
+      const width = within(screen.getByRole('group', { name: 'Area 1' })).getByLabelText('W');
+      const { result: drag } = renderHook(() => useMapClipEdit());
+
+      fireEvent.focus(width);
+      act(() => drag.current.startDraw('l1', { x: 1, y: 1 }, false));
+      fireEvent.blur(width);
+      act(() => drag.current.update({ x: 3, y: 4 }));
+      act(() => drag.current.end());
+
+      expect(getAppState().mapLayers[0].clip).toEqual({ rects: [{ x: 1, y: 1, width: 2, height: 3 }] });
       getAppState().undo();
       expect(getAppState().mapLayers[0].clip).toEqual({ rects: [{ x: 0, y: 0, width: 5, height: 5 }] });
     });

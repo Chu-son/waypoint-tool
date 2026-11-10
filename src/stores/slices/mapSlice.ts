@@ -2,7 +2,6 @@ import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import {
   MapSource,
-  MapLayerClip,
   ProjectMapLayer,
   CustomLayer,
   ManualCustomLayer,
@@ -72,8 +71,6 @@ export type MapSlice = {
    */
   rootLayerIds: string[];
   layerGroups: Record<string, LayerGroup>;
-  /** Canvas drag that is reshaping a layer's use area (its clip before the drag); null when not dragging. */
-  mapClipDrag: { layerId: string; initial: MapLayerClip | null } | null;
   activeCustomLayerId: string | null;
   defaultMapOpacity: number;
   setDefaultMapOpacity: (opacity: number) => void;
@@ -109,13 +106,6 @@ export type MapSlice = {
   setMapLayerOrigin: (id: string, origin: [number, number, number]) => void;
   /** Unlinks (the map stays where it is) or re-links (it returns to the shared pose) an instance's pose. */
   setMapLayerPoseLinked: (id: string, linked: boolean) => void;
-  /** Starts reshaping a layer's use area on the canvas. The whole drag is one undo step. */
-  beginMapClipDrag: (layerId: string) => void;
-  updateMapClipDrag: (clip: MapLayerClip) => void;
-  /** Commits the drag; a drag that changed nothing leaves no undo step. */
-  endMapClipDrag: () => void;
-  /** Abandons the drag and restores the use area from before it. */
-  cancelMapClipDrag: () => void;
   removeMapLayer: (id: string) => void;
 
   /** Moves layers and groups before / after / inside `targetId`. One undo step; returns false when refused. */
@@ -273,7 +263,6 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     customLayers: [],
     rootLayerIds: [],
     layerGroups: {},
-    mapClipDrag: null,
     activeCustomLayerId: null,
     defaultMapOpacity: 0.5,
     setDefaultMapOpacity: (opacity: number) => set({ defaultMapOpacity: opacity, isDirty: true }),
@@ -529,33 +518,6 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
         : { origin_override: shared };
       get().pushHistorySnapshot();
       set((state) => ({ mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...next } : l)), isDirty: true }));
-    },
-
-    // The whole drag is one history transaction: a drag that changed nothing leaves no undo step, and
-    // cancelling puts back the state from before it.
-    beginMapClipDrag: (layerId) => {
-      const layer = get().mapLayers.find((l) => l.id === layerId);
-      if (!layer || get().mapClipDrag) return;
-      get().beginHistoryTransaction();
-      set({ mapClipDrag: { layerId, initial: layer.clip } });
-    },
-
-    updateMapClipDrag: (clip) => {
-      const drag = get().mapClipDrag;
-      if (!drag) return;
-      get().updateMapLayer(drag.layerId, { clip });
-    },
-
-    endMapClipDrag: () => {
-      if (!get().mapClipDrag) return;
-      set({ mapClipDrag: null });
-      get().endHistoryTransaction();
-    },
-
-    cancelMapClipDrag: () => {
-      if (!get().mapClipDrag) return;
-      set({ mapClipDrag: null });
-      get().cancelHistoryTransaction();
     },
 
     removeMapLayer: (id: string) =>

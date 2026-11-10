@@ -1,4 +1,5 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, renderHook, screen } from '@testing-library/react';
+import { useGeoMapAlign } from '../../canvas/hooks/useGeoMapAlign';
 import { describe, expect, it } from 'vitest';
 import { renderWithStore as renderCard } from '../../../test/render';
 import { getAppState } from '../../../test/store';
@@ -240,14 +241,29 @@ describe('GeoMapCard', () => {
 
     it('shows the new numbers after the map is dragged on the canvas', () => {
       renderWithStore(<GeoMapCard />, enabled());
+      const { result: drag } = renderHook(() => useGeoMapAlign());
 
-      act(() => {
-        getAppState().beginGeoAlignDrag();
-        getAppState().updateGeoAlignDrag({ dx: 7.5, dy: 0, yawDeg: 0 });
-        getAppState().endGeoAlignDrag();
-      });
+      act(() => drag.current.start({ x: 0, y: 0 }, false));
+      act(() => drag.current.update({ x: 7.5, y: 0 }));
+      act(() => drag.current.end());
 
       expect(screen.getByLabelText('Offset X (m)')).toHaveValue('7.5');
+    });
+
+    it('lets a canvas drag move the map while a field is being edited, as one undo step', () => {
+      renderWithStore(<GeoMapCard />, enabled());
+      const field = screen.getByLabelText('Offset X (m)');
+      const { result: drag } = renderHook(() => useGeoMapAlign());
+
+      fireEvent.focus(field);
+      act(() => drag.current.start({ x: 0, y: 0 }, false));
+      fireEvent.blur(field);
+      act(() => drag.current.update({ x: 2, y: 1 }));
+      act(() => drag.current.end());
+
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 2, dy: 1, yawDeg: 0 });
+      act(() => getAppState().undo());
+      expect(getAppState().geoMap.alignment).toEqual({ dx: 0, dy: 0, yawDeg: 0 });
     });
   });
 });

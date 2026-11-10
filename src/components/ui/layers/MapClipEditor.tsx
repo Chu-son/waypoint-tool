@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Crop, Plus, SquareDashedMousePointer, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { Button } from '../common/Button';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
 import { ToggleSwitch } from '../common/ToggleSwitch';
@@ -42,10 +43,6 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
   const setRects = (next: ClipRect[]) => commit({ rects: next });
   const updateRect = (index: number, updates: Partial<ClipRect>) =>
     onChange({ rects: rects.map((r, i) => (i === index ? { ...r, ...updates } : r)) });
-  const numberEditing = {
-    onEditStart: () => useAppStore.getState().beginMapClipDrag(layer.id),
-    onEditEnd: () => useAppStore.getState().endMapClipDrag(),
-  };
 
   return (
     <div className="space-y-2">
@@ -121,14 +118,14 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
                   value={rect.x}
                   step={0.1}
                   onChange={(x) => updateRect(index, { x })}
-                  {...numberEditing}
+                  {...historyEditHandlers}
                 />
                 <LabeledNumericInput
                   label="Y"
                   value={rect.y}
                   step={0.1}
                   onChange={(y) => updateRect(index, { y })}
-                  {...numberEditing}
+                  {...historyEditHandlers}
                 />
                 <LabeledNumericInput
                   label="W"
@@ -136,7 +133,7 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
                   step={0.1}
                   min={0}
                   onChange={(width) => updateRect(index, { width })}
-                  {...numberEditing}
+                  {...historyEditHandlers}
                 />
                 <LabeledNumericInput
                   label="H"
@@ -144,7 +141,7 @@ export function MapClipEditor({ layer, onChange }: MapClipEditorProps) {
                   step={0.1}
                   min={0}
                   onChange={(height) => updateRect(index, { height })}
-                  {...numberEditing}
+                  {...historyEditHandlers}
                 />
               </div>
             </div>

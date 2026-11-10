@@ -28,9 +28,7 @@ export function GeoMapCard() {
   const setGeoOrigin = useAppStore((state) => state.setGeoOrigin);
   const setGeoOriginKind = useAppStore((state) => state.setGeoOriginKind);
   const resetGeoAlignment = useAppStore((state) => state.resetGeoAlignment);
-  const beginGeoAlignDrag = useAppStore((state) => state.beginGeoAlignDrag);
-  const updateGeoAlignDrag = useAppStore((state) => state.updateGeoAlignDrag);
-  const endGeoAlignDrag = useAppStore((state) => state.endGeoAlignDrag);
+  const setGeoAlignment = useAppStore((state) => state.setGeoAlignment);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -48,9 +46,8 @@ export function GeoMapCard() {
       value={alignment[key]}
       step={step}
       precision={precision}
-      onEditStart={beginGeoAlignDrag}
-      onChange={(value) => updateGeoAlignDrag({ ...alignment, [key]: value })}
-      onEditEnd={endGeoAlignDrag}
+      onChange={(value) => setGeoAlignment({ ...alignment, [key]: value })}
+      {...historyEditHandlers}
     />
   );
 
@@ -187,16 +184,15 @@ export function GeoMapCard() {
               {numberField('Rotation (°)', 'yawDeg', 2, 1)}
             </div>
             <PoseAdjuster
-              onEditStart={beginGeoAlignDrag}
+              {...historyEditHandlers}
               onNudge={({ dx, dy, dyawDeg }) =>
-                updateGeoAlignDrag({
+                setGeoAlignment({
                   ...alignment,
                   dx: alignment.dx + dx,
                   dy: alignment.dy + dy,
                   yawDeg: alignment.yawDeg + dyawDeg,
                 })
               }
-              onEditEnd={endGeoAlignDrag}
             />
             <Button
               type="button"

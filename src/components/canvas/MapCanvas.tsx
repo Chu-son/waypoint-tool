@@ -380,14 +380,14 @@ function MapCanvasView() {
       justAbortedRef.current = true;
       return true;
     }
-    // 9b. Geo base map alignment drag: restore the position before the drag
+    // 9b. Geo base map alignment drag
     if (interactionMode.current === 'geo_align_drag') {
       geoAlign.abort();
       interactionMode.current = 'none';
       justAbortedRef.current = true;
       return true;
     }
-    // 9c. Map use-area drag: restore the area from before the drag
+    // 9c. Map use-area drag
     if (interactionMode.current === 'map_clip_drag') {
       mapClipEdit.abort();
       interactionMode.current = 'none';
