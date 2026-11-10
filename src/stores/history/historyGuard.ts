@@ -21,7 +21,7 @@ import type { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
 import { changedKeys, type HistoryKey, type HistorySnapshot } from './historyModel';
 
-export type HistoryViolation = { keys: HistoryKey[]; stack: string };
+type HistoryViolation = { keys: HistoryKey[]; stack: string };
 
 const isTest = import.meta.env?.MODE === 'test';
 const isDev = !!import.meta.env?.DEV;
@@ -69,7 +69,7 @@ const isFreezable = (value: unknown): value is object => {
 };
 
 /** Freezes plain objects and arrays all the way down; class instances and binary data are left alone. */
-export function deepFreeze(value: unknown): void {
+function deepFreeze(value: unknown): void {
   if (!isFreezable(value) || Object.isFrozen(value)) return;
   Object.freeze(value);
   for (const child of Object.values(value)) deepFreeze(child);

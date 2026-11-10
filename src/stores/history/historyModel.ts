@@ -43,7 +43,7 @@ export const HISTORY_FIELDS = {
 } as const satisfies Partial<Record<keyof AppState, RestoreMode>>;
 
 export type HistoryKey = keyof typeof HISTORY_FIELDS;
-export const HISTORY_KEYS = Object.keys(HISTORY_FIELDS) as HistoryKey[];
+const HISTORY_KEYS = Object.keys(HISTORY_FIELDS) as HistoryKey[];
 
 /**
  * The undoable values at one moment, plus what goes back with them without counting as a change: the

@@ -107,17 +107,6 @@ export function resizeRect(rect: ClipRect, handle: ClipHandle, point: { x: numbe
   return rectFromCorners({ x: x0, y: y0 }, { x: x1, y: y1 });
 }
 
-export function sameClip(a: MapLayerClip | null, b: MapLayerClip | null): boolean {
-  if (a === null || b === null) return a === b;
-  return (
-    a.rects.length === b.rects.length &&
-    a.rects.every((r, i) => {
-      const o = b.rects[i];
-      return r.x === o.x && r.y === o.y && r.width === o.width && r.height === o.height;
-    })
-  );
-}
-
 export type MapPose = readonly [number, number, number];
 
 /**

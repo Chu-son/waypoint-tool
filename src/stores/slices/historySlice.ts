@@ -1,15 +1,12 @@
 import { StateCreator } from 'zustand';
 import type { AppState } from '../appStore';
-import { ActiveSelection } from '../../types/selection';
 import { captureSnapshot, matchesSnapshot, restoreSnapshot, type HistorySnapshot } from '../history/historyModel';
 import { setWithoutHistoryOf } from '../history/historyGuard';
-
-export type { HistorySnapshot } from '../history/historyModel';
 
 const MAX_HISTORY_LENGTH = 100;
 
 /** The outermost open transaction: the entry it recorded and the redo stack it cleared. */
-type OpenTransaction = { entry: HistorySnapshot | null; future: HistorySnapshot[]; dirty: boolean };
+type OpenTransaction = { entry: HistorySnapshot; future: HistorySnapshot[]; dirty: boolean };
 
 export type HistorySlice = {
   historyPast: HistorySnapshot[];
@@ -34,20 +31,6 @@ export type HistorySlice = {
   clearHistory: () => void;
 };
 
-export const cloneSelection = (sel: ActiveSelection | undefined): ActiveSelection => {
-  if (!sel) return { type: 'none' };
-  switch (sel.type) {
-    case 'none':
-      return { type: 'none' };
-    case 'nodes':
-      return { type: 'nodes', ids: [...sel.ids] };
-    case 'annotations':
-      return { type: 'annotations', ids: [...sel.ids] };
-    case 'layers':
-      return { type: 'layers', ids: [...sel.ids], selectedObjectId: sel.selectedObjectId };
-  }
-};
-
 const withEntry = (past: HistorySnapshot[], entry: HistorySnapshot): HistorySnapshot[] => {
   const next = [...past, entry];
   if (next.length > MAX_HISTORY_LENGTH) next.splice(0, next.length - MAX_HISTORY_LENGTH);
@@ -55,8 +38,8 @@ const withEntry = (past: HistorySnapshot[], entry: HistorySnapshot): HistorySnap
 };
 
 /** `past` without `entry` when it is the last one (it may have been trimmed away meanwhile). */
-const withoutLast = (past: HistorySnapshot[], entry: HistorySnapshot | null): HistorySnapshot[] =>
-  entry && past[past.length - 1] === entry ? past.slice(0, -1) : past;
+const withoutLast = (past: HistorySnapshot[], entry: HistorySnapshot): HistorySnapshot[] =>
+  past[past.length - 1] === entry ? past.slice(0, -1) : past;
 
 const warn = (message: string) => {
   if (import.meta.env?.MODE !== 'production') console.warn(`[history] ${message}`);
@@ -71,6 +54,22 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
     if (get().historyTransactionDepth === 0) return;
     warn('a history transaction was left open; closing it');
     set({ historyTransactionDepth: 0, historyTransaction: null });
+  };
+
+  /** Undo (`historyPast` → `historyFuture`) or redo (the other way): puts back the newest entry of `from`. */
+  const step = (from: 'historyPast' | 'historyFuture', to: 'historyPast' | 'historyFuture') => {
+    get().abortCanvasGestures?.();
+    closeLeakedTransaction();
+    setRestoring((state) => {
+      const stack = state[from];
+      if (stack.length === 0) return {};
+      return {
+        ...restoreSnapshot(state, stack[stack.length - 1]),
+        isDirty: true,
+        [from]: stack.slice(0, -1),
+        [to]: [...state[to], captureSnapshot(state)],
+      };
+    });
   };
 
   return {
@@ -107,11 +106,10 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
         return;
       }
       const open = state.historyTransaction;
-      const unchanged = !!open?.entry && matchesSnapshot(open.entry, state);
       set({
         historyTransactionDepth: 0,
         historyTransaction: null,
-        ...(unchanged && open
+        ...(open && matchesSnapshot(open.entry, state)
           ? { historyPast: withoutLast(state.historyPast, open.entry), historyFuture: open.future }
           : {}),
       });
@@ -127,9 +125,12 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       }
       const open = state.historyTransaction;
       setRestoring({
-        ...(open?.entry ? { ...restoreSnapshot(state, open.entry), isDirty: open.dirty } : {}),
-        historyPast: open ? withoutLast(state.historyPast, open.entry) : state.historyPast,
-        historyFuture: open ? open.future : state.historyFuture,
+        ...(open && {
+          ...restoreSnapshot(state, open.entry),
+          isDirty: open.dirty,
+          historyPast: withoutLast(state.historyPast, open.entry),
+          historyFuture: open.future,
+        }),
         historyTransactionDepth: 0,
         historyTransaction: null,
       });
@@ -145,35 +146,8 @@ export const createHistorySlice: StateCreator<AppState, [], [], HistorySlice> = 
       }
     },
 
-    undo: () => {
-      get().abortCanvasGestures?.();
-      closeLeakedTransaction();
-      setRestoring((state) => {
-        if (state.historyPast.length === 0) return {};
-        const snapshot = state.historyPast[state.historyPast.length - 1];
-        return {
-          ...restoreSnapshot(state, snapshot),
-          isDirty: true,
-          historyPast: state.historyPast.slice(0, -1),
-          historyFuture: [...state.historyFuture, captureSnapshot(state)],
-        };
-      });
-    },
-
-    redo: () => {
-      get().abortCanvasGestures?.();
-      closeLeakedTransaction();
-      setRestoring((state) => {
-        if (state.historyFuture.length === 0) return {};
-        const snapshot = state.historyFuture[state.historyFuture.length - 1];
-        return {
-          ...restoreSnapshot(state, snapshot),
-          isDirty: true,
-          historyFuture: state.historyFuture.slice(0, -1),
-          historyPast: [...state.historyPast, captureSnapshot(state)],
-        };
-      });
-    },
+    undo: () => step('historyPast', 'historyFuture'),
+    redo: () => step('historyFuture', 'historyPast'),
 
     clearHistory: () =>
       set({ historyPast: [], historyFuture: [], historyTransactionDepth: 0, historyTransaction: null }),
