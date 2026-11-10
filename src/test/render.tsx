@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { render, type RenderOptions } from '@testing-library/react';
+import { fireEvent, render, type RenderOptions } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { AppState } from '../stores/appStore';
 import { resetAppStore } from './store';
@@ -15,4 +15,21 @@ export function renderWithStore(ui: ReactElement, state: Partial<AppState> = {},
   resetAppStore(state);
   const user = userEvent.setup();
   return { user, ...render(ui, options) };
+}
+
+/**
+ * One drag of a `Slider` through `values`, released anywhere: one editing operation (`onEditStart` on
+ * press, `onEditEnd` on release), so a single undo step.
+ */
+export function dragSlider(slider: HTMLElement, ...values: string[]): void {
+  fireEvent.pointerDown(slider, { button: 0 });
+  values.forEach((value) => fireEvent.change(slider, { target: { value } }));
+  fireEvent.pointerUp(window);
+}
+
+/** Focuses `input`, types `values` in turn and leaves it: one editing operation, so a single undo step. */
+export function typeInto(input: HTMLElement, ...values: string[]): void {
+  fireEvent.focus(input);
+  values.forEach((value) => fireEvent.change(input, { target: { value } }));
+  fireEvent.blur(input);
 }

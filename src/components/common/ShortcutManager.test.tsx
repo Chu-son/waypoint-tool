@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { ShortcutManager } from './ShortcutManager';
 import { BackendAPI, DialogAPI } from '../../api';
 import { renderWithStore } from '../../test/render';
-import { getAppState, PAST_WELCOME } from '../../test/store';
+import { getAppState, getEditObjects, PAST_WELCOME } from '../../test/store';
 import {
   layerStackState,
   makeManualCustomLayer,
@@ -39,10 +39,7 @@ describe('ShortcutManager', () => {
       selection: { type: 'layers', ids: ['wall'], selectedObjectId: 's' },
       selectedEditObjectId: 's',
     });
-    const shapes = () => {
-      const [layer] = getAppState().customLayers;
-      return layer.type === 'manual' ? layer.editObjects : [];
-    };
+    const shapes = () => getEditObjects('wall');
 
     press('Delete');
     expect(shapes()).toEqual([]);

@@ -7,7 +7,7 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { useAppStore } from '../../../stores/appStore';
 import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
-import { renderWithStore } from '../../../test/render';
+import { dragSlider, renderWithStore, typeInto } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { makeTransform, makeWaypoint, waypointTree } from '../../../test/fixtures';
 import { Input } from './Input';
@@ -51,12 +51,8 @@ const expectNoOpenTransaction = () => expect(getAppState().historyTransactionDep
 describe('input components and the undo history', () => {
   it('undoes a whole slider drag in one step, wherever the pointer is released', () => {
     renderWithStore(<XSlider />, oneWaypoint());
-    const slider = screen.getByLabelText('x');
 
-    fireEvent.pointerDown(slider, { button: 0 });
-    fireEvent.change(slider, { target: { value: '10' } });
-    fireEvent.change(slider, { target: { value: '30' } });
-    fireEvent.pointerUp(window);
+    dragSlider(screen.getByLabelText('x'), '10', '30');
 
     expect(xOf()).toBe(30);
     expect(getAppState().historyPast).toHaveLength(1);
@@ -66,12 +62,8 @@ describe('input components and the undo history', () => {
 
   it('undoes everything typed between focus and blur in one step', () => {
     renderWithStore(<NameInput />, oneWaypoint());
-    const input = screen.getByLabelText('name');
 
-    fireEvent.focus(input);
-    fireEvent.change(input, { target: { value: 'e' } });
-    fireEvent.change(input, { target: { value: 'end' } });
-    fireEvent.blur(input);
+    typeInto(screen.getByLabelText('name'), 'e', 'end');
 
     expect(getAppState().historyPast).toHaveLength(1);
     act(() => getAppState().undo());

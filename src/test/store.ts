@@ -5,6 +5,7 @@
  * `useAppStore` and asserting which action was called.
  */
 import { useAppStore, type AppState } from '../stores/appStore';
+import type { EditObject } from '../types/store';
 import { layerOrderOf } from '../utils/layerTree';
 import { visibleTabIds } from '../utils/dockLayout';
 import { getDockState } from '../stores/dockAccess';
@@ -43,3 +44,10 @@ export const getLayerOrder = (): string[] => layerOrderOf(useAppStore.getState()
 
 /** The panel tabs whose contents are on screen right now (across both side panels and all columns). */
 export const getVisibleTabs = (): string[] => visibleTabIds(getDockState(useAppStore.getState()));
+
+/** The shapes of hand-drawn layer `layerId` (default: the first custom layer); none if it is not one. */
+export const getEditObjects = (layerId?: string): EditObject[] => {
+  const { customLayers } = useAppStore.getState();
+  const layer = layerId === undefined ? customLayers[0] : customLayers.find((l) => l.id === layerId);
+  return layer?.type === 'manual' ? layer.editObjects : [];
+};

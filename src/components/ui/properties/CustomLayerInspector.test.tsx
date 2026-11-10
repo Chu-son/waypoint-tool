@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
+import { dragSlider, typeInto } from '../../../test/render';
 import { CustomLayerInspector } from './CustomLayerInspector';
 import { useAppStore } from '../../../stores/appStore';
 import { PluginInstance, ManualCustomLayer, PluginCustomLayer } from '../../../types/store';
@@ -171,10 +172,7 @@ describe('CustomLayerInspector', () => {
       render(<CustomLayerInspector />);
       const input = screen.getByPlaceholderText('Layer Name');
 
-      fireEvent.focus(input);
-      fireEvent.change(input, { target: { value: 'D' } });
-      fireEvent.change(input, { target: { value: 'Dr' } });
-      fireEvent.blur(input);
+      typeInto(input, 'D', 'Dr');
 
       expect(getAppState().historyPast).toHaveLength(1);
       act(() => getAppState().undo());
@@ -186,10 +184,7 @@ describe('CustomLayerInspector', () => {
       render(<CustomLayerInspector />);
       const slider = screen.getByRole('slider');
 
-      fireEvent.pointerDown(slider, { button: 0 });
-      fireEvent.change(slider, { target: { value: '0.5' } });
-      fireEvent.change(slider, { target: { value: '0.2' } });
-      fireEvent.pointerUp(window);
+      dragSlider(slider, '0.5', '0.2');
 
       expect(getAppState().historyPast).toHaveLength(1);
       act(() => getAppState().undo());

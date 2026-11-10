@@ -8,7 +8,7 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { renderWithStore } from '../../test/render';
-import { getAppState, PAST_WELCOME } from '../../test/store';
+import { getAppState, getEditObjects, PAST_WELCOME } from '../../test/store';
 import {
   layerStackState,
   makeGenerator,
@@ -917,10 +917,7 @@ describe('MapCanvas tools', () => {
       });
 
       describe.each(['rect', 'circle', 'line', 'freehand'] as const)('drawing a %s', (tool) => {
-        const objectsOf = (id: string) => {
-          const layer = getAppState().customLayers.find((l) => l.id === id);
-          return layer?.type === 'manual' ? layer.editObjects : [];
-        };
+        const objectsOf = getEditObjects;
         const drawing = () => ({ ...editing(), mapEditSubTool: tool });
 
         it('undoes the drawing in one step, and redoes it', () => {

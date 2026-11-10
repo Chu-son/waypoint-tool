@@ -1,7 +1,7 @@
 /** A drag or a typed value on the layer panels and the map inspector is one undo step, and the panel follows undo. */
 import { act, fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { renderWithStore } from '../../../test/render';
+import { dragSlider, renderWithStore, typeInto } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { layerStackState, makeMap } from '../../../test/fixtures';
 import { DEFAULT_GEO_MAP } from '../../../stores/migrations/geoMapNormalization';
@@ -9,18 +9,6 @@ import type { ExportRegion } from '../../../types/layer';
 import { MapLayerInspector } from '../properties/MapLayerInspector';
 import { GeoMapCard } from './GeoMapCard';
 import { LayerPanel } from './LayerPanel';
-
-const dragSlider = (slider: HTMLElement, ...values: string[]) => {
-  fireEvent.pointerDown(slider, { button: 0 });
-  values.forEach((value) => fireEvent.change(slider, { target: { value } }));
-  fireEvent.pointerUp(window);
-};
-
-const typeInto = (input: HTMLElement, ...values: string[]) => {
-  fireEvent.focus(input);
-  values.forEach((value) => fireEvent.change(input, { target: { value } }));
-  fireEvent.blur(input);
-};
 
 const expectOneStep = () => expect(getAppState().historyPast).toHaveLength(1);
 const undo = () => act(() => getAppState().undo());

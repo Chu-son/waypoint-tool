@@ -1,8 +1,8 @@
 import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { MapEditOverlay } from './MapEditOverlay';
-import { renderWithStore } from '../../../test/render';
-import { getAppState, PAST_WELCOME } from '../../../test/store';
+import { dragSlider, renderWithStore } from '../../../test/render';
+import { getAppState, getEditObjects, PAST_WELCOME } from '../../../test/store';
 import { layerStackState, makeManualCustomLayer } from '../../../test/fixtures';
 
 const shape = { id: 's', type: 'rect', cx: 0, cy: 0, width: 1, height: 1, angle: 0, fillValue: 10 } as const;
@@ -17,20 +17,13 @@ const renderOverlay = () =>
     selectedEditObjectId: 's',
   });
 
-const shapes = () => {
-  const [layer] = getAppState().customLayers;
-  return layer.type === 'manual' ? layer.editObjects : [];
-};
+const shapes = () => getEditObjects('wall');
 
 describe('MapEditOverlay', () => {
   it('undoes a whole drag of the fill value in one step', () => {
     renderOverlay();
-    const slider = screen.getByRole('slider');
 
-    fireEvent.pointerDown(slider, { button: 0 });
-    fireEvent.change(slider, { target: { value: '100' } });
-    fireEvent.change(slider, { target: { value: '200' } });
-    fireEvent.pointerUp(window);
+    dragSlider(screen.getByRole('slider'), '100', '200');
     expect(shapes()[0].fillValue).toBe(200);
     expect(getAppState().historyPast).toHaveLength(1);
     act(() => getAppState().undo());
