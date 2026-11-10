@@ -31,8 +31,6 @@ export type GeoMapSlice = {
 const isFiniteAlignment = (a: GeoAlignment) =>
   Number.isFinite(a.dx) && Number.isFinite(a.dy) && Number.isFinite(a.yawDeg);
 
-const sameAlignment = (a: GeoAlignment, b: GeoAlignment) => a.dx === b.dx && a.dy === b.dy && a.yawDeg === b.yawDeg;
-
 export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (set, get) => {
   // 変更はすべてここを通る。変化がなければ何もせず、あれば変更前を記録する（トランザクション内では 1 件にまとまる）。
   const patchGeoMap = (patch: Partial<GeoMapSettings>) => {
@@ -48,18 +46,12 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
     setGeoMapEnabled: (enabled) => patchGeoMap({ enabled }),
     setGeoMapOpacity: (opacity) => patchGeoMap({ opacity: Math.max(0, Math.min(1, opacity)) }),
     setBasemap: (basemapId) => patchGeoMap({ basemapId }),
-    updateCustomBasemap: (updates) => {
-      const { customBasemap } = get().geoMap;
-      if (changesAny(customBasemap, updates)) patchGeoMap({ customBasemap: { ...customBasemap, ...updates } });
-    },
-    setGeoOrigin: (origin) => {
-      if (changesAny(get().geoMap.origin, origin)) patchGeoMap({ origin });
-    },
+    updateCustomBasemap: (updates) => patchGeoMap({ customBasemap: { ...get().geoMap.customBasemap, ...updates } }),
+    setGeoOrigin: (origin) => patchGeoMap({ origin }),
     setGeoOriginKind: (kind) => patchGeoMap({ origin: convertOrigin(get().geoMap.origin, kind) }),
 
     setGeoAlignment: (alignment) => {
-      if (!isFiniteAlignment(alignment) || sameAlignment(alignment, get().geoMap.alignment)) return;
-      patchGeoMap({ alignment });
+      if (isFiniteAlignment(alignment)) patchGeoMap({ alignment });
     },
 
     resetGeoAlignment: () => get().setGeoAlignment({ dx: 0, dy: 0, yawDeg: 0 }),
@@ -72,9 +64,7 @@ export const createGeoMapSlice: StateCreator<AppState, [], [], GeoMapSlice> = (s
     },
 
     updateGeoAlignDrag: (alignment) => {
-      if (!get().geoAlignDrag || !isFiniteAlignment(alignment)) return;
-      if (sameAlignment(alignment, get().geoMap.alignment)) return;
-      patchGeoMap({ alignment });
+      if (get().geoAlignDrag && isFiniteAlignment(alignment)) patchGeoMap({ alignment });
     },
 
     endGeoAlignDrag: () => {

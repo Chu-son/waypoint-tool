@@ -32,7 +32,7 @@ import type { DropPosition } from '../../utils/treeOps';
 import { selectedCustomLayerId } from '../../utils/layerSelection';
 import { getNextSequentialName } from '../../utils/treeUtils';
 import { moveClipWithPose } from '../../utils/mapClip';
-import { changesAny, changesAnyWithin } from '../../utils/shallowChanges';
+import { shallowEqual, updateById } from '../../utils/shallowChanges';
 import { setWithoutHistoryOf } from '../history/historyGuard';
 import {
   composeOffset,
@@ -335,13 +335,10 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     },
 
     updateCustomLayer: (id: string, updates: Partial<CustomLayer>) => {
-      const layer = get().customLayers.find((l) => l.id === id);
-      if (!layer || !changesAny(layer, updates)) return;
+      const customLayers = updateById(get().customLayers, id, updates);
+      if (!customLayers) return;
       get().pushHistorySnapshot();
-      set((state) => ({
-        customLayers: state.customLayers.map((l) => (l.id === id ? ({ ...l, ...updates } as CustomLayer) : l)),
-        isDirty: true,
-      }));
+      set({ customLayers, isDirty: true });
     },
 
     removeCustomLayer: (id: string) => {
@@ -377,13 +374,10 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
 
     updateEditObject: (layerId: string, objId: string, updates: Partial<EditObject>) => {
       const layer = manualLayerOf(get(), layerId);
-      const target = layer?.editObjects.find((o) => o.id === objId);
-      if (!layer || !target || !changesAny(target, updates)) return;
+      const editObjects = layer && updateById(layer.editObjects, objId, updates);
+      if (!editObjects) return;
       get().pushHistorySnapshot();
-      setEditObjects(
-        layerId,
-        layer.editObjects.map((o) => (o.id === objId ? ({ ...o, ...updates } as EditObject) : o)),
-      );
+      setEditObjects(layerId, editObjects);
     },
 
     addExportRegion: (region) => {
@@ -395,13 +389,10 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     },
 
     updateExportRegion: (id, updates) => {
-      const region = get().exportRegions.find((r) => r.id === id);
-      if (!region || !changesAnyWithin(region, updates, 'rect')) return;
+      const exportRegions = updateById(get().exportRegions, id, updates);
+      if (!exportRegions) return;
       get().pushHistorySnapshot();
-      set((state) => ({
-        exportRegions: state.exportRegions.map((r) => (r.id === id ? { ...r, ...updates } : r)),
-        isDirty: true,
-      }));
+      set({ exportRegions, isDirty: true });
     },
 
     removeExportRegion: (id) => {
@@ -488,23 +479,17 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
     },
 
     updateMapLayer: (id, updates) => {
-      const layer = get().mapLayers.find((l) => l.id === id);
-      if (!layer || !changesAny(layer, updates)) return;
+      const mapLayers = updateById(get().mapLayers, id, updates);
+      if (!mapLayers) return;
       get().pushHistorySnapshot();
-      set((state) => ({
-        mapLayers: state.mapLayers.map((l) => (l.id === id ? { ...l, ...updates } : l)),
-        isDirty: true,
-      }));
+      set({ mapLayers, isDirty: true });
     },
 
     updateMapSource: (id, updates) => {
-      const source = get().mapSources.find((s) => s.id === id);
-      if (!source || !changesAnyWithin(source, updates, 'info')) return;
+      const mapSources = updateById(get().mapSources, id, updates);
+      if (!mapSources) return;
       get().pushHistorySnapshot();
-      set((state) => ({
-        mapSources: state.mapSources.map((s) => (s.id === id ? { ...s, ...updates } : s)),
-        isDirty: true,
-      }));
+      set({ mapSources, isDirty: true });
     },
 
     setMapLayerOrigin: (id, origin) => {
@@ -513,7 +498,7 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       const source = layer && mapSources.find((s) => s.id === layer.sourceId);
       if (!layer || !source) return;
       const from = layer.origin_override ?? sourceOrigin(source);
-      if (origin.every((value, i) => value === from[i])) return;
+      if (shallowEqual(from, origin)) return;
       get().pushHistorySnapshot();
       if (layer.origin_override) {
         set((state) => ({

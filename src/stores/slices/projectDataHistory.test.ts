@@ -83,6 +83,7 @@ const noOps: Array<[string, () => void]> = [
   ['setting the custom base map it has', () => getAppState().updateCustomBasemap({})],
   ['setting the origin it has', () => getAppState().setGeoOrigin({ ...getAppState().geoMap.origin })],
   ['choosing the current origin format', () => getAppState().setGeoOriginKind(getAppState().geoMap.origin.kind)],
+  ['aligning the base map where it is', () => getAppState().setGeoAlignment({ ...getAppState().geoMap.alignment })],
 ];
 
 describe('undo of maps, export regions, visibility sets and the base map', () => {
@@ -135,11 +136,13 @@ describe('undo of maps, export regions, visibility sets and the base map', () =>
     expect(getAppState().historyFuture).toHaveLength(redoable);
   });
 
-  it('leaves no undo step for re-applying the set that is in effect', () => {
+  it('leaves no undo step for re-applying or re-saving the set that is in effect', () => {
     getAppState().applyLayerVisibilitySet('set');
+    getAppState().overwriteLayerVisibilitySet('set');
     const steps = getAppState().historyPast.length;
 
     getAppState().applyLayerVisibilitySet('set');
+    getAppState().overwriteLayerVisibilitySet('set');
 
     expect(getAppState().historyPast).toHaveLength(steps);
   });

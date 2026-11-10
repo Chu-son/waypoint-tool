@@ -35,6 +35,8 @@ const noOps: Array<[string, () => void]> = [
   ['removing a missing custom layer', () => getAppState().removeCustomLayer('gone')],
   ['renaming a group to its own name', () => getAppState().renameLayerGroup('floor', 'Floor')],
   ['showing layers that are already shown', () => getAppState().setLayerItemsVisible(['wall', 'floor'], true)],
+  ['updating a shape on a layer that is not hand-drawn', () => getAppState().updateEditObject('top', 'x', {})],
+  ['updating a missing shape', () => getAppState().updateEditObject('wall', 'gone', { color: 1 } as never)],
 ];
 
 describe('undo of custom layers and the layer tree', () => {

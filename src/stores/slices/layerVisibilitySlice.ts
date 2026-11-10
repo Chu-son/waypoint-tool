@@ -3,11 +3,9 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AppState } from '../appStore';
 import type { LayerVisibilitySet } from '../../types/layer';
 import { currentLayerVisibility, resolveSetVisibility, uniqueSetName } from '../../utils/layerVisibilitySets';
+import { changesAny, shallowEqual, updateById } from '../../utils/shallowChanges';
 
 const DEFAULT_SET_NAME = 'Layer Set';
-
-const sameVisibility = (a: Record<string, boolean>, b: Record<string, boolean>) =>
-  Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((id) => a[id] === b[id]);
 
 export type LayerVisibilitySlice = {
   /** Named on/off snapshots of the layer stack, used to switch the canvas and to choose what an export contains. */
@@ -53,7 +51,7 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
     const target = state.layerVisibilitySets.find((s) => s.id === id);
     if (!target) return;
     const visibility = currentLayerVisibility(state);
-    if (state.activeLayerVisibilitySetId === id && sameVisibility(target.visibility, visibility)) return;
+    if (state.activeLayerVisibilitySetId === id && shallowEqual(target.visibility, visibility)) return;
     state.pushHistorySnapshot();
     set((s) => ({
       layerVisibilitySets: s.layerVisibilitySets.map((v) => (v.id === id ? { ...v, visibility } : v)),
@@ -68,12 +66,10 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
     if (!target) return;
     const others = state.layerVisibilitySets.filter((s) => s.id !== id).map((s) => s.name);
     const unique = uniqueSetName(name.trim() || DEFAULT_SET_NAME, others);
-    if (unique === target.name) return;
+    const layerVisibilitySets = updateById(state.layerVisibilitySets, id, { name: unique });
+    if (!layerVisibilitySets) return;
     state.pushHistorySnapshot();
-    set((s) => ({
-      layerVisibilitySets: s.layerVisibilitySets.map((v) => (v.id === id ? { ...v, name: unique } : v)),
-      isDirty: true,
-    }));
+    set({ layerVisibilitySets, isDirty: true });
   },
 
   deleteLayerVisibilitySet: (id) => {
@@ -93,9 +89,8 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
 
     const next = resolveSetVisibility(target, state);
     const current = currentLayerVisibility(state);
-    const changes = Object.keys(next).some((layerId) => next[layerId] !== current[layerId]);
     // Re-applying the set that is already in effect changes nothing, so it is not an undo step.
-    if (!changes && state.activeLayerVisibilitySetId === id) return;
+    if (!changesAny(current, next) && state.activeLayerVisibilitySetId === id) return;
     state.pushHistorySnapshot();
 
     set((s) => ({
