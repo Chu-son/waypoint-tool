@@ -356,7 +356,7 @@ describe('ImportHubModal: from another project', () => {
     expect(screen.getByRole('checkbox', { name: 'Import Option Schema' })).toBeChecked();
   });
 
-  it('warns that Undo only covers the imported waypoints and annotations', async () => {
+  it('explains what Undo takes back once data is chosen', async () => {
     const { user } = await openProject();
     expect(screen.queryByText('About Undo')).not.toBeInTheDocument();
 

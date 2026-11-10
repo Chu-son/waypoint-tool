@@ -123,8 +123,8 @@ graph TD
   - `draw_shape`: アノテーションまたはマップ編集の図形ラバーバンド描画
   - `transform_shape`: 図形やROIのハンドルドラッグ変形
   - `precision_snapping`: スナップ拘束・数値キー入力中
-- **アボート機構**: ジェスチャーは `useHistoryGesture` で履歴トランザクションの中で動かします。`begin` で `registerCanvasAbortHandler` に登録され、Escape・Undo・モード切替・ポインタ喪失・アンマウントでは `cancelHistoryTransaction` で開始前の状態に戻して履歴を破棄し、続けて `onAbort`（プレビューなど UI の後始末）を呼びます。
-- **対象のジェスチャー**: ウェイポイントのドラッグ（グループ含む）・向き変更・追加、アノテーションの移動・変形、図形の描画・移動・リサイズ・回転、エクスポート領域の作成・移動・リサイズ。使用領域のドラッグと背景地図の位置合わせは、スライスの編集セッションが同じトランザクションを使います。
+- **アボート機構**: ジェスチャーは `useHistoryGesture` で履歴トランザクションの中で動かします。フックはマウント時に `registerCanvasAbortHandler` に登録され、`begin` から `end` までの間に Escape・Undo・モード切替・ポインタ喪失・アンマウントが起きると、 `cancelHistoryTransaction` で開始前の状態に戻して履歴を破棄し、続けて `onAbort`（プレビューなど UI の後始末）を呼びます。
+- **対象のジェスチャー**: ウェイポイントのドラッグ（グループ含む）・向き変更・追加、アノテーションの移動・変形、図形の描画・移動・リサイズ・回転、エクスポート領域の作成・移動・リサイズ、使用領域のドラッグ（`useMapClipEdit`）、背景地図の位置合わせ（`useGeoMapAlign`）。トランザクションは入れ子にできるので、パネルの入力中にキャンバスでドラッグしても、どちらも効きます。
 
 #### Axis 5: 選択ドメイン単一権限 (Selection Authority: 排他的単一真実源)
 - **管理スライス**: `interactionSlice.ts` (`selection: ActiveSelection`)
@@ -557,7 +557,7 @@ stateDiagram-v2
 - **強制手法**: `setSelection` 呼出による他ドメイン選択IDの自動クリア。複数ドメインのオブジェクトを同時に選択状態にすることはアーキテクチャ違反。
 
 ### 7.3 過渡ジェスチャーの原子的ロールバックとポインタ喪失保護不変条件 (Gesture Atomicity & Pointer Loss Protection Invariant)
-- **定義**: ポインタ押下から離脱までの物理的ジェスチャー（ドラッグ、回転、描画等）は、離脱（PointerUp）の瞬間まで未確定（Uncommitted）とし、中断（Escape等）やポインタ喪失（`pointercancel`, `lostpointercapture`, ウィンドウフォーカス喪失 `blur`）が発生した場合は必ず操作直前の初期状態（`initialTransforms`）へ完全ロールバックしなければならない。
+- **定義**: ポインタ押下から離脱までの物理的ジェスチャー（ドラッグ、回転、描画等）は、離脱（PointerUp）の瞬間まで未確定（Uncommitted）とし、中断（Escape等）やポインタ喪失（`pointercancel`, `lostpointercapture`, ウィンドウフォーカス喪失 `blur`）が発生した場合は必ず操作直前の状態へ完全ロールバックしなければならない（`useHistoryGesture` が `cancelHistoryTransaction` で行う）。
 - **強制手法**: `registerCanvasAbortHandler` へのアボート処理登録義務、キャンバスコンテナにおける `pointercancel` / `lostpointercapture` / `window.blur` リスナーの常時監視、および中断時の履歴ドラフト破棄。
 
 ### 7.4 単一トランジションチョークポイント不変条件 (Unified Transition Choke Point Invariant)
