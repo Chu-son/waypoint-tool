@@ -107,4 +107,24 @@ describe('undo of custom layers and the layer tree', () => {
     expect(getAppState().activeCustomLayerId).toBeNull();
     expect(getAppState().selection).toEqual({ type: 'none' });
   });
+
+  it('undoes copies of several hand-drawn layers in one step, keeping the copied maps', () => {
+    resetAppStore(layerStackState(makeManualCustomLayer('a'), makeManualCustomLayer('b'), makeMap('m')));
+
+    const copies = getAppState().duplicateLayerItems(['a', 'b', 'm']);
+    expect(copies).toHaveLength(3);
+
+    getAppState().undo();
+
+    expect(getAppState().customLayers.map((l) => l.id)).toEqual(['a', 'b']);
+    expect(getAppState().mapLayers).toHaveLength(2);
+    expect(getAppState().historyPast).toHaveLength(0);
+  });
+
+  it('leaves no undo step for copying only maps, which are not undoable', () => {
+    getAppState().duplicateLayerItems(['top']);
+
+    expect(getAppState().mapLayers).toHaveLength(3);
+    expect(getAppState().historyPast).toHaveLength(0);
+  });
 });

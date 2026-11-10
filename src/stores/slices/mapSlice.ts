@@ -696,29 +696,34 @@ export const createMapSlice: StateCreator<AppState, [], [], MapSlice> = (set, ge
       const manual = state.customLayers.filter(
         (l): l is ManualCustomLayer => l.type === 'manual' && ordered.includes(l.id),
       );
-      if (manual.length > 0) state.pushHistorySnapshot();
       const copies: string[] = [];
-      for (const id of ordered) {
-        if (state.mapLayers.some((l) => l.id === id)) {
-          const copy = get().duplicateMapLayer(id);
-          if (copy) copies.push(copy);
-          continue;
+      const duplicate = () => {
+        for (const id of ordered) {
+          if (state.mapLayers.some((l) => l.id === id)) {
+            const copy = get().duplicateMapLayer(id);
+            if (copy) copies.push(copy);
+            continue;
+          }
+          const original = manual.find((l) => l.id === id);
+          if (!original) continue;
+          const copy: ManualCustomLayer = {
+            ...structuredClone(original),
+            id: uuidv4(),
+            name: `${original.name} (copy)`,
+            editObjects: original.editObjects.map((o) => ({ ...structuredClone(o), id: uuidv4() })),
+          };
+          set((s) => ({
+            customLayers: [copy, ...s.customLayers],
+            ...withNewLayer(treeOf(s), copy.id, placementAbove(treeOf(s), id)),
+            isDirty: true,
+          }));
+          copies.push(copy.id);
         }
-        const original = manual.find((l) => l.id === id);
-        if (!original) continue;
-        const copy: ManualCustomLayer = {
-          ...structuredClone(original),
-          id: uuidv4(),
-          name: `${original.name} (copy)`,
-          editObjects: original.editObjects.map((o) => ({ ...structuredClone(o), id: uuidv4() })),
-        };
-        set((s) => ({
-          customLayers: [copy, ...s.customLayers],
-          ...withNewLayer(treeOf(s), copy.id, placementAbove(treeOf(s), id)),
-          isDirty: true,
-        }));
-        copies.push(copy.id);
-      }
+      };
+      // Copies of hand-drawn layers are one undo step. Copies of maps alone are not undoable, so they get no
+      // transaction: it would see the new map list as a change and keep an undo step for it.
+      if (manual.length > 0) state.runInHistoryTransaction(duplicate);
+      else duplicate();
       if (copies.length > 0) get().setSelection({ type: 'layers', ids: copies, selectedObjectId: null });
       return copies;
     },
