@@ -129,6 +129,7 @@
 ### 4.3 履歴スナップショット一元管理原則 (History Snapshot Rule)
 - `pushHistorySnapshot()` の呼び出しを UI コンポーネントや描画 Hook（`useMapEdit*.ts` 等）内で行うことを禁止する。
 - ユーザー操作によるドメインデータ変更はすべて Store アクション内に閉じ、Store アクション側で原子的（Atomic）に履歴スナップショットを記録する。
+- UI は操作の始まりと終わりだけを伝える（`useHistoryGesture`、`historyEditHandlers`、`runInHistoryTransaction`）。上の禁止は ESLint で検査している。仕組みは [ARCHITECTURE.md](./ARCHITECTURE.md) の `historySlice.ts` を参照。
 
 ---
 
@@ -161,9 +162,9 @@
 
 ### 5.4 過渡ジェスチャーのアトミック性とポインタ喪失保護 (Gesture Atomicity & Pointer Loss Protection Rule)
 - **Abort ハンドラーの登録義務とロールバック保証**:
-  キャンバス上でポインタの押下（PointerDown）から離脱（PointerUp）までにまたがるドラッグ、回転、描画などの過渡操作を実装する際は、必ず `registerCanvasAbortHandler` に中断ハンドラを登録しなければならない。
+  キャンバス上でポインタの押下（PointerDown）から離脱（PointerUp）までにまたがるドラッグ、回転、描画などの過渡操作を実装する際は、ストアを変えるものは `useHistoryGesture` を使い、変えないものは `registerCanvasAbortHandler` に中断ハンドラを登録しなければならない。
 - **操作前座標への完全復元**:
-  過渡ジェスチャー中に Escape キー等で中断された場合、未確定の座標変更は直前の初期状態（`initialTransforms` 等）へ原子的（Atomic）にロールバックし、作成途中の履歴スナップショット（ドラフト）は確実に破棄しなければならない。
+  過渡ジェスチャー中に Escape キー等で中断された場合、未確定の変更は開始前の状態へ原子的（Atomic）にロールバックし、作成途中の履歴スナップショット（ドラフト）は確実に破棄しなければならない（`useHistoryGesture` が `cancelHistoryTransaction` で行う）。
 - **ポインタ喪失イベント（`pointercancel`, `lostpointercapture`, `blur`）の捕捉**:
   OS通知やウィンドウ切替、タッチ操作等でポインタが喪失された場合、キャンバスは `abort()` を同期実行してドラッグ状態を解放し、ポインタのスタック（Sticky Mouse）を防止しなければならない。
 

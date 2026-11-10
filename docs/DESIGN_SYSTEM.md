@@ -240,6 +240,7 @@ const buttonVariants = cva(
 3. **インラインスタイルの排除**: `style={{ ... }}` によるレイアウト指定を避け、Tailwindクラスまたは `cva` に集約する（動的な座標・サイズ計算を除く）。
 4. **アクセシビリティ & キーボード操作**: ボタンには適切な `title` や `aria-label` を付与し、フォーカスリング（`focus:ring-2`）を担保する。
 5. **Storybook/カタログ更新**: 作成したコンポーネントの役割を [`docs/COMPONENT_CATALOG.md`](./COMPONENT_CATALOG.md) に追記する。
+6. **連続して値を変える入力部品**: 1 回の操作を `onEditStart` / `onEditEnd` で知らせる。開始したままアンマウントされたときも `onEditEnd` を呼ぶ（`common/useEditSession.ts` を使えば保証される）。Undo の対象の値につなぐときは `{...historyEditHandlers}` を渡す。
 
 ---
 
