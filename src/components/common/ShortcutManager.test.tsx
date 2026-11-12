@@ -3,8 +3,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { ShortcutManager } from './ShortcutManager';
 import { BackendAPI, DialogAPI } from '../../api';
 import { renderWithStore } from '../../test/render';
-import { getAppState, PAST_WELCOME } from '../../test/store';
-import { makePointAnnotation, makeWaypoint, waypointTree } from '../../test/fixtures';
+import { getAppState, getEditObjects, PAST_WELCOME } from '../../test/store';
+import {
+  layerStackState,
+  makeManualCustomLayer,
+  makePointAnnotation,
+  makeWaypoint,
+  waypointTree,
+} from '../../test/fixtures';
 import type { AppState } from '../../stores/appStore';
 
 const press = (key: string, modifiers: Partial<KeyboardEventInit> = {}) =>
@@ -23,6 +29,24 @@ describe('ShortcutManager', () => {
 
     expect(getAppState().rootNodeIds).toEqual(['node-2']);
     expect(getAppState().nodes['node-1']).toBeUndefined();
+  });
+
+  it('Delete removes the selected shape in one undo step', () => {
+    const shape = { id: 's', type: 'rect', cx: 0, cy: 0, width: 1, height: 1, angle: 0, fillValue: 0 } as const;
+    renderShortcuts({
+      ...layerStackState(makeManualCustomLayer('wall', { editObjects: [shape] })),
+      activeCustomLayerId: 'wall',
+      selection: { type: 'layers', ids: ['wall'], selectedObjectId: 's' },
+      selectedEditObjectId: 's',
+    });
+    const shapes = () => getEditObjects('wall');
+
+    press('Delete');
+    expect(shapes()).toEqual([]);
+    expect(getAppState().historyPast).toHaveLength(1);
+    act(() => getAppState().undo());
+
+    expect(shapes()).toEqual([shape]);
   });
 
   describe('Ctrl+G on annotations', () => {

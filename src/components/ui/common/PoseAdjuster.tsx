@@ -3,6 +3,7 @@ import type { KeyboardEvent, PointerEvent } from 'react';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Move, RotateCcw, RotateCw } from 'lucide-react';
 import { Button } from './Button';
 import { cn } from '../../../utils/cn';
+import { useEditSession, type EditBoundary } from './useEditSession';
 
 /** A relative pose change in world axes: +X right, +Y up, +yaw counter-clockwise. */
 export interface PoseNudge {
@@ -11,16 +12,12 @@ export interface PoseNudge {
   dyawDeg: number;
 }
 
-interface PoseAdjusterProps {
+interface PoseAdjusterProps extends EditBoundary {
   /**
    * Applies a nudge. Returning `false` (or a promise of `false`) means it was declined: the rest of the
    * press is ignored. While a returned promise is pending, further repeats are dropped.
    */
   onNudge: (nudge: PoseNudge) => void | boolean | Promise<void | boolean>;
-  /** Called when a press (or key hold) begins, so the whole gesture can be one Undo entry. */
-  onEditStart?: () => void;
-  /** Called when the press (or key hold) ends. */
-  onEditEnd?: () => void;
   className?: string;
 }
 
@@ -59,10 +56,11 @@ export function PoseAdjuster({ onNudge, onEditStart, onEditEnd, className }: Pos
   const preset = STEP_PRESETS.find((p) => p.id === presetId) ?? STEP_PRESETS[1];
 
   // Timers and repeated pointer/key callbacks always need the latest props, not the ones from when the press began.
-  const latest = useRef({ onNudge, onEditStart, onEditEnd, preset });
-  latest.current = { onNudge, onEditStart, onEditEnd, preset };
+  const latest = useRef({ onNudge, preset });
+  latest.current = { onNudge, preset };
 
-  const isEditing = useRef(false);
+  // A press (or key hold) is one edit; one still held when the pad unmounts ends then.
+  const edit = useEditSession({ onEditStart, onEditEnd });
   // `onNudge` declined (the user cancelled a question): the rest of this press or key hold does nothing.
   const cancelled = useRef(false);
   const pending = useRef(false);
@@ -70,10 +68,9 @@ export function PoseAdjuster({ onNudge, onEditStart, onEditEnd, className }: Pos
   const repeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const beginEdit = () => {
-    if (isEditing.current) return;
-    isEditing.current = true;
+    if (edit.isEditing()) return;
     cancelled.current = false;
-    latest.current.onEditStart?.();
+    edit.start();
   };
 
   const stopRepeat = () => {
@@ -85,9 +82,7 @@ export function PoseAdjuster({ onNudge, onEditStart, onEditEnd, className }: Pos
 
   const endEdit = () => {
     stopRepeat();
-    if (!isEditing.current) return;
-    isEditing.current = false;
-    latest.current.onEditEnd?.();
+    edit.end();
   };
 
   useEffect(() => stopRepeat, []);

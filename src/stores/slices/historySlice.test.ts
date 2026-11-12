@@ -1,7 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useAppStore } from '../appStore';
-import { makeAnnotationGroup } from '../../test/fixtures';
-import { getAppState, resetAppStore } from '../../test/store';
+import {
+  layerStackState,
+  makeAnnotationGroup,
+  makeMap,
+  makeTransform,
+  makeWaypoint,
+  waypointTree,
+} from '../../test/fixtures';
+import { getAppState, getLayerOrder, resetAppStore } from '../../test/store';
 
 describe('HistorySlice (Undo/Redo)', () => {
   beforeEach(() => {
@@ -157,6 +164,106 @@ describe('HistorySlice (Undo/Redo)', () => {
     getAppState().redo();
     expect(Object.keys(getAppState().annotationGroups)).toEqual(['grp']);
     expect(getAppState().rootAnnotationIds).toEqual(['grp']);
+  });
+
+  describe('transactions that change nothing', () => {
+    it('leave no undo step and keep what could be redone', () => {
+      resetAppStore();
+      getAppState().addNode(makeWaypoint('a'));
+      getAppState().undo();
+
+      getAppState().beginHistoryTransaction();
+      getAppState().endHistoryTransaction();
+
+      expect(getAppState().historyPast).toHaveLength(0);
+      getAppState().redo();
+      expect(getAppState().nodes.a).toBeDefined();
+    });
+
+    it('still count when something changed inside, even if a nested transaction changed nothing', () => {
+      resetAppStore();
+      getAppState().runInHistoryTransaction(() => {
+        getAppState().runInHistoryTransaction(() => {});
+        getAppState().addNode(makeWaypoint('a'));
+      });
+
+      expect(getAppState().historyPast).toHaveLength(1);
+      getAppState().undo();
+      expect(getAppState().nodes.a).toBeUndefined();
+    });
+  });
+
+  describe('cancelling a transaction', () => {
+    it('puts back the state from when it began, and what could be redone', () => {
+      resetAppStore({ ...waypointTree([makeWaypoint('a', { transform: makeTransform(1, 2) })]), isDirty: false });
+      getAppState().addNode(makeWaypoint('b'));
+      getAppState().undo();
+      getAppState().setIsDirty(false);
+
+      getAppState().beginHistoryTransaction();
+      getAppState().updateNode('a', { transform: makeTransform(5, 5) });
+      getAppState().cancelHistoryTransaction();
+
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 1, y: 2 });
+      expect(getAppState().historyPast).toHaveLength(0);
+      expect(getAppState().historyTransactionDepth).toBe(0);
+      expect(getAppState().isDirty).toBe(false);
+      getAppState().redo();
+      expect(getAppState().nodes.b).toBeDefined();
+    });
+  });
+
+  it('records again after undo when a transaction was left open by mistake', () => {
+    resetAppStore();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    getAppState().addNode(makeWaypoint('a'));
+    getAppState().beginHistoryTransaction();
+
+    getAppState().undo();
+    getAppState().addNode(makeWaypoint('b'));
+    getAppState().undo();
+
+    expect(getAppState().nodes.b).toBeUndefined();
+    expect(getAppState().historyTransactionDepth).toBe(0);
+  });
+
+  describe('maps', () => {
+    const twoMaps = () => layerStackState(makeMap('m1'), makeMap('m2'));
+
+    it('puts back what a map looked like, by map', () => {
+      resetAppStore(twoMaps());
+      getAppState().updateMapLayer('m1', { opacity: 0.2, name: 'renamed', visible: false });
+
+      getAppState().undo();
+
+      expect(getAppState().mapLayers.find((l) => l.id === 'm1')).toMatchObject({
+        opacity: 1,
+        name: 'm1',
+        visible: true,
+      });
+    });
+
+    it('keeps a map added after the step being undone', () => {
+      resetAppStore(twoMaps());
+      getAppState().addNode(makeWaypoint('a'));
+      getAppState().addMapLayer('added', { resolution: 0.05, origin: [0, 0, 0] }, '', 10, 10);
+
+      getAppState().undo();
+
+      expect(getAppState().mapLayers.map((l) => l.name)).toContain('added');
+      expect(getLayerOrder()).toHaveLength(3);
+    });
+
+    it('does not bring back a map removed after the step being undone', () => {
+      resetAppStore(twoMaps());
+      getAppState().addNode(makeWaypoint('a'));
+      getAppState().removeMapLayer('m2');
+
+      getAppState().undo();
+
+      expect(getAppState().mapLayers.map((l) => l.id)).toEqual(['m1']);
+      expect(getLayerOrder()).toEqual(['m1']);
+    });
   });
 
   it('invokes abortCanvasGestures before executing undo and redo', () => {

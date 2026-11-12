@@ -29,6 +29,7 @@ import { applyGlobalDefaultLinks } from '../../utils/optionSchema';
 import { DEFAULT_GEO_MAP } from '../migrations/geoMapNormalization';
 import { notify, notifyError } from '../../services/notify';
 import { buildProjectData } from '../serialization/projectSerializer';
+import { setWithoutHistoryOf } from '../history/historyGuard';
 
 export {
   DEFAULT_ROBOT_FOOTPRINT,
@@ -98,6 +99,7 @@ export type ProjectSlice = {
 };
 
 export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => {
+  const setWithoutHistory = setWithoutHistoryOf(set);
   const executeSaveProject = async (finalPath: string) => {
     const getDirName = (path: string) => {
       const lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
@@ -264,7 +266,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
     setProjectData: (rawData: any) => {
       get().abortCanvasGestures?.();
-      set((state) => {
+      // 読み込みは Undo の対象外。履歴はプロジェクトの境界で消す。
+      setWithoutHistory((state) => {
         // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
         state.clearHistory();
         state.resetWorkflow();
@@ -343,7 +346,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     resetProject: () => {
       get().abortCanvasGestures?.();
       get().resetWorkflow();
-      set((state) => {
+      setWithoutHistory((state) => {
         // プロジェクト境界を跨いだUndo/Redoを防ぐため履歴をクリア
         state.clearHistory();
 

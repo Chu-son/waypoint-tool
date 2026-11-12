@@ -13,7 +13,7 @@ import {
 } from '../../../../services/importFiles';
 import { notify, notifyError } from '../../../../services/notify';
 import { applyProjectImportPlan } from '../../../../services/projectImport';
-import { PROJECT_IMPORT_CATEGORIES } from '../../../../utils/import/projectImportPlan';
+import { PROJECT_IMPORT_CATEGORIES, type ProjectImportCategoryId } from '../../../../utils/import/projectImportPlan';
 import { ProjectImportCategoryRow } from './ProjectImportCategoryRow';
 import { useProjectImport } from './useProjectImport';
 import type { ImportPanelProps } from './types';
@@ -22,6 +22,9 @@ const GROUPS = [
   { kind: 'settings', title: 'Settings', hint: 'Compared with this project. Open a row to see the differences.' },
   { kind: 'data', title: 'Data', hint: 'Added to this project under new ids; nothing existing is replaced.' },
 ] as const;
+
+/** Categories whose import Undo takes back (`importSlice.applyProjectImport`, step 2). */
+const UNDOABLE_CATEGORIES: ProjectImportCategoryId[] = ['waypoints', 'annotations', 'maps', 'exportRegions', 'geoMap'];
 
 /**
  * 他のプロジェクト（.wptroj）から、必要な設定やデータだけを選んで取り込む。
@@ -62,7 +65,7 @@ export function ProjectImportPanel({ onClose }: ImportPanelProps) {
     }
   };
 
-  const hasUndoableData = state.categories.has('waypoints') || state.categories.has('annotations');
+  const hasUndoableData = UNDOABLE_CATEGORIES.some((id) => state.categories.has(id));
 
   return (
     <>
@@ -112,7 +115,8 @@ export function ProjectImportPanel({ onClose }: ImportPanelProps) {
 
         {hasUndoableData && (
           <AlertBox variant="info" title="About Undo">
-            Undo removes the imported waypoints, annotations and custom layers. Imported settings and maps stay.
+            Undo removes the imported waypoints, annotations, custom layers, layer visibility sets and export regions,
+            and puts the base map settings back. Imported maps and other settings stay.
           </AlertBox>
         )}
       </ModalContent>

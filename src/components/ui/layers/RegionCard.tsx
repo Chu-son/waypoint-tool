@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Crop } from 'lucide-react';
 import { Input } from '../common/Input';
 import { LabeledNumericInput } from '../common/LabeledNumericInput';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { ExportRegion } from '../../../types/store';
 import { LayerCardShell } from './LayerCardShell';
 
@@ -22,6 +23,7 @@ export function RegionCard({ region, index, onToggleVisible, onRemove, onUpdateR
       icon={<Crop size={14} className="text-accent-generator shrink-0" />}
       title={
         <Input
+          {...historyEditHandlers}
           value={region.name}
           onChange={(e) => onUpdateRegion({ name: e.target.value })}
           onClick={(e) => e.stopPropagation()}
@@ -45,6 +47,7 @@ export function RegionCard({ region, index, onToggleVisible, onRemove, onUpdateR
         <span className="text-[11px] font-bold text-text-base">Region Bounds</span>
         <div className="grid grid-cols-2 gap-2">
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="X (m)"
             value={region.rect.x}
             step={0.1}
@@ -52,6 +55,7 @@ export function RegionCard({ region, index, onToggleVisible, onRemove, onUpdateR
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, x: val } })}
           />
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Y (m)"
             value={region.rect.y}
             step={0.1}
@@ -59,6 +63,7 @@ export function RegionCard({ region, index, onToggleVisible, onRemove, onUpdateR
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, y: val } })}
           />
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Width (m)"
             value={region.rect.width}
             min={0}
@@ -67,6 +72,7 @@ export function RegionCard({ region, index, onToggleVisible, onRemove, onUpdateR
             onChange={(val) => onUpdateRegion({ rect: { ...region.rect, width: val } })}
           />
           <LabeledNumericInput
+            {...historyEditHandlers}
             label="Height (m)"
             value={region.rect.height}
             min={0}

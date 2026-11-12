@@ -20,8 +20,6 @@ export type GroupMoveResult = Pick<AppState, 'nodes' | 'annotationObjects' | 'an
 };
 
 export interface GroupMoveOptions {
-  /** False for the later steps of one gesture (a held nudge, a drag): only its first step records history. */
-  recordHistory?: boolean;
   /** True while a drag is under way: the path is recalculated once when it ends. */
   skipRecalculate?: boolean;
 }
@@ -184,7 +182,7 @@ export function commitGroupMove(
   const result = planGroupMove(get(), domain, id, t);
   if (!result) return false;
   const { movesWaypoints, ...changes } = result;
-  if (options?.recordHistory !== false) get().pushHistorySnapshot();
+  get().pushHistorySnapshot();
   set({ ...changes, isDirty: true });
   const state = get();
   if (movesWaypoints && !options?.skipRecalculate && state.autoRecalculatePath && state.activePathCalculatorPluginId) {

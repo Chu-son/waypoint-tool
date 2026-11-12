@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { WaypointNode } from '../../../types/store';
 import { quaternionToYaw } from '../../../utils/transformUtils';
 import { getFlattenedWaypointIds } from '../../../utils/treeUtils';
@@ -88,8 +89,7 @@ export function RelativeTransformGroup({
           fieldId="x"
           value={relX}
           precision={decimalPrecision}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('x', val)}
         />
         <TransformField
@@ -97,8 +97,7 @@ export function RelativeTransformGroup({
           fieldId="y"
           value={relY}
           precision={decimalPrecision}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('y', val)}
         />
         <TransformField
@@ -106,8 +105,7 @@ export function RelativeTransformGroup({
           fieldId="z"
           value={dz}
           precision={decimalPrecision}
-          onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-          onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+          {...historyEditHandlers}
           onChange={(val) => handleFieldChange('z', val)}
         />
         <div className="col-span-3 grid grid-cols-2 gap-2">
@@ -117,8 +115,7 @@ export function RelativeTransformGroup({
             value={relYaw}
             precision={decimalPrecision}
             step="0.01"
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            {...historyEditHandlers}
             onChange={(val) => handleYawChange(val, false)}
           />
           <TransformField
@@ -127,8 +124,7 @@ export function RelativeTransformGroup({
             value={relYaw * (180.0 / Math.PI)}
             precision={decimalPrecision}
             step="1"
-            onEditStart={() => useAppStore.getState().beginHistoryTransaction()}
-            onEditEnd={() => useAppStore.getState().endHistoryTransaction()}
+            {...historyEditHandlers}
             onChange={(val) => handleYawChange(val, true)}
           />
         </div>

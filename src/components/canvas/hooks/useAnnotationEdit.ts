@@ -11,6 +11,7 @@ import {
 import { getNextSequentialName } from '../../../utils/treeUtils';
 import { DEFAULT_ANNOTATION_COLOR } from '../../../utils/colorPresets';
 import { v4 as uuidv4 } from 'uuid';
+import { useHistoryGesture } from './useHistoryGesture';
 
 export function useAnnotationEdit() {
   const addAnnotationObject = useAppStore((state) => state.addAnnotationObject);
@@ -18,8 +19,7 @@ export function useAnnotationEdit() {
   const selectAnnotationObjects = useAppStore((state) => state.selectAnnotationObjects);
   const activeAnnotationSubTool = useAppStore((state) => state.activeAnnotationSubTool);
   const defaultAnnotationColor = useAppStore((state) => state.defaultAnnotationColor);
-  const beginHistoryTransaction = useAppStore((state) => state.beginHistoryTransaction);
-  const endHistoryTransaction = useAppStore((state) => state.endHistoryTransaction);
+  const gesture = useHistoryGesture();
 
   const [drawStartPos, setDrawStartPos] = useState<{ x: number; y: number } | null>(null);
   const [annotationPreview, setAnnotationPreview] = useState<AnnotationObject | null>(null);
@@ -339,14 +339,14 @@ export function useAnnotationEdit() {
     (id: string, worldPos: { x: number; y: number }) => {
       const obj = useAppStore.getState().annotationObjects[id];
       if (!obj) return;
-      beginHistoryTransaction();
+      gesture.begin({ onAbort: () => (movingAnnotation.current = null) });
       movingAnnotation.current = {
         id,
         startMouseWorld: worldPos,
         initialObj: structuredClone(obj),
       };
     },
-    [beginHistoryTransaction],
+    [gesture],
   );
 
   const handleMoveAnnotationMove = useCallback(
@@ -390,15 +390,15 @@ export function useAnnotationEdit() {
   const handleMoveAnnotationEnd = useCallback(() => {
     if (movingAnnotation.current) {
       movingAnnotation.current = null;
-      endHistoryTransaction();
+      gesture.end();
     }
-  }, [endHistoryTransaction]);
+  }, [gesture]);
 
   const handleStartTransformAnnotation = useCallback(
     (id: string, handleType: string, worldPos: { x: number; y: number }) => {
       const obj = useAppStore.getState().annotationObjects[id];
       if (!obj) return;
-      beginHistoryTransaction();
+      gesture.begin({ onAbort: () => (transformingHandle.current = null) });
       transformingHandle.current = {
         id,
         handleType,
@@ -406,7 +406,7 @@ export function useAnnotationEdit() {
         initialObj: structuredClone(obj),
       };
     },
-    [beginHistoryTransaction],
+    [gesture],
   );
 
   const handleTransformAnnotationMove = useCallback(
@@ -494,9 +494,9 @@ export function useAnnotationEdit() {
   const handleTransformAnnotationEnd = useCallback(() => {
     if (transformingHandle.current) {
       transformingHandle.current = null;
-      endHistoryTransaction();
+      gesture.end();
     }
-  }, [endHistoryTransaction]);
+  }, [gesture]);
 
   return {
     annotationPreview,

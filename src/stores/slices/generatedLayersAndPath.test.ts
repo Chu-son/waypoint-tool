@@ -56,7 +56,7 @@ describe('customLayers and pathCalculator in appStore', () => {
     useAppStore.getState().updateCustomLayer('plugin-layer-1', { opacity: 0.9 });
     expect(useAppStore.getState().customLayers[0].opacity).toBe(0.9);
 
-    useAppStore.getState().reorderLayers(0, 1);
+    useAppStore.getState().moveLayerItems(['plugin-layer-1'], manualLayer.id, 'after');
     expect(layerOrderOf(useAppStore.getState())).toEqual([manualLayer.id, 'plugin-layer-1']);
 
     useAppStore.getState().removeCustomLayer('plugin-layer-1');

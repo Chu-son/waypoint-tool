@@ -147,13 +147,16 @@ describe('moving a waypoint group', () => {
     expect(getAppState().customLayers).toBe(before.customLayers);
   });
 
-  it('records history only when asked, so a held nudge is one step', () => {
+  it('is one undo step per move, and one for a held nudge in a transaction', () => {
     getAppState().transformNodeGroup('site', shift(1, 0));
-    getAppState().transformNodeGroup('site', shift(1, 0), { recordHistory: false });
+    getAppState().runInHistoryTransaction(() => {
+      getAppState().transformNodeGroup('site', shift(1, 0));
+      getAppState().transformNodeGroup('site', shift(1, 0));
+    });
 
-    expect(getAppState().historyPast).toHaveLength(1);
+    expect(getAppState().historyPast).toHaveLength(2);
     getAppState().undo();
-    expect(xyOf('a')).toEqual({ x: 1, y: 0 });
+    expect(xyOf('a')).toEqual({ x: 2, y: 0 });
   });
 
   it('refuses a move that changes nothing', () => {

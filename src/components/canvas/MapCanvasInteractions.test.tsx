@@ -8,12 +8,15 @@ import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MapCanvas } from './MapCanvas';
 import { renderWithStore } from '../../test/render';
-import { getAppState, PAST_WELCOME } from '../../test/store';
+import { getAppState, getEditObjects, PAST_WELCOME } from '../../test/store';
 import {
   layerStackState,
   makeGenerator,
   makeGroup,
+  makeManualCustomLayer,
   makeMap,
+  makePointAnnotation,
+  makeRectAnnotation,
   makePlugin,
   makeTransform,
   makeWaypoint,
@@ -664,6 +667,314 @@ describe('MapCanvas tools', () => {
       pointer.up(25, -40);
 
       expect(getAppState().pluginInteractionData.start).toMatchObject({ x: 25, y: -40 });
+    });
+  });
+  describe('a gesture aborted midway', () => {
+    /** Nothing of the aborted gesture is left: no undo step and no transaction left open. */
+    const expectNothingRecorded = () => {
+      expect(getAppState().historyPast).toHaveLength(0);
+      expect(getAppState().historyTransactionDepth).toBe(0);
+    };
+    const pickableAt = waypointAt;
+
+    it('leaves no undo step for a waypoint only clicked, not moved', () => {
+      const { pointer, container } = renderCanvas(
+        waypointTree([makeWaypoint('a', { transform: makeTransform(10, 20) })]),
+      );
+
+      fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.up(10, 20);
+
+      expectNothingRecorded();
+    });
+
+    it('lets undo revert the step before a waypoint drag aborted by undo', () => {
+      const { pointer, container } = renderCanvas(
+        waypointTree([makeWaypoint('a', { transform: makeTransform(10, 20) })]),
+      );
+      act(() => getAppState().updateNode('a', { name: 'renamed' }));
+
+      fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.move(40, 60);
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 40, y: 60 });
+      act(() => getAppState().undo());
+
+      expect(getAppState().nodes.a).toMatchObject({ name: 'a', transform: { x: 10, y: 20 } });
+      expectNothingRecorded();
+    });
+
+    it('puts a dragged waypoint back when the pointer is cancelled', () => {
+      const { pointer, container, viewport } = renderCanvas(
+        waypointTree([makeWaypoint('a', { transform: makeTransform(10, 20) })]),
+      );
+
+      fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+      pointer.move(40, 60);
+      fireEvent.pointerCancel(viewport, { pointerId: 1 });
+
+      expect(getAppState().nodes.a.transform).toMatchObject({ x: 10, y: 20 });
+      expectNothingRecorded();
+    });
+
+    describe('annotations', () => {
+      const withAnnotations = () => ({
+        annotationObjects: {
+          p: makePointAnnotation('p', { x: 10, y: 20 }),
+          r: makeRectAnnotation('r', { cx: -100, cy: -100, width: 20, height: 20 }),
+        },
+        annotationOrder: ['p', 'r'],
+        rootAnnotationIds: ['p', 'r'],
+      });
+
+      it('puts a moved annotation back on Escape', () => {
+        const { pointer, container } = renderCanvas(withAnnotations());
+
+        fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(60, 70);
+        expect(getAppState().annotationObjects.p).toMatchObject({ x: 60, y: 70 });
+        escape();
+        pointer.up(60, 70);
+
+        expect(getAppState().annotationObjects.p).toMatchObject({ x: 10, y: 20 });
+        expectNothingRecorded();
+      });
+
+      it('puts a moved annotation back when the pointer capture is lost', () => {
+        const { pointer, container, viewport } = renderCanvas(withAnnotations());
+
+        fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(60, 70);
+        fireEvent.lostPointerCapture(viewport, { pointerId: 1 });
+
+        expect(getAppState().annotationObjects.p).toMatchObject({ x: 10, y: 20 });
+        expectNothingRecorded();
+      });
+
+      it('undoes a move in one step, and the next move after an Escape too', () => {
+        const { pointer, container } = renderCanvas(withAnnotations());
+        fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(60, 70);
+        escape();
+        pointer.up(60, 70);
+
+        fireEvent.pointerDown(pickableAt(container, 10, 20), { button: 0, pointerId: 1, ...toScreen(10, 20) });
+        pointer.move(30, 20);
+        pointer.move(40, 20);
+        pointer.up(40, 20);
+        expect(getAppState().historyPast).toHaveLength(1);
+        act(() => getAppState().undo());
+
+        expect(getAppState().annotationObjects.p).toMatchObject({ x: 10, y: 20 });
+      });
+
+      it('puts a rotated annotation back on Escape', () => {
+        const { pointer, container } = renderCanvas(withAnnotations());
+        act(() => getAppState().selectAnnotationObjects(['r']));
+        const rotateHandle = container.querySelector('pixigraphics[cursor="grab"]')!;
+
+        fireEvent.pointerDown(rotateHandle, { button: 0, pointerId: 1, ...toScreen(-70, -100) });
+        pointer.move(-100, -50);
+        expect((getAppState().annotationObjects.r as { angle: number }).angle).toBeCloseTo(Math.PI / 2);
+        escape();
+
+        expect(getAppState().annotationObjects.r).toMatchObject({ angle: 0 });
+        expectNothingRecorded();
+      });
+    });
+
+    describe('export regions', () => {
+      const withRegion = () => ({
+        exportRegions: [
+          {
+            id: 'r',
+            name: 'Region 1',
+            rect: { x: 0, y: 0, width: 100, height: 50 },
+            visible: true,
+            layerVisibility: {},
+          },
+        ],
+      });
+      const regionBody = (container: HTMLElement) =>
+        container.querySelector('pixicontainer[zindex="1001"] > pixigraphics[eventmode="dynamic"]')!;
+
+      it('puts a moved region back on Escape', () => {
+        const { pointer, container } = renderCanvas(withRegion());
+        selectTool('add_export_region');
+
+        fireEvent.pointerDown(regionBody(container), { button: 0, pointerId: 1, ...toScreen(50, 25) });
+        pointer.move(150, 125);
+        expect(getAppState().exportRegions[0].rect).toMatchObject({ x: 100, y: 100 });
+        escape();
+
+        expect(getAppState().exportRegions[0].rect).toEqual({ x: 0, y: 0, width: 100, height: 50 });
+        expectNothingRecorded();
+      });
+
+      it('undoes a whole move in one step', () => {
+        const { pointer, container } = renderCanvas(withRegion());
+        selectTool('add_export_region');
+
+        fireEvent.pointerDown(regionBody(container), { button: 0, pointerId: 1, ...toScreen(50, 25) });
+        pointer.move(100, 25);
+        pointer.move(150, 125);
+        pointer.up(150, 125);
+        expect(getAppState().exportRegions[0].rect).toMatchObject({ x: 100, y: 100 });
+        act(() => getAppState().undo());
+
+        expect(getAppState().exportRegions[0].rect).toEqual({ x: 0, y: 0, width: 100, height: 50 });
+      });
+
+      it('leaves nothing behind when a region being drawn is discarded with Escape', () => {
+        const { pointer } = renderCanvas();
+        selectTool('add_export_region');
+
+        pointer.down(100, 100);
+        pointer.move(200, 0);
+        escape();
+
+        expectNothingRecorded();
+      });
+    });
+
+    describe('shapes of a hand-drawn layer', () => {
+      const shape = { id: 's', type: 'rect', cx: 30, cy: 40, width: 10, height: 10, angle: 0, fillValue: 0 } as const;
+      const editing = () => ({
+        ...layerStackState(makeManualCustomLayer('wall', { editObjects: [shape] })),
+        activeCustomLayerId: 'wall',
+        isMapEditMode: true,
+      });
+
+      it('puts a moved shape back on Escape', () => {
+        const { pointer, container } = renderCanvas(editing());
+
+        fireEvent.pointerDown(pickableAt(container, 30, 40), { button: 0, pointerId: 1, ...toScreen(30, 40) });
+        pointer.move(80, 90);
+        const [moved] = getAppState().customLayers;
+        expect(moved.type === 'manual' && moved.editObjects[0]).toMatchObject({ cx: 80, cy: 90 });
+        escape();
+
+        const [layer] = getAppState().customLayers;
+        expect(layer.type === 'manual' && layer.editObjects[0]).toMatchObject({ cx: 30, cy: 40 });
+        expectNothingRecorded();
+      });
+
+      it('undoes a whole move in one step', () => {
+        const { pointer, container } = renderCanvas(editing());
+
+        fireEvent.pointerDown(pickableAt(container, 30, 40), { button: 0, pointerId: 1, ...toScreen(30, 40) });
+        pointer.move(50, 40);
+        pointer.move(80, 90);
+        pointer.up(80, 90);
+        expect(getAppState().historyPast).toHaveLength(1);
+        act(() => getAppState().undo());
+
+        const [layer] = getAppState().customLayers;
+        expect(layer.type === 'manual' && layer.editObjects[0]).toMatchObject({ cx: 30, cy: 40 });
+      });
+
+      describe('rotating a rectangle', () => {
+        const rotating = () => ({
+          ...editing(),
+          selection: { type: 'layers' as const, ids: ['wall'], selectedObjectId: 's' },
+          selectedEditObjectId: 's',
+        });
+        const angleOfShape = () => {
+          const [layer] = getAppState().customLayers;
+          return layer.type === 'manual' ? (layer.editObjects[0] as { angle: number }).angle : NaN;
+        };
+        const grabHandle = (container: HTMLElement) =>
+          fireEvent.pointerDown(container.querySelector('pixigraphics[cursor="grab"]')!, {
+            button: 0,
+            pointerId: 1,
+            ...toScreen(30, 60),
+          });
+
+        it('undoes a whole rotation in one step', () => {
+          const { pointer, container } = renderCanvas(rotating());
+
+          grabHandle(container);
+          pointer.move(60, 40);
+          pointer.move(60, 70);
+          pointer.up(60, 70);
+          expect(angleOfShape()).toBeCloseTo(Math.PI / 4, 5);
+          expect(getAppState().historyPast).toHaveLength(1);
+          act(() => getAppState().undo());
+
+          expect(angleOfShape()).toBe(0);
+        });
+
+        it('puts a rotated rectangle back on Escape', () => {
+          const { pointer, container } = renderCanvas(rotating());
+
+          grabHandle(container);
+          pointer.move(60, 70);
+          expect(angleOfShape()).toBeCloseTo(Math.PI / 4, 5);
+          escape();
+
+          expect(angleOfShape()).toBe(0);
+          expectNothingRecorded();
+        });
+      });
+
+      describe.each(['rect', 'circle', 'line', 'freehand'] as const)('drawing a %s', (tool) => {
+        const objectsOf = getEditObjects;
+        const drawing = () => ({ ...editing(), mapEditSubTool: tool });
+
+        it('undoes the drawing in one step, and redoes it', () => {
+          const { pointer } = renderCanvas(drawing());
+
+          pointer.down(-50, -50);
+          pointer.move(-40, -40);
+          pointer.move(-20, -20);
+          pointer.up(-20, -20);
+          expect(objectsOf('wall')).toHaveLength(2);
+          expect(getAppState().historyPast).toHaveLength(1);
+
+          act(() => getAppState().undo());
+          expect(objectsOf('wall')).toEqual([shape]);
+          act(() => getAppState().redo());
+          expect(objectsOf('wall')).toHaveLength(2);
+        });
+
+        it('removes the layer it had to create along with the drawing', () => {
+          const { pointer } = renderCanvas({ isMapEditMode: true, mapEditSubTool: tool });
+
+          pointer.down(-50, -50);
+          pointer.move(-20, -20);
+          pointer.up(-20, -20);
+          expect(getAppState().customLayers).toHaveLength(1);
+          expect(getAppState().historyPast).toHaveLength(1);
+          act(() => getAppState().undo());
+
+          expect(getAppState().customLayers).toHaveLength(0);
+          expect(getAppState().activeCustomLayerId).toBeNull();
+        });
+
+        it('discards the drawing and the layer it created on Escape', () => {
+          const { pointer } = renderCanvas({ isMapEditMode: true, mapEditSubTool: tool });
+
+          pointer.down(-50, -50);
+          pointer.move(-20, -20);
+          expect(getAppState().customLayers).toHaveLength(1);
+          escape();
+          pointer.up(-20, -20);
+
+          expect(getAppState().customLayers).toHaveLength(0);
+          expectNothingRecorded();
+        });
+      });
+
+      describe.each(['rect', 'circle', 'line'] as const)('a %s too small to keep', (tool) => {
+        it('takes back the layer it created and records nothing', () => {
+          const { pointer } = renderCanvas({ isMapEditMode: true, mapEditSubTool: tool });
+
+          pointer.down(-50, -50);
+          pointer.up(-50, -50);
+
+          expect(getAppState().customLayers).toHaveLength(0);
+          expectNothingRecorded();
+        });
+      });
     });
   });
 });

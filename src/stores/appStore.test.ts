@@ -131,7 +131,7 @@ describe('AppStore Zustand Store', () => {
   });
 
   it('should handle map layer operations', () => {
-    const { addMapLayer, updateMapLayer, removeMapLayer, reorderLayers } = useAppStore.getState();
+    const { addMapLayer, updateMapLayer, removeMapLayer, moveLayerItems } = useAppStore.getState();
 
     addMapLayer('Map 1', null, 'base1', 100, 100);
     const id1 = layerOrderOf(useAppStore.getState())[0];
@@ -147,9 +147,9 @@ describe('AppStore Zustand Store', () => {
     updateMapLayer(id1, { visible: false });
     expect(useAppStore.getState().mapLayers.find((l) => l.id === id1)?.visible).toBe(false);
 
-    reorderLayers(0, 1);
+    moveLayerItems([id2], id1, 'after');
     state = useAppStore.getState();
-    // Before: [id2, id1]. Move 0 to 1 -> [id1, id2]
+    // Before: [id2, id1].
     expect(layerOrderOf(state)).toEqual([id1, id2]);
 
     removeMapLayer(id2);

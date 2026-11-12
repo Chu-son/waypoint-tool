@@ -1,13 +1,29 @@
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import { useEditSession, type EditBoundary } from './useEditSession';
 
-interface SliderProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface SliderProps extends React.InputHTMLAttributes<HTMLInputElement>, EditBoundary {
   label?: string;
   valueDisplay?: string;
 }
 
+/** A range input. With `onEditStart` / `onEditEnd`, one drag of the thumb is one edit (one undo step). */
 export const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
-  ({ className, label, valueDisplay, ...props }, ref) => {
+  ({ className, label, valueDisplay, onEditStart, onEditEnd, onPointerDown, ...props }, ref) => {
+    const edit = useEditSession({ onEditStart, onEditEnd });
+    // The pointer may be released outside the thumb, so the end of the drag is watched on the window.
+    const handlePointerDown = (e: React.PointerEvent<HTMLInputElement>) => {
+      onPointerDown?.(e);
+      if (e.button !== 0) return;
+      edit.start();
+      const finish = () => {
+        window.removeEventListener('pointerup', finish);
+        window.removeEventListener('pointercancel', finish);
+        edit.end();
+      };
+      window.addEventListener('pointerup', finish);
+      window.addEventListener('pointercancel', finish);
+    };
     return (
       <div className="w-full space-y-1.5">
         {(label || valueDisplay) && (
@@ -33,6 +49,7 @@ export const Slider = React.forwardRef<HTMLInputElement, SliderProps>(
               className,
             )}
             ref={ref}
+            onPointerDown={handlePointerDown}
             {...props}
           />
         </div>

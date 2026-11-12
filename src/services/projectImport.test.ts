@@ -81,6 +81,25 @@ describe('importing from another project', () => {
     expect(state.rootAnnotationIds).toEqual([]);
   });
 
+  it('undoes imported export regions with the import, and keeps them through nothing else', async () => {
+    const importedRegion = {
+      id: 'r',
+      name: 'R',
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      visible: true,
+      layerVisibility: {},
+    };
+    await importInto(incomingProject({ export_regions: [importedRegion] }), selection(['exportRegions']));
+    expect(getAppState().exportRegions).toHaveLength(1);
+
+    getAppState().updateNode('mine', { name: 'later' });
+    getAppState().undo();
+    expect(getAppState().exportRegions).toHaveLength(1);
+
+    getAppState().undo();
+    expect(getAppState().exportRegions).toEqual([]);
+  });
+
   it('does not let Undo revert the imported settings', async () => {
     const incoming = incomingProject({
       path_color: '#abcdef',

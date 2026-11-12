@@ -2,7 +2,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { LayerGroupInspector } from './LayerGroupInspector';
 import { DialogAPI } from '../../../api';
-import { renderWithStore } from '../../../test/render';
+import { renderWithStore, typeInto } from '../../../test/render';
 import { getAppState } from '../../../test/store';
 import { layerStackState, makeLayerGroup, makeManualCustomLayer, makeMap } from '../../../test/fixtures';
 
@@ -16,26 +16,21 @@ const site = (visible = true) =>
     makeLayerGroup('site', [makeMap('mapA', { info: { origin: [1, 2, 0] } })], { name: 'Site', visible }),
   );
 
-const typeInto = (label: string, value: string) => {
-  const input = screen.getByLabelText(label);
-  fireEvent.focus(input);
-  fireEvent.change(input, { target: { value } });
-  fireEvent.blur(input);
-};
+const typeIntoField = (label: string, value: string) => typeInto(screen.getByLabelText(label), value);
 
 describe('LayerGroupInspector: moving the group', () => {
   it('moves what the group holds to the total typed, and shows the total moved so far', async () => {
     renderWithStore(<LayerGroupInspector id="site" />, site());
 
-    typeInto('ΔX (m)', '3');
-    typeInto('ΔY (m)', '-1');
+    typeIntoField('ΔX (m)', '3');
+    typeIntoField('ΔY (m)', '-1');
 
     await waitFor(() => expect(originOf('mapA')).toEqual([4, 1, 0]));
     expect(screen.getByLabelText('ΔX (m)')).toHaveValue('3');
     expect(screen.getByLabelText('ΔY (m)')).toHaveValue('-1');
 
     // A typed value is the new total, not another step.
-    typeInto('ΔX (m)', '5');
+    typeIntoField('ΔX (m)', '5');
     await waitFor(() => expect(originOf('mapA')).toEqual([6, 1, 0]));
   });
 
@@ -107,7 +102,7 @@ describe('LayerGroupInspector: moving the group', () => {
       const choose = vi.spyOn(DialogAPI, 'choose').mockResolvedValue('yes');
       renderWithStore(<LayerGroupInspector id="site" />, shared());
 
-      typeInto('ΔX (m)', '2');
+      typeIntoField('ΔX (m)', '2');
 
       await waitFor(() => expect(originOf('copy')).toEqual([2, 0, 0]));
       expect(choose).toHaveBeenCalledWith(expect.stringContaining('Copy'), expect.anything());
@@ -117,7 +112,7 @@ describe('LayerGroupInspector: moving the group', () => {
       vi.spyOn(DialogAPI, 'choose').mockResolvedValue('no');
       renderWithStore(<LayerGroupInspector id="site" />, shared());
 
-      typeInto('ΔX (m)', '2');
+      typeIntoField('ΔX (m)', '2');
 
       await waitFor(() => expect(originOf('mapA')).toEqual([2, 0, 0]));
       expect(originOf('copy')).toEqual([0, 0, 0]);
@@ -127,7 +122,7 @@ describe('LayerGroupInspector: moving the group', () => {
       const choose = vi.spyOn(DialogAPI, 'choose').mockResolvedValue('cancel');
       renderWithStore(<LayerGroupInspector id="site" />, shared());
 
-      typeInto('ΔX (m)', '2');
+      typeIntoField('ΔX (m)', '2');
 
       await waitFor(() => expect(choose).toHaveBeenCalledTimes(1));
       expect(originOf('mapA')).toEqual([0, 0, 0]);
@@ -156,7 +151,7 @@ describe('LayerGroupInspector: moving the group', () => {
       const ask = vi.spyOn(DialogAPI, 'ask').mockResolvedValue(false);
       renderWithStore(<LayerGroupInspector id="site" />, site(false));
 
-      typeInto('ΔX (m)', '3');
+      typeIntoField('ΔX (m)', '3');
 
       await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
       expect(ask.mock.calls[0][0]).toContain('Site');

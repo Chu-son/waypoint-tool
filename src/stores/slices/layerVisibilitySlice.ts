@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AppState } from '../appStore';
 import type { LayerVisibilitySet } from '../../types/layer';
 import { currentLayerVisibility, resolveSetVisibility, uniqueSetName } from '../../utils/layerVisibilitySets';
+import { changesAny, shallowEqual, updateById } from '../../utils/shallowChanges';
 
 const DEFAULT_SET_NAME = 'Layer Set';
 
@@ -36,6 +37,7 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
       ),
       visibility: currentLayerVisibility(state),
     };
+    get().pushHistorySnapshot();
     set((s) => ({
       layerVisibilitySets: [...s.layerVisibilitySets, created],
       activeLayerVisibilitySetId: created.id,
@@ -44,47 +46,58 @@ export const createLayerVisibilitySlice: StateCreator<AppState, [], [], LayerVis
     return created.id;
   },
 
-  overwriteLayerVisibilitySet: (id) =>
-    set((state) => ({
-      layerVisibilitySets: state.layerVisibilitySets.map((s) =>
-        s.id === id ? { ...s, visibility: currentLayerVisibility(state) } : s,
-      ),
+  overwriteLayerVisibilitySet: (id) => {
+    const state = get();
+    const target = state.layerVisibilitySets.find((s) => s.id === id);
+    if (!target) return;
+    const visibility = currentLayerVisibility(state);
+    if (state.activeLayerVisibilitySetId === id && shallowEqual(target.visibility, visibility)) return;
+    state.pushHistorySnapshot();
+    set((s) => ({
+      layerVisibilitySets: s.layerVisibilitySets.map((v) => (v.id === id ? { ...v, visibility } : v)),
       activeLayerVisibilitySetId: id,
       isDirty: true,
-    })),
+    }));
+  },
 
-  renameLayerVisibilitySet: (id, name) =>
-    set((state) => {
-      const others = state.layerVisibilitySets.filter((s) => s.id !== id).map((s) => s.name);
-      const unique = uniqueSetName(name.trim() || DEFAULT_SET_NAME, others);
-      return {
-        layerVisibilitySets: state.layerVisibilitySets.map((s) => (s.id === id ? { ...s, name: unique } : s)),
-        isDirty: true,
-      };
-    }),
+  renameLayerVisibilitySet: (id, name) => {
+    const state = get();
+    const target = state.layerVisibilitySets.find((s) => s.id === id);
+    if (!target) return;
+    const others = state.layerVisibilitySets.filter((s) => s.id !== id).map((s) => s.name);
+    const unique = uniqueSetName(name.trim() || DEFAULT_SET_NAME, others);
+    const layerVisibilitySets = updateById(state.layerVisibilitySets, id, { name: unique });
+    if (!layerVisibilitySets) return;
+    state.pushHistorySnapshot();
+    set({ layerVisibilitySets, isDirty: true });
+  },
 
-  deleteLayerVisibilitySet: (id) =>
+  deleteLayerVisibilitySet: (id) => {
+    if (!get().layerVisibilitySets.some((s) => s.id === id)) return;
+    get().pushHistorySnapshot();
     set((state) => ({
       layerVisibilitySets: state.layerVisibilitySets.filter((s) => s.id !== id),
       activeLayerVisibilitySetId: state.activeLayerVisibilitySetId === id ? null : state.activeLayerVisibilitySetId,
       isDirty: true,
-    })),
+    }));
+  },
 
   applyLayerVisibilitySet: (id) => {
-    const target = get().layerVisibilitySets.find((s) => s.id === id);
+    const state = get();
+    const target = state.layerVisibilitySets.find((s) => s.id === id);
     if (!target) return;
 
-    const next = resolveSetVisibility(target, get());
-    const current = currentLayerVisibility(get());
-    const changes = Object.keys(next).some((layerId) => next[layerId] !== current[layerId]);
-    // Only a real change is an undo step; re-applying the set that is already in effect is not.
-    if (changes) get().pushHistorySnapshot({ includeMapVisibility: true });
+    const next = resolveSetVisibility(target, state);
+    const current = currentLayerVisibility(state);
+    // Re-applying the set that is already in effect changes nothing, so it is not an undo step.
+    if (!changesAny(current, next) && state.activeLayerVisibilitySetId === id) return;
+    state.pushHistorySnapshot();
 
-    set((state) => ({
-      mapLayers: state.mapLayers.map((l) => ({ ...l, visible: next[l.id] })),
-      customLayers: state.customLayers.map((l) => ({ ...l, visible: next[l.id] })),
+    set((s) => ({
+      mapLayers: s.mapLayers.map((l) => ({ ...l, visible: next[l.id] })),
+      customLayers: s.customLayers.map((l) => ({ ...l, visible: next[l.id] })),
       layerGroups: Object.fromEntries(
-        Object.entries(state.layerGroups).map(([groupId, g]) => [groupId, { ...g, visible: next[groupId] }]),
+        Object.entries(s.layerGroups).map(([groupId, g]) => [groupId, { ...g, visible: next[groupId] }]),
       ),
       activeLayerVisibilitySetId: id,
       isDirty: true,

@@ -1,6 +1,7 @@
 import { ManualLayerTools } from './ManualLayerTools';
 import { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { DialogAPI } from '../../../api';
 import { PluginInstance } from '../../../types/store';
 import { Button } from '../common/Button';
@@ -58,10 +59,16 @@ export function CustomLayerInspector() {
   });
 
   const [params, setParams] = useState<Record<string, any>>({});
-  const [layerName, setLayerName] = useState<string>('');
-  const [layerOpacity, setLayerOpacity] = useState<number>(1.0);
-  const [blendMode, setBlendMode] = useState<MapBlendMode>('overwrite');
-  const [isReference, setIsReference] = useState<boolean>(false);
+  // The appearance chosen for a layer that does not exist yet; an existing layer shows the store's values,
+  // so that undo is reflected here.
+  const [draftName, setDraftName] = useState<string>('');
+  const [draftOpacity, setDraftOpacity] = useState<number>(1.0);
+  const [draftBlendMode, setDraftBlendMode] = useState<MapBlendMode>('overwrite');
+  const [draftIsReference, setDraftIsReference] = useState<boolean>(false);
+  const layerName = existingLayer ? existingLayer.name : draftName;
+  const layerOpacity = existingLayer ? (existingLayer.opacity ?? 1.0) : draftOpacity;
+  const blendMode = existingLayer ? existingLayer.blend_mode || 'overwrite' : draftBlendMode;
+  const isReference = existingLayer ? !!existingLayer.is_reference : draftIsReference;
   const [isExecuting, setIsExecuting] = useState(false);
   const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
@@ -82,11 +89,6 @@ export function CustomLayerInspector() {
     }
 
     if (existingLayer) {
-      setLayerName(existingLayer.name);
-      setLayerOpacity(existingLayer.opacity ?? 1.0);
-      setBlendMode(existingLayer.blend_mode || 'overwrite');
-      setIsReference(!!existingLayer.is_reference);
-
       if (existingLayer.type === 'plugin') {
         setSelectedPluginId(existingLayer.plugin_id);
         setActivePlugin(existingLayer.plugin_id);
@@ -114,10 +116,10 @@ export function CustomLayerInspector() {
       setSelectedPluginId(pluginIdToUse);
       setActivePlugin(pluginIdToUse);
       setActiveTool('add_generator');
-      setLayerName(plugins[pluginIdToUse]?.manifest.name || 'Generated Layer');
-      setLayerOpacity(0.7);
-      setBlendMode('overwrite');
-      setIsReference(false);
+      setDraftName(plugins[pluginIdToUse]?.manifest.name || 'Generated Layer');
+      setDraftOpacity(0.7);
+      setDraftBlendMode('overwrite');
+      setDraftIsReference(false);
 
       if (pluginIdToUse && plugins[pluginIdToUse]) {
         const initialParams: Record<string, any> = {};
@@ -159,7 +161,7 @@ export function CustomLayerInspector() {
       });
       setParams(initialParams);
       if (isNewPluginLayer) {
-        setLayerName(p.manifest.name);
+        setDraftName(p.manifest.name);
       }
     }
     clearPluginInteractionData();
@@ -188,24 +190,32 @@ export function CustomLayerInspector() {
             }
           });
 
-          const result = await useAppStore.getState().executeGeneratorPlugin({
-            plugin: activePlugin,
-            properties: params,
-            interactionData: filteredInteractionData,
-            existingExecutionId: (existingLayer as any)?.source_execution_id,
-            targetCustomLayerId: existingLayer?.id,
-          });
-
-          if (result.success && result.customLayerIds.length > 0) {
-            setActiveCustomLayerId(result.customLayerIds[0]);
-            // Apply visual overrides from UI inputs if set
-            updateCustomLayer(result.customLayerIds[0], {
-              ...(layerName ? { name: layerName } : {}),
-              opacity: layerOpacity,
-              blend_mode: blendMode,
-              is_reference: isReference,
+          // Generating and applying the appearance are one undo step. The transaction spans the plugin
+          // run, but the blocking loading overlay keeps the user from editing meanwhile.
+          const { beginHistoryTransaction, endHistoryTransaction } = useAppStore.getState();
+          beginHistoryTransaction();
+          try {
+            const result = await useAppStore.getState().executeGeneratorPlugin({
+              plugin: activePlugin,
+              properties: params,
+              interactionData: filteredInteractionData,
+              existingExecutionId: (existingLayer as any)?.source_execution_id,
+              targetCustomLayerId: existingLayer?.id,
             });
-            setActiveTool('select');
+
+            if (result.success && result.customLayerIds.length > 0) {
+              setActiveCustomLayerId(result.customLayerIds[0]);
+              // Apply visual overrides from UI inputs if set
+              updateCustomLayer(result.customLayerIds[0], {
+                ...(layerName ? { name: layerName } : {}),
+                opacity: layerOpacity,
+                blend_mode: blendMode,
+                is_reference: isReference,
+              });
+              setActiveTool('select');
+            }
+          } finally {
+            endHistoryTransaction();
           }
         },
       );
@@ -300,10 +310,8 @@ export function CustomLayerInspector() {
             <Label className="text-[11px] font-semibold text-text-muted">Layer Name</Label>
             <Input
               value={layerName}
-              onChange={(e) => {
-                setLayerName(e.target.value);
-                updateCustomLayer(existingLayer.id, { name: e.target.value });
-              }}
+              {...historyEditHandlers}
+              onChange={(e) => updateCustomLayer(existingLayer.id, { name: e.target.value })}
               className="h-8 text-xs bg-surface-base"
               placeholder="Layer Name"
             />
@@ -413,10 +421,8 @@ export function CustomLayerInspector() {
                 checked={isReference}
                 onChange={(e) => {
                   const checked = e.target.checked;
-                  setIsReference(checked);
-                  if (existingLayer) {
-                    updateCustomLayer(existingLayer.id, { is_reference: checked });
-                  }
+                  if (existingLayer) updateCustomLayer(existingLayer.id, { is_reference: checked });
+                  else setDraftIsReference(checked);
                 }}
               />
             </div>
@@ -435,12 +441,11 @@ export function CustomLayerInspector() {
               max={1}
               step={0.01}
               value={layerOpacity}
+              {...historyEditHandlers}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
-                setLayerOpacity(val);
-                if (existingLayer) {
-                  updateCustomLayer(existingLayer.id, { opacity: val });
-                }
+                if (existingLayer) updateCustomLayer(existingLayer.id, { opacity: val });
+                else setDraftOpacity(val);
               }}
             />
           </div>
@@ -453,10 +458,8 @@ export function CustomLayerInspector() {
                 disabled={isReference}
                 onChange={(e) => {
                   const val = e.target.value as MapBlendMode;
-                  setBlendMode(val);
-                  if (existingLayer) {
-                    updateCustomLayer(existingLayer.id, { blend_mode: val });
-                  }
+                  if (existingLayer) updateCustomLayer(existingLayer.id, { blend_mode: val });
+                  else setDraftBlendMode(val);
                 }}
                 className={cn(
                   'h-7 text-xs bg-surface-base border-border-base/50 w-52',

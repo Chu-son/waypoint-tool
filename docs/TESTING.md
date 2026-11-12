@@ -62,8 +62,8 @@ it('Delete removes the selected waypoints', () => {
 | ファイル | 用途 |
 |---|---|
 | `setup.ts` | jest-dom 拡張、pointer capture のポリフィル |
-| `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `getLayerOrder()`（積み順 = `layerOrderOf` の結果）, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
-| `render.tsx` | `renderWithStore(ui, state)` → `{ user, ...render結果 }` |
+| `store.ts` | `resetAppStore(overrides)`, `getAppState()`, `getLayerOrder()`（積み順 = `layerOrderOf` の結果）, `getEditObjects(layerId?)`（手描きレイヤーの図形）, `PAST_WELCOME`（初回起動モーダルを閉じた状態） |
+| `render.tsx` | `renderWithStore(ui, state)` → `{ user, ...render結果 }`、1 回の操作の手順 `dragSlider(el, ...values)`（押下→値の変更→離す）・`typeInto(el, ...values)`（focus→入力→blur） |
 | `fixtures.ts` | `makeWaypoint` / `makeGroup` / `waypointTree` / `makeTransform` / 各種アノテーション / `makeMap`（マップの source + インスタンス）/ `makeResolvedMapLayer` / `layerStackState`（マップ・カスタムレイヤー・`makeLayerGroup` のグループを、上から順に入れ子で並べたスタックのストア状態）/ `makeLayerGroup` / `makeAnnotationGroup` / `makeManualCustomLayer` / `makePluginLayer`（プラグインレイヤー）/ `makePlugin` / `makeGenerator`（子のウェイポイントを受け取り、その現在の姿勢をベースラインにした「手動編集なし」のジェネレーター。子は `waypointTree` にも渡す） |
 | `mocks/pixi.tsx` | PixiJS スタブ、描画呼び出しを記録する `createGraphicsRecorder()` |
 
@@ -80,6 +80,17 @@ it('Delete removes the selected waypoints', () => {
 
 - テストファイルは対象と同じディレクトリに `*.test.ts(x)` として置く。
 - テスト名は「何をすると、どうなるか」を振る舞いとして書く（例：`'undoes a drag in one step'`）。
+
+### Undo のテスト
+
+- `src/test/setup.ts` が、テストごとに履歴のガード（`stores/history/historyGuard.ts`）の違反を確かめる。Undo の対象の値を記録せずに変えると、そのテストが失敗する。記録した値は deep freeze されるので、ストアの値を直接書き換えると `TypeError` になる。
+- ガードで失敗したら、まず記録を足すことを考える。`withoutHistory` を使ってよいのは、Undo の対象外と決まっている変更（プロジェクトの読込・リセット、マップの追加・複製・削除など）だけ。
+- `useAppStore.setState` はガードの対象外（テストの準備に使うため）。
+- Undo の対象の操作は、表形式で次の 4 点を確かめる（例：`stores/slices/projectDataHistory.test.ts`）。
+  1. Undo で戻り、Redo でやり直せる
+  2. 前の別の操作を Undo しても巻き戻らない（後の操作を Undo しても残る）
+  3. 前の操作を残したまま、その操作だけが戻る
+  4. 連続入力が Undo 1 回にまとまる、値が変わらなければ履歴に残らない
 
 ## 7. リファクタリング時の手順
 

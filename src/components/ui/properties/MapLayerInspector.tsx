@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Map as MapIcon } from 'lucide-react';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import { Slider } from '../common/Slider';
 import { Select } from '../common/Select';
 import { FieldLabel } from '../common/FieldLabel';
@@ -70,6 +71,7 @@ export function MapLayerInspector({ id }: { id: string }) {
       <div className="space-y-2 pt-3 border-t border-border-base/30">
         <span className="text-[11px] font-bold text-text-base">Display</span>
         <Slider
+          {...historyEditHandlers}
           label="Layer Opacity"
           valueDisplay={`${Math.round(layer.opacity * 100)}%`}
           min="0"

@@ -59,7 +59,7 @@
   - **概要**: Lucide React のアイコン名文字列（例: `"FolderOpen"`, `"MapPin"`, `"Play"` 等）から安全に動的アイコンを描画する共通ヘルパーコンポーネント。
   - **主要Props**: `name`, `size`, `className`, `fallback`
 - **`Input`** / **`Select`** / **`Slider`** / **`Checkbox`** / **`Label`** ([`src/components/ui/common/`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/))
-  - **概要**: 統一されたダークテーマ適用済みの各種標準フォームコンポーネント。デスクトップ高密度（`h-8`, `text-[13px]`, `rounded-md`）準拠。
+  - **概要**: 統一されたダークテーマ適用済みの各種標準フォームコンポーネント。デスクトップ高密度（`h-8`, `text-[13px]`, `rounded-md`）準拠。`Input`（フォーカスから外れるまで）と `Slider`（押下から離すまで）は `onEditStart` / `onEditEnd` で 1 回の操作を知らせる。Undo の対象の値につなぐときは `{...historyEditHandlers}`（`stores/history/historyEditHandlers.ts`）を渡すと Undo 1 回にまとまる。開始・終了の対応とアンマウント時の終了は `useEditSession` が保証する。
 - **`EmptyState`** ([`src/components/ui/common/EmptyState.tsx`](file:///home/chuson/develop/waypoint-tool/src/components/ui/common/EmptyState.tsx))
   - **概要**: リストなどが空の場合のプレースホルダー表示用コンポーネント。Linear Style準拠（過度なアニメーションや丸みを排した `rounded-lg border` 構造）。
   - **主要Props**: `message`
@@ -328,7 +328,7 @@
 
 ### Canvas 補助モジュール (`src/components/canvas/`)
 - **`MapLayerSprite`** (`MapLayerSprite.tsx`): 占有格子画像 1 枚を ROS 原点に合わせて描画し、占有ハイライトフィルタを適用。マップインスタンスに使用領域（`clip`）があるときは、ワールド座標の矩形和集合を Pixi マスク（`utils/clipMask.ts`）として適用する。
-- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useMapClipEdit`（マップの使用領域のドラッグ描画・ハンドルでのリサイズ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得。バックエンドが返す RGBA のバイト列から直接テクスチャを作る。要求に増える番号を付けて古い計算を打ち切らせ、設定 `enableBlendCache` に応じて手描きレイヤーの `RasterCache` とバックエンドの `DecodeCache` を持つ・手放す）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）
+- **Hooks** (`canvas/hooks/`): `useTileTextures`（背景地図タイルの取得要求とテクスチャ共有キャッシュ）, `useGeoMapAlign`（背景地図のドラッグ位置合わせ）, `useMapClipEdit`（マップの使用領域のドラッグ描画・ハンドルでのリサイズ）, `useWindowSize`, `useCanvasTheme`（背景色・テーマ解決）, `useBlendedPreview`（エクスポート／占有プレビューのブレンド画像取得。バックエンドが返す RGBA のバイト列から直接テクスチャを作る。要求に増える番号を付けて古い計算を打ち切らせ、設定 `enableBlendCache` に応じて手描きレイヤーの `RasterCache` とバックエンドの `DecodeCache` を持つ・手放す）, `useSnapping`, `useAnnotationEdit`, `useMapEdit*`（ツール別編集）, `useMapEditDrawGesture`（図形の描画 4 種に共通の開始・確定。小さすぎる図形は取り消し、自動作成したレイヤーも消す）, `useHistoryGesture`（ジェスチャーを履歴トランザクションで包む。`begin({ onAbort })` / `end` / `cancel`。中断とアンマウントでは開始前の状態に戻す）
 - **純粋関数** (`canvas/utils/`): `viewport`（screen⇔world 変換・フィット・ズーム）, `hitTest`（矩形入力ハンドル判定・計測スナップ）, `canvasTheme`（フォールバックグリッド配色）, `labelLayout`（ラベル配置）, `tileCache`（タイルの同時取得数制限・LRU・失敗時の再試行間隔）
 
 ### Canvas レイヤー & フィルター群 (`src/components/canvas/`)

@@ -123,7 +123,8 @@ graph TD
   - `draw_shape`: アノテーションまたはマップ編集の図形ラバーバンド描画
   - `transform_shape`: 図形やROIのハンドルドラッグ変形
   - `precision_snapping`: スナップ拘束・数値キー入力中
-- **アボート機構**: `registerCanvasAbortHandler` によりハンドラが登録され、Escape 押下時にドラッグ前座標へのロールバックと履歴破棄を原子的（Atomic）に実行します。
+- **アボート機構**: ジェスチャーは `useHistoryGesture` で履歴トランザクションの中で動かします。フックはマウント時に `registerCanvasAbortHandler` に登録され、`begin` から `end` までの間に Escape・Undo・モード切替・ポインタ喪失・アンマウントが起きると、 `cancelHistoryTransaction` で開始前の状態に戻して履歴を破棄し、続けて `onAbort`（プレビューなど UI の後始末）を呼びます。
+- **対象のジェスチャー**: ウェイポイントのドラッグ（グループ含む）・向き変更・追加、アノテーションの移動・変形、図形の描画・移動・リサイズ・回転、エクスポート領域の作成・移動・リサイズ、使用領域のドラッグ（`useMapClipEdit`）、背景地図の位置合わせ（`useGeoMapAlign`）。トランザクションは入れ子にできるので、パネルの入力中にキャンバスでドラッグしても、どちらも効きます。
 
 #### Axis 5: 選択ドメイン単一権限 (Selection Authority: 排他的単一真実源)
 - **管理スライス**: `interactionSlice.ts` (`selection: ActiveSelection`)
@@ -343,7 +344,7 @@ flowchart TD
    - 動作: `activeElement.blur()` を実行してテキスト編集モードを抜け、キャンバスへ操作権を戻します。入力中の値は確定（Commit）されます。
 3. **Tier 3: キャンバス過渡ジェスチャー（Canvas Transient Gestures Abort）**
    - 判定: `registerCanvasAbortHandler` で登録された過渡ハンドラがアクティブ（ドラッグ中、回転中、矩形選択中、図形描画中など）。
-   - 動作: 最新のハンドラから逆順（LIFO）で呼出し。ノード移動であればドラッグ開始時の初期座標（`initialTransforms`）へロールバックし、作成途中の履歴ドラフトスナップショットを破棄します。
+   - 動作: 最新のハンドラから逆順（LIFO）で呼出し。`useHistoryGesture` のジェスチャーは、開始前の状態へ `cancelHistoryTransaction` で戻し、そのトランザクションの履歴を破棄します。
 4. **Tier 4: スナップ・精密数値入力拘束（Snapping & Precision Input Constraints）**
    - 判定: `appMode.mode === 'waypoint_add'` において、精密距離入力文字列 `snapInput` が存在するか、または軸拘束（`forcedAxis` / `forcedSign` / `lockedWaypointId`）が有効。
    - 動作: `snapInput` があればまず数値をクリア（`''`）します。数値が空で拘束があれば拘束を解除します。2段階で段階的にクリアされます。
@@ -556,7 +557,7 @@ stateDiagram-v2
 - **強制手法**: `setSelection` 呼出による他ドメイン選択IDの自動クリア。複数ドメインのオブジェクトを同時に選択状態にすることはアーキテクチャ違反。
 
 ### 7.3 過渡ジェスチャーの原子的ロールバックとポインタ喪失保護不変条件 (Gesture Atomicity & Pointer Loss Protection Invariant)
-- **定義**: ポインタ押下から離脱までの物理的ジェスチャー（ドラッグ、回転、描画等）は、離脱（PointerUp）の瞬間まで未確定（Uncommitted）とし、中断（Escape等）やポインタ喪失（`pointercancel`, `lostpointercapture`, ウィンドウフォーカス喪失 `blur`）が発生した場合は必ず操作直前の初期状態（`initialTransforms`）へ完全ロールバックしなければならない。
+- **定義**: ポインタ押下から離脱までの物理的ジェスチャー（ドラッグ、回転、描画等）は、離脱（PointerUp）の瞬間まで未確定（Uncommitted）とし、中断（Escape等）やポインタ喪失（`pointercancel`, `lostpointercapture`, ウィンドウフォーカス喪失 `blur`）が発生した場合は必ず操作直前の状態へ完全ロールバックしなければならない（`useHistoryGesture` が `cancelHistoryTransaction` で行う）。
 - **強制手法**: `registerCanvasAbortHandler` へのアボート処理登録義務、キャンバスコンテナにおける `pointercancel` / `lostpointercapture` / `window.blur` リスナーの常時監視、および中断時の履歴ドラフト破棄。
 
 ### 7.4 単一トランジションチョークポイント不変条件 (Unified Transition Choke Point Invariant)
@@ -778,9 +779,9 @@ flowchart TD
    - 本ドキュメントの「3. 11のプライマリ対話モード仕様」、「6. 状態遷移マトリクス」、および「9. UI表示対応マトリクス」を更新する。
 
 2. **キャンバス対話 Hook を作成する場合**:
-   - マウスドラッグ等の過渡操作を開始する際は、必ず開始直前の状態（初期座標など）を変数に保持する。
-   - `useAppStore.getState().registerCanvasAbortHandler(abortFn)` を呼び出し、ドラッグ中に Escape が押されたら初期座標に復元して履歴を破棄するロールバック処理を実装する。
-   - ポインタ離脱時（PointerUp）またはキャンセル時に、登録解除関数を実行してハンドラをクリーンアップする。
+   - ストアを変えるドラッグ等の過渡操作は `useHistoryGesture` を使う。開始時に `gesture.begin({ onAbort })` を呼ぶ。開始前の状態への復元と履歴の破棄はフックが行うので、`onAbort` にはプレビューの消去など UI の後始末だけを書く。
+   - `begin` したジェスチャーは、必ず `gesture.end()`（PointerUp）か `gesture.cancel()`（Escape・Undo・モード切替・`pointercancel`・キャプチャ喪失・アンマウント）で閉じる。新しい出口を足すときは閉じ忘れがないか確かめる。
+   - ストアを変えない過渡操作は、`registerCanvasAbortHandler` に中断処理を登録し、終了時に登録を解除する。
 
 3. **選択処理を行う場合**:
    - `selectedNodeIds` や `selectedAnnotationIds` を直接更新せず、必ず `useAppStore.getState().setSelection(...)` を呼び出す。

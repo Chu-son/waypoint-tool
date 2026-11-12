@@ -2,6 +2,7 @@ import { useId, useState } from 'react';
 import { ChevronDown, ChevronUp, Globe, Move, RotateCcw } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppStore } from '../../../stores/appStore';
+import { historyEditHandlers } from '../../../stores/history/historyEditHandlers';
 import type { BasemapId, GeoAlignment } from '../../../types/geo';
 import { BASEMAP_CHOICES, isValidTileTemplate, resolveBasemap } from '../../../utils/geo/basemapPresets';
 import { Button } from '../common/Button';
@@ -27,9 +28,7 @@ export function GeoMapCard() {
   const setGeoOrigin = useAppStore((state) => state.setGeoOrigin);
   const setGeoOriginKind = useAppStore((state) => state.setGeoOriginKind);
   const resetGeoAlignment = useAppStore((state) => state.resetGeoAlignment);
-  const beginGeoAlignDrag = useAppStore((state) => state.beginGeoAlignDrag);
-  const updateGeoAlignDrag = useAppStore((state) => state.updateGeoAlignDrag);
-  const endGeoAlignDrag = useAppStore((state) => state.endGeoAlignDrag);
+  const setGeoAlignment = useAppStore((state) => state.setGeoAlignment);
   const setActiveTool = useAppStore((state) => state.setActiveTool);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -47,9 +46,8 @@ export function GeoMapCard() {
       value={alignment[key]}
       step={step}
       precision={precision}
-      onEditStart={beginGeoAlignDrag}
-      onChange={(value) => updateGeoAlignDrag({ ...alignment, [key]: value })}
-      onEditEnd={endGeoAlignDrag}
+      onChange={(value) => setGeoAlignment({ ...alignment, [key]: value })}
+      {...historyEditHandlers}
     />
   );
 
@@ -101,6 +99,7 @@ export function GeoMapCard() {
                 <div className="flex flex-col gap-1">
                   <FieldLabel htmlFor={urlId}>Tile URL template</FieldLabel>
                   <Input
+                    {...historyEditHandlers}
                     id={urlId}
                     value={customBasemap.urlTemplate}
                     onChange={(e) => updateCustomBasemap({ urlTemplate: e.target.value })}
@@ -116,6 +115,7 @@ export function GeoMapCard() {
                 </div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <LabeledNumericInput
+                    {...historyEditHandlers}
                     label="Max zoom"
                     value={customBasemap.maxZoom}
                     precision={0}
@@ -128,6 +128,7 @@ export function GeoMapCard() {
                       Attribution
                     </FieldLabel>
                     <Input
+                      {...historyEditHandlers}
                       id={attributionId}
                       value={customBasemap.attribution}
                       onChange={(e) => updateCustomBasemap({ attribution: e.target.value })}
@@ -139,6 +140,7 @@ export function GeoMapCard() {
             )}
 
             <Slider
+              {...historyEditHandlers}
               label="Opacity"
               valueDisplay={`${Math.round(geoMap.opacity * 100)}%`}
               min="0"
@@ -182,16 +184,15 @@ export function GeoMapCard() {
               {numberField('Rotation (°)', 'yawDeg', 2, 1)}
             </div>
             <PoseAdjuster
-              onEditStart={beginGeoAlignDrag}
+              {...historyEditHandlers}
               onNudge={({ dx, dy, dyawDeg }) =>
-                updateGeoAlignDrag({
+                setGeoAlignment({
                   ...alignment,
                   dx: alignment.dx + dx,
                   dy: alignment.dy + dy,
                   yawDeg: alignment.yawDeg + dyawDeg,
                 })
               }
-              onEditEnd={endGeoAlignDrag}
             />
             <Button
               type="button"

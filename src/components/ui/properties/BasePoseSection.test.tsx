@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { GroupNodePanel } from './GroupNodePanel';
 import { GeneratorNodePanel } from './GeneratorNodePanel';
 import { AnnotationGroupPanel } from './AnnotationGroupPanel';
-import { renderWithStore } from '../../../test/render';
+import { renderWithStore, typeInto } from '../../../test/render';
 import { useAppStore } from '../../../stores/appStore';
 import { getAppState } from '../../../test/store';
 import {
@@ -18,12 +18,7 @@ import {
   waypointTree,
 } from '../../../test/fixtures';
 
-const typeInto = (label: string, value: string) => {
-  const input = screen.getByLabelText(label);
-  fireEvent.focus(input);
-  fireEvent.change(input, { target: { value } });
-  fireEvent.blur(input);
-};
+const typeIntoField = (label: string, value: string) => typeInto(screen.getByLabelText(label), value);
 /** The panel fed from the store, as the inspector does, so it sees the group change. */
 function LiveAnnotationGroupPanel({ id }: { id: string }) {
   const group = useAppStore((state) => state.annotationGroups[id]);
@@ -52,7 +47,7 @@ describe('BasePoseSection on a waypoint group', () => {
   it('moves the waypoints so that the reference pose lands on the typed value', async () => {
     renderWithStore(<GroupNodePanel node={group} />, groupState());
 
-    typeInto('基準 X (m)', '4');
+    typeIntoField('基準 X (m)', '4');
 
     await waitFor(() => expect(xyOf('a')).toEqual({ x: 3, y: 0 }));
     expect(xyOf('b')).toEqual({ x: 5, y: 0 });
@@ -168,7 +163,7 @@ describe('BasePoseSection on an annotation group', () => {
     renderWithStore(<LiveAnnotationGroupPanel id="g" />, state());
     expect(getAppState().pluginInteractionData.goal).toMatchObject({ x: 0, y: 0 });
 
-    typeInto('基準 Y (m)', '3');
+    typeIntoField('基準 Y (m)', '3');
 
     await waitFor(() => expect(getAppState().annotationObjects.dot).toMatchObject({ x: 0, y: 3 }));
     expect(getAppState().pluginInteractionData.goal).toMatchObject({ x: 0, y: 3 });
@@ -181,7 +176,7 @@ describe('BasePoseSection on an annotation group', () => {
     renderWithStore(<LiveAnnotationGroupPanel id="g" />, state());
     fireEvent.change(screen.getByDisplayValue('2'), { target: { value: '5' } });
 
-    typeInto('基準 Y (m)', '3');
+    typeIntoField('基準 Y (m)', '3');
 
     await waitFor(() => expect(getAppState().annotationObjects.dot).toMatchObject({ y: 3 }));
     expect(screen.getByDisplayValue('5')).toBeInTheDocument();

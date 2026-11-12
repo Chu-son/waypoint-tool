@@ -2,27 +2,23 @@ import { useState, useCallback } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { CircleEditObject } from '../../../types/store';
 import { v4 as uuidv4 } from 'uuid';
+import { useMapEditDrawGesture } from './useMapEditDrawGesture';
 
 export function useMapEditCircle() {
-  const activeCustomLayerId = useAppStore((state) => state.activeCustomLayerId);
   const mapEditFillValue = useAppStore((state) => state.mapEditFillValue);
-  const addEditObject = useAppStore((state) => state.addEditObject);
-  const setSelectedEditObjectId = useAppStore((state) => state.setSelectedEditObjectId);
-  const pushHistorySnapshot = useAppStore((state) => state.pushHistorySnapshot);
+  const draw = useMapEditDrawGesture();
 
   const [circleCenter, setCircleCenter] = useState<{ x: number; y: number } | null>(null);
   const [circlePreview, setCirclePreview] = useState<CircleEditObject | null>(null);
 
+  const clearDrawing = useCallback(() => {
+    setCircleCenter(null);
+    setCirclePreview(null);
+  }, []);
+
   const handleCircleDrawStart = useCallback(
     (worldPos: { x: number; y: number }) => {
-      const state = useAppStore.getState();
-      let targetLayer = state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual');
-      if (!targetLayer) {
-        targetLayer = state.customLayers.find((l) => l.type === 'manual') || state.addManualCustomLayer();
-      }
-      if (state.activeCustomLayerId !== targetLayer.id) {
-        state.setActiveCustomLayerId(targetLayer.id);
-      }
+      draw.begin(clearDrawing);
       setCircleCenter(worldPos);
       setCirclePreview({
         id: 'preview',
@@ -33,7 +29,7 @@ export function useMapEditCircle() {
         radius: 0.01,
       });
     },
-    [activeCustomLayerId, mapEditFillValue],
+    [draw, clearDrawing, mapEditFillValue],
   );
 
   const handleCircleDrawMove = useCallback(
@@ -56,30 +52,10 @@ export function useMapEditCircle() {
   );
 
   const handleCircleDrawEnd = useCallback(() => {
-    const state = useAppStore.getState();
-    const targetLayer =
-      state.customLayers.find((l) => l.id === activeCustomLayerId && l.type === 'manual') ||
-      state.customLayers.find((l) => l.type === 'manual');
-    const targetLayerId = targetLayer?.id;
-    if (!circleCenter || !circlePreview || !targetLayerId) {
-      setCircleCenter(null);
-      setCirclePreview(null);
-      return;
-    }
-
-    if (circlePreview.radius >= 0.02) {
-      const newObj: CircleEditObject = {
-        ...circlePreview,
-        id: uuidv4(),
-      };
-      addEditObject(targetLayerId, newObj);
-      setSelectedEditObjectId(newObj.id);
-      pushHistorySnapshot();
-    }
-
-    setCircleCenter(null);
-    setCirclePreview(null);
-  }, [circleCenter, circlePreview, activeCustomLayerId, addEditObject, setSelectedEditObjectId, pushHistorySnapshot]);
+    const largeEnough = circlePreview && circlePreview.radius >= 0.02;
+    draw.finish(largeEnough ? { ...circlePreview, id: uuidv4() } : null);
+    clearDrawing();
+  }, [draw, clearDrawing, circlePreview]);
 
   return {
     circlePreview,

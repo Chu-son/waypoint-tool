@@ -93,7 +93,6 @@ export function ShortcutManager() {
         activeCustomLayerId,
         removeEditObject,
         setSelectedEditObjectId,
-        pushHistorySnapshot,
         selectedAnnotationIds = [],
         removeAnnotationObjects,
         setActiveTool,
@@ -111,7 +110,6 @@ export function ShortcutManager() {
         if (selectedEditObjectId && activeCustomLayerId) {
           removeEditObject?.(activeCustomLayerId, selectedEditObjectId);
           if (setSelectedEditObjectId) setSelectedEditObjectId(null);
-          if (pushHistorySnapshot) pushHistorySnapshot();
         } else if (selectedAnnotationIds.length > 0) {
           removeAnnotationObjects?.(selectedAnnotationIds);
         } else if (selectedNodeIds.length > 0) {

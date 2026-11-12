@@ -3,7 +3,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState, useCallback, useMem
 import { Application, extend, useApplication } from '@pixi/react';
 import { Container, Sprite, Graphics, Texture, Text, TextStyle, type FederatedPointerEvent } from 'pixi.js';
 import type { ClipHandle } from '../../utils/mapClip';
-import { useAppStore, type AppState } from '../../stores/appStore';
+import { useAppStore } from '../../stores/appStore';
 import { wholeGroupSelected } from '../../utils/waypointGroupTransform';
 import { useResolvedMapLayers } from '../../hooks/useResolvedMapLayers';
 import { v4 as uuidv4 } from 'uuid';
@@ -22,6 +22,7 @@ import { MeasureLayer } from './layers/MeasureLayer';
 import { GeoTileLayer } from './layers/GeoTileLayer';
 import { GeoAlignMarkerLayer } from './layers/GeoAlignMarkerLayer';
 import { BasePoseMarkerLayer } from './layers/BasePoseMarkerLayer';
+import { useHistoryGesture } from './hooks/useHistoryGesture';
 import { useGeoMapAlign } from './hooks/useGeoMapAlign';
 import { useMapClipEdit } from './hooks/useMapClipEdit';
 import { MapClipEditLayer } from './layers/MapClipEditLayer';
@@ -89,7 +90,6 @@ function MapCanvasView() {
   const appMode = useAppStore((state) => state.appMode);
   const registerCanvasAbortHandler = useAppStore((state) => state.registerCanvasAbortHandler);
   const addNode = useAppStore((state) => state.addNode);
-  const removeNodes = useAppStore((state) => state.removeNodes);
   const selectNodes = useAppStore((state) => state.selectNodes);
   const nodes = useAppStore((state) => state.nodes);
   const annotationObjects = useAppStore((state) => state.annotationObjects) || {};
@@ -98,7 +98,6 @@ function MapCanvasView() {
   const insertionTarget = useAppStore((state) => state.insertionTarget);
   const updateNode = useAppStore((state) => state.updateNode);
   const updateNodes = useAppStore((state) => state.updateNodes);
-  const removeExportRegion = useAppStore((state) => state.removeExportRegion);
 
   const showPaths = useAppStore((state) => state.showPaths);
   const showGrid = useAppStore((state) => state.showGrid);
@@ -234,14 +233,9 @@ function MapCanvasView() {
     >;
     /**
      * Set when the selection is a whole group or generator: the drag moves it as one body (reference pose,
-     * generator inputs and other outputs of the same run included). `applied` is the shift done so far;
-     * `before` is put back on Escape.
+     * generator inputs and other outputs of the same run included). `applied` is the shift done so far.
      */
-    group?: {
-      id: string;
-      applied: { dx: number; dy: number };
-      before: Pick<AppState, 'nodes' | 'annotationObjects' | 'annotationGroups' | 'customLayers'>;
-    };
+    group?: { id: string; applied: { dx: number; dy: number } };
   } | null>(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
   const latestMousePos = useRef({ x: 0, y: 0 }); // Track screen mouse pos constantly
@@ -253,16 +247,6 @@ function MapCanvasView() {
   const pointsInputKey = useRef<string>('');
   const pointsItemIndex = useRef<number>(-1);
   const regionDragOffset = useRef({ x: 0, y: 0 });
-  const initialYawTransform = useRef<{
-    x: number;
-    y: number;
-    z?: number;
-    qx: number;
-    qy: number;
-    qz: number;
-    qw: number;
-  } | null>(null);
-  const isCreatingNewNodeOnYaw = useRef<boolean>(false);
   const justAbortedRef = useRef<boolean>(false);
 
   const [marqueeBox, setMarqueeBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -293,6 +277,7 @@ function MapCanvasView() {
   useSnappingKeyboardEvents(interactionMode, activeNodeId);
 
   const abortRef = useRef<() => boolean>(() => false);
+  const gesture = useHistoryGesture();
   const geoAlign = useGeoMapAlign();
   const mapClipEdit = useMapClipEdit();
   const { isAltPressed, snappedMeasureTarget, setSnappedMeasureTarget } = useMeasureAltSnap({
@@ -302,41 +287,19 @@ function MapCanvasView() {
   });
 
   const abort = useCallback((): boolean => {
-    // 1. Dragging node(s): rollback initial positions & cancel transaction
+    // Gestures that change the store run in a `useHistoryGesture`, an abort handler of its own that puts the
+    // store back. The branches below only reset what the canvas tracks.
+    // 1. Dragging node(s)
     if (interactionMode.current === 'drag_node' && movingNodesState.current) {
-      const { group } = movingNodesState.current;
-      if (group) {
-        useAppStore.setState(group.before);
-      } else {
-        const rollback: Record<string, Partial<WaypointNode>> = {};
-        Object.entries(movingNodesState.current.initialTransforms).forEach(([id, initTr]) => {
-          rollback[id] = { transform: { ...initTr } };
-        });
-        updateNodes(rollback, { skipRecalculate: true });
-      }
-      useAppStore.getState().endHistoryTransaction();
       movingNodesState.current = null;
       activeNodeId.current = null;
       interactionMode.current = 'none';
       justAbortedRef.current = true;
       return true;
     }
-    // 2. Setting yaw: delete temporary created node if freshly added, or rollback orientation if rotating existing node
+    // 2. Setting yaw (of a waypoint just placed, which the abort removes again, or of an existing one)
     if (interactionMode.current === 'set_yaw' && activeNodeId.current) {
-      if (isCreatingNewNodeOnYaw.current) {
-        removeNodes([activeNodeId.current]);
-      } else if (initialYawTransform.current) {
-        updateNodes(
-          {
-            [activeNodeId.current]: { transform: { ...initialYawTransform.current } },
-          },
-          { skipRecalculate: true },
-        );
-      }
-      useAppStore.getState().endHistoryTransaction();
       activeNodeId.current = null;
-      initialYawTransform.current = null;
-      isCreatingNewNodeOnYaw.current = false;
       interactionMode.current = 'none';
       justAbortedRef.current = true;
       return true;
@@ -351,8 +314,6 @@ function MapCanvasView() {
     }
     // 4. Export region drawing / moving / resizing
     if (interactionMode.current === 'draw_export_region' && activeNodeId.current) {
-      removeExportRegion?.(activeNodeId.current);
-      useAppStore.getState().endHistoryTransaction();
       activeNodeId.current = null;
       interactionMode.current = 'none';
       justAbortedRef.current = true;
@@ -407,12 +368,6 @@ function MapCanvasView() {
       interactionMode.current === ('edit_map_resize_object' as any) ||
       interactionMode.current === ('edit_map_set_rect_rotation' as any)
     ) {
-      if (
-        interactionMode.current === ('edit_map_move_object' as any) ||
-        interactionMode.current === ('edit_map_resize_object' as any)
-      ) {
-        useAppStore.getState().endHistoryTransaction();
-      }
       movingEditObject.current = null;
       resizingEditObject.current = null;
       interactionMode.current = 'none';
@@ -425,14 +380,14 @@ function MapCanvasView() {
       justAbortedRef.current = true;
       return true;
     }
-    // 9b. Geo base map alignment drag: restore the position before the drag
+    // 9b. Geo base map alignment drag
     if (interactionMode.current === 'geo_align_drag') {
       geoAlign.abort();
       interactionMode.current = 'none';
       justAbortedRef.current = true;
       return true;
     }
-    // 9c. Map use-area drag: restore the area from before the drag
+    // 9c. Map use-area drag
     if (interactionMode.current === 'map_clip_drag') {
       mapClipEdit.abort();
       interactionMode.current = 'none';
@@ -449,7 +404,7 @@ function MapCanvasView() {
       }
     }
     return false;
-  }, [updateNodes, removeNodes, removeExportRegion, activeTool, resetMeasure, geoAlign, mapClipEdit]);
+  }, [activeTool, resetMeasure, geoAlign, mapClipEdit]);
 
   abortRef.current = abort;
 
@@ -713,7 +668,7 @@ function MapCanvasView() {
       };
 
       interactionMode.current = 'edit_map_move_object' as any;
-      useAppStore.getState().beginHistoryTransaction();
+      gesture.begin();
       if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
@@ -761,7 +716,7 @@ function MapCanvasView() {
       };
 
       interactionMode.current = 'edit_map_resize_object' as any;
-      useAppStore.getState().beginHistoryTransaction();
+      gesture.begin();
       if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
         containerRef.current.setPointerCapture(e.nativeEvent.pointerId);
       }
@@ -978,9 +933,7 @@ function MapCanvasView() {
       const { x: worldX, y: worldY } = eventToWorld(e);
 
       const id = uuidv4();
-      useAppStore.getState().beginHistoryTransaction();
-      isCreatingNewNodeOnYaw.current = true;
-      initialYawTransform.current = null;
+      gesture.begin();
       addNode(
         {
           id,
@@ -1029,6 +982,7 @@ function MapCanvasView() {
         }
       });
 
+      gesture.begin();
       useAppStore.getState().addExportRegion({
         id,
         name: `Region ${useAppStore.getState().exportRegions.length + 1}`,
@@ -1445,13 +1399,13 @@ function MapCanvasView() {
         const dy = activeInitial ? worldY - activeInitial.y : worldY - startWorldPos.y;
 
         if (group) {
-          // History was recorded when the drag began; the path is recalculated when it ends.
+          // The path is recalculated when the drag ends.
           useAppStore
             .getState()
             .transformNodeGroup(
               group.id,
               { dx: dx - group.applied.dx, dy: dy - group.applied.dy, dyaw: 0, pivot: { x: 0, y: 0 } },
-              { recordHistory: false, skipRecalculate: true },
+              { skipRecalculate: true },
             );
           group.applied = { dx, dy };
           return;
@@ -1768,8 +1722,6 @@ function MapCanvasView() {
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (justAbortedRef.current) {
       justAbortedRef.current = false;
-      isCreatingNewNodeOnYaw.current = false;
-      initialYawTransform.current = null;
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch (_) {}
@@ -1807,12 +1759,10 @@ function MapCanvasView() {
         handleLineDrawEnd();
       } else if (interactionMode.current === ('edit_map_move_object' as any) && movingEditObject.current) {
         movingEditObject.current = null;
-        useAppStore.getState().endHistoryTransaction();
-        useAppStore.getState().pushHistorySnapshot();
+        gesture.end();
       } else if (interactionMode.current === ('edit_map_resize_object' as any) && resizingEditObject.current) {
         resizingEditObject.current = null;
-        useAppStore.getState().endHistoryTransaction();
-        useAppStore.getState().pushHistorySnapshot();
+        gesture.end();
       }
       if (interactionMode.current !== 'none') {
         e.currentTarget.releasePointerCapture(e.pointerId);
@@ -1882,8 +1832,8 @@ function MapCanvasView() {
     }
 
     if (interactionMode.current !== 'none') {
+      gesture.end();
       if (interactionMode.current === 'drag_node' || interactionMode.current === 'set_yaw') {
-        useAppStore.getState().endHistoryTransaction();
         if (useAppStore.getState().autoRecalculatePath && useAppStore.getState().activePathCalculatorPluginId) {
           useAppStore.getState().recalculatePath({ immediate: true });
         }
@@ -1999,7 +1949,7 @@ function MapCanvasView() {
         }
       }
 
-      useAppStore.getState().beginHistoryTransaction();
+      gesture.begin();
       interactionMode.current = 'drag_node';
       activeNodeId.current = nodeId;
 
@@ -2026,24 +1976,12 @@ function MapCanvasView() {
         initialTransforms[nodeId] = { ...allNodes[nodeId].transform };
       }
 
-      const store = useAppStore.getState();
-      const groupId = wholeGroupSelected(allNodes, store.selectedNodeIds);
+      const groupId = wholeGroupSelected(allNodes, useAppStore.getState().selectedNodeIds);
       movingNodesState.current = {
         activeId: nodeId,
         startWorldPos: worldPos,
         initialTransforms,
-        group: groupId
-          ? {
-              id: groupId,
-              applied: { dx: 0, dy: 0 },
-              before: {
-                nodes: store.nodes,
-                annotationObjects: store.annotationObjects,
-                annotationGroups: store.annotationGroups,
-                customLayers: store.customLayers,
-              },
-            }
-          : undefined,
+        group: groupId ? { id: groupId, applied: { dx: 0, dy: 0 } } : undefined,
       };
 
       if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
@@ -2055,10 +1993,7 @@ function MapCanvasView() {
   const handleNodeHandlePointerDown = useStableCallback((e: FederatedPointerEvent, nodeId: string) => {
     if (isMapEditMode) return;
     e.stopPropagation();
-    const existingNode = useAppStore.getState().nodes[nodeId];
-    initialYawTransform.current = existingNode?.transform ? { ...existingNode.transform } : null;
-    isCreatingNewNodeOnYaw.current = false;
-    useAppStore.getState().beginHistoryTransaction();
+    gesture.begin();
     interactionMode.current = 'set_yaw';
     activeNodeId.current = nodeId;
     if (containerRef.current && e.nativeEvent instanceof PointerEvent) {
@@ -2101,6 +2036,7 @@ function MapCanvasView() {
           const mouseY = e.nativeEvent.clientY - rect.top;
           const { x: worldX, y: worldY } = screenToWorld(mouseX, mouseY);
           regionDragOffset.current = { x: worldX - region.rect.x, y: worldY - region.rect.y };
+          gesture.begin();
           interactionMode.current = 'move_export_region';
           activeNodeId.current = regionId;
           containerRef.current?.setPointerCapture(e.nativeEvent.pointerId);
@@ -2116,6 +2052,7 @@ function MapCanvasView() {
         if (e.nativeEvent && typeof (e.nativeEvent as any).stopPropagation === 'function') {
           (e.nativeEvent as any).stopPropagation();
         }
+        gesture.begin();
         interactionMode.current = 'resize_export_region';
         activeNodeId.current = regionId;
         rectDragCorner.current = handle;
@@ -2158,11 +2095,12 @@ function MapCanvasView() {
         try {
           e.currentTarget.releasePointerCapture(e.pointerId);
         } catch (_) {}
-        abortRef.current?.();
+        // Every gesture in progress is aborted, including those of the hooks (annotations) with their own.
+        useAppStore.getState().abortCanvasGestures();
         setCursorPosition(null);
       }}
       onLostPointerCapture={() => {
-        abortRef.current?.();
+        useAppStore.getState().abortCanvasGestures();
         setCursorPosition(null);
       }}
       onPointerLeave={() => {

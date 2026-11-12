@@ -8,7 +8,6 @@ import {
   moveClipWithPose,
   rectFromCorners,
   resizeRect,
-  sameClip,
 } from './mapClip';
 import { makeResolvedMapLayer } from '../test/fixtures';
 
@@ -136,21 +135,5 @@ describe('moveClipWithPose', () => {
     const away = moveClipWithPose(clip, [1, 1, 0.3], [4, -2, 1.9]);
     const [back] = moveClipWithPose(away, [4, -2, 1.9], [1, 1, 0.3])!.rects;
     expect([back.x, back.y]).toEqual([expect.closeTo(2), expect.closeTo(0)]);
-  });
-});
-
-describe('sameClip', () => {
-  const a = { rects: [{ x: 0, y: 0, width: 1, height: 1 }] };
-
-  it('compares by area, not identity', () => {
-    expect(sameClip(a, { rects: [{ x: 0, y: 0, width: 1, height: 1 }] })).toBe(true);
-    expect(sameClip(a, { rects: [{ x: 0, y: 0, width: 2, height: 1 }] })).toBe(false);
-    expect(sameClip(a, { rects: [...a.rects, ...a.rects] })).toBe(false);
-  });
-
-  it('treats no clip as different from any clip', () => {
-    expect(sameClip(null, null)).toBe(true);
-    expect(sameClip(null, a)).toBe(false);
-    expect(sameClip(a, null)).toBe(false);
   });
 });

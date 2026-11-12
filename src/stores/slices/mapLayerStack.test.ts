@@ -147,58 +147,11 @@ describe('map layer stack', () => {
   });
 });
 
-describe('reshaping a use area with a drag', () => {
+describe('undo of a use area', () => {
   const left = { rects: [{ x: 0, y: 0, width: 5, height: 10 }] };
   const clipOf = (id: string) => getAppState().mapLayers.find((l) => l.id === id)?.clip;
 
   beforeEach(() => resetAppStore(layerStackState(makeMap('a', { clip: left }))));
-
-  it('makes a whole drag one undo step', () => {
-    getAppState().beginMapClipDrag('a');
-    getAppState().updateMapClipDrag({ rects: [{ x: 0, y: 0, width: 6, height: 10 }] });
-    getAppState().updateMapClipDrag({ rects: [{ x: 0, y: 0, width: 8, height: 10 }] });
-    getAppState().endMapClipDrag();
-    expect(clipOf('a')?.rects[0].width).toBe(8);
-
-    getAppState().undo();
-
-    expect(clipOf('a')).toEqual(left);
-  });
-
-  it('restores the area and leaves no history when the drag is cancelled', () => {
-    const undoDepth = getAppState().historyPast.length;
-
-    getAppState().beginMapClipDrag('a');
-    getAppState().updateMapClipDrag({ rects: [{ x: 1, y: 1, width: 1, height: 1 }] });
-    getAppState().cancelMapClipDrag();
-
-    expect(clipOf('a')).toEqual(left);
-    expect(getAppState().historyPast).toHaveLength(undoDepth);
-  });
-
-  it('restores "no clip" when a drag that enabled the clip is cancelled', () => {
-    resetAppStore(layerStackState(makeMap('a')));
-
-    getAppState().beginMapClipDrag('a');
-    getAppState().updateMapClipDrag(left);
-    getAppState().cancelMapClipDrag();
-
-    expect(clipOf('a')).toBeNull();
-  });
-
-  it('leaves no undo step when the drag changed nothing, and keeps the redo history', () => {
-    getAppState().updateMapLayer('a', { opacity: 0.5 });
-    getAppState().pushHistorySnapshot();
-    getAppState().undo();
-    expect(getAppState().historyFuture).toHaveLength(1);
-    const undoDepth = getAppState().historyPast.length;
-
-    getAppState().beginMapClipDrag('a');
-    getAppState().endMapClipDrag();
-
-    expect(getAppState().historyPast).toHaveLength(undoDepth);
-    expect(getAppState().historyFuture).toHaveLength(1);
-  });
 
   it('undoes and redoes a use area change without touching maps added since', () => {
     getAppState().pushHistorySnapshot();
@@ -212,11 +165,5 @@ describe('reshaping a use area with a drag', () => {
     getAppState().redo();
     expect(clipOf('a')).toBeNull();
     expect(getAppState().mapLayers).toHaveLength(2);
-  });
-
-  it('ignores updates outside a drag', () => {
-    getAppState().updateMapClipDrag({ rects: [{ x: 9, y: 9, width: 1, height: 1 }] });
-
-    expect(clipOf('a')).toEqual(left);
   });
 });

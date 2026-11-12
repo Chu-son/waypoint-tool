@@ -10,7 +10,6 @@ import {
   SourceSnapshot,
   WaypointNode,
   PipelineMetadata,
-  InsertionTarget,
 } from '../../types/store';
 import { BackendAPI } from '../../api';
 import { prepareLayersForExport, enrichInteractionDataWithCustomLayers } from '../../services/mapRasterize';
@@ -19,7 +18,7 @@ import { notify } from '../../services/notify';
 import { DEFAULT_ANNOTATION_COLOR } from '../../utils/colorPresets';
 import { findNodeParentId } from '../../utils/treeUtils';
 import { baseMapResolution, insertBelowCustomLayers } from '../../utils/layerStack';
-import { cloneSelection } from './historySlice';
+import { captureSnapshot, restoreSnapshot } from '../history/historyModel';
 import { resolvePythonPath } from '../../utils/pythonPath';
 import { resolveBindingExpression } from '../../utils/pluginBindings';
 import {
@@ -560,27 +559,11 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       };
     }
 
-    // Capture initial state for rollback on failure
-    const initialNodes = { ...get().nodes };
-    const initialRootNodeIds = [...get().rootNodeIds];
+    // Captured for rolling back on failure
+    const initialState = captureSnapshot(get());
+    const initialNodes = initialState.nodes;
     const initialSelectedNodeIds = [...get().selectedNodeIds];
-    const initialSelection = cloneSelection(get().selection);
-    const initialCustomLayers = structuredClone(get().customLayers ?? []);
-    const initialRootLayerIds = get().rootLayerIds;
-    const initialLayerGroups = get().layerGroups;
-    const initialAnnotationGroups = { ...get().annotationGroups };
-    const initialAnnotationObjects = structuredClone(get().annotationObjects ?? {});
-    const initialAnnotationOrder = [...(get().annotationOrder ?? [])];
-    const initialRootAnnotationIds = [...(get().rootAnnotationIds ?? [])];
-    const initialSelectedAnnotationIds = [...(get().selectedAnnotationIds ?? [])];
-    const initialActiveCustomLayerId = get().activeCustomLayerId;
-    const initialSelectedEditObjectId = get().selectedEditObjectId;
-    const initialInsertionTarget: InsertionTarget | null = get().insertionTarget
-      ? { parentId: get().insertionTarget!.parentId, index: get().insertionTarget!.index }
-      : null;
-
-    const initialHistoryDepth = get().historyTransactionDepth;
-    const initialHistoryLength = get().historyPast.length;
+    const nested = get().historyTransactionDepth > 0;
 
     // Snapshot selected points at execution initiation so intermediate step mutations do not clobber them
     const initialSelectedPoints = initialSelectedNodeIds
@@ -1154,28 +1137,13 @@ export const createPluginSlice: StateCreator<AppState, [], [], PluginSlice> = (s
       get().endHistoryTransaction();
       return { success: true, pipelineExecutionId };
     } catch (err: any) {
-      // Roll back cleanly
-      set({
-        nodes: initialNodes,
-        rootNodeIds: initialRootNodeIds,
-        selectedNodeIds: initialSelectedNodeIds,
-        selection: initialSelection,
-        customLayers: initialCustomLayers,
-        rootLayerIds: initialRootLayerIds,
-        layerGroups: initialLayerGroups,
-        annotationGroups: initialAnnotationGroups,
-        annotationObjects: initialAnnotationObjects,
-        annotationOrder: initialAnnotationOrder,
-        rootAnnotationIds: initialRootAnnotationIds,
-        selectedAnnotationIds: initialSelectedAnnotationIds,
-        activeCustomLayerId: initialActiveCustomLayerId,
-        selectedEditObjectId: initialSelectedEditObjectId,
-        insertionTarget: initialInsertionTarget,
-      });
-      set((state) => ({
-        historyPast: state.historyPast.slice(0, initialHistoryLength),
-        historyTransactionDepth: initialHistoryDepth,
-      }));
+      // Roll back cleanly: everything the pipeline changed, and its history entry
+      if (nested) {
+        set(restoreSnapshot(get(), initialState));
+        get().endHistoryTransaction();
+      } else {
+        get().cancelHistoryTransaction();
+      }
 
       return {
         success: false,

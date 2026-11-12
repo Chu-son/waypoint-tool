@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Input } from './Input';
+import type { EditBoundary } from './useEditSession';
 
-export interface NumericInputProps {
+export interface NumericInputProps extends EditBoundary {
   id?: string;
   value: number;
   onChange: (value: number) => void;
@@ -12,10 +13,6 @@ export interface NumericInputProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-  /** キー入力開始時（フォーカス時）に呼ばれる。連続編集をUndo/Redoの1エントリにまとめるために使う。 */
-  onEditStart?: () => void;
-  /** キー入力終了時（ブラー時）に呼ばれる。 */
-  onEditEnd?: () => void;
 }
 
 /**
@@ -70,14 +67,13 @@ export function NumericInput({
       disabled={disabled}
       step={step}
       className={className}
-      onFocus={() => {
-        setIsFocused(true);
-        onEditStart?.();
-      }}
+      // Focus to blur is one edit: the value typed is committed on blur, before the edit ends.
+      onEditStart={onEditStart}
+      onEditEnd={onEditEnd}
+      onFocus={() => setIsFocused(true)}
       onBlur={() => {
         setIsFocused(false);
         commit();
-        onEditEnd?.();
       }}
       onChange={(e) => {
         const raw = e.target.value;

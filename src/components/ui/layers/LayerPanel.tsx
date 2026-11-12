@@ -165,7 +165,11 @@ export function LayerPanel() {
                 className="h-6 w-6 ml-2 text-text-muted hover:text-primary-base hover:bg-primary-base/10"
                 onClick={() => {
                   const allVisible = exportRegions.every((r) => r.visible);
-                  exportRegions.forEach((r) => updateExportRegion(r.id, { visible: !allVisible }));
+                  useAppStore
+                    .getState()
+                    .runInHistoryTransaction(() =>
+                      exportRegions.forEach((r) => updateExportRegion(r.id, { visible: !allVisible })),
+                    );
                 }}
                 title={exportRegions.every((r) => r.visible) ? 'Hide All Regions' : 'Show All Regions'}
               >

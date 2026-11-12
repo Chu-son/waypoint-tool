@@ -1,14 +1,27 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { HISTORY_FIELDS } from '../stores/history/historyModel';
 import { StepLifecycle, WorkflowStep } from '../types/customUi';
 import { executeWorkflowAction } from '../services/workflowActions';
+
+/**
+ * A step's direct state updates may set view state and settings only. Project data has to change through
+ * `actions`, which record undo steps; written directly it would silently disappear on the next undo.
+ */
+function withoutUndoableValues(state: Record<string, unknown>): Record<string, unknown> {
+  const allowed = Object.entries(state).filter(([key]) => !(key in HISTORY_FIELDS));
+  if (allowed.length < Object.keys(state).length) {
+    console.warn('Workflow lifecycle "state" cannot set undoable project data; use "actions". Ignored those keys.');
+  }
+  return Object.fromEntries(allowed);
+}
 
 async function applyStepLifecycle(lifecycle: StepLifecycle | undefined) {
   if (!lifecycle) return;
 
   // 1. Direct state updates
   if (lifecycle.state && Object.keys(lifecycle.state).length > 0) {
-    useAppStore.setState(lifecycle.state);
+    useAppStore.setState(withoutUndoableValues(lifecycle.state));
   }
 
   // 2. Action invocations
